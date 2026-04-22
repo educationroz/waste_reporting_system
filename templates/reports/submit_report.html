@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Submit Report - WasteReport{% endblock %}
+
+{% block extra_css %}
+<style>
+#picker-map { height: 360px; border-radius: 10px; margin-bottom: 8px; border: 2px solid #334155; }
+.location-display {
+    font-size: 0.85rem; color: #94a3b8; padding: 6px 10px;
+    background: #1e293b; border-radius: 6px; border: 1px solid #334155;
+    display: inline-block; margin-top: 6px;
+}
+.photo-hint {
+    font-size: 0.82rem; color: #22d3ee; margin-top: 6px; padding: 6px 10px;
+    background: rgba(34,211,238,0.08); border-radius: 6px;
+    border: 1px solid rgba(34,211,238,0.2); display: none;
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Submit Waste Report</h2>
+    <p>Help keep your community clean</p>
+</div>
+
+<div class="card" style="max-width:720px;margin:0 auto;">
+    <form method="post" enctype="multipart/form-data" id="report-form">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label>Title *</label>
+            {{ form.title }}
+            {% if form.title.errors %}<span class="field-error">{{ form.title.errors|join:", " }}</span>{% endif %}
+        </div>
+
+        <div class="form-group">
+            <label>Description *</label>
+            {{ form.description }}
+            {% if form.description.errors %}<span class="field-error">{{ form.description.errors|join:", " }}</span>{% endif %}
+        </div>
+
+        <div class="form-group">
+            <label>Photo (optional)</label>
+            {{ form.image }}
+            <div id="photo-hint" class="photo-hint">
+                ✅ GPS location extracted from photo and pinned on map!
+            </div>
+            {% if form.image.errors %}<span class="field-error">{{ form.image.errors|join:", " }}</span>{% endif %}
+        </div>
+
+        <div class="form-group">
+            <label>Location *</label>
+            <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:8px;">
+                Auto-filled from photo GPS or your device. Click the map to adjust manually.
+            </p>
+            <div id="picker-map"></div>
+            <div id="location-display" class="location-display">Detecting location…</div>
+            {{ form.latitude }}
+            {{ form.longitude }}
+            {% if form.non_field_errors %}
+                <span class="field-error">{{ form.non_field_errors|join:", " }}</span>
+            {% endif %}
+        </div>
+
+        <div class="form-actions">
+            <a href="/map/" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">Submit Report</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    // CartoDB Voyager tiles — no Referer restriction, works on localhost
+    var map = L.map('picker-map');
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19
+    }).addTo(map);
+
+    var marker    = null;
+    var latInput  = document.getElementById('id_latitude');
+    var lngInput  = document.getElementById('id_longitude');
+    var display   = document.getElementById('location-display');
+    var photoHint = document.getElementById('photo-hint');
+
+    function setMarker(lat, lng, source) {
+        if (marker) map.removeLayer(marker);
+        marker = L.marker([lat, lng]).addTo(map)
+            .bindPopup('📍 ' + (source || 'Report location')).openPopup();
+        latInput.value = lat.toFixed(6);
+        lngInput.value = lng.toFixed(6);
+        display.textContent = 'Lat: ' + lat.toFixed(6) + ',  Lng: ' + lng.toFixed(6) +
+                              (source ? '  [' + source + ']' : '');
+        display.style.color = '#f1f5f9';
+        map.setView([lat, lng], 16);
+    }
+
+    // Manual click override
+    map.on('click', function (e) {
+        setMarker(e.latlng.lat, e.latlng.lng, 'manual pin');
+        photoHint.style.display = 'none';
+    });
+
+    // Restore on validation failure
+    if (latInput.value && lngInput.value) {
+        setMarker(parseFloat(latInput.value), parseFloat(lngInput.value), 'previous selection');
+    }
+
+    // Convert DMS array from EXIF to decimal degrees
+    function dmsToDecimal(dms, ref) {
+        if (!dms || dms.length < 3) return null;
+        var dec = Number(dms[0]) + Number(dms[1]) / 60 + Number(dms[2]) / 3600;
+        if (ref === 'S' || ref === 'W') dec = -dec;
+        return dec;
+    }
+
+    // EXIF GPS extraction when photo is selected
+    document.getElementById('id_image').addEventListener('change', function (e) {
+        var file = e.target.files[0];
+        if (!file || !file.type.startsWith('image/')) return;
+
+        EXIF.getData(file, function () {
+            var lat    = EXIF.getTag(this, 'GPSLatitude');
+            var latRef = EXIF.getTag(this, 'GPSLatitudeRef');
+            var lng    = EXIF.getTag(this, 'GPSLongitude');
+            var lngRef = EXIF.getTag(this, 'GPSLongitudeRef');
+
+            if (lat && lng) {
+                var decLat = dmsToDecimal(lat, latRef);
+                var decLng = dmsToDecimal(lng, lngRef);
+                if (decLat && decLng) {
+                    setMarker(decLat, decLng, 'photo GPS');
+                    photoHint.style.display = 'block';
+                    return;
+                }
+            }
+            // No GPS in photo — try device location
+            photoHint.style.display = 'none';
+            tryDevice(false);
+        });
+    });
+
+    // Device geolocation
+    function tryDevice(setView) {
+        if (!navigator.geolocation) {
+            if (!latInput.value) fallback();
+            return;
+        }
+        display.textContent = 'Detecting your device location…';
+        navigator.geolocation.getCurrentPosition(
+            function (pos) {
+                if (!latInput.value) {
+                    setMarker(pos.coords.latitude, pos.coords.longitude, 'device GPS');
+                }
+            },
+            function () {
+                if (!latInput.value) fallback();
+            },
+            { timeout: 8000 }
+        );
+    }
+
+    function fallback() {
+        map.setView([28.2096, 83.9856], 13);
+        display.textContent = 'Could not detect location — click map to pin.';
+    }
+
+    // Auto-run on page load
+    if (!latInput.value || !lngInput.value) {
+        map.setView([28.2096, 83.9856], 13);
+        tryDevice(true);
+    }
+})();
+</script>
+{% endblock %}

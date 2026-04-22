@@ -1,0 +1,59 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Waste Reporting System{% endblock %}</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="nav-brand">
+        <span>&#128465;</span>
+        <a href="/">WasteReport</a>
+    </div>
+    <div class="nav-links">
+        {% if user.is_authenticated %}
+            <a href="/map/">Map</a>
+            {% if user.role == 'admin' %}
+                <a href="/dashboard/">Dashboard</a>
+            {% else %}
+                <a href="/submit/">Submit Report</a>
+            {% endif %}
+            <div class="nav-user">
+                <span class="badge badge-{{ user.role }}">{{ user.role }}</span>
+                <span class="nav-username">{{ user.username }}</span>
+                <form method="post" action="/auth/logout/" style="display:inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-logout">Logout</button>
+                </form>
+            </div>
+        {% else %}
+            <a href="/auth/login/">Login</a>
+            <a href="/register/">Register</a>
+        {% endif %}
+    </div>
+</nav>
+
+<div class="container">
+    {% if messages %}
+        <div class="messages">
+            {% for msg in messages %}
+                <div class="alert alert-{{ msg.tags }}">{{ msg }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>

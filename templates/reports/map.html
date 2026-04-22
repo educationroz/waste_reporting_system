@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Map - WasteReport{% endblock %}
+
+{% block extra_css %}
+<style>
+#map { height: calc(100vh - 180px); width: 100%; border-radius: 12px; min-height: 400px; }
+.map-toolbar { display: flex; gap: 10px; align-items: center; padding: 12px 0; flex-wrap: wrap; }
+.legend {
+    display: flex; gap: 16px; align-items: center;
+    background: #1e293b; border-radius: 8px;
+    padding: 8px 14px; font-size: 0.82rem; border: 1px solid #334155;
+}
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Waste Report Map</h2>
+    <p>{{ reports|length }} report{{ reports|length|pluralize }} on the map</p>
+</div>
+
+<div class="map-toolbar">
+    <button class="btn btn-secondary" onclick="generateRoute()">Generate Optimal Route</button>
+    <button id="btn-clear-route" class="btn btn-ghost" onclick="clearRoute()" style="display:none">Clear Route</button>
+    <div class="legend">
+        <span><span class="legend-dot" style="background:#f59e0b"></span>Pending</span>
+        <span><span class="legend-dot" style="background:#3b82f6"></span>In Progress</span>
+        <span><span class="legend-dot" style="background:#22c55e"></span>Solved</span>
+    </div>
+    <span id="route-info" style="font-size:0.85rem;color:#94a3b8;"></span>
+</div>
+
+<div id="map"></div>
+
+<script id="reports-data" type="application/json">
+[{% for r in reports %}{"id":{{ r.id }},"title":"{{ r.title|escapejs }}","description":"{{ r.description|truncatechars:100|escapejs }}","lat":{{ r.latitude }},"lng":{{ r.longitude }},"status":"{{ r.status }}","user":"{{ r.user.username|escapejs }}","created_at":"{{ r.created_at|date:'M d, Y' }}"{% if r.image %},"image":"{{ r.image.url }}"{% endif %}}{% if not forloop.last %},{% endif %}{% endfor %}]
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/map.js' %}"></script>
+{% endblock %}

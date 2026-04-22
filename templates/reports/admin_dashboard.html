@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Admin Dashboard - WasteReport{% endblock %}
+
+{% block extra_css %}
+<style>
+#admin-map { height: 300px; border-radius: 10px; margin-bottom: 24px; border: 1px solid #334155; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; margin-bottom: 28px; }
+.stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 18px; text-align: center; }
+.stat-number { font-size: 2rem; font-weight: 700; }
+.stat-label { font-size: 0.8rem; color: #94a3b8; margin-top: 4px; }
+.filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+.reports-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.reports-table th { background: #1e293b; padding: 10px 12px; text-align: left; border-bottom: 2px solid #334155; font-weight: 600; }
+.reports-table td { padding: 10px 12px; border-bottom: 1px solid #334155; vertical-align: middle; }
+.reports-table tr:hover td { background: rgba(30,41,59,0.5); }
+.report-img { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; }
+.no-img { width: 50px; height: 50px; background: #1e293b; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+.action-group { display: flex; gap: 6px; align-items: center; }
+.status-select { font-size: 0.82rem; padding: 4px 8px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #f1f5f9; cursor: pointer; }
+.empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+    <div>
+        <h2>Admin Dashboard</h2>
+        <p>Manage and monitor all waste reports</p>
+    </div>
+    <a href="/map/" class="btn btn-secondary">Full Map</a>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.total }}</div>
+        <div class="stat-label">Total</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number" style="color:#f59e0b">{{ stats.pending }}</div>
+        <div class="stat-label">Pending</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number" style="color:#3b82f6">{{ stats.in_progress }}</div>
+        <div class="stat-label">In Progress</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number" style="color:#22c55e">{{ stats.solved }}</div>
+        <div class="stat-label">Solved</div>
+    </div>
+</div>
+
+<!-- Mini Map -->
+<div id="admin-map"></div>
+
+<!-- Filter -->
+<div class="filter-bar">
+    <strong>Filter:</strong>
+    <a href="/dashboard/" class="btn {% if not status_filter %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">All</a>
+    {% for val, label in status_choices %}
+    <a href="/dashboard/?status={{ val }}" class="btn {% if status_filter == val %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">{{ label }}</a>
+    {% endfor %}
+    <span style="margin-left:auto;color:#94a3b8;font-size:0.85rem;">{{ reports|length }} report{{ reports|length|pluralize }}</span>
+</div>
+
+<!-- Reports table -->
+{% if reports %}
+<div style="overflow-x:auto;">
+    <table class="reports-table">
+        <thead>
+            <tr>
+                <th>Image</th>
+                <th>Title</th>
+                <th>Submitted By</th>
+                <th>Location</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for report in reports %}
+        <tr>
+            <td>
+                {% if report.image %}
+                <img src="{{ report.image.url }}" alt="" class="report-img">
+                {% else %}
+                <div class="no-img">&#128465;</div>
+                {% endif %}
+            </td>
+            <td>
+                <strong>{{ report.title }}</strong>
+                <div style="font-size:0.78rem;color:#94a3b8;margin-top:2px;">{{ report.description|truncatechars:60 }}</div>
+            </td>
+            <td>{{ report.user.username }}</td>
+            <td style="font-size:0.8rem;">{{ report.latitude }},<br>{{ report.longitude }}</td>
+            <td style="font-size:0.8rem;white-space:nowrap;">{{ report.created_at|date:"M d, Y" }}</td>
+            <td>
+                {% if report.status == 'pending' %}
+                    <span class="badge badge-status-pending">Pending</span>
+                {% elif report.status == 'in_progress' %}
+                    <span class="badge badge-status-in_progress">In Progress</span>
+                {% else %}
+                    <span class="badge badge-status-solved">Solved</span>
+                {% endif %}
+            </td>
+            <td>
+                <div class="action-group">
+                    <form method="post" action="/reports/{{ report.pk }}/status/">
+                        {% csrf_token %}
+                        <select name="status" class="status-select" onchange="this.form.submit()">
+                            {% for val, label in status_choices %}
+                            <option value="{{ val }}" {% if report.status == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                    {% if report.status == 'solved' %}
+                    <form method="post" action="/reports/{{ report.pk }}/delete/"
+                          onsubmit="return confirm('Permanently delete this solved report?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm" title="Delete">&#128465;</button>
+                    </form>
+                    {% else %}
+                    <button class="btn btn-ghost btn-sm" disabled title="Mark as Solved first">&#128274;</button>
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <div style="font-size:3rem;">&#128235;</div>
+    <h3>No reports found</h3>
+    <p>{% if status_filter %}No "{{ status_filter }}" reports.{% else %}No waste reports submitted yet.{% endif %}</p>
+</div>
+{% endif %}
+
+<script id="reports-data" type="application/json">
+[{% for r in reports %}{"id":{{ r.id }},"title":"{{ r.title|escapejs }}","lat":{{ r.latitude }},"lng":{{ r.longitude }},"status":"{{ r.status }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var reports = JSON.parse(document.getElementById('reports-data').textContent);
+    var map = L.map('admin-map');
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19
+    }).addTo(map);
+
+    var colors = { pending: '#f59e0b', in_progress: '#3b82f6', solved: '#22c55e' };
+
+    if (reports.length === 0) {
+        map.setView([28.2096, 83.9856], 5);
+    } else {
+        var bounds = [];
+        reports.forEach(function (r) {
+            L.circleMarker([r.lat, r.lng], {
+                radius: 8,
+                fillColor: colors[r.status] || '#888',
+                color: '#fff', weight: 2, fillOpacity: 0.9
+            }).addTo(map).bindPopup('<strong>' + r.title + '</strong><br>' + r.status);
+            bounds.push([r.lat, r.lng]);
+        });
+        map.fitBounds(bounds, { padding: [30, 30] });
+    }
+})();
+</script>
+{% endblock %}
