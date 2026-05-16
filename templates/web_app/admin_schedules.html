@@ -1,0 +1,206 @@
+{% extends 'web_app/base.html' %}
+{% block title %}Admin - Schedules Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h2 class="mb-4"><i class="bi bi-calendar-week text-success me-2"></i>Schedules Management</h2>
+
+    <!-- Add Schedule Button -->
+    <div class="mb-3">
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
+            <i class="bi bi-plus-lg me-1"></i>Add Schedule
+        </button>
+    </div>
+
+    <!-- Schedules Table -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Zone</th>
+                            <th>Day</th>
+                            <th>Frequency</th>
+                            <th>Driver</th>
+                            <th>Vehicle</th>
+                            <th>Active</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for schedule in schedules %}
+                        <tr>
+                            <td>{{ schedule.id }}</td>
+                            <td>{{ schedule.zone_name }}</td>
+                            <td>
+                                {% if schedule.day_of_week is not None %}
+                                    {% with day=schedule.day_of_week %}
+                                        {% if day == 0 %}Monday
+                                        {% elif day == 1 %}Tuesday
+                                        {% elif day == 2 %}Wednesday
+                                        {% elif day == 3 %}Thursday
+                                        {% elif day == 4 %}Friday
+                                        {% elif day == 5 %}Saturday
+                                        {% elif day == 6 %}Sunday
+                                        {% else %}Unknown
+                                        {% endif %}
+                                    {% endwith %}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>{{ schedule.get_frequency_display }}</td>
+                            <td>
+                                {% if schedule.driver %}
+                                    {{ schedule.driver.user.username }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if schedule.vehicle %}
+                                    {{ schedule.vehicle.plate_number }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch"
+                                        id="schedule-active-{{ schedule.id }}"
+                                        {% if schedule.is_active %}checked{% endif %}
+                                        onchange="toggleActive({{ schedule.id }}, this.checked)">
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteSchedule({{ schedule.id }})">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="8" class="text-center text-muted py-3">No schedules configured.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Schedule Modal -->
+<div class="modal fade" id="addScheduleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Schedule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Zone Name</label>
+                    <input type="text" class="form-control" id="add-zone" placeholder="e.g., North Pokhara">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Day of Week</label>
+                    <select class="form-select" id="add-day">
+                        <option value="0">Monday</option>
+                        <option value="1">Tuesday</option>
+                        <option value="2">Wednesday</option>
+                        <option value="3">Thursday</option>
+                        <option value="4">Friday</option>
+                        <option value="5">Saturday</option>
+                        <option value="6">Sunday</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Frequency</label>
+                    <select class="form-select" id="add-frequency">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="biweekly">Bi-Weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Driver (optional)</label>
+                    <select class="form-select" id="add-driver">
+                        <option value="">None</option>
+                        {% for driver in drivers %}
+                        <option value="{{ driver.id }}">{{ driver.user.username }} ({{ driver.vehicle.plate_number|default:"No vehicle" }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Vehicle (optional)</label>
+                    <select class="form-select" id="add-vehicle">
+                        <option value="">None</option>
+                        {% for vehicle in vehicles %}
+                        <option value="{{ vehicle.id }}">{{ vehicle.plate_number }} — {{ vehicle.get_vehicle_type_display }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success" onclick="addSchedule()">Add Schedule</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function toggleActive(scheduleId, isActive) {
+    const data = await API.patch(`/api/schedules/${scheduleId}/`, { is_active: isActive });
+    if (!data || data.id === undefined) {
+        showToast('Failed to update active status.', 'danger');
+        document.getElementById(`schedule-active-${scheduleId}`).checked = !isActive;
+    } else {
+        showToast('Schedule updated.', 'success');
+    }
+}
+
+async function deleteSchedule(scheduleId) {
+    if (!confirm('Delete this schedule?')) return;
+    const data = await API.delete(`/api/schedules/${scheduleId}/`);
+    if (data && data.detail === 'Deleted') {
+        showToast('Schedule deleted.', 'success');
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Delete failed.', 'danger');
+    }
+}
+
+async function addSchedule() {
+    const payload = {
+        zone_name: document.getElementById('add-zone').value,
+        day_of_week: parseInt(document.getElementById('add-day').value),
+        frequency: document.getElementById('add-frequency').value,
+        driver: document.getElementById('add-driver').value || null,
+        vehicle: document.getElementById('add-vehicle').value || null,
+        is_active: true,
+        start_time: "00:00",  // default; can be edited later via API if needed
+    };
+
+    if (!payload.zone_name || payload.day_of_week === undefined || !payload.frequency) {
+        showToast('Zone, day, and frequency are required.', 'warning');
+        return;
+    }
+
+    const data = await API.post('/api/schedules/', payload);
+    if (data && data.id) {
+        showToast('Schedule added!', 'success');
+        const modalEl = document.getElementById('addScheduleModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Failed to add schedule.', 'danger');
+    }
+}
+</script>
+{% endblock %}

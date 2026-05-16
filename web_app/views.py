@@ -1,0 +1,436 @@
+from django.contrib.auth import get_user_model, logout as django_logout
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.cache import cache
+from django.shortcuts import redirect
+from django.utils import timezone
+from django.views.generic import ListView, TemplateView
+
+from api_app.models import Driver, Notification, Route, Schedule, Vehicle, WasteRequest
+
+User = get_user_model()
+
+
+# ─── Public / Auth Pages ───────────────────────────────────────────────────────
+
+class HomeView(TemplateView):
+    template_name = 'web_app/home.html'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        # Public: show all requests with coordinates on map (limited to 100)
+        qs = WasteRequest.objects.filter(
+            status__in=['pending', 'assigned', 'in_progress', 'completed'],
+            latitude__isnull=False,
+            longitude__isnull=False
+        ).select_related('user', 'driver__user').order_by('-created_at')[:100]
+
+        # Prepare JSON-serializable list
+        public_data = []
+        for req in qs:
+            public_data.append({
+                'id': req.id,
+                'latitude': float(req.latitude),
+                'longitude': float(req.longitude),
+                'status': req.status,
+                'status_display': req.get_status_display(),
+                'waste_type': req.waste_type,
+                'waste_type_display': req.get_waste_type_display(),
+                'pickup_address': req.pickup_address or '',
+                'username': req.user.username if req.user else 'Unknown',
+                'driver_name': req.driver.user.username if req.driver and req.driver.user else None,
+            })
+        ctx['public_requests'] = public_data
+        return ctx
+
+
+class LoginPageView(TemplateView):
+    """Renders the login page. Actual login handled via REST API + JS."""
+    template_name = 'web_app/login.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+
+class RegisterPageView(TemplateView):
+    """Renders the register page. Registration via REST API + JS."""
+    template_name = 'web_app/register.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+
+# ─── Admin Dashboard ───────────────────────────────────────────────────────────
+
+class AdminDashboardView(LoginRequiredMixin, TemplateView):
+    template_name = 'web_app/admin_dashboard.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role != 'admin':
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        
+        # Try to get cached dashboard stats (5 minute TTL)
+        cache_key = 'admin_dashboard_stats'
+        cached_stats = cache.get(cache_key)
+        
+        if cached_stats:
+            # Use cached data
+            ctx.update(cached_stats)
+        else:
+            # Calculate statistics
+            stats = {}
+            stats['total_requests'] = WasteRequest.objects.count()
+            stats['pending_requests'] = WasteRequest.objects.filter(status='pending').count()
+            stats['assigned_requests_count'] = WasteRequest.objects.filter(status='assigned').count()
+            stats['in_progress_requests_count'] = WasteRequest.objects.filter(status='in_progress').count()
+            stats['completed_requests_count'] = WasteRequest.objects.filter(status='completed').count()
+            stats['cancelled_requests_count'] = WasteRequest.objects.filter(status='cancelled').count()
+            stats['overdue_requests'] = WasteRequest.objects.filter(
+                status__in=['pending', 'assigned'],
+                scheduled_date__lt=timezone.now()
+            ).count()
+            stats['active_drivers'] = Driver.objects.filter(is_available=True).count()
+            stats['total_drivers'] = Driver.objects.count()
+            stats['total_vehicles'] = Vehicle.objects.count()
+            stats['available_vehicles'] = Vehicle.objects.filter(status='available').count()
+            stats['vehicles_on_route'] = Vehicle.objects.filter(status='on_route').count()
+            stats['total_users'] = User.objects.filter(role='user').count()
+            stats['total_admin_users'] = User.objects.filter(role='admin').count()
+            
+            # Cache for 5 minutes (300 seconds)
+            cache.set(cache_key, stats, 300)
+            ctx.update(stats)
+        
+        # Non-cached data (always fresh - only 20 records max)
+        ctx['recent_requests'] = (
+            WasteRequest.objects.select_related('user', 'driver__user')
+            .order_by('-created_at')[:10]
+        )
+        ctx['recent_status_changes'] = (
+            WasteRequest.objects.select_related('user', 'driver__user')
+            .order_by('-updated_at')[:7]
+        )
+        ctx['active_routes'] = Route.objects.filter(status='active').select_related(
+            'driver__user', 'vehicle'
+        )
+        ctx['drivers'] = Driver.objects.select_related('user', 'vehicle').all()
+        ctx['admin_role'] = self.request.user.role.title()
+        ctx['now'] = timezone.now()
+        
+        # System alerts
+        ctx['system_alerts'] = []
+        if ctx['overdue_requests'] > 0:
+            ctx['system_alerts'].append({
+                'type': 'danger',
+                'icon': 'exclamation-triangle',
+                'title': f'{ctx["overdue_requests"]} Overdue Requests',
+                'message': 'Requests past scheduled date need immediate attention',
+            })
+        if ctx['pending_requests'] > 5:
+            ctx['system_alerts'].append({
+                'type': 'warning',
+                'icon': 'clock-history',
+                'title': f'{ctx["pending_requests"]} Pending Requests',
+                'message': 'Multiple requests awaiting driver assignment',
+            })
+        if ctx['active_drivers'] == 0:
+            ctx['system_alerts'].append({
+                'type': 'danger',
+                'icon': 'exclamation-circle',
+                'title': 'No Available Drivers',
+                'message': 'All drivers are currently busy',
+            })
+        if ctx['available_vehicles'] == 0:
+            ctx['system_alerts'].append({
+                'type': 'warning',
+                'icon': 'exclamation-circle',
+                'title': 'No Available Vehicles',
+                'message': 'All vehicles are currently in use or maintenance',
+            })
+        
+        return ctx
+
+
+class AdminRequestListView(LoginRequiredMixin, ListView):
+    template_name = 'web_app/admin_requests.html'
+    context_object_name = 'requests'
+    paginate_by = 20
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role != 'admin':
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        qs = WasteRequest.objects.select_related('user', 'driver__user').order_by('-created_at')
+        status_filter = self.request.GET.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['drivers'] = Driver.objects.filter(is_available=True).select_related('user')
+        ctx['status_choices'] = WasteRequest.STATUS_CHOICES
+        ctx['current_status'] = self.request.GET.get('status', '')
+        return ctx
+
+
+class AdminDriverListView(LoginRequiredMixin, ListView):
+    template_name = 'web_app/admin_drivers.html'
+    context_object_name = 'drivers'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role != 'admin':
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return Driver.objects.select_related('user', 'vehicle').order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['vehicles'] = Vehicle.objects.filter(status='available')
+        ctx['users_no_driver'] = User.objects.filter(
+            role='driver', driver_profile__isnull=True
+        )
+        return ctx
+
+
+class AdminVehicleListView(LoginRequiredMixin, ListView):
+    template_name = 'web_app/admin_vehicles.html'
+    context_object_name = 'vehicles'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role != 'admin':
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return Vehicle.objects.order_by('-created_at')
+
+class AdminScheduleListView(LoginRequiredMixin, ListView):
+    template_name = 'web_app/admin_schedules.html'
+    context_object_name = 'schedules'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role != 'admin':
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return Schedule.objects.select_related('driver__user', 'vehicle').order_by('zone_name')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['drivers'] = Driver.objects.filter(is_available=True).select_related('user')
+        ctx['vehicles'] = Vehicle.objects.filter(status='available')
+        return ctx
+
+
+# ─── User Dashboard ────────────────────────────────────────────────────────────
+
+class UserDashboardView(LoginRequiredMixin, TemplateView):
+    template_name = 'web_app/user_dashboard.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role != 'user':
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        user = self.request.user
+        ctx['my_requests'] = (
+            WasteRequest.objects.filter(user=user)
+            .select_related('driver__user')
+            .order_by('-created_at')[:5]
+        )
+        ctx['pending_count'] = WasteRequest.objects.filter(user=user, status='pending').count()
+        ctx['completed_count'] = WasteRequest.objects.filter(user=user, status='completed').count()
+        ctx['unread_notifications'] = Notification.objects.filter(
+            user=user, is_read=False
+        ).order_by('-created_at')[:5]
+        return ctx
+
+
+class UserRequestListView(LoginRequiredMixin, ListView):
+    template_name = 'web_app/user_requests.html'
+    context_object_name = 'requests'
+    paginate_by = 10
+
+    def get_queryset(self):
+        return (
+            WasteRequest.objects.filter(user=self.request.user)
+            .select_related('driver__user')
+            .order_by('-created_at')
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['waste_type_choices'] = WasteRequest.WASTE_TYPE_CHOICES
+        return ctx
+
+
+# ─── Driver Dashboard ──────────────────────────────────────────────────────────
+
+class DriverDashboardView(LoginRequiredMixin, TemplateView):
+    template_name = 'web_app/driver_dashboard.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role != 'driver':
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        user = self.request.user
+        driver, _ = Driver.objects.get_or_create(
+            user=user,
+            defaults={
+                'license_number': f'DRIVER-{user.id}',
+                'is_available': True,
+            },
+        )
+        ctx['driver'] = driver
+        ctx['assigned_requests'] = (
+            WasteRequest.objects.filter(driver=driver, status__in=['assigned', 'in_progress'])
+            .select_related('user')
+            .order_by('scheduled_date')
+        )
+        ctx['active_route'] = Route.objects.filter(
+            driver=driver, status='active'
+        ).first()
+        ctx['completed_today'] = WasteRequest.objects.filter(
+            driver=driver, status='completed'
+        ).count()
+        ctx['today_schedule'] = Schedule.objects.filter(
+            driver=driver, is_active=True
+        )
+        return ctx
+
+
+# ─── Notifications Page ────────────────────────────────────────────────────────
+
+class NotificationsView(LoginRequiredMixin, ListView):
+    template_name = 'web_app/notifications.html'
+    context_object_name = 'notifications'
+    paginate_by = 20
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'admin':
+            return Notification.objects.order_by('-created_at')  # ← admins see all
+        return Notification.objects.filter(
+            user=user
+        ).order_by('-created_at')
+
+
+# ─── Admin Management Views ────────────────────────────────────────────────────
+
+class AdminUsersManagementView(LoginRequiredMixin, ListView):
+    """Manage admin users and their permissions."""
+    template_name = 'web_app/admin_users.html'
+    context_object_name = 'admin_users'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role != 'admin':
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return User.objects.filter(role='admin').order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['total_admins'] = User.objects.filter(role='admin').count()
+        ctx['active_admins'] = User.objects.filter(role='admin', is_active=True).count()
+        ctx['inactive_admins'] = User.objects.filter(role='admin', is_active=False).count()
+        ctx['all_users'] = User.objects.all().count()
+        ctx['all_roles'] = dict(User.ROLE_CHOICES)
+        return ctx
+
+
+class AdminLogsView(LoginRequiredMixin, ListView):
+    """View admin activity logs for audit trail."""
+    template_name = 'web_app/admin_logs.html'
+    context_object_name = 'logs'
+    paginate_by = 50
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role != 'admin':
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        from api_app.models import AdminLog
+        qs = AdminLog.objects.select_related('admin_user').order_by('-created_at')
+        
+        # Filter by action if provided
+        action_filter = self.request.GET.get('action')
+        if action_filter:
+            qs = qs.filter(action=action_filter)
+        
+        # Filter by admin user if provided
+        admin_filter = self.request.GET.get('admin')
+        if admin_filter:
+            qs = qs.filter(admin_user_id=admin_filter)
+        
+        return qs
+
+    def get_context_data(self, **kwargs):
+        from api_app.models import AdminLog
+        ctx = super().get_context_data(**kwargs)
+        ctx['action_choices'] = AdminLog.ACTION_CHOICES
+        ctx['admin_choices'] = User.objects.filter(role='admin')
+        ctx['current_action'] = self.request.GET.get('action', '')
+        ctx['current_admin'] = self.request.GET.get('admin', '')
+        ctx['total_logs'] = AdminLog.objects.count()
+        return ctx
+
+
+class AdminSettingsView(LoginRequiredMixin, TemplateView):
+    """Manage system settings and configuration."""
+    template_name = 'web_app/admin_settings.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role != 'admin':
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        from api_app.models import SystemSettings
+        ctx = super().get_context_data(**kwargs)
+        ctx['settings'] = SystemSettings.objects.all()
+        ctx['system_info'] = {
+            'total_requests': WasteRequest.objects.count(),
+            'total_users': User.objects.filter(role='user').count(),
+            'total_drivers': Driver.objects.count(),
+            'total_vehicles': Vehicle.objects.count(),
+            'total_routes': Route.objects.count(),
+            'database_status': 'Connected',
+        }
+        return ctx
+
+
+# ─── Helper ────────────────────────────────────────────────────────────────────
+
+def redirect_by_role(user):
+    role_redirect = {
+        'admin': '/admin-dashboard/',
+        'driver': '/driver-dashboard/',
+        'user': '/dashboard/',
+    }
+    return redirect(role_redirect.get(user.role, '/dashboard/'))
+
+
+def web_logout(request):
+    django_logout(request)
+    return redirect('/login/')

@@ -1,0 +1,221 @@
+{% extends 'web_app/base.html' %}
+{% block title %}Admin - Vehicles Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h2 class="mb-4"><i class="bi bi-truck text-success me-2"></i>Vehicles Management</h2>
+
+    <!-- Add Vehicle Button -->
+    <div class="mb-3">
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addVehicleModal">
+            <i class="bi bi-plus-lg me-1"></i>Add Vehicle
+        </button>
+    </div>
+
+    <!-- Vehicles Table -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Plate Number</th>
+                            <th>Type</th>
+                            <th>Capacity (kg)</th>
+                            <th>Status</th>
+                            <th>Assigned Driver</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for vehicle in vehicles %}
+                        <tr>
+                            <td>{{ vehicle.id }}</td>
+                            <td class="fw-bold">{{ vehicle.plate_number }}</td>
+                            <td>{{ vehicle.get_vehicle_type_display }}</td>
+                            <td>{{ vehicle.capacity_kg }}</td>
+                            <td>
+                                <span class="badge
+                                    {% if vehicle.status == 'available' %}bg-success
+                                    {% elif vehicle.status == 'on_route' %}bg-primary
+                                    {% elif vehicle.status == 'maintenance' %}bg-warning text-dark
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ vehicle.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% with driver=vehicle.assigned_drivers.first %}
+                                    {% if driver %}
+                                        {{ driver.user.username }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editVehicleModal{{ vehicle.id }}">
+                                    Edit
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteVehicle({{ vehicle.id }})">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+
+                        <!-- Edit Vehicle Modal -->
+                        <div class="modal fade" id="editVehicleModal{{ vehicle.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Edit Vehicle — {{ vehicle.plate_number }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <input type="hidden" id="edit-vehicle-id-{{ vehicle.id }}" value="{{ vehicle.id }}">
+                                        <div class="mb-3">
+                                            <label class="form-label">Plate Number</label>
+                                            <input type="text" class="form-control" id="edit-plate-{{ vehicle.id }}" value="{{ vehicle.plate_number }}">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Type</label>
+                                            <select class="form-select" id="edit-type-{{ vehicle.id }}">
+                                                {% for key, label in vehicle.TYPE_CHOICES %}
+                                                <option value="{{ key }}" {% if vehicle.vehicle_type == key %}selected{% endif %}>{{ label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Capacity (kg)</label>
+                                            <input type="number" class="form-control" id="edit-capacity-{{ vehicle.id }}" value="{{ vehicle.capacity_kg }}">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Status</label>
+                                            <select class="form-select" id="edit-status-{{ vehicle.id }}">
+                                                {% for key, label in vehicle.STATUS_CHOICES %}
+                                                <option value="{{ key }}" {% if vehicle.status == key %}selected{% endif %}>{{ label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                        <button class="btn btn-primary" onclick="updateVehicle({{ vehicle.id }})">Save Changes</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% empty %}
+                        <tr><td colspan="7" class="text-center text-muted py-3">No vehicles registered.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Vehicle Modal -->
+<div class="modal fade" id="addVehicleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Vehicle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Plate Number</label>
+                    <input type="text" class="form-control" id="add-plate" placeholder="e.g., BA 1 XXXX">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Type</label>
+                    <select class="form-select" id="add-type">
+                        <option value="truck">Garbage Truck</option>
+                        <option value="van">Van</option>
+                        <option value="compactor">Compactor</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Capacity (kg)</label>
+                    <input type="number" class="form-control" id="add-capacity" placeholder="e.g., 500">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="add-status">
+                        <option value="available">Available</option>
+                        <option value="on_route">On Route</option>
+                        <option value="maintenance">Under Maintenance</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success" onclick="addVehicle()">Add Vehicle</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function updateVehicle(vehicleId) {
+    const payload = {
+        plate_number: document.getElementById(`edit-plate-${vehicleId}`).value,
+        vehicle_type: document.getElementById(`edit-type-${vehicleId}`).value,
+        capacity_kg: parseFloat(document.getElementById(`edit-capacity-${vehicleId}`).value),
+        status: document.getElementById(`edit-status-${vehicleId}`).value,
+    };
+
+    const data = await API.patch(`/api/vehicles/${vehicleId}/`, payload);
+    if (data && data.id) {
+        showToast('Vehicle updated!', 'success');
+        const modalEl = document.getElementById(`editVehicleModal${vehicleId}`);
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+        setTimeout(() => location.reload(), 800);
+    } else {
+        showToast('Update failed.', 'danger');
+    }
+}
+
+async function deleteVehicle(vehicleId) {
+    if (!confirm('Delete this vehicle? This cannot be undone.')) return;
+    const data = await API.delete(`/api/vehicles/${vehicleId}/`);
+    if (data && data.detail === 'Deleted') {
+        showToast('Vehicle deleted.', 'success');
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Delete failed.', 'danger');
+    }
+}
+
+async function addVehicle() {
+    const payload = {
+        plate_number: document.getElementById('add-plate').value,
+        vehicle_type: document.getElementById('add-type').value,
+        capacity_kg: parseFloat(document.getElementById('add-capacity').value),
+        status: document.getElementById('add-status').value,
+    };
+
+    if (!payload.plate_number || !payload.capacity_kg) {
+        showToast('Plate number and capacity required.', 'warning');
+        return;
+    }
+
+    const data = await API.post('/api/vehicles/', payload);
+    if (data && data.id) {
+        showToast('Vehicle added!', 'success');
+        const modalEl = document.getElementById('addVehicleModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Failed to add vehicle.', 'danger');
+    }
+}
+</script>
+{% endblock %}

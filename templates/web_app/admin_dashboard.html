@@ -1,0 +1,400 @@
+{% extends 'web_app/base.html' %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
+        <div>
+            <h2 class="mb-1"><i class="bi bi-speedometer2 text-success me-2"></i>Admin Dashboard</h2>
+            <p class="text-muted mb-0">
+                Welcome back, <span class="fw-semibold text-dark">{{ request.user.username }}</span>
+                <span class="badge bg-success ms-2 text-uppercase">{{ admin_role }}</span>
+            </p>
+        </div>
+        <div class="text-md-end">
+            <div class="small text-muted">Updated: {{ now|date:"d M Y H:i" }}</div>
+            <div class="fw-semibold">Total users: {{ total_users }} | Admins: {{ total_admin_users }}</div>
+        </div>
+    </div>
+
+    <!-- System Alerts -->
+    {% if system_alerts %}
+    <div class="row g-3 mb-4">
+        {% for alert in system_alerts %}
+        <div class="col-12">
+            <div class="alert alert-{{ alert.type }} alert-dismissible fade show" role="alert">
+                <i class="bi bi-{{ alert.icon }} me-2"></i>
+                <strong>{{ alert.title }}</strong> — {{ alert.message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Quick Action Buttons -->
+    <div class="row g-2 mb-4">
+        <div class="col-auto">
+            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddModal">
+                <i class="bi bi-plus-circle me-1"></i>New Request
+            </button>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'admin-drivers' %}" class="btn btn-info btn-sm">
+                <i class="bi bi-person-plus me-1"></i>Manage Drivers
+            </a>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'admin-vehicles' %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-truck me-1"></i>Manage Vehicles
+            </a>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'admin-schedules' %}" class="btn btn-warning btn-sm">
+                <i class="bi bi-calendar-week me-1"></i>Schedules
+            </a>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'admin-requests' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-list-check me-1"></i>All Requests
+            </a>
+        </div>
+        <!-- New Admin Management Buttons -->
+        <div class="col-auto">
+            <a href="{% url 'admin-users' %}" class="btn btn-outline-primary btn-sm" title="Manage Admin Users">
+                <i class="bi bi-shield-check me-1"></i>Admins
+            </a>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'admin-logs' %}" class="btn btn-outline-info btn-sm" title="View Activity Logs">
+                <i class="bi bi-file-text me-1"></i>Logs
+            </a>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'admin-settings' %}" class="btn btn-outline-warning btn-sm" title="System Settings">
+                <i class="bi bi-gear me-1"></i>Settings
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}'">
+                <div class="card-body">
+                    <div class="text-muted small">Total Requests</div>
+                    <div class="fs-2 fw-bold text-success">{{ total_requests }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 bg-warning bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=pending'">
+                <div class="card-body">
+                    <div class="text-muted small">Pending</div>
+                    <div class="fs-2 fw-bold text-warning">{{ pending_requests }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 bg-danger bg-opacity-10 h-100 cursor-pointer">
+                <div class="card-body">
+                    <div class="text-muted small">Overdue</div>
+                    <div class="fs-2 fw-bold text-danger">{{ overdue_requests }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=assigned'">
+                <div class="card-body">
+                    <div class="text-muted small">Assigned</div>
+                    <div class="fs-2 fw-bold text-info">{{ assigned_requests_count }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=in_progress'">
+                <div class="card-body">
+                    <div class="text-muted small">In Progress</div>
+                    <div class="fs-2 fw-bold text-primary">{{ in_progress_requests_count }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=completed'">
+                <div class="card-body">
+                    <div class="text-muted small">Completed</div>
+                    <div class="fs-2 fw-bold text-success">{{ completed_requests_count }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-drivers' %}'">
+                <div class="card-body">
+                    <div class="text-muted small">Active Drivers</div>
+                    <div class="fs-2 fw-bold text-info">{{ active_drivers }}/{{ total_drivers }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-vehicles' %}'">
+                <div class="card-body">
+                    <div class="text-muted small">Vehicles</div>
+                    <div class="fs-2 fw-bold text-primary">{{ available_vehicles }}/{{ total_vehicles }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <!-- Search & Filter Section -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-search me-2 text-success"></i>Quick Search</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <input type="text" class="form-control form-control-sm" placeholder="Search request ID or username..." id="search-box">
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select form-select-sm" id="filter-status">
+                                <option value="">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="assigned">Assigned</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-success btn-sm w-100" onclick="applyFilters()">
+                                <i class="bi bi-search me-1"></i>Search
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center bg-white">
+                    <div>
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-clipboard-list me-2 text-success"></i>Recent Requests</h6>
+                        <div class="small text-muted">Track waste report progress and status changes.</div>
+                    </div>
+                    <a href="{% url 'admin-requests' %}" class="btn btn-sm btn-outline-success">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th><th>User</th><th>Type</th><th>Status</th><th>Driver</th><th>Date</th><th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in recent_requests %}
+                                <tr>
+                                    <td>{{ req.id }}</td>
+                                    <td>{{ req.user.username }}</td>
+                                    <td><span class="badge bg-secondary">{{ req.get_waste_type_display }}</span></td>
+                                    <td>
+                                        <span class="badge
+                                            {% if req.status == 'completed' %}bg-success
+                                            {% elif req.status == 'pending' %}bg-warning text-dark
+                                            {% elif req.status == 'in_progress' %}bg-info
+                                            {% elif req.status == 'cancelled' %}bg-danger
+                                            {% else %}bg-primary{% endif %}">
+                                            {{ req.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td> {% if req.driver %}{{ req.driver.user.username }}{% else %}Unassigned{% endif %} </td>
+                                    <td class="small text-muted">{{ req.scheduled_date|date:"d M Y" }}</td>
+                                    <td>
+                                        {% if req.status == 'pending' %}
+                                        <button class="btn btn-xs btn-outline-success btn-sm" onclick="openAssignModal({{ req.id }})">Assign</button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="7" class="text-center text-muted py-3">No requests yet.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-arrow-repeat me-2 text-success"></i>Recent Status Changes</h6>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for req in recent_status_changes %}
+                    <div class="list-group-item d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="fw-semibold">Request #{{ req.id }} — {{ req.user.username }}</div>
+                            <div class="small text-muted">Status changed to <strong>{{ req.get_status_display }}</strong> on {{ req.updated_at|date:"d M Y H:i" }}</div>
+                        </div>
+                        <span class="badge {% if req.status == 'completed' %}bg-success{% elif req.status == 'pending' %}bg-warning text-dark{% elif req.status == 'in_progress' %}bg-info{% elif req.status == 'cancelled' %}bg-danger{% else %}bg-primary{% endif %} rounded-pill">{{ req.get_status_display }}</span>
+                    </div>
+                    {% empty %}
+                    <div class="list-group-item text-center text-muted py-3">No recent status changes.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-truck me-2 text-success"></i>Driver Tracking</h6>
+                </div>
+                <div class="card-body">
+                    <div class="small text-muted mb-3">Active routes and driver assignments.</div>
+                    {% if active_routes %}
+                    <ul class="list-group list-group-flush">
+                        {% for route in active_routes %}
+                        <li class="list-group-item">
+                            <div class="fw-semibold">Route #{{ route.id }}</div>
+                            <div class="small text-muted">Driver: {% if route.driver %}{{ route.driver.user.username }}{% else %}Unassigned{% endif %}</div>
+                            <div class="small text-muted">Vehicle: {% if route.vehicle %}{{ route.vehicle.plate_number }}{% else %}None{% endif %}</div>
+                            <div class="small mt-1"><span class="badge bg-info">{{ route.get_status_display }}</span></div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-center text-muted py-4">No active routes currently.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-people me-2 text-success"></i>Driver Summary</h6>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for driver in drivers|slice:":5" %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-semibold">{{ driver.user.username }}</div>
+                            <div class="small text-muted">{{ driver.vehicle.plate_number|default:"No vehicle" }}</div>
+                        </div>
+                        <span class="badge {% if driver.is_available %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">
+                            {% if driver.is_available %}Available{% else %}Busy{% endif %}
+                        </span>
+                    </li>
+                    {% endfor %}
+                    <li class="list-group-item text-center text-muted"><small>Showing top 5 drivers. <a href="{% url 'admin-drivers' %}">View all</a></small></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assign Driver Modal -->
+<div class="modal fade" id="assignModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Assign Driver</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modal-request-id">
+                <label class="form-label">Select Driver</label>
+                <select id="modal-driver-select" class="form-select">
+                    {% for driver in drivers %}
+                    {% if driver.is_available %}
+                    <option value="{{ driver.id }}">{{ driver.user.username }} — {{ driver.vehicle.plate_number|default:"No vehicle" }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success" onclick="assignDriver()">Assign</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Add Modal -->
+<div class="modal fade" id="quickAddModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Quick Actions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="list-group">
+                    <a href="{% url 'admin-requests' %}" class="list-group-item list-group-item-action">
+                        <div class="fw-semibold"><i class="bi bi-plus-circle me-2 text-success"></i>Create New Request</div>
+                        <small class="text-muted">Manually create a waste collection request</small>
+                    </a>
+                    <a href="{% url 'admin-drivers' %}" class="list-group-item list-group-item-action">
+                        <div class="fw-semibold"><i class="bi bi-person-plus me-2 text-info"></i>Add Driver</div>
+                        <small class="text-muted">Register a new driver and assign vehicle</small>
+                    </a>
+                    <a href="{% url 'admin-vehicles' %}" class="list-group-item list-group-item-action">
+                        <div class="fw-semibold"><i class="bi bi-truck me-2 text-primary"></i>Add Vehicle</div>
+                        <small class="text-muted">Register a new collection vehicle</small>
+                    </a>
+                    <a href="{% url 'admin-schedules' %}" class="list-group-item list-group-item-action">
+                        <div class="fw-semibold"><i class="bi bi-calendar me-2 text-warning"></i>Create Schedule</div>
+                        <small class="text-muted">Set up collection schedule for zone</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+.cursor-pointer { cursor: pointer; transition: transform 0.2s; }
+.cursor-pointer:hover { transform: translateY(-2px); }
+</style>
+<script>
+const assignModal = new bootstrap.Modal(document.getElementById('assignModal'));
+const quickAddModal = new bootstrap.Modal(document.getElementById('quickAddModal'));
+
+function openAssignModal(requestId) {
+    document.getElementById('modal-request-id').value = requestId;
+    assignModal.show();
+}
+
+async function assignDriver() {
+    const requestId = document.getElementById('modal-request-id').value;
+    const driverId = document.getElementById('modal-driver-select').value;
+    const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
+    if (data && data.id) {
+        showToast('Driver assigned successfully!', 'success');
+        assignModal.hide();
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Failed to assign driver.', 'danger');
+    }
+}
+
+function applyFilters() {
+    const searchTerm = document.getElementById('search-box').value.trim();
+    const status = document.getElementById('filter-status').value;
+    
+    let url = '{% url 'admin-requests' %}?';
+    if (searchTerm) url += `search=${encodeURIComponent(searchTerm)}&`;
+    if (status) url += `status=${status}`;
+    
+    window.location.href = url;
+}
+
+document.getElementById('search-box').addEventListener('keypress', e => {
+    if (e.key === 'Enter') applyFilters();
+});
+</script>
+{% endblock %}

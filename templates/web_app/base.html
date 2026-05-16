@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Waste Management System{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    {% load static %}
+    <link href="{% static 'web_app/css/main.css' %}" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+{% if user.is_authenticated %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-success shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/">
+            <i class="bi bi-recycle me-2"></i>WasteMS
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navMenu">
+            <ul class="navbar-nav me-auto">
+                {% if user.role == 'admin' %}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'admin-dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'admin-requests' %}"><i class="bi bi-clipboard-list me-1"></i>Requests</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'admin-drivers' %}"><i class="bi bi-person-badge me-1"></i>Drivers</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'admin-vehicles' %}"><i class="bi bi-truck me-1"></i>Vehicles</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'admin-schedules' %}"><i class="bi bi-calendar-week me-1"></i>Schedules</a></li>
+                {% elif user.role == 'driver' %}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'driver-dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+                {% else %}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'user-dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'user-requests' %}"><i class="bi bi-clipboard me-1"></i>My Requests</a></li>
+                {% endif %}
+            </ul>
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link position-relative" href="{% url 'notifications' %}">
+                        <i class="bi bi-bell"></i>
+                        <span id="notif-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"></span>
+                    </a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle me-1"></i>{{ user.username }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><span class="dropdown-item-text text-muted small">{{ user.role|capfirst }}</span></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" onclick="logout(); return false;"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+{% else %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-success shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/">
+            <i class="bi bi-recycle me-2"></i>WasteMS
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#publicNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="publicNav">
+            <ul class="navbar-nav me-auto">
+                <!-- Public left side empty or could add About, Contact etc. -->
+            </ul>
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'login' %}"><i class="bi bi-box-arrow-in-right me-1"></i>Sign In</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'register' %}"><i class="bi bi-person-plus me-1"></i>Register</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+{% endif %}
+
+<main class="{% if user.is_authenticated %}container-fluid py-4{% endif %}">
+    {% if messages %}
+        <div class="container">
+            {% for msg in messages %}
+                <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
+                    {{ msg }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index:1100"></div>
+
+    {% block content %}{% endblock %}
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% load static %}
+<script src="{% static 'web_app/js/main.js' %}"></script>
+{% block extra_js %}{% endblock %}
+
+{% if user.is_authenticated %}
+<script>
+    // ── JWT helpers ─────────────────────────────────────────────────────────────
+    const API = {
+        get: (url) => apiFetch('GET', url),
+        post: (url, data) => apiFetch('POST', url, data),
+        patch: (url, data) => apiFetch('PATCH', url, data),
+        delete: (url) => apiFetch('DELETE', url),
+    };
+
+    function getToken() { return localStorage.getItem('access_token'); }
+
+    async function apiFetch(method, url, data = null) {
+    let token = localStorage.getItem('access_token');
+    
+    const makeRequest = (t) => {
+        const opts = {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${t}`,
+            },
+        };
+        if (data) opts.body = JSON.stringify(data);
+        return fetch(url, opts);
+    };
+
+    let res = await makeRequest(token);
+
+    // If 401, try refreshing token once
+    if (res.status === 401) {
+        const refresh = localStorage.getItem('refresh_token');
+        if (!refresh) { logout(); return null; }
+
+        const refreshRes = await fetch('/auth/token/refresh/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh }),
+        });
+
+        if (refreshRes.ok) {
+            const refreshData = await refreshRes.json();
+            localStorage.setItem('access_token', refreshData.access);
+            // Retry original request with new token
+            res = await makeRequest(refreshData.access);
+        } else {
+            logout();
+            return null;
+        }
+    }
+
+    return res.json();
+}
+
+    async function logout() {
+        const refresh = localStorage.getItem('refresh_token');
+        if (refresh) {
+            try {
+                await fetch('/auth/logout/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`,
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ refresh }),
+                });
+            } catch (e) { /* ignore errors */ }
+        }
+        if (window._notifSocket) {
+            try { window._notifSocket.close(); } catch (e) {}
+        }
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        // Always clear Django session server-side, then land on login page.
+        window.location.href = '/logout/';
+    }
+
+    function showToast(message, type = 'success') {
+        const id = 'toast-' + Date.now();
+        const html = `
+            <div id="${id}" class="toast align-items-center text-bg-${type} border-0 show" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            </div>`;
+        document.getElementById('toast-container').insertAdjacentHTML('beforeend', html);
+        setTimeout(() => document.getElementById(id)?.remove(), 4000);
+    }
+
+    // ── Notification badge via WebSocket ────────────────────────────────────────
+    try {
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const notifSocket = new WebSocket(`${protocol}${location.host}/ws/notifications/`);
+        window._notifSocket = notifSocket;
+        notifSocket.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'notification') {
+                showToast(`${data.title}: ${data.message}`, 'info');
+                const badge = document.getElementById('notif-badge');
+                badge.classList.remove('d-none');
+                badge.textContent = (parseInt(badge.textContent || '0') + 1).toString();
+            }
+        };
+        notifSocket.onerror = () => {};  // silently ignore if Redis is down
+    } catch(e) {}
+
+    // ── Unread count on load ─────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        const token = localStorage.getItem('access_token');
+        if (!token) return;  // not logged in, skip
+
+        fetch('/api/notifications/unread/', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+            if (data && data.length > 0) {
+                const badge = document.getElementById('notif-badge');
+                badge.classList.remove('d-none');
+                badge.textContent = data.length;
+            }
+        })
+        .catch(() => {});  // silently ignore if fails
+    });
+
+    // ── WebSocket Error Handling ───────────────────────────────────────────────────
+    window.addEventListener('beforeunload', function() {
+        // Close any open WebSockets to prevent errors on logout
+        if (window._notifSocket) window._notifSocket.close();
+    });
+</script>
+{% endif %}
+</body>
+</html>

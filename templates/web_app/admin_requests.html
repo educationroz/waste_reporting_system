@@ -1,0 +1,147 @@
+{% extends 'web_app/base.html' %}
+{% block title %}Admin - Requests Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h2 class="mb-4"><i class="bi bi-clipboard-list text-success me-2"></i>Requests Management</h2>
+
+    <!-- Filter -->
+    <form method="get" class="row g-2 mb-4">
+        <div class="col-auto">
+            <select name="status" class="form-select" onchange="this.form.submit()">
+                <option value="">All Statuses</option>
+                {% for key, label in status_choices %}
+                <option value="{{ key }}" {% if current_status == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'admin-requests' %}" class="btn btn-outline-secondary">Clear</a>
+        </div>
+    </form>
+
+    <!-- Requests Table -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>User</th>
+                            <th>Waste Type</th>
+                            <th>Address</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Driver</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in requests %}
+                        <tr>
+                            <td>{{ req.id }}</td>
+                            <td>{{ req.user.username }}</td>
+                            <td><span class="badge bg-secondary">{{ req.get_waste_type_display }}</span></td>
+                            <td class="small">{{ req.pickup_address|truncatechars:30 }}</td>
+                            <td>
+                                <span class="badge
+                                    {% if req.status == 'completed' %}bg-success
+                                    {% elif req.status == 'pending' %}bg-warning text-dark
+                                    {% elif req.status == 'in_progress' %}bg-info
+                                    {% elif req.status == 'cancelled' %}bg-danger
+                                    {% else %}bg-primary{% endif %}">
+                                    {{ req.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="small text-muted">{{ req.scheduled_date|date:"d M Y" }}</td>
+                            <td class="small">
+                                {% if req.driver %}
+                                    {{ req.driver.user.username }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if req.status == 'pending' %}
+                                <button class="btn btn-sm btn-outline-success" onclick="openAssignModal({{ req.id }})">
+                                    Assign Driver
+                                </button>
+                                {% endif %}
+                                {% if req.status == 'pending' %}
+                                <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }})">
+                                    Cancel
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="8" class="text-center text-muted py-3">No requests found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assign Driver Modal -->
+<div class="modal fade" id="assignModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Assign Driver</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modal-request-id">
+                <label class="form-label">Select Driver</label>
+                <select id="modal-driver-select" class="form-select">
+                    {% for driver in drivers %}
+                    <option value="{{ driver.id }}">{{ driver.user.username }} — {{ driver.vehicle.plate_number|default:"No vehicle" }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success" onclick="assignDriver()">Assign</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const assignModal = new bootstrap.Modal(document.getElementById('assignModal'));
+
+function openAssignModal(requestId) {
+    document.getElementById('modal-request-id').value = requestId;
+    assignModal.show();
+}
+
+async function assignDriver() {
+    const requestId = document.getElementById('modal-request-id').value;
+    const driverId = document.getElementById('modal-driver-select').value;
+    const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
+    if (data && data.id) {
+        showToast('Driver assigned successfully!', 'success');
+        assignModal.hide();
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Failed to assign driver.', 'danger');
+    }
+}
+
+async function cancelRequest(requestId) {
+    if (!confirm('Cancel this request?')) return;
+    const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
+    if (data && data.id) {
+        showToast('Request cancelled.', 'success');
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Failed to cancel request.', 'danger');
+    }
+}
+</script>
+{% endblock %}

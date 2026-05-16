@@ -1,0 +1,150 @@
+{% extends 'web_app/base.html' %}
+{% block title %}Register — Waste Management{% endblock %}
+
+{% block content %}
+<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light py-4">
+    <div class="card shadow-sm" style="width:440px">
+        <div class="card-body p-4">
+            <div class="text-center mb-4">
+                <i class="bi bi-recycle text-success" style="font-size:2.5rem"></i>
+                <h4 class="mt-2 fw-bold">Create Account</h4>
+            </div>
+
+            <div id="error-alert" class="alert alert-danger d-none"></div>
+            <div id="success-alert" class="alert alert-success d-none"></div>
+
+            <div class="row">
+                <div class="col-6 mb-3">
+                    <label class="form-label">Username *</label>
+                    <input type="text" id="username" class="form-control">
+                </div>
+                <div class="col-6 mb-3">
+                    <label class="form-label">Email *</label>
+                    <input type="email" id="email" class="form-control">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Phone</label>
+                <input type="tel" id="phone" class="form-control">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Role *</label>
+                <select id="role" class="form-select">
+                    <option value="user">Regular User</option>
+                    <option value="driver">Driver</option>
+                </select>
+            </div>
+            <div class="row">
+                <div class="col-6 mb-3">
+                    <label class="form-label">Password *</label>
+                    <input type="password" id="password" class="form-control">
+                </div>
+                <div class="col-6 mb-3">
+                    <label class="form-label">Confirm Password *</label>
+                    <input type="password" id="password2" class="form-control">
+                </div>
+            </div>
+
+            <button class="btn btn-success w-100" onclick="doRegister()">
+                <span id="reg-text">Create Account</span>
+                <span id="reg-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
+            </button>
+
+            <p class="text-center mt-3 mb-0 small">
+                Already have an account? <a href="{% url 'login' %}" class="text-success">Sign in</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function doRegister() {
+    const errDiv = document.getElementById('error-alert');
+    const sucDiv = document.getElementById('success-alert');
+    const spinner = document.getElementById('reg-spinner');
+    const text = document.getElementById('reg-text');
+    errDiv.classList.add('d-none');
+    sucDiv.classList.add('d-none');
+
+    const payload = {
+        username: document.getElementById('username').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        role: document.getElementById('role').value,
+        password: document.getElementById('password').value,
+        password2: document.getElementById('password2').value,
+    };
+
+    if (!payload.username || !payload.email || !payload.password) {
+        errDiv.textContent = 'Username, email and password are required.';
+        errDiv.classList.remove('d-none');
+        return;
+    }
+
+    spinner.classList.remove('d-none');
+    text.textContent = 'Creating...';
+
+    try {
+        const res = await fetch('/auth/register/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            localStorage.setItem('access_token', data.access);
+            localStorage.setItem('refresh_token', data.refresh);
+            sucDiv.textContent = 'Account created! Redirecting...';
+            sucDiv.classList.remove('d-none');
+
+            // Create Django session so LoginRequiredMixin works
+            await fetch('/auth/session-login/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({
+                    username: payload.username,
+                    password: payload.password,
+                }),
+            });
+
+            const role = data.user?.role || 'user';
+            const redirectMap = {
+                admin: '/admin-dashboard/',
+                driver: '/driver-dashboard/',
+                user: '/dashboard/',
+            };
+            setTimeout(() => window.location.href = redirectMap[role] || '/dashboard/', 1000);
+        } else {
+            const msgs = Object.entries(data).map(([k,v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('<br>');
+            errDiv.innerHTML = msgs || 'Registration failed.';
+            errDiv.classList.remove('d-none');
+        }
+    } catch (e) {
+        errDiv.textContent = 'Network error: ' + e.message;
+        errDiv.classList.remove('d-none');
+    } finally {
+        spinner.classList.add('d-none');
+        text.textContent = 'Create Account';
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        document.cookie.split(';').forEach(cookie => {
+            const c = cookie.trim();
+            if (c.startsWith(name + '=')) {
+                cookieValue = decodeURIComponent(c.slice(name.length + 1));
+            }
+        });
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

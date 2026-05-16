@@ -1,0 +1,220 @@
+{% extends 'web_app/base.html' %}
+{% block title %}Waste Management System — Live Map{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+    #map {
+        height: calc(100vh - 56px);
+        width: 100%;
+        z-index: 1;
+    }
+    .hero-section {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        max-width: 400px;
+        display: {% if public_requests|length == 0 %}block{% else %}none{% endif %};
+    }
+    .hero-section h1 {
+        color: #198754;
+        font-weight: 700;
+    }
+    .hero-section p {
+        color: #666;
+    }
+    .hero-section .btn {
+        margin: 0.5rem;
+    }
+    .info-panel {
+        position: absolute;
+        top: 70px;
+        left: 20px;
+        z-index: 1000;
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        max-width: 300px;
+    }
+    .info-panel h6 {
+        margin: 0 0 10px 0;
+        color: #198754;
+    }
+    .info-panel .legend-item {
+        display: flex;
+        align-items: center;
+        margin: 4px 0;
+        font-size: 0.9rem;
+    }
+    .info-panel .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    .info-panel hr {
+        margin: 10px 0;
+    }
+    .info-panel small {
+        color: #666;
+        line-height: 1.4;
+    }
+    .navbar {
+        z-index: 2000;
+    }
+    .leaflet-popup-content {
+        min-width: 180px;
+    }
+    .leaflet-popup-content strong {
+        display: block;
+        margin-bottom: 4px;
+    }
+    .leaflet-popup-content .badge {
+        display: inline-block;
+        margin: 2px 0;
+    }
+    .leaflet-popup-content small {
+        color: #666;
+        display: block;
+        margin-top: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="position-relative">
+    <!-- Hero Section (only shown when no reports) -->
+    <div class="hero-section text-center">
+        <h1><i class="bi bi-recycle"></i> Waste Management</h1>
+        <p class="mb-4">Track garbage collection requests in real-time. Submit reports with GPS location.</p>
+        {% if user.is_authenticated %}
+            <a href="{% if user.role == 'admin' %}{% url 'admin-dashboard' %}{% elif user.role == 'driver' %}{% url 'driver-dashboard' %}{% else %}{% url 'user-dashboard' %}{% endif %}" class="btn btn-success btn-lg">
+                <i class="bi bi-speedometer2 me-2"></i>Go to Dashboard
+            </a>
+        {% else %}
+            <a href="{% url 'login' %}" class="btn btn-success btn-lg"><i class="bi bi-box-arrow-in-right me-2"></i>Sign In</a>
+            <a href="{% url 'register' %}" class="btn btn-outline-success btn-lg"><i class="bi bi-person-plus me-2"></i>Register</a>
+        {% endif %}
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel">
+        <h6><i class="bi bi-recycle me-2"></i>Live Waste Reports</h6>
+        <div class="legend-item">
+            <span class="legend-color" style="background: #ffc107;"></span>
+            <small>Pending</small>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background: #6c757d;"></span>
+            <small>Assigned</small>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background: #0dcaf0;"></span>
+            <small>In Progress</small>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background: #198754;"></span>
+            <small>Completed</small>
+        </div>
+        <hr>
+        <small>
+            Showing {{ public_requests|length }} reports with locations.<br>
+            {% if user.is_authenticated %}
+                <a href="{% if user.role == 'admin' %}{% url 'admin-dashboard' %}{% elif user.role == 'driver' %}{% url 'driver-dashboard' %}{% else %}{% url 'user-dashboard' %}{% endif %}" class="text-success">
+                    Go to Dashboard
+                </a> to submit a report.
+            {% else %}
+                <a href="{% url 'login' %}" class="text-success">Sign in</a> to submit your report.
+            {% endif %}
+        </small>
+    </div>
+
+    <!-- Map Container -->
+    <div id="map"></div>
+</div>
+
+<!-- Embed public_requests as JSON for JavaScript -->
+{{ public_requests|json_script:"public-requests-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Parse the embedded JSON data
+    const rawData = document.getElementById('public-requests-data').textContent;
+    const requests = JSON.parse(rawData);
+
+    // Initialize map centered on a default location (Pokhara)
+    const map = L.map('map').setView([28.2096, 83.9856], 13);
+
+    // Add OpenStreetMap tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // Color mapping by status
+    const statusColors = {
+        'pending': '#ffc107',
+        'assigned': '#6c757d',
+        'in_progress': '#0dcaf0',
+        'completed': '#198754',
+        'cancelled': '#dc3545'
+    };
+
+    // Custom icon for markers
+    function createCircleIcon(color) {
+        return L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="
+                background-color: ${color};
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                border: 2px solid white;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            "></div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+    }
+
+    // Add markers for each request
+    const markers = [];
+    requests.forEach(req => {
+        const color = statusColors[req.status] || '#999';
+        const icon = createCircleIcon(color);
+
+        const marker = L.marker([req.latitude, req.longitude], { icon: icon })
+            .addTo(map)
+            .bindPopup(`
+                <div>
+                    <strong>Request #${req.id}</strong><br>
+                    <span class="badge" style="background:${color};color:white">
+                        ${req.status_display}
+                    </span><br>
+                    <small><strong>Type:</strong> ${req.waste_type_display}</small><br>
+                    <small><strong>Address:</strong> ${req.pickup_address}</small><br>
+                    <small><strong>Reported by:</strong> ${req.username}</small>
+                    ${req.driver_name ? `<small><strong>Driver:</strong> ${req.driver_name}</small>` : ''}
+                </div>
+            `);
+        markers.push(marker);
+    });
+
+    // Fit map to show all markers if any exist
+    if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.1));
+    }
+});
+</script>
+{% endblock %}

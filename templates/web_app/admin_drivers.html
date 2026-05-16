@@ -1,0 +1,142 @@
+{% extends 'web_app/base.html' %}
+{% block title %}Admin - Drivers Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h2 class="mb-4"><i class="bi bi-person-badge text-success me-2"></i>Drivers Management</h2>
+
+    <!-- Drivers Table -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>License</th>
+                            <th>Vehicle</th>
+                            <th>Status</th>
+                            <th>Total Trips</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for driver in drivers %}
+                        <tr>
+                            <td>{{ driver.id }}</td>
+                            <td>
+                                {{ driver.user.get_full_name|default:driver.user.username }}
+                                <div class="small text-muted">{{ driver.user.email }}</div>
+                            </td>
+                            <td>{{ driver.license_number|default:"—" }}</td>
+                            <td>
+                                {% if driver.vehicle %}
+                                    {{ driver.vehicle.plate_number }}
+                                    <div class="small text-muted">{{ driver.vehicle.type }} ({{ driver.vehicle.capacity_kg }}kg)</div>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {% if driver.is_available %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">
+                                    {% if driver.is_available %}Available{% else %}Busy{% endif %}
+                                </span>
+                            </td>
+                            <td>{{ driver.total_trips }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-{% if driver.is_available %}secondary{% else %}success{% endif %}"
+                                    onclick="toggleAvailability({{ driver.id }}, {{ driver.is_available|yesno:'true,false' }})">
+                                    {% if driver.is_available %}Set Busy{% else %}Set Available{% endif %}
+                                </button>
+
+                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignVehicleModal{{ driver.id }}">
+                                    Assign Vehicle
+                                </button>
+                            </td>
+                        </tr>
+
+                        <!-- Assign Vehicle Modal -->
+                        <div class="modal fade" id="assignVehicleModal{{ driver.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Assign Vehicle to {{ driver.user.username }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <input type="hidden" id="assign-vehicle-driver-id" value="{{ driver.id }}">
+                                        <label class="form-label">Select Vehicle</label>
+                                        <select class="form-select" id="assign-vehicle-select-{{ driver.id }}">
+                                            <option value="">None</option>
+                                            {% for vehicle in vehicles %}
+                                            <option value="{{ vehicle.id }}" {% if vehicle == driver.vehicle %}selected{% endif %}>
+                                                {{ vehicle.plate_number }} — {{ vehicle.type }} ({{ vehicle.capacity_kg }}kg, {{ vehicle.get_status_display }})
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                        <button class="btn btn-primary" onclick="assignVehicle({{ driver.id }})">Assign</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% empty %}
+                        <tr><td colspan="7" class="text-center text-muted py-3">No drivers found. Create a user with role 'driver' first.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Drivers Without Profile -->
+    {% if users_no_driver %}
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-warning bg-opacity-10">
+            <h6 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Users with Driver Role but No Profile</h6>
+        </div>
+        <div class="card-body">
+            <p class="mb-0 small">These users are registered as drivers but lack a driver profile. Assign them a vehicle and license details.</p>
+            <ul class="mb-0">
+                {% for u in users_no_driver %}
+                <li>{{ u.username }} — {{ u.email }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function toggleAvailability(driverId, currentlyAvailable) {
+    const data = await API.patch(`/api/drivers/${driverId}/`, { is_available: !currentlyAvailable });
+    if (data && data.id) {
+        showToast('Availability updated!', 'success');
+        setTimeout(() => location.reload(), 800);
+    } else {
+        showToast('Update failed.', 'danger');
+    }
+}
+
+async function assignVehicle(driverId) {
+    const vehicleSelect = document.getElementById(`assign-vehicle-select-${driverId}`);
+    const vehicleId = vehicleSelect.value;
+    const data = await API.patch(`/api/drivers/${driverId}/`, { vehicle: vehicleId || null });
+    if (data && data.id) {
+        showToast('Vehicle assigned!', 'success');
+        const modalEl = document.getElementById(`assignVehicleModal${driverId}`);
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+        setTimeout(() => location.reload(), 800);
+    } else {
+        showToast('Failed to assign vehicle.', 'danger');
+    }
+}
+</script>
+{% endblock %}
