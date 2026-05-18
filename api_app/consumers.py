@@ -134,6 +134,17 @@ class DriverLocationConsumer(AsyncWebsocketConsumer):
             'longitude': event['longitude'],
         }))
 
+    async def route_update(self, event):
+        """Handle optimized route updates and broadcast to connected clients."""
+        await self.send(json.dumps({
+            'type': 'route_update',
+            'driver_id': event['driver_id'],
+            'route_id': event['route_id'],
+            'waypoints': event['waypoints'],
+            'total_distance': event['total_distance'],
+            'total_stops': event['total_stops'],
+        }))
+
     @database_sync_to_async
     def save_driver_location(self, lat, lng):
         from .models import Driver

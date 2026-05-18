@@ -420,7 +420,11 @@ document.addEventListener('DOMContentLoaded', function() {
 // ── Real-time status updates via WebSocket ───────────────────────────────────
 try {
     const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-    const ws = new WebSocket(`${protocol}${location.host}/ws/requests/`);
+    const token = localStorage.getItem('access_token');
+    const wsURL = token
+        ? `${protocol}${location.host}/ws/requests/?token=${encodeURIComponent(token)}`
+        : `${protocol}${location.host}/ws/requests/`;
+    const ws = new WebSocket(wsURL);
     ws.onopen = () => {};
     ws.onmessage = (e) => {
         const data = JSON.parse(e.data);

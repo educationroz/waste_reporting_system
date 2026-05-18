@@ -69,16 +69,27 @@ WSGI_APPLICATION = 'waste_system.wsgi.application'
 ASGI_APPLICATION = 'waste_system.asgi.application'
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='waste_db'),
-        'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default=''),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
+# Use SQLite for development, PostgreSQL for production
+DB_ENGINE = config('DB_ENGINE', default='sqlite3')  # 'postgresql' or 'sqlite3'
+
+if DB_ENGINE == 'postgresql':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='waste_db'),
+            'USER': config('DB_USER', default='postgres'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
     }
-}
+else:  # SQLite (default for development)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # ─── Caching ───────────────────────────────────────────────────────────────────
 # Default: In-memory cache for development. Switch to Redis for production.

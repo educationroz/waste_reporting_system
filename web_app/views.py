@@ -317,6 +317,31 @@ class DriverDashboardView(LoginRequiredMixin, TemplateView):
         return ctx
 
 
+class RoutePlanningView(LoginRequiredMixin, TemplateView):
+    """Route planning and optimization for drivers and admins."""
+    template_name = 'web_app/route_planning.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        # Only drivers and admins can access
+        if request.user.is_authenticated and request.user.role not in ['driver', 'admin']:
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        user = self.request.user
+        
+        if user.role == 'driver':
+            # Driver sees only their routes
+            driver = Driver.objects.get(user=user)
+            ctx['user_routes'] = Route.objects.filter(driver=driver).order_by('-planned_date')
+        else:
+            # Admin sees all routes
+            ctx['user_routes'] = Route.objects.select_related('driver__user', 'vehicle').order_by('-planned_date')
+        
+        return ctx
+
+
 # ─── Notifications Page ────────────────────────────────────────────────────────
 
 class NotificationsView(LoginRequiredMixin, ListView):

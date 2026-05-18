@@ -1,0 +1,516 @@
+{% extends 'web_app/base.html' %}
+{% load static %}
+
+{% block title %}Route Planning - Waste Reporting System{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+    #route-map {
+        height: 600px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border: 1px solid #ddd;
+    }
+
+    .route-controls {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .route-info-card {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        border-left: 4px solid #28a745;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .route-info-card h5 {
+        margin-top: 0;
+        color: #28a745;
+    }
+
+    .waypoint-list {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .waypoint-item {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background 0.2s;
+    }
+
+    .waypoint-item:hover {
+        background: #f5f5f5;
+    }
+
+    .waypoint-item.active {
+        background: #e7f5e7;
+        border-left: 3px solid #28a745;
+    }
+
+    .waypoint-badge {
+        display: inline-block;
+        background: #28a745;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        min-width: 20px;
+        text-align: center;
+    }
+
+    .distance-info {
+        color: #666;
+        font-size: 0.9em;
+    }
+
+    .btn-group-vertical {
+        width: 100%;
+    }
+
+    .leaflet-popup-content {
+        font-size: 0.9em;
+    }
+
+    .route-status {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 0.9em;
+        font-weight: 500;
+    }
+
+    .route-status.active {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .route-status.completed {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+
+    .route-status.planned {
+        background: #fff3cd;
+        color: #856404;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <h2 class="mb-4">
+                <i class="fas fa-route"></i> Route Planning & Tracking
+            </h2>
+
+            <div class="route-controls">
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label>Select Driver</label>
+                        <select id="driverSelect" class="form-control">
+                            <option value="">Loading drivers...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label>Planned Date</label>
+                        <input type="date" id="plannedDate" class="form-control">
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <button class="btn btn-primary w-100" onclick="loadWasteRequests()">
+                            <i class="fas fa-list"></i> Select Requests
+                        </button>
+                    </div>
+                    <div class="col-md-6">
+                        <button class="btn btn-success w-100" onclick="generateRoute()" id="generateBtn" disabled>
+                            <i class="fas fa-magic"></i> Generate Optimal Route
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map -->
+            <div id="route-map"></div>
+
+            <!-- Route Info -->
+            <div id="routeInfo" style="display: none;">
+                <div class="route-info-card">
+                    <h5>Route Summary</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Total Distance:</strong> <span id="totalDistance">0</span> km</p>
+                            <p><strong>Total Stops:</strong> <span id="totalStops">0</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Status:</strong> <span id="routeStatus" class="route-status planned">Planned</span></p>
+                            <button class="btn btn-sm btn-success" onclick="startRoute()" id="startRouteBtn">
+                                <i class="fas fa-play"></i> Start Route
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Waypoints Sidebar -->
+        <div class="col-md-4">
+            <h5 class="mb-3">
+                <i class="fas fa-map-marker-alt"></i> Waypoints
+            </h5>
+            <div class="waypoint-list" id="waypointList">
+                <p class="text-muted text-center">Generate a route to see waypoints</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Requests Modal -->
+<div class="modal fade" id="requestsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Waste Requests</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="requestsList"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="confirmSelection()">Add Selected</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+    // ── State ────────────────────────────────────────────────────────────────
+    let map = null;
+    let currentRoute = null;
+    let currentRouteId = null;       // FIX: store route ID after generation
+    let routeMarkers = [];
+    let routePolyline = null;        // FIX: track polyline so it can be cleared
+    let selectedRequests = [];
+
+    // ── Get token safely ─────────────────────────────────────────────────────
+    // FIX: always read fresh from localStorage, don't cache at page load
+    function getToken() {
+        return localStorage.getItem('access_token');
+    }
+
+    // ── Map ──────────────────────────────────────────────────────────────────
+    function initMap() {
+        // FIX: default to Pokhara, Nepal (not London)
+        map = L.map('route-map').setView([28.2096, 83.9856], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+    }
+
+    // ── Load drivers ─────────────────────────────────────────────────────────
+    async function loadDrivers() {
+        try {
+            const res = await fetch('/api/drivers/', {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (!res.ok) {
+                console.error('Failed to load drivers:', res.status);
+                return;
+            }
+            const data = await res.json();
+            // API may return paginated {results:[]} or plain array
+            const drivers = Array.isArray(data) ? data : (data.results || []);
+            const select = document.getElementById('driverSelect');
+            select.innerHTML = '<option value="">Select a driver...</option>';
+            drivers.forEach(d => {
+                const option = document.createElement('option');
+                option.value = d.id;
+                option.textContent = d.user_detail?.username || d.username || `Driver #${d.id}`;
+                select.appendChild(option);
+            });
+        } catch (e) {
+            console.error('Failed to load drivers:', e);
+        }
+    }
+
+    // ── Load waste requests ──────────────────────────────────────────────────
+    async function loadWasteRequests() {
+        try {
+            const res = await fetch('/api/waste-requests/', {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (!res.ok) {
+                showToast('Failed to load requests. Are you logged in?', 'danger');
+                return;
+            }
+            const data = await res.json();
+            const requests = Array.isArray(data) ? data : (data.results || []);
+
+            if (requests.length === 0) {
+                document.getElementById('requestsList').innerHTML =
+                    '<p class="text-muted text-center">No waste requests found.</p>';
+            } else {
+                let html = '';
+                requests.forEach(r => {
+                    html += `
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" value="${r.id}" id="req${r.id}">
+                            <label class="form-check-label" for="req${r.id}">
+                                <strong>#${r.id}</strong> — ${r.pickup_address || 'No address'}
+                                <span class="badge bg-secondary ms-1">${r.status}</span>
+                            </label>
+                        </div>`;
+                });
+                document.getElementById('requestsList').innerHTML = html;
+            }
+            new bootstrap.Modal(document.getElementById('requestsModal')).show();
+        } catch (e) {
+            console.error('Failed to load requests:', e);
+        }
+    }
+
+    // ── Confirm request selection ────────────────────────────────────────────
+    function confirmSelection() {
+        selectedRequests = Array.from(
+            document.querySelectorAll('#requestsList input:checked')
+        ).map(el => parseInt(el.value));
+
+        document.getElementById('generateBtn').disabled = selectedRequests.length === 0;
+
+        if (selectedRequests.length > 0) {
+            showToast(`${selectedRequests.length} request(s) selected.`, 'success');
+        }
+        bootstrap.Modal.getInstance(document.getElementById('requestsModal')).hide();
+    }
+
+    // ── Generate optimal route ───────────────────────────────────────────────
+    async function generateRoute() {
+        const driverId = document.getElementById('driverSelect').value;
+        const plannedDate = document.getElementById('plannedDate').value;
+
+        if (!driverId) {
+            showToast('Please select a driver.', 'warning');
+            return;
+        }
+        if (selectedRequests.length === 0) {
+            showToast('Please select at least one waste request.', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('generateBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Generating...';
+
+        try {
+            const res = await fetch('/api/routes/generate_optimal/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    driver_id: parseInt(driverId),
+                    waste_request_ids: selectedRequests,
+                    planned_date: plannedDate,
+                }),
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                currentRoute = data.route_data;
+                currentRouteId = data.route?.id || null;   // FIX: save route ID
+                displayRoute(data.route_data);
+                document.getElementById('routeInfo').style.display = 'block';
+                showToast('Route generated successfully!', 'success');
+            } else {
+                showToast('Error: ' + (data.error || 'Failed to generate route'), 'danger');
+            }
+        } catch (e) {
+            showToast('Network error: ' + e.message, 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-magic"></i> Generate Optimal Route';
+        }
+    }
+
+    // ── Display route on map ─────────────────────────────────────────────────
+    function displayRoute(routeData) {
+        // Clear previous markers
+        routeMarkers.forEach(m => map.removeLayer(m));
+        routeMarkers = [];
+
+        // FIX: clear previous polyline
+        if (routePolyline) {
+            map.removeLayer(routePolyline);
+            routePolyline = null;
+        }
+
+        const waypoints = routeData.waypoints;
+        const start = routeData.start_location;
+
+        // Start marker
+        const startMarker = L.circleMarker([start.latitude, start.longitude], {
+            radius: 10,
+            fillColor: '#007bff',
+            color: '#0056b3',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9,
+        }).addTo(map).bindPopup('<strong>Driver Start Location</strong>');
+        routeMarkers.push(startMarker);
+
+        // Waypoint markers
+        waypoints.forEach((wp, idx) => {
+            const marker = L.marker([wp.latitude, wp.longitude])
+                .addTo(map)
+                .bindPopup(`
+                    <strong>${wp.type === 'request' ? '🗑 Request' : '🗂 Bin'} #${wp.id}</strong><br>
+                    Stop <strong>${idx + 1}</strong> of ${waypoints.length}<br>
+                    Distance from previous: <strong>${wp.distance_from_previous.toFixed(2)} km</strong>
+                `);
+            routeMarkers.push(marker);
+        });
+
+        // Draw route line
+        const coords = [
+            [start.latitude, start.longitude],
+            ...waypoints.map(wp => [wp.latitude, wp.longitude]),
+        ];
+        routePolyline = L.polyline(coords, {
+            color: '#28a745',
+            weight: 3,
+            opacity: 0.8,
+            dashArray: '8, 4',
+        }).addTo(map);
+
+        // Fit map to route
+        const group = new L.featureGroup(routeMarkers);
+        map.fitBounds(group.getBounds().pad(0.15));
+
+        // Update summary
+        document.getElementById('totalDistance').textContent = routeData.total_distance_km.toFixed(2);
+        document.getElementById('totalStops').textContent = routeData.total_stops;
+
+        displayWaypoints(waypoints);
+    }
+
+    // ── Display waypoints list ───────────────────────────────────────────────
+    function displayWaypoints(waypoints) {
+        if (waypoints.length === 0) {
+            document.getElementById('waypointList').innerHTML =
+                '<p class="text-muted text-center">No waypoints.</p>';
+            return;
+        }
+        let html = '';
+        waypoints.forEach((wp, idx) => {
+            html += `
+                <div class="waypoint-item" onclick="highlightWaypoint(${idx})">
+                    <div>
+                        <strong>${wp.type === 'request' ? '🗑 Request' : '🗂 Bin'} #${wp.id}</strong><br>
+                        <small class="distance-info">+${wp.distance_from_previous.toFixed(2)} km</small>
+                    </div>
+                    <div class="waypoint-badge">${idx + 1}</div>
+                </div>`;
+        });
+        document.getElementById('waypointList').innerHTML = html;
+    }
+
+    // ── Highlight waypoint ───────────────────────────────────────────────────
+    function highlightWaypoint(idx) {
+        document.querySelectorAll('.waypoint-item').forEach((el, i) => {
+            el.classList.toggle('active', i === idx);
+        });
+        // Pan map to that marker (+1 because index 0 is start marker)
+        if (routeMarkers[idx + 1]) {
+            map.panTo(routeMarkers[idx + 1].getLatLng());
+            routeMarkers[idx + 1].openPopup();
+        }
+    }
+
+    // ── Start route ──────────────────────────────────────────────────────────
+    async function startRoute() {
+        // FIX: use stored currentRouteId instead of broken DOM query
+        if (!currentRouteId) {
+            showToast('No route to start. Generate one first.', 'warning');
+            return;
+        }
+        try {
+            const res = await fetch(`/api/routes/${currentRouteId}/start_route/`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${getToken()}` },
+            });
+            if (res.ok) {
+                const statusEl = document.getElementById('routeStatus');
+                statusEl.textContent = 'Active';
+                statusEl.className = 'route-status active';
+                document.getElementById('startRouteBtn').disabled = true;
+                showToast('Route started!', 'success');
+            } else {
+                showToast('Failed to start route.', 'danger');
+            }
+        } catch (e) {
+            showToast('Network error: ' + e.message, 'danger');
+        }
+    }
+
+    // ── WebSocket for real-time driver location updates ──────────────────────
+    function connectRouteWebSocket() {
+        const token = getToken();
+        if (!token) return;
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const ws = new WebSocket(
+            `${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`
+        );
+        ws.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'route_update') {
+                // Re-display route if a new optimized route comes in for current driver
+                showToast('Route updated in real-time!', 'info');
+                if (data.waypoints) displayRoute({
+                    waypoints: data.waypoints,
+                    total_distance_km: data.total_distance,
+                    total_stops: data.total_stops,
+                    start_location: routeData?.start_location || { latitude: 28.2096, longitude: 83.9856 },
+                });
+            }
+            if (data.type === 'driver_location') {
+                // Optionally update a driver marker on the map
+                console.log('Driver location update:', data);
+            }
+        };
+        ws.onerror = () => {};
+        ws.onclose = () => {};
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        initMap();
+        loadDrivers();
+        document.getElementById('plannedDate').valueAsDate = new Date();
+        connectRouteWebSocket();
+    });
+</script>
+{% endblock %}

@@ -33,6 +33,7 @@ class SessionLoginView(APIView):
 class CustomTokenObtainPairView(TokenObtainPairView):
     """Login — returns access + refresh tokens plus user info."""
     serializer_class = CustomTokenObtainPairSerializer
+    permission_classes = [AllowAny]
 
 
 class RegisterView(generics.CreateAPIView):

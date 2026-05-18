@@ -29,6 +29,7 @@
                     <li class="nav-item"><a class="nav-link" href="{% url 'admin-drivers' %}"><i class="bi bi-person-badge me-1"></i>Drivers</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'admin-vehicles' %}"><i class="bi bi-truck me-1"></i>Vehicles</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'admin-schedules' %}"><i class="bi bi-calendar-week me-1"></i>Schedules</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'route-planning' %}"><i class="bi bi-map me-1"></i>Routes</a></li>
                 {% elif user.role == 'driver' %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'driver-dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
                 {% else %}
@@ -199,7 +200,11 @@
     // ── Notification badge via WebSocket ────────────────────────────────────────
     try {
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-        const notifSocket = new WebSocket(`${protocol}${location.host}/ws/notifications/`);
+        const token = localStorage.getItem('access_token');
+        const wsURL = token 
+            ? `${protocol}${location.host}/ws/notifications/?token=${encodeURIComponent(token)}`
+            : `${protocol}${location.host}/ws/notifications/`;
+        const notifSocket = new WebSocket(wsURL);
         window._notifSocket = notifSocket;
         notifSocket.onmessage = (e) => {
             const data = JSON.parse(e.data);

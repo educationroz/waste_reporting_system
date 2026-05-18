@@ -233,6 +233,88 @@ class RouteViewSet(viewsets.ModelViewSet):
         route.save(update_fields=['status', 'completed_at'])
         return Response(RouteSerializer(route).data)
 
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def generate_optimal(self, request):
+        """
+        POST /api/routes/generate_optimal/ — generate optimized route for driver.
+        Request body: {
+            "driver_id": int,
+            "waste_request_ids": [int, ...],
+            "bin_ids": [int, ...],
+            "planned_date": "YYYY-MM-DD"
+        }
+        """
+        from .route_optimizer import generate_optimal_route
+        
+        driver_id = request.data.get('driver_id')
+        waste_request_ids = request.data.get('waste_request_ids', [])
+        bin_ids = request.data.get('bin_ids', [])
+        planned_date = request.data.get('planned_date')
+        
+        if not driver_id:
+            return Response({'error': 'driver_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            driver = Driver.objects.get(id=driver_id)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check permissions
+        if request.user.role != 'admin' and driver.user != request.user:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Generate optimized route
+        route_data = generate_optimal_route(driver, waste_request_ids, bin_ids)
+        
+        if 'error' in route_data:
+            return Response(route_data, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create or update route
+        from datetime import datetime
+        if planned_date:
+            planned_date = datetime.strptime(planned_date, '%Y-%m-%d').date()
+        else:
+            planned_date = datetime.now().date()
+        
+        route, created = Route.objects.get_or_create(
+            driver=driver,
+            planned_date=planned_date,
+            status='planned',
+            defaults={
+                'vehicle': driver.vehicle,
+                'total_distance_km': route_data['total_distance_km'],
+            }
+        )
+        
+        if not created:
+            route.total_distance_km = route_data['total_distance_km']
+            route.save(update_fields=['total_distance_km'])
+        
+        # Add waste requests and bins to route
+        if waste_request_ids:
+            route.waste_requests.set(waste_request_ids)
+        if bin_ids:
+            route.bins.set(bin_ids)
+        
+        # Broadcast route update via WebSocket
+        if CHANNEL_LAYER is not None:
+            async_to_sync(CHANNEL_LAYER.group_send)(
+                'driver_locations',
+                {
+                    'type': 'route_update',
+                    'driver_id': driver.id,
+                    'route_id': route.id,
+                    'waypoints': route_data['waypoints'],
+                    'total_distance': route_data['total_distance_km'],
+                    'total_stops': route_data['total_stops'],
+                }
+            )
+        
+        return Response({
+            'route': RouteSerializer(route).data,
+            'route_data': route_data,
+        }, status=status.HTTP_201_CREATED)
+
 
 class ScheduleViewSet(viewsets.ModelViewSet):
     """Recurring collection schedules. Admin manages, all read."""

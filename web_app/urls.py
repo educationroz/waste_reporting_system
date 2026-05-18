@@ -14,6 +14,7 @@ from .views import (
     LoginPageView,
     NotificationsView,
     RegisterPageView,
+    RoutePlanningView,
     UserDashboardView,
     UserRequestListView,
     web_logout,
@@ -43,4 +44,7 @@ urlpatterns = [
 
     # Driver
     path('driver-dashboard/',  DriverDashboardView.as_view(),  name='driver-dashboard'),
+    
+    # Route Planning
+    path('route-planning/',    RoutePlanningView.as_view(),    name='route-planning'),
 ]

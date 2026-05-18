@@ -1,6 +1,10 @@
 {% extends 'web_app/base.html' %}
 {% block title %}Admin Settings{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -75,6 +79,11 @@
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="depot-tab" data-bs-toggle="tab" data-bs-target="#depot-panel" type="button" role="tab">
+                        <i class="bi bi-geo-alt-fill me-2"></i>Depot Location
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
                     <button class="nav-link" id="email-tab" data-bs-toggle="tab" data-bs-target="#email-panel" type="button" role="tab">
                         <i class="bi bi-envelope me-2"></i>Email Configuration
                     </button>
@@ -130,6 +139,66 @@
                         <div class="col-12">
                             <button class="btn btn-success">
                                 <i class="bi bi-check-circle me-1"></i>Save Settings
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Depot Location ─────────────────────────────────────────── -->
+            <div class="tab-pane fade" id="depot-panel" role="tabpanel">
+                <div class="p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <h6 class="fw-semibold mb-1">
+                                <i class="bi bi-building me-2 text-success"></i>Depot / Office Starting Point
+                            </h6>
+                            <p class="text-muted small mb-0">
+                                All generated routes will start from this fixed location.
+                                Click the map or drag the marker to set the exact position.
+                            </p>
+                        </div>
+
+                        <!-- Coordinates inputs -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Latitude</label>
+                            <input type="number" step="any" class="form-control"
+                                   id="depot_lat" placeholder="e.g. 28.209600">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Longitude</label>
+                            <input type="number" step="any" class="form-control"
+                                   id="depot_lng" placeholder="e.g. 83.985600">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end gap-2">
+                            <button class="btn btn-outline-secondary w-100" onclick="useMyGPS()">
+                                <i class="bi bi-crosshair me-1"></i>Use My GPS
+                            </button>
+                        </div>
+
+                        <!-- Current saved location badge -->
+                        <div class="col-12">
+                            <div id="depot-status" class="d-none alert alert-success py-2 mb-0">
+                                <i class="bi bi-check-circle me-1"></i>
+                                <span id="depot-status-text"></span>
+                            </div>
+                        </div>
+
+                        <!-- Map -->
+                        <div class="col-12">
+                            <div id="depot-map"
+                                 style="height:350px; border-radius:8px; border:1px solid #dee2e6;">
+                            </div>
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Click anywhere on the map or drag the marker to adjust the depot location.
+                            </small>
+                        </div>
+
+                        <!-- Save button -->
+                        <div class="col-12">
+                            <button class="btn btn-success px-4" onclick="saveDepotLocation()" id="depot-save-btn">
+                                <i class="bi bi-check-circle me-1"></i>Save Depot Location
                             </button>
                         </div>
                     </div>
@@ -320,60 +389,197 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-function addSetting() {
-    const key = document.getElementById('setting_key').value;
-    const value = document.getElementById('setting_value').value;
-    const description = document.getElementById('setting_description').value;
-    const is_sensitive = document.getElementById('is_sensitive').checked;
-    
-    if (!key || !value) {
-        alert('Please fill in all required fields');
-        return;
-    }
-    
-    // API call to create setting
-    fetch('/api/system/settings/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken'),
-        },
-        body: JSON.stringify({
-            key: key,
-            value: value,
-            description: description,
-            is_sensitive: is_sensitive,
-        }),
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Setting added successfully!');
-            location.reload();
-        } else {
-            alert('Error: ' + (data.message || 'Failed to add setting'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error adding setting');
+// ── Depot Map ────────────────────────────────────────────────────────────────
+let depotMap = null;
+let depotMarker = null;
+const DEFAULT_LAT = 28.2096;
+const DEFAULT_LNG = 83.9856;
+
+// Initialize map when Depot tab is clicked
+document.getElementById('depot-tab').addEventListener('shown.bs.tab', function () {
+    initDepotMap();
+    loadDepotLocation();
+});
+
+function initDepotMap() {
+    if (depotMap) return; // already initialized
+
+    depotMap = L.map('depot-map').setView([DEFAULT_LAT, DEFAULT_LNG], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
+    }).addTo(depotMap);
+
+    // Depot marker (draggable)
+    depotMarker = L.marker([DEFAULT_LAT, DEFAULT_LNG], { draggable: true })
+        .addTo(depotMap)
+        .bindPopup('<strong>🏢 Depot Location</strong><br>Drag to adjust')
+        .openPopup();
+
+    // Update inputs when marker is dragged
+    depotMarker.on('dragend', function () {
+        const pos = depotMarker.getLatLng();
+        setDepotInputs(pos.lat, pos.lng);
+    });
+
+    // Click map to move marker
+    depotMap.on('click', function (e) {
+        depotMarker.setLatLng(e.latlng);
+        setDepotInputs(e.latlng.lat, e.latlng.lng);
     });
 }
 
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
+function setDepotInputs(lat, lng) {
+    document.getElementById('depot_lat').value = parseFloat(lat).toFixed(6);
+    document.getElementById('depot_lng').value = parseFloat(lng).toFixed(6);
+}
+
+function moveDepotMarker(lat, lng) {
+    if (depotMarker) {
+        depotMarker.setLatLng([lat, lng]);
+        depotMap.setView([lat, lng], 15);
     }
-    return cookieValue;
+    setDepotInputs(lat, lng);
+}
+
+// ── Load existing depot location from API ────────────────────────────────────
+async function loadDepotLocation() {
+    try {
+        const res = await fetch('/api/system-settings/depot_location/', {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            const lat = data.value.latitude;
+            const lng = data.value.longitude;
+            moveDepotMarker(lat, lng);
+            showDepotStatus(`Depot set to ${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`);
+        }
+        // 404 = not set yet, that's fine — keep defaults
+    } catch (e) {}
+}
+
+// ── Save depot location ──────────────────────────────────────────────────────
+async function saveDepotLocation() {
+    const lat = parseFloat(document.getElementById('depot_lat').value);
+    const lng = parseFloat(document.getElementById('depot_lng').value);
+
+    if (isNaN(lat) || isNaN(lng)) {
+        showToast('Please enter valid coordinates or click the map.', 'warning');
+        return;
+    }
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        showToast('Coordinates out of range. Lat: -90 to 90, Lng: -180 to 180.', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('depot-save-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+    const payload = {
+        value: { latitude: lat, longitude: lng },
+        description: 'Fixed depot/office starting point for all routes',
+    };
+
+    // Try PATCH first (update existing), fall back to POST (create new)
+    let res = await fetch('/api/system-settings/depot_location/', {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${getToken()}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (res.status === 404) {
+        // Not created yet — POST to create
+        res = await fetch('/api/system-settings/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ key: 'depot_location', ...payload }),
+        });
+    }
+
+    if (res.ok) {
+        showToast('Depot location saved! All future routes will start here.', 'success');
+        showDepotStatus(`Depot set to ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        moveDepotMarker(lat, lng);
+    } else {
+        const err = await res.json().catch(() => ({}));
+        showToast('Failed to save: ' + (JSON.stringify(err) || 'Unknown error'), 'danger');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Save Depot Location';
+}
+
+// ── Use GPS ──────────────────────────────────────────────────────────────────
+function useMyGPS() {
+    if (!navigator.geolocation) {
+        showToast('GPS not available in your browser.', 'warning');
+        return;
+    }
+    showToast('Getting GPS location...', 'info');
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            moveDepotMarker(lat, lng);
+            showToast('GPS location captured! Click Save to confirm.', 'success');
+        },
+        () => showToast('Could not get GPS location. Allow location access and try again.', 'danger'),
+        { timeout: 8000 }
+    );
+}
+
+function showDepotStatus(text) {
+    const el = document.getElementById('depot-status');
+    document.getElementById('depot-status-text').textContent = text;
+    el.classList.remove('d-none');
+}
+
+// ── Add Setting Modal ────────────────────────────────────────────────────────
+async function addSetting() {
+    const key = document.getElementById('setting_key').value.trim();
+    const value = document.getElementById('setting_value').value.trim();
+    const description = document.getElementById('setting_description').value.trim();
+    const is_sensitive = document.getElementById('is_sensitive').checked;
+
+    if (!key || !value) {
+        showToast('Please fill in key and value.', 'warning');
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/system-settings/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ key, value, description, is_sensitive }),
+        });
+
+        if (res.ok) {
+            showToast('Setting added successfully!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('addSettingModal')).hide();
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            const err = await res.json();
+            showToast('Error: ' + JSON.stringify(err), 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
+    }
 }
 </script>
 {% endblock %}

@@ -127,7 +127,11 @@
 {% block extra_js %}
 <script>
 const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-const locationWS = new WebSocket(`${protocol}${location.host}/ws/driver-locations/`);
+const token = localStorage.getItem('access_token');
+const locationWSURL = token
+    ? `${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`
+    : `${protocol}${location.host}/ws/driver-locations/`;
+const locationWS = new WebSocket(locationWSURL);
 
 function useGPS() {
     if (!navigator.geolocation) { showToast('GPS not supported.', 'warning'); return; }
