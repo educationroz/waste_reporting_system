@@ -62,3 +62,7 @@ htmlcov/
 # Node (if any frontend build)
 node_modules/
 npm-debug.log*
+
+
+# Ignore local database migration generated during setup
+api_app/migrations/0007_*.py
