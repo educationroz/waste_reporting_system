@@ -1,0 +1,60 @@
+/* waste_system/static/web_app/css/main.css */
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-size: 1.3rem;
+    letter-spacing: 0.5px;
+}
+
+.card {
+    border-radius: 12px;
+    border: none;
+}
+
+.card.shadow-sm {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07) !important;
+}
+
+.table th {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6c757d;
+}
+
+.badge {
+    font-weight: 500;
+    font-size: 0.75rem;
+}
+
+.btn-xs {
+    padding: 2px 8px;
+    font-size: 0.75rem;
+}
+
+/* Sidebar nav active link */
+.navbar .nav-link.active {
+    font-weight: 600;
+    color: #fff !important;
+}
+
+/* Toast container */
+#toast-container .toast {
+    min-width: 260px;
+}
+
+/* Form controls */
+.form-control:focus,
+.form-select:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 0 0.2rem rgba(40,167,69,0.15);
+}
+
+/* Stat cards */
+.card .fs-2 {
+    line-height: 1.1;
+}
