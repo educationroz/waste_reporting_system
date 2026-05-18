@@ -66,7 +66,23 @@ async function markAllRead() {
     const data = await API.patch('/api/notifications/mark_all_read/', {});
     if (data && data.message) {
         showToast('All notifications marked as read.', 'success');
-        setTimeout(() => location.reload(), 800);
+
+        // Badge तुरुन्तै हटाउने — reload को पर्खाइ नगरी
+        const badge = document.getElementById('notif-badge');
+        if (badge) {
+            badge.classList.add('d-none');
+            badge.textContent = '';
+        }
+
+        // Page का "New" badges र bg-light हटाउने
+        document.querySelectorAll('.badge.bg-primary').forEach(el => el.remove());
+        document.querySelectorAll('.list-group-item.bg-light').forEach(el => {
+            el.classList.remove('bg-light');
+        });
+
+        setTimeout(() => location.reload(), 4000);
+    } else {
+        showToast('Something went wrong. Please try again.', 'danger');
     }
 }
 </script>
