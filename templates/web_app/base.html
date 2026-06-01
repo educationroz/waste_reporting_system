@@ -214,10 +214,29 @@
         })
         .then(res => res.ok ? res.json() : null)
         .then(data => {
-            if (data && data.length > 0) {
+            if (data) {
                 const badge = document.getElementById('notif-badge');
-                badge.classList.remove('d-none');
-                badge.textContent = data.length;
+                let count = 0;
+
+                // यदि API ले सिधै Array पठाउँछ भने केवल is_read: false भएका मात्र गन्ने
+                if (Array.isArray(data)) {
+                    count = data.filter(n => n.is_read === false).length;
+                } 
+                // यदि API ले अब्जेक्टमा count वा unread_count पठाउँछ भने
+                else if (data.unread_count !== undefined) {
+                    count = parseInt(data.unread_count);
+                } else if (data.count !== undefined) {
+                    count = parseInt(data.count);
+                }
+
+                // काउन्ट ० भन्दा धेरै भए मात्र ब्याज देखाउने, नत्र लुकाउने
+                if (count > 0) {
+                    badge.classList.remove('d-none');
+                    badge.textContent = count;
+                } else {
+                    badge.classList.add('d-none');
+                    badge.textContent = '';
+                }
             }
         })
         .catch(() => {});

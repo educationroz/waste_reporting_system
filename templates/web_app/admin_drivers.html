@@ -1,114 +1,370 @@
 {% extends 'web_app/base.html' %}
 {% block title %}Admin - Drivers Management{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* ==========================================
+       1. CORE PORTAL GRID LAYOUT
+       ========================================== */
+    .portal-wrapper {
+        display: flex;
+        min-height: calc(100vh - 56px);
+        background-color: #f8f9fa;
+        width: 100%;
+    }
+
+    /* Fixed Left Sidebar Styling */
+    .portal-sidebar {
+        width: 260px;
+        background: #ffffff;
+        border-right: 1px solid #e9ecef;
+        padding: 1.5rem 1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        flex-shrink: 0;
+    }
+
+    /* Dynamic Main Content Container */
+    .portal-content {
+        flex-grow: 1;
+        padding: 2rem;
+        overflow-x: hidden;
+        background: #fdfdfd;
+    }
+
+    /* ==========================================
+       2. NAVIGATION LINKS STYLING
+       ========================================== */
+    .nav-section-title {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #adb5bd;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        padding-left: 0.5rem;
+    }
+
+    .sidebar-menu {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 2rem 0;
+    }
+
+    .sidebar-item {
+        margin-bottom: 0.25rem;
+    }
+
+    .sidebar-link {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        color: #495057;
+        text-decoration: none;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .sidebar-link i {
+        font-size: 1.1rem;
+        margin-right: 0.75rem;
+        color: #6c757d;
+        transition: color 0.2s ease;
+    }
+
+    /* Interactive Hover & Active states */
+    .sidebar-link:hover {
+        background-color: #f1f8f5;
+        color: #198754;
+    }
+
+    .sidebar-link:hover i {
+        color: #198754;
+    }
+
+    .sidebar-link.active {
+        background-color: #198754;
+        color: #ffffff;
+    }
+
+    .sidebar-link.active i {
+        color: #ffffff;
+    }
+
+    /* ==========================================
+       3. MODERN DATA TABLES & CARDS
+       ========================================== */
+    .dashboard-card {
+        border: none;
+        border-radius: 14px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+        background: #ffffff;
+    }
+
+    .dashboard-card .card-header {
+        border-bottom: 1px solid #f1f3f5;
+        padding: 1.25rem;
+    }
+
+    .table-responsive {
+        border-radius: 0 0 14px 14px;
+    }
+
+    .table th {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+        color: #6c757d;
+        padding: 1rem;
+    }
+
+    .table td {
+        padding: 1rem;
+        font-size: 0.88rem;
+    }
+
+    /* ==========================================
+       4. ADAPTIVE RESPONSIVENESS (MOBILE BREAKPOINTS)
+       ========================================== */
+    @media (max-width: 991.98px) {
+        .portal-wrapper {
+            flex-direction: column;
+        }
+
+        .portal-sidebar {
+            width: 100%;
+            border-right: none;
+            border-bottom: 1px solid #e9ecef;
+            padding: 1rem;
+        }
+
+        .sidebar-menu {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0;
+        }
+
+        .sidebar-item {
+            margin-bottom: 0;
+        }
+
+        .sidebar-link {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .nav-section-title, .sidebar-footer {
+            display: none;
+        }
+
+        .portal-content {
+            padding: 1.25rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid px-4">
-    <h2 class="mb-4"><i class="bi bi-person-badge text-success me-2"></i>Drivers Management</h2>
+<div class="portal-wrapper">
+    
+    <!-- LEFT NAVIGATION SIDEBAR -->
+    <nav class="portal-sidebar">
+        <div>
+            <!-- Core Navigation Group -->
+            <div class="nav-section-title">Core Operations</div>
+            <ul class="sidebar-menu">
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-dashboard' %}" class="sidebar-link">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-requests' %}" class="sidebar-link">
+                        <i class="bi bi-list-check"></i> Collection Requests
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="#" class="sidebar-link active">
+                        <i class="bi bi-person-badge"></i> Manage Drivers
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-vehicles' %}" class="sidebar-link">
+                        <i class="bi bi-truck"></i> Fleet Logistics
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-schedules' %}" class="sidebar-link">
+                        <i class="bi bi-calendar-week"></i> Zone Schedules
+                    </a>
+                </li>
+            </ul>
 
-    <!-- Drivers Table -->
-    <div class="card shadow-sm">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>#</th>
-                            <th>Name</th>
-                            <th>License</th>
-                            <th>Vehicle</th>
-                            <th>Status</th>
-                            <th>Total Trips</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for driver in drivers %}
-                        <tr>
-                            <td>{{ driver.id }}</td>
-                            <td>
-                                {{ driver.user.get_full_name|default:driver.user.username }}
-                                <div class="small text-muted">{{ driver.user.email }}</div>
-                            </td>
-                            <td>{{ driver.license_number|default:"—" }}</td>
-                            <td>
-                                {% if driver.vehicle %}
-                                    {{ driver.vehicle.plate_number }}
-                                    <div class="small text-muted">{{ driver.vehicle.type }} ({{ driver.vehicle.capacity_kg }}kg)</div>
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="badge {% if driver.is_available %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">
-                                    {% if driver.is_available %}Available{% else %}Busy{% endif %}
-                                </span>
-                            </td>
-                            <td>{{ driver.total_trips }}</td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-{% if driver.is_available %}secondary{% else %}success{% endif %}"
-                                    onclick="toggleAvailability({{ driver.id }}, {{ driver.is_available|yesno:'true,false' }})">
-                                    {% if driver.is_available %}Set Busy{% else %}Set Available{% endif %}
-                                </button>
+            <!-- Management & Safety Group -->
+            <div class="nav-section-title">System Control</div>
+            <ul class="sidebar-menu">
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-users' %}" class="sidebar-link">
+                        <i class="bi bi-shield-check"></i> Security Admins
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-logs' %}" class="sidebar-link">
+                        <i class="bi bi-file-earmark-text"></i> Activity Logs
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-settings' %}" class="sidebar-link">
+                        <i class="bi bi-gear"></i> Portal Settings
+                    </a>
+                </li>
+            </ul>
+        </div>
 
-                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignVehicleModal{{ driver.id }}">
-                                    Assign Vehicle
-                                </button>
-                            </td>
-                        </tr>
+        <!-- Sidebar Sticky Metadata Footer -->
+        <div class="sidebar-footer pt-3 border-top border-light">
+            <div class="d-flex align-items-center gap-2">
+                <div class="bg-success bg-opacity-10 p-2 rounded-circle">
+                    <i class="bi bi-building text-success fs-5"></i>
+                </div>
+                <div>
+                    <div class="small fw-bold text-dark">WasteMS Pokhara</div>
+                    <div class="text-muted" style="font-size: 0.75rem;">Municipality Node</div>
+                </div>
+            </div>
+        </div>
+    </nav>
 
-                        <!-- Assign Vehicle Modal -->
-                        <div class="modal fade" id="assignVehicleModal{{ driver.id }}" tabindex="-1">
-                            <div class="modal-dialog">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Assign Vehicle to {{ driver.user.username }}</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <!-- RIGHT DASHBOARD BODY CONTENT -->
+    <main class="portal-content">
+        
+        <!-- Header Strip Matrix -->
+        <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-person-badge text-success me-2"></i>Drivers Management</h2>
+                <p class="text-muted mb-0">Monitor active field staff registry, verify logistics permits, and allocate municipal vehicle fleets.</p>
+            </div>
+        </div>
+
+        <!-- Drivers Primary Records Card -->
+        <div class="card dashboard-card">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-layers-half me-2 text-success"></i>Verified Active Roster</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Name / Contact Node</th>
+                                <th>License Permittance</th>
+                                <th>Allocated Machinery</th>
+                                <th>Status Check</th>
+                                <th>Total Trips</th>
+                                <th class="text-end pe-4">Action Control</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for driver in drivers %}
+                            <tr>
+                                <td class="fw-bold text-secondary">#{{ driver.id }}</td>
+                                <td>
+                                    <div class="fw-semibold text-dark">{{ driver.user.get_full_name|default:driver.user.username }}</div>
+                                    <div class="small text-muted" style="font-size: 0.8rem;">{{ driver.user.email }}</div>
+                                </td>
+                                <td class="font-monospace text-secondary fw-semibold">{{ driver.license_number|default:"—" }}</td>
+                                <td>
+                                    {% if driver.vehicle %}
+                                        <div class="fw-semibold text-dark"><i class="bi bi-truck me-1 text-success"></i>{{ driver.vehicle.plate_number }}</div>
+                                        <div class="small text-muted" style="font-size: 0.8rem;">{{ driver.vehicle.type }} ({{ driver.vehicle.capacity_kg }}kg)</div>
+                                    {% else %}
+                                        <span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>No Asset Linked</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge {% if driver.is_available %}bg-success bg-opacity-10 text-success{% else %}bg-secondary bg-opacity-10 text-secondary{% endif %} px-3 rounded-pill">
+                                        {% if driver.is_available %}Available{% else %}Busy{% endif %}
+                                    </span>
+                                </td>
+                                <td class="fw-semibold font-monospace">{{ driver.total_trips }}</td>
+                                <td class="text-end pe-4">
+                                    <div class="d-inline-flex gap-2">
+                                        <button class="btn btn-sm btn-outline-{% if driver.is_available %}secondary{% else %}success{% endif %} py-1 px-3" style="font-size: 0.82rem;"
+                                            onclick="toggleAvailability({{ driver.id }}, {{ driver.is_available|yesno:'true,false' }})">
+                                            {% if driver.is_available %}<i class="bi bi-dash-circle me-1"></i>Set Busy{% else %}<i class="bi bi-check-circle me-1"></i>Set Available{% endif %}
+                                        </button>
+
+                                        <button class="btn btn-sm btn-outline-primary py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#assignVehicleModal{{ driver.id }}">
+                                            <i class="bi bi-link-45deg me-1"></i>Assign Vehicle
+                                        </button>
                                     </div>
-                                    <div class="modal-body">
-                                        <input type="hidden" id="assign-vehicle-driver-id" value="{{ driver.id }}">
-                                        <label class="form-label">Select Vehicle</label>
-                                        <select class="form-select" id="assign-vehicle-select-{{ driver.id }}">
-                                            <option value="">None</option>
-                                            {% for vehicle in vehicles %}
-                                            <option value="{{ vehicle.id }}" {% if vehicle == driver.vehicle %}selected{% endif %}>
-                                                {{ vehicle.plate_number }} — {{ vehicle.type }} ({{ vehicle.capacity_kg }}kg, {{ vehicle.get_status_display }})
-                                            </option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                        <button class="btn btn-primary" onclick="assignVehicle({{ driver.id }})">Assign</button>
+                                </td>
+                            </tr>
+
+                            <!-- Assign Vehicle Modal Context Loop -->
+                            <div class="modal fade" id="assignVehicleModal{{ driver.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content border-0 shadow">
+                                        <div class="modal-header bg-success text-white">
+                                            <h5 class="modal-title fw-bold"><i class="bi bi-truck me-2"></i>Link Fleet Asset</h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-4">
+                                            <input type="hidden" id="assign-vehicle-driver-id" value="{{ driver.id }}">
+                                            <div class="mb-2">
+                                                <label class="form-label fw-semibold text-secondary">Select Vehicle for {{ driver.user.username }}</label>
+                                                <select class="form-select form-select-lg" style="font-size: 0.95rem;" id="assign-vehicle-select-${driver.id}">
+                                                    <option value="">None (De-allocate System Asset)</option>
+                                                    {% for vehicle in vehicles %}
+                                                    <option value="{{ vehicle.id }}" {% if vehicle == driver.vehicle %}selected{% endif %}>
+                                                        {{ vehicle.plate_number }} — {{ vehicle.type }} ({{ vehicle.capacity_kg }}kg, {{ vehicle.get_status_display }})
+                                                    </option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer bg-light">
+                                            <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+                                            <button class="btn btn-success px-4" onclick="assignVehicle({{ driver.id }})">Update Allocation</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {% empty %}
-                        <tr><td colspan="7" class="text-center text-muted py-3">No drivers found. Create a user with role 'driver' first.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            {% empty %}
+                            <tr><td colspan="7" class="text-center text-muted py-5">No drivers registered in this sector cluster yet. Create a user with role 'driver' first.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Drivers Without Profile -->
-    {% if users_no_driver %}
-    <div class="card shadow-sm mt-4">
-        <div class="card-header bg-warning bg-opacity-10">
-            <h6 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Users with Driver Role but No Profile</h6>
+        <!-- Alert Notification Box: Drivers Without Active Profile -->
+        {% if users_no_driver %}
+        <div class="card dashboard-card border border-warning border-opacity-20 mt-4">
+            <div class="card-header bg-warning bg-opacity-10 py-3">
+                <h6 class="mb-0 fw-bold text-warning-emphasis"><i class="bi bi-exclamation-triangle-fill me-2"></i>Profile Lifecycle Warning (Unmapped Personnel)</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-secondary mb-3">The following accounts are tagged with a <code>driver</code> permission token, but structural identity rows are missing inside the primary driver tables. Grant them metadata vectors or fleet licenses immediately to resolve routing pipeline integrity warnings:</p>
+                <div class="bg-light p-3 rounded-3 border-start border-warning border-3">
+                    <ul class="mb-0 gap-1 d-flex flex-column" style="font-size: 0.88rem;">
+                        {% for u in users_no_driver %}
+                        <li><span class="fw-bold text-dark">{{ u.username }}</span> — <span class="text-secondary font-monospace">{{ u.email }}</span></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <p class="mb-0 small">These users are registered as drivers but lack a driver profile. Assign them a vehicle and license details.</p>
-            <ul class="mb-0">
-                {% for u in users_no_driver %}
-                <li>{{ u.username }} — {{ u.email }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
-    {% endif %}
+        {% endif %}
+    </main>
 </div>
 {% endblock %}
 
@@ -117,10 +373,10 @@
 async function toggleAvailability(driverId, currentlyAvailable) {
     const data = await API.patch(`/api/drivers/${driverId}/`, { is_available: !currentlyAvailable });
     if (data && data.id) {
-        showToast('Availability updated!', 'success');
+        showToast('Availability successfully updated!', 'success');
         setTimeout(() => location.reload(), 800);
     } else {
-        showToast('Update failed.', 'danger');
+        showToast('Update failed inside DB cluster.', 'danger');
     }
 }
 
@@ -129,13 +385,13 @@ async function assignVehicle(driverId) {
     const vehicleId = vehicleSelect.value;
     const data = await API.patch(`/api/drivers/${driverId}/`, { vehicle: vehicleId || null });
     if (data && data.id) {
-        showToast('Vehicle assigned!', 'success');
+        showToast('Vehicle asset allocation verified!', 'success');
         const modalEl = document.getElementById(`assignVehicleModal${driverId}`);
         const modal = bootstrap.Modal.getInstance(modalEl);
-        modal.hide();
+        if(modal) modal.hide();
         setTimeout(() => location.reload(), 800);
     } else {
-        showToast('Failed to assign vehicle.', 'danger');
+        showToast('Failed to write asset mapping parameters.', 'danger');
     }
 }
 </script>

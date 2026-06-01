@@ -350,14 +350,16 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['patch'])
     def mark_all_read(self, request):
-        """PATCH /api/notifications/mark_all_read/ — mark all user notifications as read."""
-        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        qs = Notification.objects.filter(is_read=False)
+        if request.user.role != 'admin':
+            qs = qs.filter(user=request.user)
+        qs.update(is_read=True)
         return Response({'message': 'All notifications marked as read.'})
 
     @action(detail=False, methods=['get'])
     def unread(self, request):
-        """GET /api/notifications/unread/ — unread notifications only."""
         qs = self.get_queryset().filter(is_read=False)
+        # get_queryset() le admin ko lagi sabai notifications return garcha — correct chha
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
 

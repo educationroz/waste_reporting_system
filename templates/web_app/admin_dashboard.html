@@ -1,352 +1,601 @@
 {% extends 'web_app/base.html' %}
 {% block title %}Admin Dashboard{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* ==========================================
+       1. CORE PORTAL GRID LAYOUT
+       ========================================== */
+    .portal-wrapper {
+        display: flex;
+        min-height: calc(100vh - 56px);
+        background-color: #f8f9fa;
+        width: 100%;
+    }
+
+    /* Fixed Left Sidebar Styling */
+    .portal-sidebar {
+        width: 260px;
+        background: #ffffff;
+        border-right: 1px solid #e9ecef;
+        padding: 1.5rem 1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        flex-shrink: 0;
+    }
+
+    /* Dynamic Main Content Container */
+    .portal-content {
+        flex-grow: 1;
+        padding: 2rem;
+        overflow-x: hidden;
+        background: #fdfdfd;
+    }
+
+    /* ==========================================
+       2. NAVIGATION LINKS STYLING
+       ========================================== */
+    .nav-section-title {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #adb5bd;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        padding-left: 0.5rem;
+    }
+
+    .sidebar-menu {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 2rem 0;
+    }
+
+    .sidebar-item {
+        margin-bottom: 0.25rem;
+    }
+
+    .sidebar-link {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        color: #495057;
+        text-decoration: none;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .sidebar-link i {
+        font-size: 1.1rem;
+        margin-right: 0.75rem;
+        color: #6c757d;
+        transition: color 0.2s ease;
+    }
+
+    /* Interactive Hover & Active states */
+    .sidebar-link:hover {
+        background-color: #f1f8f5;
+        color: #198754;
+    }
+
+    .sidebar-link:hover i {
+        color: #198754;
+    }
+
+    .sidebar-link.active {
+        background-color: #198754;
+        color: #ffffff;
+    }
+
+    .sidebar-link.active i {
+        color: #ffffff;
+    }
+
+    /* ==========================================
+       3. METRICS CARDS WITH SCALE HOVERS
+       ========================================== */
+    .metric-card {
+        border: none;
+        border-radius: 12px;
+        transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    }
+
+    .metric-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(25, 135, 84, 0.08);
+    }
+
+    .cursor-pointer {
+        cursor: pointer;
+    }
+
+    /* ==========================================
+       4. MODERN DATA TABLES & CARDS
+       ========================================== */
+    .dashboard-card {
+        border: none;
+        border-radius: 14px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+        background: #ffffff;
+    }
+
+    .dashboard-card .card-header {
+        border-bottom: 1px solid #f1f3f5;
+        padding: 1.25rem;
+    }
+
+    .table-responsive {
+        border-radius: 0 0 14px 14px;
+    }
+
+    .table th {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+        color: #6c757d;
+        padding: 1rem;
+    }
+
+    .table td {
+        padding: 1rem;
+        font-size: 0.88rem;
+    }
+
+    /* ==========================================
+       5. ADAPTIVE RESPONSIVENESS (MOBILE BREAKPOINTS)
+       ========================================== */
+    @media (max-width: 991.98px) {
+        .portal-wrapper {
+            flex-direction: column;
+        }
+
+        .portal-sidebar {
+            width: 100%;
+            border-right: none;
+            border-bottom: 1px solid #e9ecef;
+            padding: 1rem;
+        }
+
+        .sidebar-menu {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0;
+        }
+
+        .sidebar-item {
+            margin-bottom: 0;
+        }
+
+        .sidebar-link {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .nav-section-title, .sidebar-footer {
+            display: none;
+        }
+
+        .portal-content {
+            padding: 1.25rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid px-4">
-    <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
+<div class="portal-wrapper">
+    
+    <nav class="portal-sidebar">
         <div>
-            <h2 class="mb-1"><i class="bi bi-speedometer2 text-success me-2"></i>Admin Dashboard</h2>
-            <p class="text-muted mb-0">
-                Welcome back, <span class="fw-semibold text-dark">{{ request.user.username }}</span>
-                <span class="badge bg-success ms-2 text-uppercase">{{ admin_role }}</span>
-            </p>
-        </div>
-        <div class="text-md-end">
-            <div class="small text-muted">Updated: {{ now|date:"d M Y H:i" }}</div>
-            <div class="fw-semibold">Total users: {{ total_users }} | Admins: {{ total_admin_users }}</div>
-        </div>
-    </div>
+            <div class="nav-section-title">Core Operations</div>
+            <ul class="sidebar-menu">
+                <li class="sidebar-item">
+                    <a href="#" class="sidebar-link active">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-requests' %}" class="sidebar-link">
+                        <i class="bi bi-list-check"></i> Collection Requests
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-drivers' %}" class="sidebar-link">
+                        <i class="bi bi-person-badge"></i> Manage Drivers
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-vehicles' %}" class="sidebar-link">
+                        <i class="bi bi-truck"></i> Fleet Logistics
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-schedules' %}" class="sidebar-link">
+                        <i class="bi bi-calendar-week"></i> Zone Schedules
+                    </a>
+                </li>
+            </ul>
 
-    <!-- System Alerts -->
-    {% if system_alerts %}
-    <div class="row g-3 mb-4">
-        {% for alert in system_alerts %}
-        <div class="col-12">
-            <div class="alert alert-{{ alert.type }} alert-dismissible fade show" role="alert">
-                <i class="bi bi-{{ alert.icon }} me-2"></i>
-                <strong>{{ alert.title }}</strong> — {{ alert.message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <div class="nav-section-title">System Control</div>
+            <ul class="sidebar-menu">
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-users' %}" class="sidebar-link">
+                        <i class="bi bi-shield-check"></i> Security Admins
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-logs' %}" class="sidebar-link">
+                        <i class="bi bi-file-earmark-text"></i> Activity Logs
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-settings' %}" class="sidebar-link">
+                        <i class="bi bi-gear"></i> Portal Settings
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <div class="sidebar-footer pt-3 border-top border-light">
+            <div class="d-flex align-items-center gap-2">
+                <div class="bg-success bg-opacity-10 p-2 rounded-circle">
+                    <i class="bi bi-building text-success fs-5"></i>
+                </div>
+                <div>
+                    <div class="small fw-bold text-dark">WasteMS Pokhara</div>
+                    <div class="text-muted" style="font-size: 0.75rem;">Municipality Node</div>
+                </div>
             </div>
         </div>
-        {% endfor %}
-    </div>
-    {% endif %}
+    </nav>
 
-    <!-- Quick Action Buttons -->
-    <div class="row g-2 mb-4">
-        <div class="col-auto">
-            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddModal">
-                <i class="bi bi-plus-circle me-1"></i>New Request
+    <main class="portal-content">
+        
+        <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-grid-1x2-fill text-success me-2"></i>Admin Management Console</h2>
+                <p class="text-muted mb-0">
+                    Active Session: <span class="fw-semibold text-dark">{{ request.user.username }}</span>
+                    <span class="badge bg-success bg-opacity-10 text-success ms-2 text-uppercase font-monospace" style="font-size: 0.75rem;">{{ admin_role }}</span>
+                </p>
+            </div>
+            <div class="text-md-end bg-white p-2 px-3 border rounded-3 shadow-xs">
+                <div class="small text-muted"><i class="bi bi-clock me-1"></i>Updated: {{ now|date:"d M Y H:i" }}</div>
+                <div class="fw-semibold text-success small mt-1">Users Matrix: {{ total_users }} total | {{ total_admin_users }} admins</div>
+            </div>
+        </div>
+
+        {% if system_alerts %}
+        <div class="row g-3 mb-4">
+            {% for alert in system_alerts %}
+            <div class="col-12">
+                <div class="alert alert-{{ alert.type }} border-0 shadow-sm alert-dismissible fade show" role="alert">
+                    <i class="bi bi-{{ alert.icon }} me-2 fs-5 align-middle"></i>
+                    <strong>{{ alert.title }}</strong> — {{ alert.message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="d-flex flex-wrap gap-2 mb-4 bg-white p-2 rounded-3 border">
+            <button class="btn btn-success btn-sm px-3 rounded-2" data-bs-toggle="modal" data-bs-target="#quickAddModal">
+                <i class="bi bi-plus-circle me-1"></i>Action Terminal
             </button>
-        </div>
-        <div class="col-auto">
-            <a href="{% url 'admin-drivers' %}" class="btn btn-info btn-sm">
-                <i class="bi bi-person-plus me-1"></i>Manage Drivers
+            <a href="{% url 'admin-drivers' %}" class="btn btn-light btn-sm border px-3 text-secondary">
+                <i class="bi bi-person-plus text-info me-1"></i>Drivers Registry
+            </a>
+            <a href="{% url 'admin-vehicles' %}" class="btn btn-light btn-sm border px-3 text-secondary">
+                <i class="bi bi-truck text-primary me-1"></i>Fleet Terminal
+            </a>
+            <a href="{% url 'admin-schedules' %}" class="btn btn-light btn-sm border px-3 text-secondary">
+                <i class="bi bi-calendar-week text-warning me-1"></i>Calendar Setup
             </a>
         </div>
-        <div class="col-auto">
-            <a href="{% url 'admin-vehicles' %}" class="btn btn-primary btn-sm">
-                <i class="bi bi-truck me-1"></i>Manage Vehicles
-            </a>
-        </div>
-        <div class="col-auto">
-            <a href="{% url 'admin-schedules' %}" class="btn btn-warning btn-sm">
-                <i class="bi bi-calendar-week me-1"></i>Schedules
-            </a>
-        </div>
-        <div class="col-auto">
-            <a href="{% url 'admin-requests' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-list-check me-1"></i>All Requests
-            </a>
-        </div>
-        <!-- New Admin Management Buttons -->
-        <div class="col-auto">
-            <a href="{% url 'admin-users' %}" class="btn btn-outline-primary btn-sm" title="Manage Admin Users">
-                <i class="bi bi-shield-check me-1"></i>Admins
-            </a>
-        </div>
-        <div class="col-auto">
-            <a href="{% url 'admin-logs' %}" class="btn btn-outline-info btn-sm" title="View Activity Logs">
-                <i class="bi bi-file-text me-1"></i>Logs
-            </a>
-        </div>
-        <div class="col-auto">
-            <a href="{% url 'admin-settings' %}" class="btn btn-outline-warning btn-sm" title="System Settings">
-                <i class="bi bi-gear me-1"></i>Settings
-            </a>
-        </div>
-    </div>
 
-    <!-- Stats Row -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <div class="card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}'">
-                <div class="card-body">
-                    <div class="text-muted small">Total Requests</div>
-                    <div class="fs-2 fw-bold text-success">{{ total_requests }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 bg-warning bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=pending'">
-                <div class="card-body">
-                    <div class="text-muted small">Pending</div>
-                    <div class="fs-2 fw-bold text-warning">{{ pending_requests }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 bg-danger bg-opacity-10 h-100 cursor-pointer">
-                <div class="card-body">
-                    <div class="text-muted small">Overdue</div>
-                    <div class="fs-2 fw-bold text-danger">{{ overdue_requests }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=assigned'">
-                <div class="card-body">
-                    <div class="text-muted small">Assigned</div>
-                    <div class="fs-2 fw-bold text-info">{{ assigned_requests_count }}</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <div class="card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=in_progress'">
-                <div class="card-body">
-                    <div class="text-muted small">In Progress</div>
-                    <div class="fs-2 fw-bold text-primary">{{ in_progress_requests_count }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=completed'">
-                <div class="card-body">
-                    <div class="text-muted small">Completed</div>
-                    <div class="fs-2 fw-bold text-success">{{ completed_requests_count }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-drivers' %}'">
-                <div class="card-body">
-                    <div class="text-muted small">Active Drivers</div>
-                    <div class="fs-2 fw-bold text-info">{{ active_drivers }}/{{ total_drivers }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-vehicles' %}'">
-                <div class="card-body">
-                    <div class="text-muted small">Vehicles</div>
-                    <div class="fs-2 fw-bold text-primary">{{ available_vehicles }}/{{ total_vehicles }}</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-4">
-        <div class="col-lg-8">
-            <!-- Search & Filter Section -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-search me-2 text-success"></i>Quick Search</h6>
-                </div>
-                <div class="card-body">
-                    <div class="row g-2">
-                        <div class="col-md-6">
-                            <input type="text" class="form-control form-control-sm" placeholder="Search request ID or username..." id="search-box">
-                        </div>
-                        <div class="col-md-3">
-                            <select class="form-select form-select-sm" id="filter-status">
-                                <option value="">All Status</option>
-                                <option value="pending">Pending</option>
-                                <option value="assigned">Assigned</option>
-                                <option value="in_progress">In Progress</option>
-                                <option value="completed">Completed</option>
-                                <option value="cancelled">Cancelled</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <button class="btn btn-success btn-sm w-100" onclick="applyFilters()">
-                                <i class="bi bi-search me-1"></i>Search
-                            </button>
-                        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3">
+                <div class="card metric-card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}'">
+                    <div class="card-body p-4">
+                        <div class="text-success fw-semibold small mb-1">Total Requests</div>
+                        <div class="display-6 fw-bold text-success">{{ total_requests }}</div>
                     </div>
                 </div>
             </div>
-
-            <div class="card shadow-sm">
-                <div class="card-header d-flex justify-content-between align-items-center bg-white">
-                    <div>
-                        <h6 class="mb-0 fw-bold"><i class="bi bi-clipboard-list me-2 text-success"></i>Recent Requests</h6>
-                        <div class="small text-muted">Track waste report progress and status changes.</div>
-                    </div>
-                    <a href="{% url 'admin-requests' %}" class="btn btn-sm btn-outline-success">View All</a>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0 align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>#</th><th>User</th><th>Type</th><th>Status</th><th>Driver</th><th>Date</th><th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for req in recent_requests %}
-                                <tr>
-                                    <td>{{ req.id }}</td>
-                                    <td>{{ req.user.username }}</td>
-                                    <td><span class="badge bg-secondary">{{ req.get_waste_type_display }}</span></td>
-                                    <td>
-                                        <span class="badge
-                                            {% if req.status == 'completed' %}bg-success
-                                            {% elif req.status == 'pending' %}bg-warning text-dark
-                                            {% elif req.status == 'in_progress' %}bg-info
-                                            {% elif req.status == 'cancelled' %}bg-danger
-                                            {% else %}bg-primary{% endif %}">
-                                            {{ req.get_status_display }}
-                                        </span>
-                                    </td>
-                                    <td> {% if req.driver %}{{ req.driver.user.username }}{% else %}Unassigned{% endif %} </td>
-                                    <td class="small text-muted">{{ req.scheduled_date|date:"d M Y" }}</td>
-                                    <td>
-                                        {% if req.status == 'pending' %}
-                                        <button class="btn btn-xs btn-outline-success btn-sm" onclick="openAssignModal({{ req.id }})">Assign</button>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr><td colspan="7" class="text-center text-muted py-3">No requests yet.</td></tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+            <div class="col-6 col-md-3">
+                <div class="card metric-card border-0 bg-warning bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=pending'">
+                    <div class="card-body p-4">
+                        <div class="text-warning fw-semibold small mb-1">Pending Sync</div>
+                        <div class="display-6 fw-bold text-warning">{{ pending_requests }}</div>
                     </div>
                 </div>
             </div>
-
-            <div class="card shadow-sm mt-4">
-                <div class="card-header bg-white">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-arrow-repeat me-2 text-success"></i>Recent Status Changes</h6>
+            <div class="col-6 col-md-3">
+                <div class="card metric-card border-0 bg-danger bg-opacity-10 h-100 cursor-pointer">
+                    <div class="card-body p-4">
+                        <div class="text-danger fw-semibold small mb-1">Overdue Alerts</div>
+                        <div class="display-6 fw-bold text-danger">{{ overdue_requests }}</div>
+                    </div>
                 </div>
-                <div class="list-group list-group-flush">
-                    {% for req in recent_status_changes %}
-                    <div class="list-group-item d-flex justify-content-between align-items-start">
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card metric-card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=assigned'">
+                    <div class="card-body p-4">
+                        <div class="text-info fw-semibold small mb-1">Assigned Tasks</div>
+                        <div class="display-6 fw-bold text-info">{{ assigned_requests_count }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="card metric-card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=in_progress'">
+                    <div class="card-body p-4">
+                        <div class="text-primary fw-semibold small mb-1">In Progress</div>
+                        <div class="display-6 fw-bold text-primary">{{ in_progress_requests_count }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card metric-card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=completed'">
+                    <div class="card-body p-4">
+                        <div class="text-success fw-semibold small mb-1">Completed Jobs</div>
+                        <div class="display-6 fw-bold text-success">{{ completed_requests_count }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card metric-card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-drivers' %}'">
+                    <div class="card-body p-4">
+                        <div class="text-info fw-semibold small mb-1">Active Drivers</div>
+                        <div class="display-6 fw-bold text-info">{{ active_drivers }}<span class="fs-5 text-secondary fw-normal">/{{ total_drivers }}</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card metric-card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-vehicles' %}'">
+                    <div class="card-body p-4">
+                        <div class="text-primary fw-semibold small mb-1">Fleet Available</div>
+                        <div class="display-6 fw-bold text-primary">{{ available_vehicles }}<span class="fs-5 text-secondary fw-normal">/{{ total_vehicles }}</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                
+                <div class="card dashboard-card mb-4">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-search me-2 text-success"></i>Query Filter Terminal</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <input type="text" class="form-control" placeholder="Search request ID or user log tags..." id="search-box">
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="filter-status">
+                                    <option value="">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="assigned">Assigned</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <button class="btn btn-success w-100" onclick="applyFilters()">
+                                    <i class="bi bi-funnel me-1"></i>Execute Filter
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card dashboard-card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center bg-white">
                         <div>
-                            <div class="fw-semibold">Request #{{ req.id }} — {{ req.user.username }}</div>
-                            <div class="small text-muted">Status changed to <strong>{{ req.get_status_display }}</strong> on {{ req.updated_at|date:"d M Y H:i" }}</div>
+                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-layers-half me-2 text-success"></i>Recent Log Streams</h6>
+                            <div class="small text-muted" style="font-size: 0.8rem;">Live pipeline updates for ongoing municipality requests.</div>
                         </div>
-                        <span class="badge {% if req.status == 'completed' %}bg-success{% elif req.status == 'pending' %}bg-warning text-dark{% elif req.status == 'in_progress' %}bg-info{% elif req.status == 'cancelled' %}bg-danger{% else %}bg-primary{% endif %} rounded-pill">{{ req.get_status_display }}</span>
+                        <a href="{% url 'admin-requests' %}" class="btn btn-sm btn-outline-success px-3">Full Logs</a>
                     </div>
-                    {% empty %}
-                    <div class="list-group-item text-center text-muted py-3">No recent status changes.</div>
-                    {% endfor %}
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th><th>Client</th><th>Waste Context</th><th>Status Check</th><th>Assigned Driver</th><th>Date</th><th>Action Control</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for req in recent_requests %}
+                                    <tr>
+                                        <td class="fw-bold text-secondary">#{{ req.id }}</td>
+                                        <td>{{ req.user.username }}</td>
+                                        <td><span class="badge bg-light text-dark border">{{ req.get_waste_type_display }}</span></td>
+                                        <td>
+                                            <span class="badge px-2 py-1
+                                                {% if req.status == 'completed' %}bg-success
+                                                {% elif req.status == 'pending' %}bg-warning text-dark
+                                                {% elif req.status == 'in_progress' %}bg-info
+                                                {% elif req.status == 'cancelled' %}bg-danger
+                                                {% else %}bg-primary{% endif %}">
+                                                {{ req.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if req.driver %}
+                                                <span class="text-dark"><i class="bi bi-person me-1"></i>{{ req.driver.user.username }}</span>
+                                            {% else %}
+                                                <span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>Unassigned</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="small text-muted">{{ req.scheduled_date|date:"d M Y" }}</td>
+                                        <td>
+                                            {% if req.status == 'pending' %}
+                                            <button class="btn btn-sm btn-outline-success py-1 px-2" style="font-size: 0.8rem;" onclick="openAssignModal({{ req.id }})">
+                                                <i class="bi bi-person-plus me-1"></i>Assign
+                                            </button>
+                                            {% else %}
+                                            <span class="text-muted small">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="7" class="text-center text-muted py-4">No requests reported in this pipeline node yet.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card dashboard-card">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-arrow-repeat me-2 text-success"></i>State Transition Audit Trail</h6>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        {% for req in recent_status_changes %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center p-3">
+                            <div>
+                                <div class="fw-semibold text-dark">Request Record #{{ req.id }} — <span class="text-muted">{{ req.user.username }}</span></div>
+                                <div class="small text-secondary mt-1">Status compiled to <strong>{{ req.get_status_display }}</strong> on {{ req.updated_at|date:"d M Y H:i" }}</div>
+                            </div>
+                            <span class="badge {% if req.status == 'completed' %}bg-success{% elif req.status == 'pending' %}bg-warning text-dark{% elif req.status == 'in_progress' %}bg-info{% elif req.status == 'cancelled' %}bg-danger{% else %}bg-primary{% endif %} rounded-pill px-3">{{ req.get_status_display }}</span>
+                        </div>
+                        {% empty %}
+                        <div class="list-group-item text-center text-muted py-4">No recent lifecycle status events.</div>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="col-lg-4">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-truck me-2 text-success"></i>Driver Tracking</h6>
+            <div class="col-lg-4">
+                
+                <div class="card dashboard-card mb-4">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-geo-alt me-2 text-success"></i>Live Fleet Dispatches</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="small text-muted mb-3">Currently deployed routes and active logistics tracking.</div>
+                        {% if active_routes %}
+                        <div class="d-flex flex-column gap-2">
+                            {% for route in active_routes %}
+                            <div class="p-3 border rounded-3 bg-light bg-opacity-50">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold text-dark text-sm">Route Node #{{ route.id }}</span>
+                                    <span class="badge bg-info text-white font-monospace" style="font-size: 0.75rem;">{{ route.get_status_display }}</span>
+                                </div>
+                                <div class="small text-muted"><i class="bi bi-person-badge me-1"></i>Driver: {{ route.driver.user.username|default:"Unassigned" }}</div>
+                                <div class="small text-muted"><i class="bi bi-truck me-1"></i>Plate Number: {{ route.vehicle.plate_number|default:"None" }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center text-muted py-4 bg-light bg-opacity-50 rounded-3">
+                            <i class="bi bi-map text-secondary fs-3 d-block mb-1"></i>
+                            <span class="small">No fleet dispatch lines open currently.</span>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="small text-muted mb-3">Active routes and driver assignments.</div>
-                    {% if active_routes %}
+
+                <div class="card dashboard-card">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-people me-2 text-success"></i>Crew Roster Status</h6>
+                    </div>
                     <ul class="list-group list-group-flush">
-                        {% for route in active_routes %}
-                        <li class="list-group-item">
-                            <div class="fw-semibold">Route #{{ route.id }}</div>
-                            <div class="small text-muted">Driver: {% if route.driver %}{{ route.driver.user.username }}{% else %}Unassigned{% endif %}</div>
-                            <div class="small text-muted">Vehicle: {% if route.vehicle %}{{ route.vehicle.plate_number }}{% else %}None{% endif %}</div>
-                            <div class="small mt-1"><span class="badge bg-info">{{ route.get_status_display }}</span></div>
+                        {% for driver in drivers|slice:":5" %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+                            <div>
+                                <div class="fw-semibold text-dark">{{ driver.user.username }}</div>
+                                <div class="small text-muted font-monospace"><i class="bi bi-card-text me-1"></i>{{ driver.vehicle.plate_number|default:"No Asset Linked" }}</div>
+                            </div>
+                            <span class="badge {% if driver.is_available %}bg-success bg-opacity-10 text-success{% else %}bg-secondary bg-opacity-10 text-secondary{% endif %} px-3 rounded-pill">
+                                {% if driver.is_available %}Available{% else %}Active Route{% endif %}
+                            </span>
                         </li>
                         {% endfor %}
+                        <li class="list-group-item text-center bg-light bg-opacity-20 py-2">
+                            <a href="{% url 'admin-drivers' %}" class="small text-success text-decoration-none fw-semibold">Manage Complete Roster ({{ total_drivers }})</a>
+                        </li>
                     </ul>
-                    {% else %}
-                    <div class="text-center text-muted py-4">No active routes currently.</div>
-                    {% endif %}
                 </div>
-            </div>
-
-            <div class="card shadow-sm">
-                <div class="card-header bg-white">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-people me-2 text-success"></i>Driver Summary</h6>
-                </div>
-                <ul class="list-group list-group-flush">
-                    {% for driver in drivers|slice:":5" %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="fw-semibold">{{ driver.user.username }}</div>
-                            <div class="small text-muted">{{ driver.vehicle.plate_number|default:"No vehicle" }}</div>
-                        </div>
-                        <span class="badge {% if driver.is_available %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">
-                            {% if driver.is_available %}Available{% else %}Busy{% endif %}
-                        </span>
-                    </li>
-                    {% endfor %}
-                    <li class="list-group-item text-center text-muted"><small>Showing top 5 drivers. <a href="{% url 'admin-drivers' %}">View all</a></small></li>
-                </ul>
             </div>
         </div>
-    </div>
+    </main>
 </div>
 
-<!-- Assign Driver Modal -->
 <div class="modal fade" id="assignModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Assign Driver</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Assign Crew Dispatch</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <input type="hidden" id="modal-request-id">
-                <label class="form-label">Select Driver</label>
-                <select id="modal-driver-select" class="form-select">
-                    {% for driver in drivers %}
-                    {% if driver.is_available %}
-                    <option value="{{ driver.id }}">{{ driver.user.username }} — {{ driver.vehicle.plate_number|default:"No vehicle" }}</option>
-                    {% endif %}
-                    {% endfor %}
-                </select>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary">Select Available Crew Member</label>
+                    <select id="modal-driver-select" class="form-select form-select-lg" style="font-size: 0.95rem;">
+                        {% for driver in drivers %}
+                        {% if driver.is_available %}
+                        <option value="{{ driver.id }}">{{ driver.user.username }} [Asset: {{ driver.vehicle.plate_number|default:"No Vehicle Allocated" }}]</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success" onclick="assignDriver()">Assign</button>
+            <div class="modal-footer bg-light">
+                <button class="btn btn-light border px-4" data-bs-dismiss="modal">Abort</button>
+                <button class="btn btn-success px-4" onclick="assignDriver()">Confirm Dispatch</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Quick Add Modal -->
 <div class="modal fade" id="quickAddModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Quick Actions</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-terminal me-2"></i>Action Hub Terminal</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div class="list-group">
-                    <a href="{% url 'admin-requests' %}" class="list-group-item list-group-item-action">
-                        <div class="fw-semibold"><i class="bi bi-plus-circle me-2 text-success"></i>Create New Request</div>
-                        <small class="text-muted">Manually create a waste collection request</small>
+            <div class="modal-body p-0">
+                <div class="list-group list-group-flush">
+                    <a href="{% url 'admin-requests' %}" class="list-group-item list-group-item-action p-3">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 fw-bold text-success"><i class="bi bi-plus-circle me-2"></i>Log Manual Collection Request</h6>
+                        </div>
+                        <p class="mb-1 small text-muted">Manually append and drop a waste collection node into maps pipeline.</p>
                     </a>
-                    <a href="{% url 'admin-drivers' %}" class="list-group-item list-group-item-action">
-                        <div class="fw-semibold"><i class="bi bi-person-plus me-2 text-info"></i>Add Driver</div>
-                        <small class="text-muted">Register a new driver and assign vehicle</small>
+                    <a href="{% url 'admin-drivers' %}" class="list-group-item list-group-item-action p-3">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 fw-bold text-info"><i class="bi bi-person-badge me-2"></i>Register New Driver Node</h6>
+                        </div>
+                        <p class="mb-1 small text-muted">Provision a new profile to staff pool and allocate vehicle resources.</p>
                     </a>
-                    <a href="{% url 'admin-vehicles' %}" class="list-group-item list-group-item-action">
-                        <div class="fw-semibold"><i class="bi bi-truck me-2 text-primary"></i>Add Vehicle</div>
-                        <small class="text-muted">Register a new collection vehicle</small>
+                    <a href="{% url 'admin-vehicles' %}" class="list-group-item list-group-item-action p-3">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 fw-bold text-primary"><i class="bi bi-truck me-2"></i>Commission New Fleet Asset</h6>
+                        </div>
+                        <p class="mb-1 small text-muted">Register structural machinery details and license plates inside DB logs.</p>
                     </a>
-                    <a href="{% url 'admin-schedules' %}" class="list-group-item list-group-item-action">
-                        <div class="fw-semibold"><i class="bi bi-calendar me-2 text-warning"></i>Create Schedule</div>
-                        <small class="text-muted">Set up collection schedule for zone</small>
+                    <a href="{% url 'admin-schedules' %}" class="list-group-item list-group-item-action p-3">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 fw-bold text-warning"><i class="bi bi-calendar-event me-2"></i>Map Zone Routing Calendar</h6>
+                        </div>
+                        <p class="mb-1 small text-muted">Set routine automated pickup loops for synchronized city zones.</p>
                     </a>
                 </div>
             </div>
@@ -356,10 +605,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<style>
-.cursor-pointer { cursor: pointer; transition: transform 0.2s; }
-.cursor-pointer:hover { transform: translateY(-2px); }
-</style>
 <script>
 const assignModal = new bootstrap.Modal(document.getElementById('assignModal'));
 const quickAddModal = new bootstrap.Modal(document.getElementById('quickAddModal'));
@@ -372,13 +617,20 @@ function openAssignModal(requestId) {
 async function assignDriver() {
     const requestId = document.getElementById('modal-request-id').value;
     const driverId = document.getElementById('modal-driver-select').value;
+    
+    // Safety check if no driver is available or chosen
+    if(!driverId) {
+        showToast('No active available driver was chosen.', 'danger');
+        return;
+    }
+
     const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
     if (data && data.id) {
-        showToast('Driver assigned successfully!', 'success');
+        showToast('Driver dispatch successfully configured!', 'success');
         assignModal.hide();
         setTimeout(() => location.reload(), 1000);
     } else {
-        showToast('Failed to assign driver.', 'danger');
+        showToast('Failed to deploy driver node.', 'danger');
     }
 }
 
@@ -386,7 +638,7 @@ function applyFilters() {
     const searchTerm = document.getElementById('search-box').value.trim();
     const status = document.getElementById('filter-status').value;
     
-    let url = '{% url 'admin-requests' %}?';
+    let url = '{% url "admin-requests" %}?';
     if (searchTerm) url += `search=${encodeURIComponent(searchTerm)}&`;
     if (status) url += `status=${status}`;
     

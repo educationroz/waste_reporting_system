@@ -1,110 +1,371 @@
 {% extends 'web_app/base.html' %}
 {% block title %}Admin - Requests Management{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* ==========================================
+       1. CORE PORTAL GRID LAYOUT
+       ========================================== */
+    .portal-wrapper {
+        display: flex;
+        min-height: calc(100vh - 56px);
+        background-color: #f8f9fa;
+        width: 100%;
+    }
+
+    /* Fixed Left Sidebar Styling */
+    .portal-sidebar {
+        width: 260px;
+        background: #ffffff;
+        border-right: 1px solid #e9ecef;
+        padding: 1.5rem 1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        flex-shrink: 0;
+    }
+
+    /* Dynamic Main Content Container */
+    .portal-content {
+        flex-grow: 1;
+        padding: 2rem;
+        overflow-x: hidden;
+        background: #fdfdfd;
+    }
+
+    /* ==========================================
+       2. NAVIGATION LINKS STYLING
+       ========================================== */
+    .nav-section-title {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #adb5bd;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        padding-left: 0.5rem;
+    }
+
+    .sidebar-menu {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 2rem 0;
+    }
+
+    .sidebar-item {
+        margin-bottom: 0.25rem;
+    }
+
+    .sidebar-link {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        color: #495057;
+        text-decoration: none;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .sidebar-link i {
+        font-size: 1.1rem;
+        margin-right: 0.75rem;
+        color: #6c757d;
+        transition: color 0.2s ease;
+    }
+
+    /* Interactive Hover & Active states */
+    .sidebar-link:hover {
+        background-color: #f1f8f5;
+        color: #198754;
+    }
+
+    .sidebar-link:hover i {
+        color: #198754;
+    }
+
+    .sidebar-link.active {
+        background-color: #198754;
+        color: #ffffff;
+    }
+
+    .sidebar-link.active i {
+        color: #ffffff;
+    }
+
+    /* ==========================================
+       3. MODERN DATA TABLES & CARDS
+       ========================================== */
+    .dashboard-card {
+        border: none;
+        border-radius: 14px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+        background: #ffffff;
+    }
+
+    .dashboard-card .card-header {
+        border-bottom: 1px solid #f1f3f5;
+        padding: 1.25rem;
+    }
+
+    .table-responsive {
+        border-radius: 0 0 14px 14px;
+    }
+
+    .table th {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+        color: #6c757d;
+        padding: 1rem;
+    }
+
+    .table td {
+        padding: 1rem;
+        font-size: 0.88rem;
+    }
+
+    /* ==========================================
+       4. ADAPTIVE RESPONSIVENESS (MOBILE BREAKPOINTS)
+       ========================================== */
+    @media (max-width: 991.98px) {
+        .portal-wrapper {
+            flex-direction: column;
+        }
+
+        .portal-sidebar {
+            width: 100%;
+            border-right: none;
+            border-bottom: 1px solid #e9ecef;
+            padding: 1rem;
+        }
+
+        .sidebar-menu {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0;
+        }
+
+        .sidebar-item {
+            margin-bottom: 0;
+        }
+
+        .sidebar-link {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .nav-section-title, .sidebar-footer {
+            display: none;
+        }
+
+        .portal-content {
+            padding: 1.25rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid px-4">
-    <h2 class="mb-4"><i class="bi bi-clipboard-list text-success me-2"></i>Requests Management</h2>
+<div class="portal-wrapper">
+    
+    <nav class="portal-sidebar">
+        <div>
+            <div class="nav-section-title">Core Operations</div>
+            <ul class="sidebar-menu">
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-dashboard' %}" class="sidebar-link">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="#" class="sidebar-link active">
+                        <i class="bi bi-list-check"></i> Collection Requests
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-drivers' %}" class="sidebar-link">
+                        <i class="bi bi-person-badge"></i> Manage Drivers
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-vehicles' %}" class="sidebar-link">
+                        <i class="bi bi-truck"></i> Fleet Logistics
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-schedules' %}" class="sidebar-link">
+                        <i class="bi bi-calendar-week"></i> Zone Schedules
+                    </a>
+                </li>
+            </ul>
 
-    <!-- Filter -->
-    <form method="get" class="row g-2 mb-4">
-        <div class="col-auto">
-            <select name="status" class="form-select" onchange="this.form.submit()">
-                <option value="">All Statuses</option>
-                {% for key, label in status_choices %}
-                <option value="{{ key }}" {% if current_status == key %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
+            <div class="nav-section-title">System Control</div>
+            <ul class="sidebar-menu">
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-users' %}" class="sidebar-link">
+                        <i class="bi bi-shield-check"></i> Security Admins
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-logs' %}" class="sidebar-link">
+                        <i class="bi bi-file-earmark-text"></i> Activity Logs
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-settings' %}" class="sidebar-link">
+                        <i class="bi bi-gear"></i> Portal Settings
+                    </a>
+                </li>
+            </ul>
         </div>
-        <div class="col-auto">
-            <a href="{% url 'admin-requests' %}" class="btn btn-outline-secondary">Clear</a>
-        </div>
-    </form>
 
-    <!-- Requests Table -->
-    <div class="card shadow-sm">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>#</th>
-                            <th>User</th>
-                            <th>Waste Type</th>
-                            <th>Address</th>
-                            <th>Status</th>
-                            <th>Date</th>
-                            <th>Driver</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for req in requests %}
-                        <tr>
-                            <td>{{ req.id }}</td>
-                            <td>{{ req.user.username }}</td>
-                            <td><span class="badge bg-secondary">{{ req.get_waste_type_display }}</span></td>
-                            <td class="small">{{ req.pickup_address|truncatechars:30 }}</td>
-                            <td>
-                                <span class="badge
-                                    {% if req.status == 'completed' %}bg-success
-                                    {% elif req.status == 'pending' %}bg-warning text-dark
-                                    {% elif req.status == 'in_progress' %}bg-info
-                                    {% elif req.status == 'cancelled' %}bg-danger
-                                    {% else %}bg-primary{% endif %}">
-                                    {{ req.get_status_display }}
-                                </span>
-                            </td>
-                            <td class="small text-muted">{{ req.scheduled_date|date:"d M Y" }}</td>
-                            <td class="small">
-                                {% if req.driver %}
-                                    {{ req.driver.user.username }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if req.status == 'pending' %}
-                                <button class="btn btn-sm btn-outline-success" onclick="openAssignModal({{ req.id }})">
-                                    Assign Driver
-                                </button>
-                                {% endif %}
-                                {% if req.status == 'pending' %}
-                                <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }})">
-                                    Cancel
-                                </button>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="8" class="text-center text-muted py-3">No requests found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <div class="sidebar-footer pt-3 border-top border-light">
+            <div class="d-flex align-items-center gap-2">
+                <div class="bg-success bg-opacity-10 p-2 rounded-circle">
+                    <i class="bi bi-building text-success fs-5"></i>
+                </div>
+                <div>
+                    <div class="small fw-bold text-dark">WasteMS Pokhara</div>
+                    <div class="text-muted" style="font-size: 0.75rem;">Municipality Node</div>
+                </div>
             </div>
         </div>
-    </div>
+    </nav>
+
+    <main class="portal-content">
+        
+        <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-clipboard-list text-success me-2"></i>Requests Management</h2>
+                <p class="text-muted mb-0">Evaluate citizen pick-up requests, filter pipeline segments, and dispatch operational field units.</p>
+            </div>
+        </div>
+
+        <div class="card dashboard-card mb-4">
+            <div class="card-body p-3">
+                <form method="get" class="row g-2 align-items-center" id="requests-filter-form">
+                    <div class="col-auto">
+                        <select name="status" class="form-select form-select-md" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').submit()">
+                            <option value="">All Lifecycles / Statuses</option>
+                            {% for key, label in status_choices %}
+                            <option value="{{ key }}" {% if current_status == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% if current_status %}
+                    <div class="col-auto">
+                        <a href="{% url 'admin-requests' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle me-1"></i>Reset Pipeline Filter
+                        </a>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+
+        <div class="card dashboard-card">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-layers-half me-2 text-success"></i>Dispatched Manifest & Pipeline Streams</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th># ID</th>
+                                <th>Citizen User</th>
+                                <th>Waste Vector Classification</th>
+                                <th>Geospatial Address Context</th>
+                                <th>Status Sign</th>
+                                <th>Scheduled Timeline</th>
+                                <th>Assigned Logistics Crew</th>
+                                <th class="text-end pe-4">Pipeline Action Dispatch</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in requests %}
+                            <tr>
+                                <td class="fw-bold text-secondary">#{{ req.id }}</td>
+                                <td class="fw-semibold text-dark">{{ req.user.username }}</td>
+                                <td>
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-10 px-2.5 py-1">
+                                        {{ req.get_waste_type_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="text-dark d-block" title="{{ req.pickup_address }}" style="max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        {{ req.pickup_address }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge px-3 rounded-pill 
+                                        {% if req.status == 'completed' %}bg-success bg-opacity-10 text-success
+                                        {% elif req.status == 'pending' %}bg-warning bg-opacity-10 text-warning-emphasis
+                                        {% elif req.status == 'in_progress' %}bg-info bg-opacity-10 text-info
+                                        {% elif req.status == 'cancelled' %}bg-danger bg-opacity-10 text-danger
+                                        {% else %}bg-primary bg-opacity-10 text-primary{% endif %}">
+                                        {{ req.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="font-monospace text-secondary fw-semibold">{{ req.scheduled_date|date:"d M Y" }}</td>
+                                <td class="fw-medium">
+                                    {% if req.driver %}
+                                        <div class="text-dark"><i class="bi bi-person me-1 text-success"></i>{{ req.driver.user.username }}</div>
+                                    {% else %}
+                                        <span class="text-muted small italic"><i class="bi bi-exclamation-circle me-1"></i>Unassigned</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-4">
+                                    <div class="d-inline-flex gap-2">
+                                        {% if req.status == 'pending' %}
+                                        <button class="btn btn-sm btn-outline-success py-1 px-3" style="font-size: 0.82rem;" onclick="openAssignModal({{ req.id }})">
+                                            <i class="bi bi-person-plus me-1"></i>Assign Driver
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="cancelRequest({{ req.id }})">
+                                            <i class="bi bi-slash-circle me-1"></i>Cancel
+                                        </button>
+                                        {% else %}
+                                        <span class="text-muted small italic px-2">Lifecycle Locked</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
 </div>
 
-<!-- Assign Driver Modal -->
 <div class="modal fade" id="assignModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Assign Driver</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-shield-plus me-2"></i>Dispatch Operator Node</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <input type="hidden" id="modal-request-id">
-                <label class="form-label">Select Driver</label>
-                <select id="modal-driver-select" class="form-select">
-                    {% for driver in drivers %}
-                    <option value="{{ driver.id }}">{{ driver.user.username }} — {{ driver.vehicle.plate_number|default:"No vehicle" }}</option>
-                    {% endfor %}
-                </select>
+                <div class="mb-2">
+                    <label class="form-label fw-semibold text-secondary">Select Active Field Driver</label>
+                    <select id="modal-driver-select" class="form-select form-select-lg" style="font-size: 0.95rem;">
+                        {% for driver in drivers %}
+                        <option value="{{ driver.id }}">{{ driver.user.username }} — [{{ driver.vehicle.plate_number|default:"No Asset Machine Linked" }}]</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success" onclick="assignDriver()">Assign</button>
+            <div class="modal-footer bg-light">
+                <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success px-4" onclick="assignDriver()">Confirm Dispatch</button>
             </div>
         </div>
     </div>
@@ -125,22 +386,22 @@ async function assignDriver() {
     const driverId = document.getElementById('modal-driver-select').value;
     const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
     if (data && data.id) {
-        showToast('Driver assigned successfully!', 'success');
+        showToast('Driver assigned successfully to the route sequence!', 'success');
         assignModal.hide();
-        setTimeout(() => location.reload(), 1000);
+        setTimeout(() => location.reload(), 800);
     } else {
-        showToast('Failed to assign driver.', 'danger');
+        showToast('Failed to patch driver assignment parameter.', 'danger');
     }
 }
 
 async function cancelRequest(requestId) {
-    if (!confirm('Cancel this request?')) return;
+    if (!confirm('Are you absolutely sure you want to cancel this municipal request matrix?')) return;
     const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
     if (data && data.id) {
-        showToast('Request cancelled.', 'success');
-        setTimeout(() => location.reload(), 1000);
+        showToast('Operational collection request has been cancelled.', 'success');
+        setTimeout(() => location.reload(), 800);
     } else {
-        showToast('Failed to cancel request.', 'danger');
+        showToast('Failed to drop request pipeline node state.', 'danger');
     }
 }
 </script>

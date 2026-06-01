@@ -1,151 +1,407 @@
 {% extends 'web_app/base.html' %}
 {% block title %}Admin - Schedules Management{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* ==========================================
+       1. CORE PORTAL GRID LAYOUT
+       ========================================== */
+    .portal-wrapper {
+        display: flex;
+        min-height: calc(100vh - 56px);
+        background-color: #f8f9fa;
+        width: 100%;
+    }
+
+    /* Fixed Left Sidebar Styling */
+    .portal-sidebar {
+        width: 260px;
+        background: #ffffff;
+        border-right: 1px solid #e9ecef;
+        padding: 1.5rem 1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        flex-shrink: 0;
+    }
+
+    /* Dynamic Main Content Container */
+    .portal-content {
+        flex-grow: 1;
+        padding: 2rem;
+        overflow-x: hidden;
+        background: #fdfdfd;
+    }
+
+    /* ==========================================
+       2. NAVIGATION LINKS STYLING
+       ========================================== */
+    .nav-section-title {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #adb5bd;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        padding-left: 0.5rem;
+    }
+
+    .sidebar-menu {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 2rem 0;
+    }
+
+    .sidebar-item {
+        margin-bottom: 0.25rem;
+    }
+
+    .sidebar-link {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        color: #495057;
+        text-decoration: none;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .sidebar-link i {
+        font-size: 1.1rem;
+        margin-right: 0.75rem;
+        color: #6c757d;
+        transition: color 0.2s ease;
+    }
+
+    /* Interactive Hover & Active states */
+    .sidebar-link:hover {
+        background-color: #f1f8f5;
+        color: #198754;
+    }
+
+    .sidebar-link:hover i {
+        color: #198754;
+    }
+
+    .sidebar-link.active {
+        background-color: #198754;
+        color: #ffffff;
+    }
+
+    .sidebar-link.active i {
+        color: #ffffff;
+    }
+
+    /* ==========================================
+       3. MODERN DATA TABLES & CARDS
+       ========================================== */
+    .dashboard-card {
+        border: none;
+        border-radius: 14px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+        background: #ffffff;
+    }
+
+    .dashboard-card .card-header {
+        border-bottom: 1px solid #f1f3f5;
+        padding: 1.25rem;
+    }
+
+    .table-responsive {
+        border-radius: 0 0 14px 14px;
+    }
+
+    .table th {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+        color: #6c757d;
+        padding: 1rem;
+    }
+
+    .table td {
+        padding: 1rem;
+        font-size: 0.88rem;
+    }
+
+    /* Custom Switch Overrides */
+    .form-check-input:checked {
+        background-color: #198754;
+        border-color: #198754;
+    }
+
+    /* ==========================================
+       4. ADAPTIVE RESPONSIVENESS (MOBILE BREAKPOINTS)
+       ========================================== */
+    @media (max-width: 991.98px) {
+        .portal-wrapper {
+            flex-direction: column;
+        }
+
+        .portal-sidebar {
+            width: 100%;
+            border-right: none;
+            border-bottom: 1px solid #e9ecef;
+            padding: 1rem;
+        }
+
+        .sidebar-menu {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0;
+        }
+
+        .sidebar-item {
+            margin-bottom: 0;
+        }
+
+        .sidebar-link {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .nav-section-title, .sidebar-footer {
+            display: none;
+        }
+
+        .portal-content {
+            padding: 1.25rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid px-4">
-    <h2 class="mb-4"><i class="bi bi-calendar-week text-success me-2"></i>Schedules Management</h2>
+<div class="portal-wrapper">
+    
+    <nav class="portal-sidebar">
+        <div>
+            <div class="nav-section-title">Core Operations</div>
+            <ul class="sidebar-menu">
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-dashboard' %}" class="sidebar-link">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-requests' %}" class="sidebar-link">
+                        <i class="bi bi-list-check"></i> Collection Requests
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-drivers' %}" class="sidebar-link">
+                        <i class="bi bi-person-badge"></i> Manage Drivers
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-vehicles' %}" class="sidebar-link">
+                        <i class="bi bi-truck"></i> Fleet Logistics
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="#" class="sidebar-link active">
+                        <i class="bi bi-calendar-week"></i> Zone Schedules
+                    </a>
+                </li>
+            </ul>
 
-    <!-- Add Schedule Button -->
-    <div class="mb-3">
-        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
-            <i class="bi bi-plus-lg me-1"></i>Add Schedule
-        </button>
-    </div>
+            <div class="nav-section-title">System Control</div>
+            <ul class="sidebar-menu">
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-users' %}" class="sidebar-link">
+                        <i class="bi bi-shield-check"></i> Security Admins
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-logs' %}" class="sidebar-link">
+                        <i class="bi bi-file-earmark-text"></i> Activity Logs
+                    </a>
+                </li>
+                <li class="sidebar-item">
+                    <a href="{% url 'admin-settings' %}" class="sidebar-link">
+                        <i class="bi bi-gear"></i> Portal Settings
+                    </a>
+                </li>
+            </ul>
+        </div>
 
-    <!-- Schedules Table -->
-    <div class="card shadow-sm">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>#</th>
-                            <th>Zone</th>
-                            <th>Day</th>
-                            <th>Frequency</th>
-                            <th>Driver</th>
-                            <th>Vehicle</th>
-                            <th>Active</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for schedule in schedules %}
-                        <tr>
-                            <td>{{ schedule.id }}</td>
-                            <td>{{ schedule.zone_name }}</td>
-                            <td>
-                                {% if schedule.day_of_week is not None %}
-                                    {% with day=schedule.day_of_week %}
-                                        {% if day == 0 %}Monday
-                                        {% elif day == 1 %}Tuesday
-                                        {% elif day == 2 %}Wednesday
-                                        {% elif day == 3 %}Thursday
-                                        {% elif day == 4 %}Friday
-                                        {% elif day == 5 %}Saturday
-                                        {% elif day == 6 %}Sunday
-                                        {% else %}Unknown
-                                        {% endif %}
-                                    {% endwith %}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </td>
-                            <td>{{ schedule.get_frequency_display }}</td>
-                            <td>
-                                {% if schedule.driver %}
-                                    {{ schedule.driver.user.username }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if schedule.vehicle %}
-                                    {{ schedule.vehicle.plate_number }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch"
-                                        id="schedule-active-{{ schedule.id }}"
-                                        {% if schedule.is_active %}checked{% endif %}
-                                        onchange="toggleActive({{ schedule.id }}, this.checked)">
-                                </div>
-                            </td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-danger" onclick="deleteSchedule({{ schedule.id }})">
-                                    Delete
-                                </button>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="8" class="text-center text-muted py-3">No schedules configured.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <div class="sidebar-footer pt-3 border-top border-light">
+            <div class="d-flex align-items-center gap-2">
+                <div class="bg-success bg-opacity-10 p-2 rounded-circle">
+                    <i class="bi bi-building text-success fs-5"></i>
+                </div>
+                <div>
+                    <div class="small fw-bold text-dark">WasteMS Pokhara</div>
+                    <div class="text-muted" style="font-size: 0.75rem;">Municipality Node</div>
+                </div>
             </div>
         </div>
-    </div>
+    </nav>
+
+    <main class="portal-content">
+        
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-calendar-week text-success me-2"></i>Schedules Management</h2>
+                <p class="text-muted mb-0">Configure municipal boundary collection maps, recurrence intervals, and operational fleet constraints.</p>
+            </div>
+            <div>
+                <button class="btn btn-success px-4 py-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
+                    <i class="bi bi-plus-lg me-2"></i>Create Zone Mapping
+                </button>
+            </div>
+        </div>
+
+        <div class="card dashboard-card">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-calendar2-range me-2 text-success"></i>Configured Operational Route Intervals</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th># ID</th>
+                                <th>Sector / Zone Name</th>
+                                <th>Recurring Day</th>
+                                <th>Frequency Sequence</th>
+                                <th>Assigned Operator</th>
+                                <th>Asset Plate ID</th>
+                                <th>State Engine</th>
+                                <th class="text-end pe-4">Registry Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for schedule in schedules %}
+                            <tr>
+                                <td class="fw-bold text-secondary">#{{ schedule.id }}</td>
+                                <td class="fw-bold text-dark">{{ schedule.zone_name }}</td>
+                                <td class="fw-medium text-dark">
+                                    {% if schedule.day_of_week is not None %}
+                                        {% with day=schedule.day_of_week %}
+                                            {% if day == 0 %}<span class="badge bg-secondary bg-opacity-10 text-dark">Monday</span>
+                                            {% elif day == 1 %}<span class="badge bg-secondary bg-opacity-10 text-dark">Tuesday</span>
+                                            {% elif day == 2 %}<span class="badge bg-secondary bg-opacity-10 text-dark">Wednesday</span>
+                                            {% elif day == 3 %}<span class="badge bg-secondary bg-opacity-10 text-dark">Thursday</span>
+                                            {% elif day == 4 %}<span class="badge bg-secondary bg-opacity-10 text-dark">Friday</span>
+                                            {% elif day == 5 %}<span class="badge bg-success bg-opacity-10 text-success">Saturday</span>
+                                            {% elif day == 6 %}<span class="badge bg-danger bg-opacity-10 text-danger">Sunday</span>
+                                            {% else %}Unknown
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% else %}
+                                        <span class="text-muted small italic">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary bg-opacity-10 text-primary px-2.5 py-1">
+                                        {{ schedule.get_frequency_display }}
+                                    </span>
+                                </td>
+                                <td class="fw-semibold">
+                                    {% if schedule.driver %}
+                                        <span class="text-dark"><i class="bi bi-person text-secondary me-1"></i>{{ schedule.driver.user.username }}</span>
+                                    {% else %}
+                                        <span class="text-muted small italic">No Operator Bound</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if schedule.vehicle %}
+                                        <code class="text-info font-monospace" style="font-size: 0.85rem;">{{ schedule.vehicle.plate_number }}</code>
+                                    {% else %}
+                                        <span class="text-muted small italic">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" role="switch"
+                                            id="schedule-active-{{ schedule.id }}"
+                                            {% if schedule.is_active %}checked{% endif %}
+                                            onchange="toggleActive({{ schedule.id }}, this.checked)">
+                                    </div>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-sm btn-outline-danger px-3 py-1" style="font-size: 0.8rem;" onclick="deleteSchedule({{ schedule.id }})">
+                                        <i class="bi bi-trash me-1"></i>Purge
+                                    </button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-5">
+                                    <i class="bi bi-inbox fs-3 d-block mb-1"></i> No system-wide scheduling matrices map inside active storage logs.
+                                td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
 </div>
 
-<!-- Add Schedule Modal -->
 <div class="modal fade" id="addScheduleModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New Schedule</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-calendar-plus me-2"></i>Map Operational Schedule Cluster</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <div class="mb-3">
-                    <label class="form-label">Zone Name</label>
-                    <input type="text" class="form-control" id="add-zone" placeholder="e.g., North Pokhara">
+                    <label class="form-label small fw-semibold text-secondary">Municipal Zone Identifier</label>
+                    <input type="text" class="form-control" id="add-zone" placeholder="e.g., Ward 8 - Lakeside North">
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold text-secondary">Recurrence Weekday</label>
+                        <select class="form-select" id="add-day">
+                            <option value="0">Monday</option>
+                            <option value="1">Tuesday</option>
+                            <option value="2">Wednesday</option>
+                            <option value="3">Thursday</option>
+                            <option value="4">Friday</option>
+                            <option value="5">Saturday</option>
+                            <option value="6">Sunday</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold text-secondary">Interval Frequency</label>
+                        <select class="form-select" id="add-frequency">
+                            <option value="daily">Daily Stream</option>
+                            <option value="weekly">Weekly Cycle</option>
+                            <option value="biweekly">Bi-Weekly Loop</option>
+                            <option value="monthly">Monthly Mapping</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Day of Week</label>
-                    <select class="form-select" id="add-day">
-                        <option value="0">Monday</option>
-                        <option value="1">Tuesday</option>
-                        <option value="2">Wednesday</option>
-                        <option value="3">Thursday</option>
-                        <option value="4">Friday</option>
-                        <option value="5">Saturday</option>
-                        <option value="6">Sunday</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Frequency</label>
-                    <select class="form-select" id="add-frequency">
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="biweekly">Bi-Weekly</option>
-                        <option value="monthly">Monthly</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Driver (optional)</label>
+                    <label class="form-label small fw-semibold text-secondary">Primary Fleet Operator (Optional)</label>
                     <select class="form-select" id="add-driver">
-                        <option value="">None</option>
+                        <option value="">Leave Unassigned</option>
                         {% for driver in drivers %}
-                        <option value="{{ driver.id }}">{{ driver.user.username }} ({{ driver.vehicle.plate_number|default:"No vehicle" }})</option>
+                        <option value="{{ driver.id }}">{{ driver.user.username }} [{{ driver.vehicle.plate_number|default:"No Asset Machine Linked" }}]</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Vehicle (optional)</label>
+                <div class="mb-1">
+                    <label class="form-label small fw-semibold text-secondary">Asset Heavy Machine Fleet (Optional)</label>
                     <select class="form-select" id="add-vehicle">
-                        <option value="">None</option>
+                        <option value="">Leave Unassigned</option>
                         {% for vehicle in vehicles %}
-                        <option value="{{ vehicle.id }}">{{ vehicle.plate_number }} — {{ vehicle.get_vehicle_type_display }}</option>
+                        <option value="{{ vehicle.id }}">{{ vehicle.plate_number }} — [{{ vehicle.get_vehicle_type_display }}]</option>
                         {% endfor %}
                     </select>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success" onclick="addSchedule()">Add Schedule</button>
+            <div class="modal-footer bg-light">
+                <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success px-4" onclick="addSchedule()">Save Matrix Node</button>
             </div>
         </div>
     </div>
@@ -157,21 +413,21 @@
 async function toggleActive(scheduleId, isActive) {
     const data = await API.patch(`/api/schedules/${scheduleId}/`, { is_active: isActive });
     if (!data || data.id === undefined) {
-        showToast('Failed to update active status.', 'danger');
+        showToast('Failed to patch systemic active lifecycle flag.', 'danger');
         document.getElementById(`schedule-active-${scheduleId}`).checked = !isActive;
     } else {
-        showToast('Schedule updated.', 'success');
+        showToast('Zone monitoring schedule altered successfully.', 'success');
     }
 }
 
 async function deleteSchedule(scheduleId) {
-    if (!confirm('Delete this schedule?')) return;
+    if (!confirm('Are you absolutely sure you want to drop this scheduling context from system routing?')) return;
     const data = await API.delete(`/api/schedules/${scheduleId}/`);
     if (data && data.detail === 'Deleted') {
-        showToast('Schedule deleted.', 'success');
-        setTimeout(() => location.reload(), 1000);
+        showToast('Operational route sequence entry successfully dropped.', 'success');
+        setTimeout(() => location.reload(), 800);
     } else {
-        showToast('Delete failed.', 'danger');
+        showToast('Failed to drop scheduling database record node.', 'danger');
     }
 }
 
@@ -183,23 +439,23 @@ async function addSchedule() {
         driver: document.getElementById('add-driver').value || null,
         vehicle: document.getElementById('add-vehicle').value || null,
         is_active: true,
-        start_time: "00:00",  // default; can be edited later via API if needed
+        start_time: "00:00",
     };
 
     if (!payload.zone_name || payload.day_of_week === undefined || !payload.frequency) {
-        showToast('Zone, day, and frequency are required.', 'warning');
+        showToast('Required baseline keys (Zone parameters, weekday vector, frequency) are unassigned.', 'warning');
         return;
     }
 
     const data = await API.post('/api/schedules/', payload);
     if (data && data.id) {
-        showToast('Schedule added!', 'success');
+        showToast('Naya pipeline schedule successfully created!', 'success');
         const modalEl = document.getElementById('addScheduleModal');
         const modal = bootstrap.Modal.getInstance(modalEl);
         modal.hide();
-        setTimeout(() => location.reload(), 1000);
+        setTimeout(() => location.reload(), 800);
     } else {
-        showToast('Failed to add schedule.', 'danger');
+        showToast('Network fault or schema reject during insertion.', 'danger');
     }
 }
 </script>
