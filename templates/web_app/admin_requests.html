@@ -247,19 +247,35 @@
 
         <div class="card dashboard-card mb-4">
             <div class="card-body p-3">
-                <form method="get" class="row g-2 align-items-center" id="requests-filter-form">
-                    <div class="col-auto">
-                        <select name="status" class="form-select form-select-md" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').submit()">
+                <form method="get" class="row g-3" id="requests-filter-form">
+                    
+                    <div class="col-md-7 col-sm-12">
+                        <label class="form-label small fw-semibold text-secondary mb-1">Search Requests</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0 text-muted">
+                                <i class="bi bi-search"></i>
+                            </span>
+                            <input type="text" name="search" class="form-control border-start-0 ps-0" 
+                                   placeholder="Search by Citizen name, Request ID, or Address..." 
+                                   value="{{ current_search|default:'' }}" style="font-size: 0.9rem;">
+                            <button class="btn btn-success px-4" type="submit">Search</button>
+                        </div>
+                    </div>
+
+                    <div class="col-md-5 col-sm-12">
+                        <label class="form-label small fw-semibold text-secondary mb-1">Filter Pipeline Lifecycle</label>
+                        <select name="status" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').submit()">
                             <option value="">All Lifecycles / Statuses</option>
                             {% for key, label in status_choices %}
                             <option value="{{ key }}" {% if current_status == key %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    {% if current_status %}
-                    <div class="col-auto">
-                        <a href="{% url 'admin-requests' %}" class="btn btn-outline-secondary">
-                            <i class="bi bi-x-circle me-1"></i>Reset Pipeline Filter
+                    
+                    {% if current_status or current_search %}
+                    <div class="col-12 mt-2 text-end">
+                        <a href="{% url 'admin-requests' %}" class="btn btn-sm btn-outline-secondary px-3">
+                            <i class="bi bi-x-circle me-1"></i>Clear All Active Filters
                         </a>
                     </div>
                     {% endif %}

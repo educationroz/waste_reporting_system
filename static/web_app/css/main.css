@@ -5,10 +5,19 @@ body {
     background-color: #f8f9fa;
 }
 
+.navbar {
+    background-color: #fffbfb !important;
+}
+.navbar .nav-link {
+    color: #000000 !important;
+    font-size: 0.9rem;
+    transition: color 0.2s ease-in-out;
+}
 .navbar-brand {
     font-size: 1.3rem;
     letter-spacing: 0.5px;
 }
+
 
 .card {
     border-radius: 12px;
@@ -34,12 +43,6 @@ body {
 .btn-xs {
     padding: 2px 8px;
     font-size: 0.75rem;
-}
-
-/* Sidebar nav active link */
-.navbar .nav-link.active {
-    font-weight: 600;
-    color: #fff !important;
 }
 
 /* Toast container */

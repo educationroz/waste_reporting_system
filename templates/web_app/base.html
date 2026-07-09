@@ -1,28 +1,31 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Waste Management System{% endblock %}</title>
-    <link rel="icon" type="image/x-icon" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/icons/recycle.svg">
+    <title>Safha Sahar - Live Waste Reporting System</title>
+    <link rel="icon" type="image/png" href="{% static 'web_app/image/SafhaSahar.png' %}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-    {% load static %}
     <link href="{% static 'web_app/css/main.css' %}" rel="stylesheet">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-success shadow-sm" style="position: relative; z-index: 2000;">
+<nav class="navbar navbar-expand-lg navbar-light shadow-sm">
     <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="/">
-            <i class="bi bi-recycle me-2"></i>WasteMS
+        <a class="navbar-brand d-flex align-items-center" href="/">
+            <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="Logo" width="32" height="32" class="d-inline-block align-text-top me-2">
+            <span class="fw-semibold" style="color: #1fae24;">SafhaSahar</span>
         </a>
+        
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                 data-bs-target="#navMenu" aria-controls="navMenu"
                 aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
+        
         <div class="collapse navbar-collapse" id="navMenu">
             {% if user.is_authenticated %}
             <ul class="navbar-nav me-auto">
@@ -91,7 +94,6 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-{% load static %}
 <script src="{% static 'web_app/js/main.js' %}"></script>
 {% block extra_js %}{% endblock %}
 
@@ -218,18 +220,15 @@
                 const badge = document.getElementById('notif-badge');
                 let count = 0;
 
-                // यदि API ले सिधै Array पठाउँछ भने केवल is_read: false भएका मात्र गन्ने
                 if (Array.isArray(data)) {
                     count = data.filter(n => n.is_read === false).length;
                 } 
-                // यदि API ले अब्जेक्टमा count वा unread_count पठाउँछ भने
                 else if (data.unread_count !== undefined) {
                     count = parseInt(data.unread_count);
                 } else if (data.count !== undefined) {
                     count = parseInt(data.count);
                 }
 
-                // काउन्ट ० भन्दा धेरै भए मात्र ब्याज देखाउने, नत्र लुकाउने
                 if (count > 0) {
                     badge.classList.remove('d-none');
                     badge.textContent = count;
@@ -247,9 +246,11 @@
     });
 </script>
 {% endif %}
+
 <footer>
     <div class="text-center py-3 bg-light mt-4">
-        <small>&copy; {{ current_year }} Smart Waste Collection System. All rights reserved. | Team KAR</small>
+        <small>&copy; {{ current_year }} Safha Sahar. All rights reserved. | Team KAR</small>
     </div>
+</footer>
 </body>
 </html>

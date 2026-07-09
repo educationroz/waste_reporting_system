@@ -158,8 +158,14 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
         return ctx
 
 
+from django.db.models import Q
+from django.views.generic import ListView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import redirect
+
+
 class AdminRequestListView(LoginRequiredMixin, ListView):
-    template_name = 'web_app/admin_requests.html'
+    model = WasteRequest
     context_object_name = 'requests'
     paginate_by = 20
 
@@ -168,11 +174,33 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
             return redirect_by_role(request.user)
         return super().dispatch(request, *args, **kwargs)
 
+    def get_template_names(self):
+        # AJAX request bhaye table partial matra return garne,
+        # normal request bhaye full page
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return ['web_app/partials/admin_requests_table.html']
+        return ['web_app/admin_requests.html']
+
     def get_queryset(self):
         qs = WasteRequest.objects.select_related('user', 'driver__user').order_by('-created_at')
+
         status_filter = self.request.GET.get('status')
+        search_query = self.request.GET.get('search', '').strip()
+
         if status_filter:
             qs = qs.filter(status=status_filter)
+
+        if search_query:
+            filters = Q(user__username__icontains=search_query) | \
+                      Q(pickup_address__icontains=search_query)
+
+            # ID le exact numeric match matra garne, so "12" jasto
+            # search garda ID=12 pani match hos
+            if search_query.isdigit():
+                filters |= Q(id=int(search_query))
+
+            qs = qs.filter(filters)
+
         return qs
 
     def get_context_data(self, **kwargs):
@@ -180,6 +208,7 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         ctx['drivers'] = Driver.objects.filter(is_available=True).select_related('user')
         ctx['status_choices'] = WasteRequest.STATUS_CHOICES
         ctx['current_status'] = self.request.GET.get('status', '')
+        ctx['current_search'] = self.request.GET.get('search', '')
         return ctx
 
 

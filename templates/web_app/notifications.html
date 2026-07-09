@@ -81,6 +81,15 @@
         color: #198754;
     }
 
+    .sidebar-link.active {
+        background-color: #198754;
+        color: #ffffff;
+    }
+
+    .sidebar-link.active i {
+        color: #ffffff;
+    }
+
     /* ==========================================
        3. NOTIFICATION SPECIFIC STYLING
        ========================================== */
@@ -126,56 +135,83 @@
 
 {% block content %}
 <div class="portal-wrapper">
-    
+
     <nav class="portal-sidebar">
         <div>
-            <div class="nav-section-title">Core Operations</div>
-            <ul class="sidebar-menu">
-                <li class="sidebar-item">
-                    <a href="{% url 'admin-dashboard' %}" class="sidebar-link">
-                        <i class="bi bi-speedometer2"></i> Dashboard
-                    </a>
-                </li>
-                <li class="sidebar-item">
-                    <a href="{% url 'admin-requests' %}" class="sidebar-link">
-                        <i class="bi bi-list-check"></i> Collection Requests
-                    </a>
-                </li>
-                <li class="sidebar-item">
-                    <a href="{% url 'admin-drivers' %}" class="sidebar-link">
-                        <i class="bi bi-person-badge"></i> Manage Drivers
-                    </a>
-                </li>
-                <li class="sidebar-item">
-                    <a href="{% url 'admin-vehicles' %}" class="sidebar-link">
-                        <i class="bi bi-truck"></i> Fleet Logistics
-                    </a>
-                </li>
-                <li class="sidebar-item">
-                    <a href="{% url 'admin-schedules' %}" class="sidebar-link">
-                        <i class="bi bi-calendar-week"></i> Zone Schedules
-                    </a>
-                </li>
-            </ul>
+            {% if user.role == 'admin' %}
+                <div class="nav-section-title">Core Operations</div>
+                <ul class="sidebar-menu">
+                    <li class="sidebar-item">
+                        <a href="{% url 'admin-dashboard' %}" class="sidebar-link">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{% url 'admin-requests' %}" class="sidebar-link">
+                            <i class="bi bi-list-check"></i> Collection Requests
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{% url 'admin-drivers' %}" class="sidebar-link">
+                            <i class="bi bi-person-badge"></i> Manage Drivers
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{% url 'admin-vehicles' %}" class="sidebar-link">
+                            <i class="bi bi-truck"></i> Fleet Logistics
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{% url 'admin-schedules' %}" class="sidebar-link">
+                            <i class="bi bi-calendar-week"></i> Zone Schedules
+                        </a>
+                    </li>
+                </ul>
 
-            <div class="nav-section-title">System Control</div>
-            <ul class="sidebar-menu">
-                <li class="sidebar-item">
-                    <a href="{% url 'admin-users' %}" class="sidebar-link">
-                        <i class="bi bi-shield-check"></i> Security Admins
-                    </a>
-                </li>
-                <li class="sidebar-item">
-                    <a href="{% url 'admin-logs' %}" class="sidebar-link">
-                        <i class="bi bi-file-earmark-text"></i> Activity Logs
-                    </a>
-                </li>
-                <li class="sidebar-item">
-                    <a href="{% url 'admin-settings' %}" class="sidebar-link">
-                        <i class="bi bi-gear"></i> Portal Settings
-                    </a>
-                </li>
-            </ul>
+                <div class="nav-section-title">System Control</div>
+                <ul class="sidebar-menu">
+                    <li class="sidebar-item">
+                        <a href="{% url 'admin-users' %}" class="sidebar-link">
+                            <i class="bi bi-shield-check"></i> Security Admins
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{% url 'admin-logs' %}" class="sidebar-link">
+                            <i class="bi bi-file-earmark-text"></i> Activity Logs
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{% url 'admin-settings' %}" class="sidebar-link">
+                            <i class="bi bi-gear"></i> Portal Settings
+                        </a>
+                    </li>
+                </ul>
+
+            {% elif user.role == 'driver' %}
+                <div class="nav-section-title">Driver Panel</div>
+                <ul class="sidebar-menu">
+                    <li class="sidebar-item">
+                        <a href="{% url 'driver-dashboard' %}" class="sidebar-link">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                </ul>
+
+            {% else %}
+                <div class="nav-section-title">My Account</div>
+                <ul class="sidebar-menu">
+                    <li class="sidebar-item">
+                        <a href="{% url 'user-dashboard' %}" class="sidebar-link">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{% url 'user-requests' %}" class="sidebar-link">
+                            <i class="bi bi-clipboard"></i> My Requests
+                        </a>
+                    </li>
+                </ul>
+            {% endif %}
         </div>
 
         <div class="sidebar-footer pt-3 border-top border-light">
@@ -225,7 +261,7 @@
                         <small class="text-muted fw-medium">{{ notif.created_at|timesince }} ago</small>
                     </div>
                     <p class="mb-0 mt-2 text-secondary" style="font-size: 0.9rem;">{{ notif.message }}</p>
-                    
+
                     {% if notif.related_request %}
                     <div class="mt-2">
                         <span class="badge bg-light text-secondary border rounded-1">Request #{{ notif.related_request.id }}</span>
