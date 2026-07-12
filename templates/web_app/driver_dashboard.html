@@ -1,126 +1,227 @@
 {% extends 'web_app/base.html' %}
 {% block title %}Driver Dashboard{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* साइडबारका लिङ्कहरू होभर गर्दा ब्याकग्राउन्ड चेन्ज हुने सानो स्टाइल */
+    .nav-pills .nav-link:not(.active):hover {
+        background-color: #f8f9fa;
+        color: #198754 !important;
+    }
+
+    /* ==========================================
+       SIDEBAR LAYOUT — flexbox, always side-by-side,
+       kahilyai top मा जाँदैन, screen sano hunda
+       icon-only mode मा खुम्चिन्छ (top मा जाँदैन)
+       ========================================== */
+    .layout-wrapper {
+        display: flex;
+        align-items: stretch;
+        gap: 1.5rem;
+    }
+
+    .sidebar-col {
+        flex: 0 0 220px;
+        max-width: 220px;
+        transition: flex-basis 0.15s ease, max-width 0.15s ease;
+    }
+
+    .sidebar-card {
+        height: 100%;
+        position: sticky;
+        top: 20px;
+        z-index: 1020;
+    }
+
+    .content-col {
+        flex: 1 1 auto;
+        min-width: 0; /* overflow bata jogauna (table le parent nafutaos) */
+    }
+
+    .sidebar-logo-text,
+    .sidebar-link-text {
+        white-space: nowrap;
+    }
+
+    /* Screen sano huda — sidebar icon-only, tara SIDE माnai रहन्छ */
+    @media (max-width: 767.98px) {
+        .sidebar-col {
+            flex: 0 0 64px;
+            max-width: 64px;
+        }
+        .sidebar-card .card-body {
+            padding: 0.75rem 0.4rem !important;
+            align-items: center;
+        }
+        .sidebar-logo-text,
+        .sidebar-link-text {
+            display: none;
+        }
+        .sidebar-card .nav-link {
+            justify-content: center;
+            padding: 0.6rem !important;
+        }
+        .sidebar-card .nav-link i {
+            margin: 0 !important;
+            font-size: 1.15rem;
+        }
+        .sidebar-card h5 {
+            text-align: center;
+            padding: 0 !important;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container px-4">
-    <h2 class="mb-4"><i class="bi bi-truck text-success me-2"></i>Driver Dashboard</h2>
+<div class="container-fluid px-4 py-3">
+    <div class="layout-wrapper {% if not driver %}justify-content-center{% endif %}">
 
-    {% if not driver %}
-    <div class="alert alert-warning">
-        <i class="bi bi-exclamation-triangle me-2"></i>
-        No driver profile found for your account. Contact admin.
-    </div>
-    {% else %}
-
-    <!-- Stats -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <div class="card border-0 bg-success bg-opacity-10">
-                <div class="card-body text-center">
-                    <div class="text-muted small">Completed Today</div>
-                    <div class="fs-2 fw-bold text-success">{{ completed_today }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 bg-info bg-opacity-10">
-                <div class="card-body text-center">
-                    <div class="text-muted small">Total Trips</div>
-                    <div class="fs-2 fw-bold text-info">{{ driver.total_trips }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 {% if driver.is_available %}bg-success{% else %}bg-secondary{% endif %} bg-opacity-10">
-                <div class="card-body text-center">
-                    <div class="text-muted small">Status</div>
-                    <div class="fw-bold {% if driver.is_available %}text-success{% else %}text-secondary{% endif %}">
-                        {% if driver.is_available %}Available{% else %}Busy{% endif %}
+        <!-- ── १. साइडबार सेक्सन (Sidebar Section) ── -->
+        <div class="sidebar-col">
+            <div class="card shadow-sm border-0 sidebar-card">
+                <div class="card-body p-3 d-flex flex-column">
+                    <h5 class="text-success fw-bold mb-3 px-2">
+                        <span class="sidebar-logo-text">SafhaSahar</span>
+                    </h5>
+                    <div class="nav flex-column nav-pills">
+                        <a href="{% url 'driver-dashboard' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
+                            <i class="bi bi-speedometer2 me-2"></i><span class="sidebar-link-text">Dashboard</span>
+                        </a>
+                        <a href="{% url 'notifications' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-bell me-2"></i><span class="sidebar-link-text">Notifications</span>
+                        </a> 
+                        <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
+                        </a>
                     </div>
-                    <button class="btn btn-sm {% if driver.is_available %}btn-outline-secondary{% else %}btn-outline-success{% endif %} mt-1"
-                        onclick="toggleAvailability()">
-                        Toggle
-                    </button>
                 </div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 bg-primary bg-opacity-10">
-                <div class="card-body text-center">
-                    <div class="text-muted small">Vehicle</div>
-                    <div class="fw-bold text-primary">{{ driver.vehicle.plate_number|default:"Not assigned" }}</div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Location Update -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white fw-bold">
-            <i class="bi bi-geo-alt text-success me-2"></i>Update My Location
-        </div>
-        <div class="card-body">
-            <div class="row g-2">
-                <div class="col-md-4">
-                    <input type="number" id="lat" class="form-control" placeholder="Latitude" step="any">
-                </div>
-                <div class="col-md-4">
-                    <input type="number" id="lng" class="form-control" placeholder="Longitude" step="any">
-                </div>
-                <div class="col-md-4">
-                    <button class="btn btn-outline-success w-100" onclick="useGPS()">
-                        <i class="bi bi-crosshair me-1"></i>Use GPS
-                    </button>
-                </div>
-            </div>
-            <button class="btn btn-success mt-2" onclick="updateLocation()">
-                <i class="bi bi-send me-1"></i>Send Location
-            </button>
-        </div>
-    </div>
+        <!-- ── २. मुख्य सामाग्री (Main Content Area) ── -->
+        <div class="content-col">
+            <h2 class="mb-4"><i class="bi bi-truck text-success me-2"></i>Driver Dashboard</h2>
 
-    <!-- Assigned Requests -->
-    <div class="card shadow-sm">
-        <div class="card-header bg-white fw-bold">
-            <i class="bi bi-clipboard-check text-success me-2"></i>My Assigned Requests
-        </div>
-        <div class="card-body p-0">
-            <table class="table table-hover mb-0 align-middle">
-                <thead class="table-light">
-                    <tr><th>#</th><th>User</th><th>Address</th><th>Type</th><th>Status</th><th>Date</th><th>Action</th></tr>
-                </thead>
-                <tbody>
-                    {% for req in assigned_requests %}
-                    <tr>
-                        <td>{{ req.id }}</td>
-                        <td>{{ req.user.username }}</td>
-                        <td class="small">{{ req.pickup_address|truncatechars:30 }}</td>
-                        <td><span class="badge bg-secondary">{{ req.get_waste_type_display }}</span></td>
-                        <td>
-                            <span class="badge {% if req.status == 'in_progress' %}bg-info{% else %}bg-primary{% endif %}">
-                                {{ req.get_status_display }}
-                            </span>
-                        </td>
-                        <td class="small text-muted">{{ req.scheduled_date|date:"d M" }}</td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                {% if req.status == 'assigned' %}
-                                <button class="btn btn-outline-info" onclick="updateStatus({{ req.id }}, 'in_progress')">Start</button>
-                                {% endif %}
-                                {% if req.status == 'in_progress' %}
-                                <button class="btn btn-outline-success" onclick="updateStatus({{ req.id }}, 'completed')">Done</button>
-                                {% endif %}
+            {% if not driver %}
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                No driver profile found for your account. Contact admin.
+            </div>
+            {% else %}
+
+            <!-- Stats -->
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-success bg-opacity-10 h-100">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">Completed Today</div>
+                            <div class="fs-2 fw-bold text-success">{{ completed_today }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-info bg-opacity-10 h-100">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">Total Trips</div>
+                            <div class="fs-2 fw-bold text-info">{{ driver.total_trips }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 {% if driver.is_available %}bg-success{% else %}bg-secondary{% endif %} bg-opacity-10 h-100">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">Status</div>
+                            <div class="fw-bold {% if driver.is_available %}text-success{% else %}text-secondary{% endif %}" id="availability-label">
+                                {% if driver.is_available %}Available{% else %}Busy{% endif %}
                             </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="7" class="text-center text-muted py-3">No assigned requests.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {% endif %}
+                            <button class="btn btn-sm {% if driver.is_available %}btn-outline-secondary{% else %}btn-outline-success{% endif %} mt-1"
+                                id="toggle-availability-btn"
+                                onclick="toggleAvailability()">
+                                Toggle
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-primary bg-opacity-10 h-100">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">Vehicle</div>
+                            <div class="fw-bold text-primary">{{ driver.vehicle.plate_number|default:"Not assigned" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location Update -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-geo-alt text-success me-2"></i>Update My Location
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <input type="number" id="lat" class="form-control" placeholder="Latitude" step="any">
+                        </div>
+                        <div class="col-md-4">
+                            <input type="number" id="lng" class="form-control" placeholder="Longitude" step="any">
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-outline-success w-100" onclick="useGPS()">
+                                <i class="bi bi-crosshair me-1"></i>Use GPS
+                            </button>
+                        </div>
+                    </div>
+                    <button class="btn btn-success mt-2" onclick="updateLocation()">
+                        <i class="bi bi-send me-1"></i>Send Location
+                    </button>
+                </div>
+            </div>
+
+            <!-- Assigned Requests -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-clipboard-check text-success me-2"></i>My Assigned Requests
+                </div>
+                <div class="card-body p-0 table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr><th>#</th><th>User</th><th>Address</th><th>Type</th><th>Status</th><th>Date</th><th>Action</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for req in assigned_requests %}
+                            <tr>
+                                <td>{{ req.id }}</td>
+                                <td>{{ req.user.username }}</td>
+                                <td class="small">{{ req.pickup_address|truncatechars:30 }}</td>
+                                <td><span class="badge bg-secondary">{{ req.get_waste_type_display }}</span></td>
+                                <td>
+                                    <span class="badge {% if req.status == 'in_progress' %}bg-info{% else %}bg-primary{% endif %}">
+                                        {{ req.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="small text-muted">{{ req.scheduled_date|date:"d M" }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        {% if req.status == 'assigned' %}
+                                        <button class="btn btn-outline-info" onclick="updateStatus({{ req.id }}, 'in_progress')">Start</button>
+                                        {% endif %}
+                                        {% if req.status == 'in_progress' %}
+                                        <button class="btn btn-outline-success" onclick="updateStatus({{ req.id }}, 'completed')">Done</button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="7" class="text-center text-muted py-3">No assigned requests.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div> <!-- /मुख्य सामाग्री -->
+    </div> <!-- /layout-wrapper -->
 </div>
 {% endblock %}
 
@@ -149,10 +250,8 @@ async function updateLocation() {
     const lng = document.getElementById('lng').value;
     if (!lat || !lng) { showToast('Enter coordinates.', 'warning'); return; }
 
-    // Send via WebSocket (real-time broadcast)
     locationWS.send(JSON.stringify({ latitude: lat, longitude: lng }));
 
-    // Also persist via REST
     const driverId = {{ driver.id|default:'null' }};
     if (driverId) {
         await API.patch(`/api/drivers/${driverId}/update_location/`, { latitude: lat, longitude: lng });
@@ -172,12 +271,14 @@ async function updateStatus(requestId, newStatus) {
 
 async function toggleAvailability() {
     const driverId = {{ driver.id|default:'null' }};
-    const current = {{ driver.is_available|yesno:'true,false' }};
     if (!driverId) return;
-    const data = await API.patch(`/api/drivers/${driverId}/`, { is_available: !current });
+
+    const data = await API.patch(`/api/drivers/${driverId}/toggle_availability/`, {});
     if (data && data.id) {
         showToast('Availability updated!', 'success');
         setTimeout(() => location.reload(), 800);
+    } else {
+        showToast('Failed to update availability.', 'danger');
     }
 }
 </script>

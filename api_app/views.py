@@ -177,7 +177,20 @@ class DriverViewSet(viewsets.ModelViewSet):
     search_fields = ['user__username', 'license_number']
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
+    def toggle_availability(self, request, pk=None):
+        """PATCH /api/drivers/{id}/toggle_availability/ — driver toggles their own is_available."""
+        driver = self.get_object()
+        if request.user.role != 'admin' and driver.user != request.user:
+            return Response(
+                {'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN
+            )
+        driver.is_available = not driver.is_available
+        driver.save(update_fields=['is_available'])
+        return Response(DriverSerializer(driver).data)
+
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def update_location(self, request, pk=None):
+        ...  # (yo already थियो, jaसको तस nai raख्नुहोस्)
         """PATCH /api/drivers/{id}/update_location/ — driver updates GPS location."""
         driver = self.get_object()
         # Only the driver themselves or admin can update location
@@ -208,12 +221,6 @@ class DriverViewSet(viewsets.ModelViewSet):
             )
         return Response({'message': 'Location updated.', 'latitude': lat, 'longitude': lng})
 
-    @action(detail=False, methods=['get'])
-    def available(self, request):
-        """GET /api/drivers/available/ — available drivers only."""
-        qs = Driver.objects.filter(is_available=True).select_related('user', 'vehicle')
-        serializer = self.get_serializer(qs, many=True)
-        return Response(serializer.data)
 
 
 class BinViewSet(viewsets.ModelViewSet):

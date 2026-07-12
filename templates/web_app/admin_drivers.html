@@ -270,9 +270,9 @@
                                 <th class="text-end pe-4">Action Control</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="drivers-table-body">
                             {% for driver in drivers %}
-                            <tr>
+                            <tr id="driver-row-{{ driver.id }}">
                                 <td class="fw-bold text-secondary">#{{ driver.id }}</td>
                                 <td>
                                     <div class="fw-semibold text-dark">{{ driver.user.get_full_name|default:driver.user.username }}</div>
@@ -302,6 +302,9 @@
 
                                         <button class="btn btn-sm btn-outline-primary py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#assignVehicleModal{{ driver.id }}">
                                             <i class="bi bi-link-45deg me-1"></i>Assign Vehicle
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="removeDriver({{ driver.id }})">
+                                            <i class="bi bi-trash me-1"></i>Remove
                                         </button>
                                     </div>
                                 </td>
@@ -392,6 +395,36 @@ async function assignVehicle(driverId) {
         setTimeout(() => location.reload(), 800);
     } else {
         showToast('Failed to write asset mapping parameters.', 'danger');
+    }
+}
+
+async function removeDriver(driverId) {
+    if (!confirm('Are you sure you want to remove this driver from the system?')) return;
+
+    try {
+        const res = await fetch(`/api/drivers/${driverId}/`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            },
+        });
+
+        if (res.ok || res.status === 204) {
+            showToast('Driver removed successfully.', 'success');
+            const row = document.getElementById(`driver-row-${driverId}`);
+            if (row) row.remove();
+        } else {
+            let errMsg = 'Failed to remove driver.';
+            try {
+                const data = await res.json();
+                errMsg = typeof data === 'object'
+                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                    : String(data);
+            } catch (e) {}
+            showToast(errMsg, 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
     }
 }
 </script>

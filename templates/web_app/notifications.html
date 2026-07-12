@@ -4,94 +4,72 @@
 {% block extra_css %}
 <style>
     /* ==========================================
-       1. CORE PORTAL GRID LAYOUT (Consistency Tracker)
+       SIDEBAR LAYOUT — same as home.html, flexbox,
+       always side-by-side, icon-only mode on small screens
        ========================================== */
-    .portal-wrapper {
+    .layout-wrapper {
         display: flex;
-        min-height: calc(100vh - 56px);
+        align-items: stretch;
+        gap: 1.5rem;
+    }
+
+    .sidebar-col {
+        flex: 0 0 220px;
+        max-width: 220px;
+        transition: flex-basis 0.15s ease, max-width 0.15s ease;
+    }
+
+    .sidebar-card {
+        height: 100%;
+        position: sticky;
+        top: 20px;
+        z-index: 1020;
+    }
+
+    .content-col {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .sidebar-logo-text,
+    .sidebar-link-text {
+        white-space: nowrap;
+    }
+
+    .nav-pills .nav-link:not(.active):hover {
         background-color: #f8f9fa;
-        width: 100%;
+        color: #198754 !important;
     }
 
-    .portal-sidebar {
-        width: 260px;
-        background: #ffffff;
-        border-right: 1px solid #e9ecef;
-        padding: 1.5rem 1rem;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        flex-shrink: 0;
-    }
-
-    .portal-content {
-        flex-grow: 1;
-        padding: 2rem;
-        overflow-x: hidden;
-        background: #fdfdfd;
-    }
-
-    /* ==========================================
-       2. SIDEBAR LINK STYLING
-       ========================================== */
-    .nav-section-title {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        color: #adb5bd;
-        font-weight: 700;
-        margin-bottom: 0.75rem;
-        padding-left: 0.5rem;
-    }
-
-    .sidebar-menu {
-        list-style: none;
-        padding: 0;
-        margin: 0 0 2rem 0;
-    }
-
-    .sidebar-item {
-        margin-bottom: 0.25rem;
-    }
-
-    .sidebar-link {
-        display: flex;
-        align-items: center;
-        padding: 0.75rem 1rem;
-        color: #495057;
-        text-decoration: none;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        font-weight: 500;
-        transition: all 0.2s ease;
-    }
-
-    .sidebar-link i {
-        font-size: 1.1rem;
-        margin-right: 0.75rem;
-        color: #6c757d;
-    }
-
-    .sidebar-link:hover {
-        background-color: #f1f8f5;
-        color: #198754;
-    }
-
-    .sidebar-link:hover i {
-        color: #198754;
-    }
-
-    .sidebar-link.active {
-        background-color: #198754;
-        color: #ffffff;
-    }
-
-    .sidebar-link.active i {
-        color: #ffffff;
+    @media (max-width: 767.98px) {
+        .sidebar-col {
+            flex: 0 0 64px;
+            max-width: 64px;
+        }
+        .sidebar-card .card-body {
+            padding: 0.75rem 0.4rem !important;
+            align-items: center;
+        }
+        .sidebar-logo-text,
+        .sidebar-link-text {
+            display: none;
+        }
+        .sidebar-card .nav-link {
+            justify-content: center;
+            padding: 0.6rem !important;
+        }
+        .sidebar-card .nav-link i {
+            margin: 0 !important;
+            font-size: 1.15rem;
+        }
+        .sidebar-card h5 {
+            text-align: center;
+            padding: 0 !important;
+        }
     }
 
     /* ==========================================
-       3. NOTIFICATION SPECIFIC STYLING
+       NOTIFICATION SPECIFIC STYLING
        ========================================== */
     .notif-card {
         border: none;
@@ -107,7 +85,6 @@
         transition: all 0.2s ease;
     }
 
-    /* अनरिड (Unread) नोटिफिकेसनलाई अलि बढी प्राथमिकता र देब्रेपट्टी हरियो बर्डर */
     .notif-item.unread-style {
         background-color: #f4faf6 !important;
         border-left-color: #198754;
@@ -120,189 +97,159 @@
         background-color: #198754;
         border-color: #198754;
     }
-
-    @media (max-width: 991.98px) {
-        .portal-wrapper { flex-direction: column; }
-        .portal-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #e9ecef; padding: 1rem; }
-        .sidebar-menu { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0; }
-        .sidebar-item { margin-bottom: 0; }
-        .sidebar-link { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
-        .nav-section-title, .sidebar-footer { display: none; }
-        .portal-content { padding: 1.25rem; }
-    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="portal-wrapper">
+<div class="container-fluid px-4 py-3">
+    <div class="layout-wrapper">
 
-    <nav class="portal-sidebar">
-        <div>
-            {% if user.role == 'admin' %}
-                <div class="nav-section-title">Core Operations</div>
-                <ul class="sidebar-menu">
-                    <li class="sidebar-item">
-                        <a href="{% url 'admin-dashboard' %}" class="sidebar-link">
-                            <i class="bi bi-speedometer2"></i> Dashboard
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{% url 'admin-requests' %}" class="sidebar-link">
-                            <i class="bi bi-list-check"></i> Collection Requests
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{% url 'admin-drivers' %}" class="sidebar-link">
-                            <i class="bi bi-person-badge"></i> Manage Drivers
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{% url 'admin-vehicles' %}" class="sidebar-link">
-                            <i class="bi bi-truck"></i> Fleet Logistics
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{% url 'admin-schedules' %}" class="sidebar-link">
-                            <i class="bi bi-calendar-week"></i> Zone Schedules
-                        </a>
-                    </li>
-                </ul>
+        <!-- ── साइडबार सेक्सन (Sidebar Section) ── -->
+        <div class="sidebar-col">
+            <div class="card shadow-sm border-0 sidebar-card">
+                <div class="card-body p-3 d-flex flex-column">
+                    <h5 class="text-success fw-bold mb-3 px-2">
+                        <span class="sidebar-logo-text">SafhaSahar</span>
+                    </h5>
+                    <div class="nav flex-column nav-pills">
+                        {% if user.role == 'admin' %}
+                            <a href="{% url 'admin-dashboard' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-speedometer2 me-2"></i><span class="sidebar-link-text">Dashboard</span>
+                            </a>
+                            <a href="{% url 'admin-requests' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-list-check me-2"></i><span class="sidebar-link-text">Collection Requests</span>
+                            </a>
+                            <a href="{% url 'admin-drivers' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-person-badge me-2"></i><span class="sidebar-link-text">Manage Drivers</span>
+                            </a>
+                            <a href="{% url 'admin-vehicles' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-truck me-2"></i><span class="sidebar-link-text">Fleet Logistics</span>
+                            </a>
+                            <a href="{% url 'admin-schedules' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-calendar-week me-2"></i><span class="sidebar-link-text">Zone Schedules</span>
+                            </a>
+                            <a href="{% url 'admin-users' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-shield-check me-2"></i><span class="sidebar-link-text">Security Admins</span>
+                            </a>
+                            <a href="{% url 'admin-logs' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-file-earmark-text me-2"></i><span class="sidebar-link-text">Activity Logs</span>
+                            </a>
+                            <a href="{% url 'admin-settings' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-gear me-2"></i><span class="sidebar-link-text">Portal Settings</span>
+                            </a>
+                            <a href="{% url 'notifications' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
+                                <i class="bi bi-bell me-2"></i><span class="sidebar-link-text">Notifications</span>
+                            </a>
+                            <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
+                            </a>
 
-                <div class="nav-section-title">System Control</div>
-                <ul class="sidebar-menu">
-                    <li class="sidebar-item">
-                        <a href="{% url 'admin-users' %}" class="sidebar-link">
-                            <i class="bi bi-shield-check"></i> Security Admins
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{% url 'admin-logs' %}" class="sidebar-link">
-                            <i class="bi bi-file-earmark-text"></i> Activity Logs
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{% url 'admin-settings' %}" class="sidebar-link">
-                            <i class="bi bi-gear"></i> Portal Settings
-                        </a>
-                    </li>
-                </ul>
+                        {% elif user.role == 'driver' %}
+                            <a href="{% url 'driver-dashboard' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-speedometer2 me-2"></i><span class="sidebar-link-text">Dashboard</span>
+                            </a>
+                            <a href="{% url 'notifications' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
+                                <i class="bi bi-bell me-2"></i><span class="sidebar-link-text">Notifications</span>
+                            </a>
+                            <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
+                            </a>
 
-            {% elif user.role == 'driver' %}
-                <div class="nav-section-title">Driver Panel</div>
-                <ul class="sidebar-menu">
-                    <li class="sidebar-item">
-                        <a href="{% url 'driver-dashboard' %}" class="sidebar-link">
-                            <i class="bi bi-speedometer2"></i> Dashboard
-                        </a>
-                    </li>
-                </ul>
-
-            {% else %}
-                <div class="nav-section-title">My Account</div>
-                <ul class="sidebar-menu">
-                    <li class="sidebar-item">
-                        <a href="{% url 'home' %}" class="sidebar-link">
-                            <i class="bi bi-speedometer2"></i> Dashboard
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{% url 'user-requests' %}" class="sidebar-link">
-                            <i class="bi bi-clipboard"></i> My Requests
-                        </a>
-                    </li>
-                </ul>
-            {% endif %}
+                        {% else %}
+                            <a href="{% url 'home' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-house me-2"></i><span class="sidebar-link-text">Dashboard</span>
+                            </a>
+                            <a href="{% url 'user-requests' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-clock-history me-2"></i><span class="sidebar-link-text">My Requests</span>
+                            </a>
+                            <a href="{% url 'notifications' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
+                                <i class="bi bi-bell me-2"></i><span class="sidebar-link-text">Notifications</span>
+                            </a>
+                            <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="sidebar-footer pt-3 border-top border-light">
-            <div class="d-flex align-items-center gap-2">
-                <div class="bg-success bg-opacity-10 p-2 rounded-circle">
-                    <i class="bi bi-building text-success fs-5"></i>
-                </div>
+        <!-- ── मुख्य सामाग्री (Main Content Area) ── -->
+        <div class="content-col">
+            <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <div class="small fw-bold text-dark">WasteMS Pokhara</div>
-                    <div class="text-muted" style="font-size: 0.75rem;">Municipality Node</div>
+                    <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-bell text-success me-2"></i>System Notifications</h2>
+                    <p class="text-muted mb-0">Monitor real-time system alerts, operations, and audit triggers</p>
                 </div>
+                {% if notifications %}
+                <button class="btn btn-outline-success px-3 py-2 fw-semibold btn-sm rounded-2" onclick="markAllRead()">
+                    <i class="bi bi-check-all me-1"></i>Mark All Read
+                </button>
+                {% endif %}
             </div>
-        </div>
-    </nav>
 
-    <main class="portal-content">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-bell text-success me-2"></i>System Notifications</h2>
-                <p class="text-muted mb-0">Monitor real-time system alerts, operations, and audit triggers</p>
-            </div>
-            {% if notifications %}
-            <button class="btn btn-outline-success px-3 py-2 fw-semibold btn-sm rounded-2" onclick="markAllRead()">
-                <i class="bi bi-check-all me-1"></i>Mark All Read
-            </button>
-            {% endif %}
-        </div>
-
-        <div class="card notif-card">
-            <div class="list-group list-group-flush" id="notif-list">
-                {% for notif in notifications %}
-                <div class="list-group-item notif-item {% if not notif.is_read %}unread-style{% endif %}" id="notif-{{ notif.id }}">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <span class="badge rounded-pill px-2 py-1.5 me-2
-                                {% if notif.notification_type == 'success' %}bg-success-subtle text-success border border-success-subtle
-                                {% elif notif.notification_type == 'warning' %}bg-warning-subtle text-warning border border-warning-subtle
-                                {% elif notif.notification_type == 'alert' %}bg-danger-subtle text-danger border border-danger-subtle
-                                {% else %}bg-info-subtle text-info border border-info-subtle{% endif %}">
-                                {{ notif.get_notification_type_display }}
-                            </span>
-                            <strong class="text-dark fs-6">{{ notif.title }}</strong>
-                            {% if not notif.is_read %}
-                            <span class="badge bg-primary ms-1 unread-tag">New</span>
-                            {% endif %}
+            <div class="card notif-card">
+                <div class="list-group list-group-flush" id="notif-list">
+                    {% for notif in notifications %}
+                    <div class="list-group-item notif-item {% if not notif.is_read %}unread-style{% endif %}" id="notif-{{ notif.id }}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <span class="badge rounded-pill px-2 py-1.5 me-2
+                                    {% if notif.notification_type == 'success' %}bg-success-subtle text-success border border-success-subtle
+                                    {% elif notif.notification_type == 'warning' %}bg-warning-subtle text-warning border border-warning-subtle
+                                    {% elif notif.notification_type == 'alert' %}bg-danger-subtle text-danger border border-danger-subtle
+                                    {% else %}bg-info-subtle text-info border border-info-subtle{% endif %}">
+                                    {{ notif.get_notification_type_display }}
+                                </span>
+                                <strong class="text-dark fs-6">{{ notif.title }}</strong>
+                                {% if not notif.is_read %}
+                                <span class="badge bg-primary ms-1 unread-tag">New</span>
+                                {% endif %}
+                            </div>
+                            <small class="text-muted fw-medium">{{ notif.created_at|timesince }} ago</small>
                         </div>
-                        <small class="text-muted fw-medium">{{ notif.created_at|timesince }} ago</small>
-                    </div>
-                    <p class="mb-0 mt-2 text-secondary" style="font-size: 0.9rem;">{{ notif.message }}</p>
+                        <p class="mb-0 mt-2 text-secondary" style="font-size: 0.9rem;">{{ notif.message }}</p>
 
-                    {% if notif.related_request %}
-                    <div class="mt-2">
-                        <span class="badge bg-light text-secondary border rounded-1">Request #{{ notif.related_request.id }}</span>
+                        {% if notif.related_request %}
+                        <div class="mt-2">
+                            <span class="badge bg-light text-secondary border rounded-1">Request #{{ notif.related_request.id }}</span>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
+                    {% empty %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-bell-slash fs-1 d-block mb-2 text-secondary"></i>
+                        <span class="fw-medium">No system notifications found at this time.</span>
+                    </div>
+                    {% endfor %}
                 </div>
-                {% empty %}
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-bell-slash fs-1 d-block mb-2 text-secondary"></i>
-                    <span class="fw-medium">No system notifications found at this time.</span>
-                </div>
-                {% endfor %}
             </div>
-        </div>
 
-        {% if is_paginated %}
-        <nav class="mt-4">
-            <ul class="pagination justify-content-center m-0">
-                {% if page_obj.has_previous %}
-                <li class="page-item"><a class="page-link shadow-none" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
-                {% endif %}
-                <li class="page-item disabled"><span class="page-link text-dark fw-medium">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
-                {% if page_obj.has_next %}
-                <li class="page-item"><a class="page-link shadow-none" href="?page={{ page_obj.next_page_number }}">Next</a></li>
-                {% endif %}
-            </ul>
-        </nav>
-        {% endif %}
-    </main>
+            {% if is_paginated %}
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center m-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link shadow-none" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
+                    {% endif %}
+                    <li class="page-item disabled"><span class="page-link text-dark fw-medium">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link shadow-none" href="?page={{ page_obj.next_page_number }}">Next</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div> <!-- /मुख्य सामाग्री -->
+    </div> <!-- /layout-wrapper -->
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 async function markAllRead() {
-    // फ्रन्टइन्डमा बिना झन्झट तुरुन्तै ब्याकग्राउन्ड र "New" हटाउने
     const unreadItems = document.querySelectorAll('.notif-item.unread-style');
     const unreadTags = document.querySelectorAll('.unread-tag');
     const mainBadge = document.getElementById('notif-badge');
 
-    // तत्कालै लुक चेन्ज गरिदिने (यूजरलाई फास्ट रेस्पोन्स फिल हुन्छ)
     unreadItems.forEach(el => el.classList.remove('unread-style'));
     unreadTags.forEach(el => el.remove());
     if (mainBadge) {
@@ -314,10 +261,8 @@ async function markAllRead() {
         const data = await API.patch('/api/notifications/mark_all_read/', {});
         if (data && (data.message || data.success)) {
             showToast('All notifications marked as read.', 'success');
-            // ४ सेकेन्ड कुर्नु पर्दैन, १ सेकेन्ड भित्र सफासँग डेटा सिंक गर्न रिलोड गर्ने
             setTimeout(() => location.reload(), 800);
         } else {
-            // यदि ब्याकेन्ड फेल भयो भने मात्र पुरानै स्टाइल फिर्ता ल्याउने
             showToast('Failed to update server data.', 'danger');
             unreadItems.forEach(el => el.classList.add('unread-style'));
         }
