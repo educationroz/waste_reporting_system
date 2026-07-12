@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AdminLogViewSet,
     BinViewSet,
+    DatabaseBackupViewSet,
     DriverViewSet,
     NotificationViewSet,
     RouteViewSet,
@@ -23,6 +24,7 @@ router.register('schedules',      ScheduleViewSet,     basename='schedule')
 router.register('notifications',  NotificationViewSet, basename='notification')
 router.register('admin-logs',     AdminLogViewSet,     basename='admin-log')
 router.register('system-settings', SystemSettingsViewSet, basename='system-setting')
+router.register('database-backups', DatabaseBackupViewSet, basename='database-backup')
 
 urlpatterns = [
     path('', include(router.urls)),

@@ -463,7 +463,7 @@
                                 <div class="card-body">
                                     <h6 class="card-title fw-bold text-dark"><i class="bi bi-cloud-arrow-down me-2 text-primary"></i>Create Backup</h6>
                                     <p class="card-text text-muted small">Export all system data to a backup file</p>
-                                    <button class="btn btn-sm btn-primary px-3 fw-semibold">
+                                    <button id="backup-create-btn" class="btn btn-sm btn-primary px-3 fw-semibold">
                                         <i class="bi bi-download me-1"></i>Create Backup
                                     </button>
                                 </div>
@@ -474,7 +474,8 @@
                                 <div class="card-body">
                                     <h6 class="card-title fw-bold text-dark"><i class="bi bi-cloud-arrow-up me-2 text-warning"></i>Restore from Backup</h6>
                                     <p class="card-text text-muted small">Import data from a previously saved backup file</p>
-                                    <button class="btn btn-sm btn-warning fw-semibold text-dark">
+                                    <input id="backup-file-input" type="file" accept=".json" class="d-none">
+                                    <button id="backup-restore-btn" class="btn btn-sm btn-warning fw-semibold text-dark">
                                         <i class="bi bi-upload me-1"></i>Restore Backup
                                     </button>
                                 </div>
@@ -492,15 +493,9 @@
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="small text-dark">
+                                    <tbody id="backup-table-body" class="small text-dark">
                                         <tr>
-                                            <td><code>backup_2024_05_14.sql</code></td>
-                                            <td>125 MB</td>
-                                            <td>2024-05-14 10:30 AM</td>
-                                            <td>
-                                                <button class="btn btn-sm btn-outline-primary py-0 px-2">Download</button>
-                                                <button class="btn btn-sm btn-outline-danger py-0 px-2">Delete</button>
-                                            </td>
+                                            <td colspan="4" class="text-muted text-center py-3">Loading backups...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -697,6 +692,158 @@ function showDepotStatus(text) {
     document.getElementById('depot-status-text').textContent = text;
     el.classList.remove('d-none');
 }
+
+// ── Database Backup / Restore ──────────────────────────────────────────────
+async function loadBackupFiles() {
+    const tableBody = document.getElementById('backup-table-body');
+    if (!tableBody) return;
+
+    try {
+        const res = await fetch('/api/database-backups/history/', {
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+            },
+        });
+
+        if (!res.ok) {
+            throw new Error('Unable to load backup history.');
+        }
+
+        const backups = await res.json();
+        if (!backups.length) {
+            tableBody.innerHTML = '<tr><td colspan="4" class="text-muted text-center py-3">No backups have been created yet.</td></tr>';
+            return;
+        }
+
+        tableBody.innerHTML = backups.map(backup => `
+            <tr>
+                <td><code>${backup.file_name}</code></td>
+                <td>${formatBytes(backup.size_bytes)}</td>
+                <td>${new Date(backup.created_at).toLocaleString()}</td>
+                <td>
+                    <a class="btn btn-sm btn-outline-primary py-0 px-2" href="${backup.download_url}" target="_blank" rel="noopener">Download</a>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteBackup('${backup.file_name}')">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        tableBody.innerHTML = '<tr><td colspan="4" class="text-danger text-center py-3">Unable to load backup history.</td></tr>';
+    }
+}
+
+function formatBytes(bytes) {
+    if (!bytes) return '0 Bytes';
+    const units = ['Bytes', 'KB', 'MB', 'GB'];
+    const unitsIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const value = bytes / Math.pow(1024, unitsIndex);
+    return `${value.toFixed(2)} ${units[unitsIndex]}`;
+}
+
+async function createBackup() {
+    const btn = document.getElementById('backup-create-btn');
+    if (!btn) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating...';
+
+    try {
+        const res = await fetch('/api/database-backups/backup/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.error || 'Unable to create backup.');
+        }
+
+        showToast(`Backup created: ${data.file_name}`, 'success');
+        await loadBackupFiles();
+    } catch (e) {
+        showToast(e.message, 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-download me-1"></i>Create Backup';
+    }
+}
+
+async function deleteBackup(fileName) {
+    if (!window.confirm(`Delete ${fileName}?`)) return;
+
+    try {
+        const res = await fetch(`/api/database-backups/delete/?file_name=${encodeURIComponent(fileName)}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+            },
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.error || 'Unable to delete backup.');
+        }
+
+        showToast(data.message, 'success');
+        await loadBackupFiles();
+    } catch (e) {
+        showToast(e.message, 'danger');
+    }
+}
+
+async function restoreBackup(file) {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('backup_file', file);
+
+    try {
+        const res = await fetch('/api/database-backups/restore/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+            },
+            body: formData,
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.error || 'Unable to restore backup.');
+        }
+
+        showToast(data.message, 'success');
+        await loadBackupFiles();
+    } catch (e) {
+        showToast(e.message, 'danger');
+    }
+}
+
+function attachBackupHandlers() {
+    const createBtn = document.getElementById('backup-create-btn');
+    const restoreBtn = document.getElementById('backup-restore-btn');
+    const fileInput = document.getElementById('backup-file-input');
+
+    if (createBtn) {
+        createBtn.addEventListener('click', createBackup);
+    }
+
+    if (restoreBtn && fileInput) {
+        restoreBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            await restoreBackup(file);
+            event.target.value = '';
+        });
+    }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    attachBackupHandlers();
+    loadBackupFiles();
+});
 
 // ── Add Setting Node Async Trigger ───────────────────────────────────────────
 async function addSetting() {

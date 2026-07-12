@@ -1,3 +1,10 @@
+import io
+from pathlib import Path
+
+from django.conf import settings
+from django.core.management import call_command
+from django.db import transaction
+from django.http import FileResponse
 from django.utils import timezone
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer # type: ignore
@@ -21,6 +28,124 @@ from .serializers import (
 )
 
 CHANNEL_LAYER = get_channel_layer()
+BACKUP_DIR = Path(settings.BASE_DIR) / 'backups'
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _get_backup_files():
+    files = []
+    for backup_path in sorted(BACKUP_DIR.glob('*.json'), key=lambda item: item.stat().st_mtime, reverse=True):
+        files.append({
+            'file_name': backup_path.name,
+            'size_bytes': backup_path.stat().st_size,
+            'created_at': timezone.datetime.fromtimestamp(backup_path.stat().st_mtime, tz=timezone.utc).isoformat(),
+            'download_url': f'/api/database-backups/download/?file_name={backup_path.name}',
+        })
+    return files
+
+
+def _resolve_backup_path(file_name):
+    if not file_name:
+        raise ValueError('file_name is required.')
+
+    candidate = (BACKUP_DIR / file_name).resolve()
+    backup_root = BACKUP_DIR.resolve()
+    if candidate.parent != backup_root:
+        raise ValueError('Invalid backup file location.')
+
+    if not candidate.exists():
+        raise FileNotFoundError(f'Backup file {file_name} was not found.')
+
+    return candidate
+
+
+class DatabaseBackupViewSet(viewsets.GenericViewSet):
+    """Create, list, download, restore, and delete JSON database backups."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    @action(detail=False, methods=['get'])
+    def history(self, request):
+        return Response(_get_backup_files())
+
+    @action(detail=False, methods=['post'])
+    def backup(self, request):
+        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+        file_name = f'backup_{timestamp}.json'
+        file_path = BACKUP_DIR / file_name
+
+        buffer = io.StringIO()
+        try:
+            call_command(
+                'dumpdata',
+                stdout=buffer,
+                indent=2,
+                natural_foreign=True,
+                natural_primary=True,
+                verbosity=0,
+            )
+            file_path.write_text(buffer.getvalue(), encoding='utf-8')
+        except Exception as exc:
+            return Response({'error': f'Backup failed: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            'file_name': file_name,
+            'file_path': str(file_path),
+            'size_bytes': file_path.stat().st_size,
+            'created_at': timezone.now().isoformat(),
+        })
+
+    @action(detail=False, methods=['get'])
+    def download(self, request):
+        file_name = request.query_params.get('file_name')
+        try:
+            backup_path = _resolve_backup_path(file_name)
+        except (ValueError, FileNotFoundError) as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return FileResponse(
+            backup_path.open('rb'),
+            as_attachment=True,
+            filename=backup_path.name,
+            content_type='application/json',
+        )
+
+    @action(detail=False, methods=['delete'])
+    def delete(self, request):
+        file_name = request.query_params.get('file_name')
+        try:
+            backup_path = _resolve_backup_path(file_name)
+        except (ValueError, FileNotFoundError) as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        backup_path.unlink(missing_ok=True)
+        return Response({'message': f'Backup {file_name} deleted successfully.'})
+
+    @action(detail=False, methods=['post'])
+    def restore(self, request):
+        uploaded_file = request.FILES.get('backup_file')
+        if not uploaded_file:
+            return Response({'error': 'backup_file is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not uploaded_file.name.endswith('.json'):
+            return Response({'error': 'Only .json backup files are supported.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        backup_path = BACKUP_DIR / uploaded_file.name
+        with backup_path.open('wb') as backup_file:
+            for chunk in uploaded_file.chunks():
+                backup_file.write(chunk)
+
+        try:
+            with transaction.atomic():
+                call_command('flush', interactive=False, verbosity=0)
+                call_command('loaddata', str(backup_path), verbosity=0)
+        except Exception as exc:
+            return Response({'error': f'Restore failed: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            'message': f'Backup {uploaded_file.name} restored successfully.',
+            'restored_file': uploaded_file.name,
+        })
 
 
 class VehicleViewSet(viewsets.ModelViewSet):
