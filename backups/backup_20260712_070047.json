@@ -1,0 +1,952 @@
+[
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "admin",
+    "model": "logentry"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "auth",
+    "model": "group"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "auth",
+    "model": "permission"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "contenttypes",
+    "model": "contenttype"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "sessions",
+    "model": "session"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "token_blacklist",
+    "model": "blacklistedtoken"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "token_blacklist",
+    "model": "outstandingtoken"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "auth_app",
+    "model": "user"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "api_app",
+    "model": "adminlog"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "api_app",
+    "model": "bin"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "api_app",
+    "model": "complaint"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "api_app",
+    "model": "driver"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "api_app",
+    "model": "notification"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "api_app",
+    "model": "route"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "api_app",
+    "model": "schedule"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "api_app",
+    "model": "systemsettings"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "api_app",
+    "model": "vehicle"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "api_app",
+    "model": "wasterequest"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "bzua3s7so16f0s1ov6a45efiyg4gq2hz",
+  "fields": {
+    "session_data": ".eJxVjEsOAiEQBe_C2hBBfu3SvWcgTdPIqIFkmFkZ766TzEK3r6reS0RclxrXwXOcsjgLJQ6_W0J6cNtAvmO7dUm9LfOU5KbInQ557Zmfl939O6g46rcmAIPFBAemoIVivU8OOVlHZK1mVtqrI2cfgIILcPIFmCAVHwrqpMT7A-s3ODw:1wioBD:qBC64iFUgVkt0wQmQVFpYZEgYiZhVtRDIoX0F_T2eFI",
+    "expire_date": "2026-07-26T07:00:47.423Z"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add log entry",
+    "content_type": [
+      "admin",
+      "logentry"
+    ],
+    "codename": "add_logentry"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change log entry",
+    "content_type": [
+      "admin",
+      "logentry"
+    ],
+    "codename": "change_logentry"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete log entry",
+    "content_type": [
+      "admin",
+      "logentry"
+    ],
+    "codename": "delete_logentry"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view log entry",
+    "content_type": [
+      "admin",
+      "logentry"
+    ],
+    "codename": "view_logentry"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add permission",
+    "content_type": [
+      "auth",
+      "permission"
+    ],
+    "codename": "add_permission"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change permission",
+    "content_type": [
+      "auth",
+      "permission"
+    ],
+    "codename": "change_permission"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete permission",
+    "content_type": [
+      "auth",
+      "permission"
+    ],
+    "codename": "delete_permission"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view permission",
+    "content_type": [
+      "auth",
+      "permission"
+    ],
+    "codename": "view_permission"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add group",
+    "content_type": [
+      "auth",
+      "group"
+    ],
+    "codename": "add_group"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change group",
+    "content_type": [
+      "auth",
+      "group"
+    ],
+    "codename": "change_group"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete group",
+    "content_type": [
+      "auth",
+      "group"
+    ],
+    "codename": "delete_group"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view group",
+    "content_type": [
+      "auth",
+      "group"
+    ],
+    "codename": "view_group"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add content type",
+    "content_type": [
+      "contenttypes",
+      "contenttype"
+    ],
+    "codename": "add_contenttype"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change content type",
+    "content_type": [
+      "contenttypes",
+      "contenttype"
+    ],
+    "codename": "change_contenttype"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete content type",
+    "content_type": [
+      "contenttypes",
+      "contenttype"
+    ],
+    "codename": "delete_contenttype"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view content type",
+    "content_type": [
+      "contenttypes",
+      "contenttype"
+    ],
+    "codename": "view_contenttype"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add session",
+    "content_type": [
+      "sessions",
+      "session"
+    ],
+    "codename": "add_session"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change session",
+    "content_type": [
+      "sessions",
+      "session"
+    ],
+    "codename": "change_session"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete session",
+    "content_type": [
+      "sessions",
+      "session"
+    ],
+    "codename": "delete_session"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view session",
+    "content_type": [
+      "sessions",
+      "session"
+    ],
+    "codename": "view_session"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add Blacklisted Token",
+    "content_type": [
+      "token_blacklist",
+      "blacklistedtoken"
+    ],
+    "codename": "add_blacklistedtoken"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change Blacklisted Token",
+    "content_type": [
+      "token_blacklist",
+      "blacklistedtoken"
+    ],
+    "codename": "change_blacklistedtoken"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete Blacklisted Token",
+    "content_type": [
+      "token_blacklist",
+      "blacklistedtoken"
+    ],
+    "codename": "delete_blacklistedtoken"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view Blacklisted Token",
+    "content_type": [
+      "token_blacklist",
+      "blacklistedtoken"
+    ],
+    "codename": "view_blacklistedtoken"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add Outstanding Token",
+    "content_type": [
+      "token_blacklist",
+      "outstandingtoken"
+    ],
+    "codename": "add_outstandingtoken"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change Outstanding Token",
+    "content_type": [
+      "token_blacklist",
+      "outstandingtoken"
+    ],
+    "codename": "change_outstandingtoken"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete Outstanding Token",
+    "content_type": [
+      "token_blacklist",
+      "outstandingtoken"
+    ],
+    "codename": "delete_outstandingtoken"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view Outstanding Token",
+    "content_type": [
+      "token_blacklist",
+      "outstandingtoken"
+    ],
+    "codename": "view_outstandingtoken"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add User",
+    "content_type": [
+      "auth_app",
+      "user"
+    ],
+    "codename": "add_user"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change User",
+    "content_type": [
+      "auth_app",
+      "user"
+    ],
+    "codename": "change_user"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete User",
+    "content_type": [
+      "auth_app",
+      "user"
+    ],
+    "codename": "delete_user"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view User",
+    "content_type": [
+      "auth_app",
+      "user"
+    ],
+    "codename": "view_user"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add bin",
+    "content_type": [
+      "api_app",
+      "bin"
+    ],
+    "codename": "add_bin"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change bin",
+    "content_type": [
+      "api_app",
+      "bin"
+    ],
+    "codename": "change_bin"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete bin",
+    "content_type": [
+      "api_app",
+      "bin"
+    ],
+    "codename": "delete_bin"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view bin",
+    "content_type": [
+      "api_app",
+      "bin"
+    ],
+    "codename": "view_bin"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add driver",
+    "content_type": [
+      "api_app",
+      "driver"
+    ],
+    "codename": "add_driver"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change driver",
+    "content_type": [
+      "api_app",
+      "driver"
+    ],
+    "codename": "change_driver"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete driver",
+    "content_type": [
+      "api_app",
+      "driver"
+    ],
+    "codename": "delete_driver"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view driver",
+    "content_type": [
+      "api_app",
+      "driver"
+    ],
+    "codename": "view_driver"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add notification",
+    "content_type": [
+      "api_app",
+      "notification"
+    ],
+    "codename": "add_notification"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change notification",
+    "content_type": [
+      "api_app",
+      "notification"
+    ],
+    "codename": "change_notification"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete notification",
+    "content_type": [
+      "api_app",
+      "notification"
+    ],
+    "codename": "delete_notification"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view notification",
+    "content_type": [
+      "api_app",
+      "notification"
+    ],
+    "codename": "view_notification"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add route",
+    "content_type": [
+      "api_app",
+      "route"
+    ],
+    "codename": "add_route"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change route",
+    "content_type": [
+      "api_app",
+      "route"
+    ],
+    "codename": "change_route"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete route",
+    "content_type": [
+      "api_app",
+      "route"
+    ],
+    "codename": "delete_route"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view route",
+    "content_type": [
+      "api_app",
+      "route"
+    ],
+    "codename": "view_route"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add schedule",
+    "content_type": [
+      "api_app",
+      "schedule"
+    ],
+    "codename": "add_schedule"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change schedule",
+    "content_type": [
+      "api_app",
+      "schedule"
+    ],
+    "codename": "change_schedule"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete schedule",
+    "content_type": [
+      "api_app",
+      "schedule"
+    ],
+    "codename": "delete_schedule"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view schedule",
+    "content_type": [
+      "api_app",
+      "schedule"
+    ],
+    "codename": "view_schedule"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add vehicle",
+    "content_type": [
+      "api_app",
+      "vehicle"
+    ],
+    "codename": "add_vehicle"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change vehicle",
+    "content_type": [
+      "api_app",
+      "vehicle"
+    ],
+    "codename": "change_vehicle"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete vehicle",
+    "content_type": [
+      "api_app",
+      "vehicle"
+    ],
+    "codename": "delete_vehicle"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view vehicle",
+    "content_type": [
+      "api_app",
+      "vehicle"
+    ],
+    "codename": "view_vehicle"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add waste request",
+    "content_type": [
+      "api_app",
+      "wasterequest"
+    ],
+    "codename": "add_wasterequest"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change waste request",
+    "content_type": [
+      "api_app",
+      "wasterequest"
+    ],
+    "codename": "change_wasterequest"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete waste request",
+    "content_type": [
+      "api_app",
+      "wasterequest"
+    ],
+    "codename": "delete_wasterequest"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view waste request",
+    "content_type": [
+      "api_app",
+      "wasterequest"
+    ],
+    "codename": "view_wasterequest"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add system settings",
+    "content_type": [
+      "api_app",
+      "systemsettings"
+    ],
+    "codename": "add_systemsettings"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change system settings",
+    "content_type": [
+      "api_app",
+      "systemsettings"
+    ],
+    "codename": "change_systemsettings"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete system settings",
+    "content_type": [
+      "api_app",
+      "systemsettings"
+    ],
+    "codename": "delete_systemsettings"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view system settings",
+    "content_type": [
+      "api_app",
+      "systemsettings"
+    ],
+    "codename": "view_systemsettings"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add admin log",
+    "content_type": [
+      "api_app",
+      "adminlog"
+    ],
+    "codename": "add_adminlog"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change admin log",
+    "content_type": [
+      "api_app",
+      "adminlog"
+    ],
+    "codename": "change_adminlog"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete admin log",
+    "content_type": [
+      "api_app",
+      "adminlog"
+    ],
+    "codename": "delete_adminlog"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view admin log",
+    "content_type": [
+      "api_app",
+      "adminlog"
+    ],
+    "codename": "view_adminlog"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add complaint",
+    "content_type": [
+      "api_app",
+      "complaint"
+    ],
+    "codename": "add_complaint"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change complaint",
+    "content_type": [
+      "api_app",
+      "complaint"
+    ],
+    "codename": "change_complaint"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete complaint",
+    "content_type": [
+      "api_app",
+      "complaint"
+    ],
+    "codename": "delete_complaint"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view complaint",
+    "content_type": [
+      "api_app",
+      "complaint"
+    ],
+    "codename": "view_complaint"
+  }
+},
+{
+  "model": "auth_app.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$urITSjwgg7hGxQPOaxyb6Y$9XaU+HDcamG7uGDXyZI52Tz8C3pt+AoKe6c+djzbOaE=",
+    "last_login": "2026-07-12T07:00:47.422Z",
+    "is_superuser": true,
+    "username": "backupadmin",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-07-12T07:00:46.814Z",
+    "role": "admin",
+    "phone": null,
+    "address": null,
+    "profile_picture": "",
+    "is_verified": false,
+    "created_at": "2026-07-12T07:00:47.418Z",
+    "updated_at": "2026-07-12T07:00:47.418Z",
+    "groups": [],
+    "user_permissions": []
+  }
+}
+]
