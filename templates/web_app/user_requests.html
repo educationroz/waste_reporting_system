@@ -7,41 +7,101 @@
         background-color: #f8f9fa;
         color: #198754 !important;
     }
+
+    /* ==========================================
+       SIDEBAR LAYOUT — flexbox, always side-by-side,
+       kahilyai top मा जाँदैन, screen sano hunda
+       icon-only mode मा खुम्चिन्छ (top मा जाँदैन)
+       ========================================== */
+    .layout-wrapper {
+        display: flex;
+        align-items: stretch;
+        gap: 1.5rem;
+    }
+
+    .sidebar-col {
+        flex: 0 0 220px;
+        max-width: 220px;
+        transition: flex-basis 0.15s ease, max-width 0.15s ease;
+    }
+
     .sidebar-card {
-        min-height: calc(100vh - 100px);
+        height: 100%;
+        position: sticky;
+        top: 20px;
+        z-index: 1020;
+    }
+
+    .content-col {
+        flex: 1 1 auto;
+        min-width: 0; /* overflow bata jogauna (table le parent nafutaos) */
+    }
+
+    .sidebar-logo-text,
+    .sidebar-link-text {
+        white-space: nowrap;
+    }
+
+    /* Screen sano huda — sidebar icon-only, tara SIDE माnai रहन्छ */
+    @media (max-width: 767.98px) {
+        .sidebar-col {
+            flex: 0 0 64px;
+            max-width: 64px;
+        }
+        .sidebar-card .card-body {
+            padding: 0.75rem 0.4rem !important;
+            align-items: center;
+        }
+        .sidebar-logo-text,
+        .sidebar-link-text {
+            display: none;
+        }
+        .sidebar-card .nav-link {
+            justify-content: center;
+            padding: 0.6rem !important;
+        }
+        .sidebar-card .nav-link i {
+            margin: 0 !important;
+            font-size: 1.15rem;
+        }
+        .sidebar-card h5 {
+            text-align: center;
+            padding: 0 !important;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid px-4 py-3">
-    <div class="row g-4 align-items-stretch">
+    <div class="layout-wrapper">
 
         <!-- ── १. साइडबार सेक्सन (Sidebar Section) ── -->
-        <div class="col-12 col-md-3 col-lg-2">
-            <div class="card shadow-sm border-0 sticky-top sidebar-card" style="top: 20px; z-index: 1020;">
+        {% if user.is_authenticated and user.role == 'user' %}
+        <div class="sidebar-col">
+            <div class="card shadow-sm border-0 sidebar-card">
                 <div class="card-body p-3 d-flex flex-column">
-                    <h5 class="text-success fw-bold mb-3 px-2">SafhaSahar</h5>
+                    <h5 class="text-success fw-bold mb-3 px-2">
+                         <span class="sidebar-logo-text">SafhaSahar</span>
+                    </h5>
                     <div class="nav flex-column nav-pills">
-                        <a href="{% url 'home' %}" class="nav-link text-dark mb-2">
-                            <i class="bi bi-house me-2"></i> Dashboard
+                        <a href="{% url 'home' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-house me-2"></i><span class="sidebar-link-text">Dashboard</span>
                         </a>
-                        <a href="{% url 'user-requests' %}" class="nav-link active bg-success mb-2">
-                            <i class="bi bi-clock-history me-2"></i> My Requests
+                        <a href="{% url 'user-requests' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
+                            <i class="bi bi-clock-history me-2"></i><span class="sidebar-link-text">My Requests</span>
                         </a>
-                        {% if user.is_authenticated and user.role == 'user' %}
-                        <a href="{% url 'user-complaints' %}" class="nav-link text-dark mb-2">
-                            <i class="bi bi-exclamation-circle me-2"></i> Complaints
+                        <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
                         </a>
-                        {% endif %}
-                        <hr class="text-muted my-2">
                     </div>
                 </div>
             </div>
         </div>
+        {% endif %}
 
         <!-- ── २. मुख्य सामाग्री (Main Content Area) ── -->
-        <div class="col-12 col-md-9 col-lg-10">
+        <div class="content-col">
 
             <h2 class="mb-4"><i class="bi bi-clipboard text-success me-2"></i>My Requests</h2>
 
@@ -112,7 +172,7 @@
             </div>
 
         </div> <!-- /मुख्य सामाग्री -->
-    </div> <!-- /row -->
+    </div> <!-- /layout-wrapper -->
 </div>
 {% endblock %}
 
