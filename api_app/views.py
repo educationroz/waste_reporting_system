@@ -1,11 +1,11 @@
 from django.utils import timezone
 from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
-from rest_framework import filters, status, viewsets
-from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from channels.layers import get_channel_layer # type: ignore
+from rest_framework import filters, status, viewsets # type: ignore
+from rest_framework.decorators import action # type: ignore
+from rest_framework.permissions import AllowAny, IsAuthenticated # type: ignore
+from rest_framework.response import Response # type: ignore
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser # type: ignore
 from .models import AdminLog, Bin, Driver, Notification, Route, Schedule, SystemSettings, Vehicle, WasteRequest
 from .permissions import IsAdminOrReadOnly, IsAdminUser, IsOwnerOrAdmin
 from .serializers import (
@@ -111,16 +111,32 @@ class BinViewSet(viewsets.ModelViewSet):
 class WasteRequestViewSet(viewsets.ModelViewSet):
     """
     Waste pickup requests.
+    - Anonymous (guest): can create a request only (no login required to report garbage).
     - Regular users: create + view own requests only.
     - Drivers: view assigned requests; update status.
     - Admins: full access + assign drivers.
     """
     serializer_class = WasteRequestSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
-    parser_classes =[MultiPartParser, FormParser, JSONParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['status', 'waste_type', 'pickup_address', 'user__username']
     ordering_fields = ['created_at', 'scheduled_date', 'status']
+
+    def get_permissions(self):
+        """
+        create (submitting a new pickup request) chai guest (login nagareko) lai pani
+        khula rakhne.
+        assign_driver / update_status chai driver/admin le use garne action ho —
+        yaha IsOwnerOrAdmin apply garda driver "owner" nabhako le 403 aauthyo,
+        tesैle yi lai IsAuthenticated matra rakheर, role-check function bhitra nai
+        (already existing) garne.
+        Baaki (list/retrieve/update/delete) chai login + ownership check required nai.
+        """
+        if self.action == 'create':
+            return [AllowAny()]
+        if self.action in ('assign_driver', 'update_status'):
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsOwnerOrAdmin()]
 
     def get_queryset(self):
         user = self.request.user
@@ -130,6 +146,13 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             'driver__user',
             'driver__vehicle',
         )
+
+        # Anonymous user le create bahek arko kunai action hit garyo bhane
+        # (theoretically hunu hudaina kina ki get_permissions le block garcha),
+        # safety net ko lagi khali queryset return garne.
+        if not user.is_authenticated:
+            return base_qs.none()
+
         if user.role == 'admin':
             qs = base_qs
         elif user.role == 'driver':
@@ -141,6 +164,12 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         if status_filter:
             qs = qs.filter(status=status_filter)
         return qs.order_by('-created_at')
+
+    def perform_create(self, serializer):
+        # Login gareko user bhaye tesैle nai owner huncha,
+        # guest bhaye user=None (anonymous report) save huncha.
+        user = self.request.user if self.request.user.is_authenticated else None
+        serializer.save(user=user)
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def assign_driver(self, request, pk=None):
@@ -158,14 +187,15 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         waste_request.status = 'assigned'
         waste_request.save(update_fields=['driver', 'status'])
 
-        # Notify user
-        Notification.objects.create(
-            user=waste_request.user,
-            title='Driver Assigned',
-            message=f'Driver {driver.user.username} has been assigned to your request.',
-            notification_type='info',
-            related_request=waste_request,
-        )
+        # Notify user (guest/anonymous requests won't have a user to notify)
+        if waste_request.user_id:
+            Notification.objects.create(
+                user=waste_request.user,
+                title='Driver Assigned',
+                message=f'Driver {driver.user.username} has been assigned to your request.',
+                notification_type='info',
+                related_request=waste_request,
+            )
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
@@ -188,13 +218,15 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             update_fields.append('completed_at')
         waste_request.save(update_fields=update_fields)
 
-        Notification.objects.create(
-            user=waste_request.user,
-            title='Request Status Updated',
-            message=f'Your request status changed to: {new_status}.',
-            notification_type='success' if new_status == 'completed' else 'info',
-            related_request=waste_request,
-        )
+        # Guest/anonymous requests won't have a user to notify
+        if waste_request.user_id:
+            Notification.objects.create(
+                user=waste_request.user,
+                title='Request Status Updated',
+                message=f'Your request status changed to: {new_status}.',
+                notification_type='success' if new_status == 'completed' else 'info',
+                related_request=waste_request,
+            )
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
 
@@ -245,37 +277,37 @@ class RouteViewSet(viewsets.ModelViewSet):
         }
         """
         from .route_optimizer import generate_optimal_route
-        
+
         driver_id = request.data.get('driver_id')
         waste_request_ids = request.data.get('waste_request_ids', [])
         bin_ids = request.data.get('bin_ids', [])
         planned_date = request.data.get('planned_date')
-        
+
         if not driver_id:
             return Response({'error': 'driver_id is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             driver = Driver.objects.get(id=driver_id)
         except Driver.DoesNotExist:
             return Response({'error': 'Driver not found'}, status=status.HTTP_404_NOT_FOUND)
-        
+
         # Check permissions
         if request.user.role != 'admin' and driver.user != request.user:
             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
-        
+
         # Generate optimized route
         route_data = generate_optimal_route(driver, waste_request_ids, bin_ids)
-        
+
         if 'error' in route_data:
             return Response(route_data, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Create or update route
         from datetime import datetime
         if planned_date:
             planned_date = datetime.strptime(planned_date, '%Y-%m-%d').date()
         else:
             planned_date = datetime.now().date()
-        
+
         route, created = Route.objects.get_or_create(
             driver=driver,
             planned_date=planned_date,
@@ -285,17 +317,17 @@ class RouteViewSet(viewsets.ModelViewSet):
                 'total_distance_km': route_data['total_distance_km'],
             }
         )
-        
+
         if not created:
             route.total_distance_km = route_data['total_distance_km']
             route.save(update_fields=['total_distance_km'])
-        
+
         # Add waste requests and bins to route
         if waste_request_ids:
             route.waste_requests.set(waste_request_ids)
         if bin_ids:
             route.bins.set(bin_ids)
-        
+
         # Broadcast route update via WebSocket
         if CHANNEL_LAYER is not None:
             async_to_sync(CHANNEL_LAYER.group_send)(
@@ -309,7 +341,7 @@ class RouteViewSet(viewsets.ModelViewSet):
                     'total_stops': route_data['total_stops'],
                 }
             )
-        
+
         return Response({
             'route': RouteSerializer(route).data,
             'route_data': route_data,
@@ -386,9 +418,9 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
     serializer_class = SystemSettingsSerializer
     permission_classes = [IsAuthenticated, IsAdminUser]
     lookup_field = 'key'
-    
+
     def perform_create(self, serializer):
         serializer.save(updated_by=self.request.user)
-    
+
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)

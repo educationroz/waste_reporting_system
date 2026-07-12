@@ -13,13 +13,13 @@
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-light shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-light shadow-sm sticky-top" style="z-index: 1030;">
     <div class="container-fluid">
         <a class="navbar-brand d-flex align-items-center" href="/">
-            <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="Logo" width="32" height="32" class="d-inline-block align-text-top me-2">
-            <span class="fw-semibold" style="color: #1fae24;">SafhaSahar</span>
+            <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="Logo" width="40" height="40" class="d-inline-block align-text-top me-2">
+            <span class="fw-semibold" style="color: #049b09;">Safha</span> <span class="fw-semibold" style="color: #56dd59;">Sahar</span>
         </a>
-        
+
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                 data-bs-target="#navMenu" aria-controls="navMenu"
                 aria-expanded="false" aria-label="Toggle navigation">
@@ -38,9 +38,12 @@
                     <li class="nav-item"><a class="nav-link" href="{% url 'route-planning' %}"><i class="bi bi-map me-1"></i>Routes</a></li>
                 {% elif user.role == 'driver' %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'driver-dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
-                {% else %}
-                    <li class="nav-item"><a class="nav-link" href="{% url 'user-dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+                {% elif user.role == 'user' %}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'home' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'user-requests' %}"><i class="bi bi-clipboard me-1"></i>My Requests</a></li>
+                {% else%}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'login' %}"><i class="bi bi-speedometer2 me-1"></i>Login</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'register' %}"><i class="bi bi-person-plus me-1"></i>Register</a></li>
                 {% endif %}
             </ul>
             <ul class="navbar-nav">
@@ -76,7 +79,7 @@
     </div>
 </nav>
 
-<main class="{% if user.is_authenticated %}container-fluid py-4{% endif %}">
+<main class="{% if user.is_authenticated %}container-fluid py-4{% endif %}" style="padding-top: 1rem;">
     {% if messages %}
         <div class="container">
             {% for msg in messages %}
@@ -97,6 +100,20 @@
 <script src="{% static 'web_app/js/main.js' %}"></script>
 {% block extra_js %}{% endblock %}
 
+<script>
+function showToast(message, type = 'success') {
+    const id = 'toast-' + Date.now();
+    const html = `
+        <div id="${id}" class="toast align-items-center text-bg-${type} border-0 show" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>`;
+    document.getElementById('toast-container').insertAdjacentHTML('beforeend', html);
+    setTimeout(() => document.getElementById(id)?.remove(), 4000);
+}
+</script>
 {% if user.is_authenticated %}
 <script>
     const API = {
@@ -171,18 +188,6 @@
         window.location.href = '/logout/';
     }
 
-    function showToast(message, type = 'success') {
-        const id = 'toast-' + Date.now();
-        const html = `
-            <div id="${id}" class="toast align-items-center text-bg-${type} border-0 show" role="alert">
-                <div class="d-flex">
-                    <div class="toast-body">${message}</div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                </div>
-            </div>`;
-        document.getElementById('toast-container').insertAdjacentHTML('beforeend', html);
-        setTimeout(() => document.getElementById(id)?.remove(), 4000);
-    }
 
     try {
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';

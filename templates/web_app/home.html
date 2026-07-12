@@ -1,340 +1,803 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Waste Management System — Live Map{% endblock %}
+{% block title %}Home{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-    #map {
-        height: calc(100vh - 56px);
-        width: calc(95% - 40px);
-        margin: 35px auto;
-        z-index: 1;
-    }
-    .hero-section {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 1000;
-        text-align: center;
-        background: rgba(255, 255, 255, 0.95);
-        padding: 2rem;
-        border-radius: 1rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-        max-width: 400px;
-        display: {% if public_requests|length == 0 %}block{% else %}none{% endif %};
-    }
-    .hero-section h1 { color: #198754; font-weight: 700; }
-    .hero-section p { color: #666; }
-    .hero-section .btn { margin: 0.5rem; }
-
-   
-    /* Wrap map setup safely inside relative layouts */
-    .position-relative {
-        width: 100%;
-        overflow: hidden;
+    /* साइडबारका लिङ्कहरू होभर गर्दा ब्याकग्राउन्ड चेन्ज हुने सानो स्टाइल */
+    .nav-pills .nav-link:not(.active):hover {
+        background-color: #f8f9fa;
+        color: #198754 !important;
     }
 
-    /* Modern Responsive Floating Overlay Layout */
-        .info-panel {
-        position: absolute;
-        top: 2px !important;
-        left: 100px !important;
-        z-index: 1000;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-        overflow: hidden;
-        transition: all 0.25s ease;
-        max-width: 250px;
-        max-height: auto;
+    /* साइडबार पूरा height स्ट्रेच होस् भनेर */
+    .sidebar-card {
+        min-height: calc(100vh - 100px);
     }
-    /* Headers alignment inside card layer */
-    .info-panel-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 12px;
+
+    /* Complaint modal — waste-type-jasto card-style radio buttons */
+    .complaint-type-option {
         cursor: pointer;
-        user-select: none;
-        background-color: #fafafa;
+        border: 1.5px solid #e9ecef;
+        border-radius: 10px;
+        padding: 0.6rem 0.5rem;
+        text-align: center;
+        transition: all 0.15s ease;
+        font-size: 0.82rem;
+        color: #495057;
     }
-
-    .info-panel-header h6 {
-        margin: 0;
-        color: #198754;
-        font-weight: 600;
-        font-size: 0.88rem;
+    .complaint-type-option:hover {
+        border-color: #198754;
+        background: #f1f8f5;
     }
-
-    /* Scroll bar layout nested dynamically inside the collapsible component */
-    .info-panel-body {
-        padding: 12px;
+    .complaint-type-option.active {
+        border-color: #198754;
+        background: #198754;
+        color: #fff;
+    }
+    .complaint-type-option i {
+        font-size: 1.2rem;
         display: block;
-        overflow-y: auto; /* Dherai records vaye vitrai scroll hos */
-        max-height: 250px; /* Max safe layer limit */
-        transition: max-height 0.25s ease, opacity 0.2s ease;
-        opacity: 1;
+        margin-bottom: 0.25rem;
     }
 
-    .info-panel-body.collapsed {
-        max-height: 0 !important;
-        opacity: 0;
-        padding: 0 12px; /* Smooth collapsible bounce */
+    #complaint-photo-drop {
+        border: 2px dashed #dee2e6;
+        border-radius: 10px;
+        padding: 1.25rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        background: #fafafa;
     }
-
-    /* Inner clean metrics */
-    .info-panel .legend-item {
-        display: flex;
-        align-items: center;
-        margin: 6px 0;
-        font-size: 0.85rem;
+    #complaint-photo-drop:hover {
+        border-color: #198754;
+        background: #f1f8f5;
     }
-    
-    .info-panel .legend-color {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        margin-right: 10px;
-        flex-shrink: 0;
-    }
-
-    .info-panel hr {
-        margin: 10px 0;
-        opacity: 0.15;
-    }
-    .info-panel small { color: #666; line-height: 1.4; }
-
-    .navbar { z-index: 2000; }
-    .leaflet-popup-content { min-width: 180px; }
-    .leaflet-popup-content strong { display: block; margin-bottom: 4px; }
-    .leaflet-popup-content .badge { display: inline-block; margin: 2px 0; }
-    .leaflet-popup-content small { color: #666; display: block; margin-top: 4px; }
-
-/* Mobile standard view optimizations */
-    @media (max-width: 576px) {
-        .info-panel {
-            width: 180px; /* Small phone screen layout scaling */
-            top: 10px !important;
-            left: 10px !important;
-        }
-        .info-panel-header h6 {
-            font-size: 0.78rem;
-        }
-        .info-panel-header {
-            padding: 8px;
-        }
-        .info-panel-body {
-            padding: 8px;
-            max-height: 180px;
-        }
-    }
-    
-    /* Leaflet Control adjustments so zoom triggers don't collide */
-    .leaflet-top.leaflet-left {
-        margin-top: 75px; /* Box muni zoom controls automatic line up hunchhan */
-    }
-    
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="position-relative">
+<div class="container-fluid px-4 py-3">
+    <div class="row g-4 align-items-stretch">
 
-    <!-- Info Panel -->
-    <div class="info-panel" id="infoPanel">
-        <div class="info-panel-header" onclick="toggleInfoPanel()">
-            <h6><i class="bi bi-recycle me-2"></i>Live Waste Reports</h6>
-            <button class="info-panel-toggle" id="toggleBtn" aria-label="Toggle panel" aria-expanded="true">
-                <i class="bi bi-chevron-up"></i>
-            </button>
-        </div>
-        <div class="info-panel-body" id="infoPanelBody">
-            <div class="legend-item">
-                <span class="legend-color" style="background: #ffc107;"></span>
-                <small>Pending</small>
-            </div>
-            <div class="legend-item">
-                <span class="legend-color" style="background: #6c757d;"></span>
-                <small>Assigned</small>
-            </div>
-            <div class="legend-item">
-                <span class="legend-color" style="background: #0dcaf0;"></span>
-                <small>In Progress</small>
-            </div>
-            <div class="legend-item">
-                <span class="legend-color" style="background: #198754;"></span>
-                <small>Completed</small>
-            </div>
-            <hr>
-            <small>
-                Showing {{ public_requests|length }} reports with locations.<br>
-                {% if user.is_authenticated %}
-                    <a href="{% if user.role == 'admin' %}{% url 'admin-dashboard' %}{% elif user.role == 'driver' %}{% url 'driver-dashboard' %}{% else %}{% url 'user-dashboard' %}{% endif %}" class="text-success">
-                        Go to Dashboard
-                    </a> to submit a report.
-                {% else %}
-                    <a href="{% url 'login' %}" class="text-success">Sign in</a> to submit your report.
-                {% endif %}
-            </small>
-        </div>
-    </div>
-
-    <!-- Map Container -->
-    <div id="map"></div>
-</div>
- 
-<div class="card shadow-sm mb-4">
-        <div class="card-header bg-white fw-bold">
-            <i class="bi bi-plus-circle text-success me-2"></i>New Pickup Request
-        </div>
-        <div class="card-body">
-            <div class="row g-3">
-
-                <!-- Photo Upload -->
-                <div class="col-12">
-                    <label class="form-label fw-semibold">
-                        Upload Garbage Photo
-                        <span class="text-muted small fw-normal">— GPS location auto-extracted if available</span>
-                    </label>
-                    <input type="file" id="garbage-photo" class="form-control"
-                        accept="image/*" capture="environment" onchange="handlePhotoUpload(this)">
-                </div>
-
-                <!-- Photo Preview -->
-                <div class="col-12 d-none" id="photo-preview-section">
-                    <img id="photo-preview" src="" alt="Preview"
-                        class="img-thumbnail" style="max-height:200px">
-                    <div id="exif-info" class="mt-2 small"></div>
-                </div>
-
-                <!-- Leaflet Map -->
-                <div class="col-12">
-                    <label class="form-label fw-semibold">
-                        Location
-                        <span class="text-muted small fw-normal">— click map or drag pin to adjust</span>
-                    </label>
-                    <div id="map" style="height:300px; border-radius:8px; border:1px solid #dee2e6;"></div>
-                    <div class="mt-1 small text-muted">
-                        <i class="bi bi-geo-alt me-1"></i>
-                        Lat: <span id="display-lat">detecting...</span> &nbsp;
-                        Lng: <span id="display-lng">detecting...</span>
+        <!-- ── १. साइडबार सेक्सन (Sidebar Section) ── -->
+        <div class="col-12 col-md-3 col-lg-2">
+            <div class="card shadow-sm border-0 sticky-top sidebar-card" style="top: 20px; z-index: 1020;">
+                <div class="card-body p-3 d-flex flex-column">
+                    <h5 class="text-success fw-bold mb-3 px-2">SafhaSahar</h5>
+                    <div class="nav flex-column nav-pills">
+                        <a href="#" class="nav-link active bg-success mb-2">
+                            <i class="bi bi-house me-2"></i> Dashboard
+                        </a>
+                        <a href="{% if user.is_authenticated %}{% url 'user-requests' %}{% else %}{% url 'login' %}{% endif %}" class="nav-link text-dark mb-2">
+                            <i class="bi bi-clock-history me-2"></i> My Requests
+                        </a>
+                        {% if user.is_authenticated and user.role == 'user' %}
+                        <a href="{% url 'user-complaints' %}" class="nav-link text-dark mb-2">
+                            <i class="bi bi-exclamation-circle me-2"></i> Complaints
+                        </a>
+                        {% endif %}
+                        <hr class="text-muted my-2">
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <!-- Hidden coordinate fields -->
-                <input type="hidden" id="req-lat">
-                <input type="hidden" id="req-lng">
+        <!-- ── २. मुख्य सामाग्री (Main Content Area) ── -->
+        <div class="col-12 col-md-9 col-lg-10">
 
-                <!-- Form Fields -->
-                <div class="col-md-4">
-                    <label class="form-label">Waste Type</label>
-                    <select id="waste-type" class="form-select" data-bs-toggle="tooltip" data-bs-placement="top" title="Select the type of waste to be collected">
-                        <option value="general">General Waste</option>
-                        <option value="recyclable">Recyclable</option>
-                        <option value="organic">Organic</option>
-                        <option value="bulky">Bulky Item</option>
-                        <option value="hazardous">Hazardous</option>
-                    </select>
+            {% if user.is_authenticated and user.role == 'user' %}
+            <h2 class="mb-4"><i class="bi bi-house text-success me-2"></i>Welcome, {{ user.first_name|default:user.username }}!</h2>
+
+            <!-- Stats -->
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-warning bg-opacity-10 h-100">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">Pending</div>
+                            <div class="fs-2 fw-bold text-warning">{{ pending_count }}</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">Pickup Address</label>
-                    <input type="text" id="pickup-address" class="form-control"
-                        placeholder="Enter your address">
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-success bg-opacity-10 h-100">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">Completed</div>
+                            <div class="fs-2 fw-bold text-success">{{ completed_count }}</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">Preferred Date</label>
-                    <input type="datetime-local" id="scheduled-date" class="form-control">
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-danger bg-opacity-10 h-100 d-flex align-items-center justify-content-center cursor-pointer"
+                         style="cursor:pointer" data-bs-toggle="modal" data-bs-target="#complaintModal">
+                        <div class="card-body text-center py-3 w-100">
+                            <div class="text-danger small mb-1"><i class="bi bi-megaphone-fill me-1"></i>Have an issue?</div>
+                            <div class="fw-bold text-danger">File a Complaint</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-12">
-                    <label class="form-label">Description (optional)</label>
-                    <textarea id="description" class="form-control" rows="2"
-                        placeholder="Describe the garbage..."></textarea>
+            </div>
+            {% endif %}
+
+            <!-- New Request Card — sabai lai (login chahidaina) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-plus-circle text-success me-2"></i>New Pickup Request
                 </div>
-                <div class="col-12">
-                    <button class="btn btn-success" id="submit-btn" onclick="submitRequest()">
-                        <span id="submit-text"><i class="bi bi-send me-2"></i>Submit Request</span>
-                        <span id="submit-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
-                    </button>
+                <div class="card-body">
+                    <div class="row g-3">
+
+                        <!-- Photo Upload -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">
+                                Upload Garbage Photo
+                                <span class="text-muted small fw-normal">— GPS location auto-extracted if available</span>
+                            </label>
+                            <input type="file" id="garbage-photo" class="form-control"
+                                accept="image/*" capture="environment" onchange="handlePhotoUpload(this)">
+                        </div>
+
+                        <!-- Photo Preview -->
+                        <div class="col-12 d-none" id="photo-preview-section">
+                            <img id="photo-preview" src="" alt="Preview"
+                                class="img-thumbnail" style="max-height:200px">
+                            <div id="exif-info" class="mt-2 small"></div>
+                        </div>
+
+                        <!-- Leaflet Map -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">
+                                Location
+                                <span class="text-muted small fw-normal">— click map or drag pin to adjust</span>
+                            </label>
+                            <div id="map" style="height:300px; border-radius:8px; border:1px solid #dee2e6;"></div>
+                            <div class="mt-1 small text-muted">
+                                <i class="bi bi-geo-alt me-1"></i>
+                                Lat: <span id="display-lat">detecting...</span> &nbsp;
+                                Lng: <span id="display-lng">detecting...</span>
+                            </div>
+                        </div>
+
+                        <!-- Hidden coordinate fields -->
+                        <input type="hidden" id="req-lat">
+                        <input type="hidden" id="req-lng">
+
+                        <!-- Form Fields -->
+                        <div class="col-md-4">
+                            <label class="form-label">Waste Type</label>
+                            <select id="waste-type" class="form-select" data-bs-toggle="tooltip" data-bs-placement="top" title="Select the type of waste to be collected">
+                                <option value="general">General Waste</option>
+                                <option value="recyclable">Recyclable</option>
+                                <option value="organic">Organic</option>
+                                <option value="bulky">Bulky Item</option>
+                                <option value="hazardous">Hazardous</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Pickup Address</label>
+                            <input type="text" id="pickup-address" class="form-control"
+                                placeholder="Enter your address">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Preferred Date</label>
+                            <input type="datetime-local" id="scheduled-date" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description (optional)</label>
+                            <textarea id="description" class="form-control" rows="2"
+                                placeholder="Describe the garbage..."></textarea>
+                        </div>
+                        <div class="col-12">
+                            {% if not user.is_authenticated %}
+                            <div class="alert alert-light border small mb-2">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Want to Track your requests and get notifications?
+                                <a href="{% url 'login' %}">Sign in</a> to track waste.
+                            </div>
+                            <div class="alert alert-light border small mb-3">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Any Complaints?
+                                <a href="{% url 'login' %}">Sign in</a> for complaints.
+                            </div>
+                            {% endif %}
+
+                            <button class="btn btn-success" id="submit-btn" onclick="submitRequest()">
+                                <span id="submit-text"><i class="bi bi-send me-2"></i>Submit Request</span>
+                                <span id="submit-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            <!-- Recent Requests Table -->
+            {% if user.is_authenticated and user.role == 'user' %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">
+                        <i class="bi bi-clock-history text-success me-2"></i>Recent Requests
+                    </span>
+                    <a href="{% url 'user-requests' %}" class="btn btn-sm btn-outline-success">View All</a>
+                </div>
+                <div class="card-body p-0 table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Driver</th>
+                                <th>Photo</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in my_requests %}
+                            <tr id="home-request-row-{{ req.id }}">
+                                <td>{{ req.id }}</td>
+                                <td>{{ req.get_waste_type_display }}</td>
+                                <td>
+                                    <span class="badge
+                                        {% if req.status == 'completed' %}bg-success
+                                        {% elif req.status == 'pending' %}bg-warning text-dark
+                                        {% elif req.status == 'in_progress' %}bg-info
+                                        {% elif req.status == 'cancelled' %}bg-danger
+                                        {% else %}bg-primary{% endif %}">
+                                        {{ req.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="small">{{ req.driver.user.username|default:"—" }}</td>
+                                <td>
+                                    {% if req.photo %}
+                                    <a href="{{ req.photo.url }}" target="_blank">
+                                        <img src="{{ req.photo.url }}" alt="photo"
+                                            style="height:36px;width:36px;object-fit:cover;border-radius:4px;">
+                                    </a>
+                                    {% else %}
+                                    <span class="text-muted small">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small text-muted">{{ req.scheduled_date|date:"d M Y" }}</td>
+                                <td>
+                                    {% if req.status == 'pending' %}
+                                    <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }})">
+                                        Cancel
+                                    </button>
+                                    {% elif req.status == 'completed' or req.status == 'cancelled' or req.status == 'in_progress' %}
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }})">
+                                        <i class="bi bi-trash3"></i> Delete
+                                    </button>
+                                    {% else %}
+                                    —
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-3">
+                                    No requests yet. Submit one above!
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+        </div> <!-- /मुख्य सामाग्री -->
+    </div> <!-- /row -->
+</div>
+
+<!-- ── Complaint Modal ─────────────────────────────────────────────────────── -->
+<div class="modal fade" id="complaintModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-megaphone-fill me-2"></i>File a Complaint</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+
+                <!-- Complaint Type — card-style options -->
+                <label class="form-label fw-semibold mb-2">What's the issue?</label>
+                <div class="row g-2 mb-3" id="complaint-type-group">
+                    <div class="col-4">
+                        <div class="complaint-type-option active" data-value="missed_pickup">
+                            <i class="bi bi-truck"></i>Missed Pickup
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="complaint-type-option" data-value="driver_behavior">
+                            <i class="bi bi-person-x"></i>Driver Behavior
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="complaint-type-option" data-value="illegal_dumping">
+                            <i class="bi bi-exclamation-triangle"></i>Illegal Dumping
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="complaint-type-option" data-value="overflowing_bin">
+                            <i class="bi bi-trash3"></i>Overflowing Bin
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="complaint-type-option" data-value="app_issue">
+                            <i class="bi bi-phone"></i>App Issue
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="complaint-type-option" data-value="other">
+                            <i class="bi bi-three-dots"></i>Other
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" id="complaint-type" value="missed_pickup">
+
+                <!-- Description -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Description *</label>
+                    <textarea id="complaint-description" class="form-control" rows="3"
+                        placeholder="Describe your complaint in detail..."></textarea>
+                </div>
+
+                <!-- Photo upload — drop-zone style -->
+                <div class="mb-2">
+                    <label class="form-label fw-semibold">
+                        Attach Photo <span class="text-muted small fw-normal">(optional)</span>
+                    </label>
+                    <div id="complaint-photo-drop" onclick="document.getElementById('complaint-photo').click()">
+                        <i class="bi bi-camera fs-3 text-muted d-block mb-1"></i>
+                        <span class="small text-muted">Click to upload an image as evidence</span>
+                    </div>
+                    <input type="file" id="complaint-photo" class="d-none"
+                        accept="image/*" onchange="handleComplaintPhotoUpload(this)">
+                </div>
+
+                <div class="d-none mt-2" id="complaint-photo-preview-section">
+                    <div class="position-relative d-inline-block">
+                        <img id="complaint-photo-preview" src="" alt="Preview"
+                            class="img-thumbnail" style="max-height:160px">
+                        <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 rounded-circle p-0"
+                            style="width:22px;height:22px;line-height:1;" onclick="removeComplaintPhoto()">
+                            <i class="bi bi-x" style="font-size:0.9rem;"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-danger px-4" id="complaint-submit-btn" onclick="submitComplaint()">
+                    <span id="complaint-submit-text"><i class="bi bi-send me-1"></i>Submit Complaint</span>
+                    <span id="complaint-submit-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
+                </button>
             </div>
         </div>
     </div>
+</div>
 
-{{ public_requests|json_script:"public-requests-data" }}
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-function toggleInfoPanel() {
-    const body = document.getElementById('infoPanelBody');
-    const btn = document.getElementById('toggleBtn');
-    const isCollapsed = body.classList.contains('collapsed');
-    body.classList.toggle('collapsed');
-    btn.classList.toggle('collapsed');
-    btn.setAttribute('aria-expanded', isCollapsed ? 'true' : 'false');
-}
+// ── State ────────────────────────────────────────────────────────────────────
+let map = null;
+let marker = null;
+let photoFile = null;
 
-document.addEventListener('DOMContentLoaded', function() {
-    const rawData = document.getElementById('public-requests-data').textContent;
-    const requests = JSON.parse(rawData);
+// Default location — Pokhara, Nepal
+const DEFAULT_LAT = 28.2096;
+const DEFAULT_LNG = 83.9856;
 
-    const map = L.map('map').setView([28.2096, 83.9856], 13);
+// ── Map ──────────────────────────────────────────────────────────────────────
+function initMap(lat, lng) {
+    if (map) {
+        marker.setLatLng([lat, lng]);
+        map.setView([lat, lng], 16);
+        updateCoords(lat, lng);
+        return;
+    }
+
+    map = L.map('map').setView([lat, lng], 15);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
     }).addTo(map);
 
-    const statusColors = {
-        'pending': '#ffc107',
-        'assigned': '#6c757d',
-        'in_progress': '#0dcaf0',
-        'completed': '#198754',
-        'cancelled': '#dc3545'
-    };
+    marker = L.marker([lat, lng], { draggable: true })
+        .addTo(map)
+        .bindPopup('<b>Garbage location</b><br>Drag to adjust')
+        .openPopup();
 
-    function createCircleIcon(color) {
-        return L.divIcon({
-            className: 'custom-marker',
-            html: `<div style="
-                background-color: ${color};
-                width: 20px;
-                height: 20px;
-                border-radius: 50%;
-                border: 2px solid white;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            "></div>`,
-            iconSize: [20, 20],
-            iconAnchor: [10, 10]
-        });
-    }
-
-    const markers = [];
-    requests.forEach(req => {
-        const color = statusColors[req.status] || '#999';
-        const icon = createCircleIcon(color);
-        const marker = L.marker([req.latitude, req.longitude], { icon: icon })
-            .addTo(map)
-            .bindPopup(`
-                <div>
-                    <strong>Request #${req.id}</strong><br>
-                    <span class="badge" style="background:${color};color:white">
-                        ${req.status_display}
-                    </span><br>
-                    <small><strong>Type:</strong> ${req.waste_type_display}</small><br>
-                    <small><strong>Address:</strong> ${req.pickup_address}</small><br>
-                    <small><strong>Reported by:</strong> ${req.username}</small>
-                    ${req.driver_name ? `<small><strong>Driver:</strong> ${req.driver_name}</small>` : ''}
-                </div>
-            `);
-        markers.push(marker);
+    marker.on('dragend', function () {
+        const pos = marker.getLatLng();
+        updateCoords(pos.lat, pos.lng);
     });
 
-    if (markers.length > 0) {
-        const group = L.featureGroup(markers);
-        map.fitBounds(group.getBounds().pad(0.1));
+    map.on('click', function (e) {
+        marker.setLatLng(e.latlng);
+        updateCoords(e.latlng.lat, e.latlng.lng);
+    });
+
+    updateCoords(lat, lng);
+}
+
+function updateCoords(lat, lng) {
+    const latF = parseFloat(lat).toFixed(6);
+    const lngF = parseFloat(lng).toFixed(6);
+    document.getElementById('display-lat').textContent = latF;
+    document.getElementById('display-lng').textContent = lngF;
+    document.getElementById('req-lat').value = latF;
+    document.getElementById('req-lng').value = lngF;
+
+    reverseGeocodeDebounced(latF, lngF);
+}
+
+// ── Reverse Geocoding ────────────────────────────────────────────────────────
+let geocodeTimer = null;
+
+function reverseGeocodeDebounced(lat, lng) {
+    const addressField = document.getElementById('pickup-address');
+    addressField.placeholder = 'Detecting address...';
+
+    clearTimeout(geocodeTimer);
+    geocodeTimer = setTimeout(() => reverseGeocode(lat, lng), 600);
+}
+
+async function reverseGeocode(lat, lng) {
+    const addressField = document.getElementById('pickup-address');
+    try {
+        const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+            { headers: { 'Accept-Language': 'en' } }
+        );
+        if (!res.ok) throw new Error('geocode failed');
+        const data = await res.json();
+
+        if (data && data.display_name) {
+            addressField.value = data.display_name;
+        }
+    } catch (e) {
+        // Fallback for user custom text
+    } finally {
+        addressField.placeholder = 'Enter your address';
+    }
+}
+
+window.addEventListener('load', () => {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            pos => initMap(pos.coords.latitude, pos.coords.longitude),
+            ()   => initMap(DEFAULT_LAT, DEFAULT_LNG),
+            { timeout: 8000 }
+        );
+    } else {
+        initMap(DEFAULT_LAT, DEFAULT_LNG);
     }
 });
+
+// ── EXIF Photo Handler ───────────────────────────────────────────────────────
+async function handlePhotoUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    photoFile = file;
+
+    const previewSection = document.getElementById('photo-preview-section');
+    const preview = document.getElementById('photo-preview');
+    const exifInfo = document.getElementById('exif-info');
+
+    preview.src = URL.createObjectURL(file);
+    previewSection.classList.remove('d-none');
+    exifInfo.innerHTML = '<span class="text-muted">Reading EXIF data...</span>';
+
+    try {
+        const exifr = await import('https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.esm.js');
+        const gps = await exifr.gps(file);
+
+        if (gps && gps.latitude && gps.longitude) {
+            const lat = gps.latitude;
+            const lng = gps.longitude;
+
+            exifInfo.innerHTML = `
+                <span class="text-success">
+                    <i class="bi bi-geo-alt-fill me-1"></i>
+                    GPS extracted from photo:
+                    <strong>${lat.toFixed(6)}, ${lng.toFixed(6)}</strong>
+                </span>`;
+
+            initMap(lat, lng);
+            showToast('GPS location extracted from photo!', 'success');
+        } else {
+            exifInfo.innerHTML = `
+                <span class="text-warning">
+                    <i class="bi bi-exclamation-circle me-1"></i>
+                    No GPS in this photo — set location manually on the map.
+                </span>`;
+        }
+    } catch (err) {
+        exifInfo.innerHTML = `
+            <span class="text-muted">
+                <i class="bi bi-info-circle me-1"></i>
+                No GPS data available — set location manually on the map.
+            </span>`;
+    }
+}
+
+// ── Token helper ─────────────────────────────────────────────────────────────
+async function getOptionalToken() {
+    const access = localStorage.getItem('access_token');
+    const refresh = localStorage.getItem('refresh_token');
+
+    if (!access) return null;
+
+    try {
+        const res = await fetch('/api/notifications/unread/', {
+            headers: { 'Authorization': `Bearer ${access}` }
+        });
+
+        if (res.status === 401) {
+            if (!refresh) return null;
+
+            const refreshRes = await fetch('/auth/token/refresh/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh }),
+            });
+
+            if (refreshRes.ok) {
+                const data = await refreshRes.json();
+                localStorage.setItem('access_token', data.access);
+                return data.access;
+            } else {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                return null;
+            }
+        }
+        return access;
+    } catch {
+        return access;
+    }
+}
+
+// ── Submit Request ───────────────────────────────────────────────────────────
+async function submitRequest() {
+    const address  = document.getElementById('pickup-address').value.trim();
+    const date     = document.getElementById('scheduled-date').value;
+    const lat      = document.getElementById('req-lat').value;
+    const lng      = document.getElementById('req-lng').value;
+    const btn      = document.getElementById('submit-btn');
+    const text     = document.getElementById('submit-text');
+    const spinner  = document.getElementById('submit-spinner');
+
+    if (!address) {
+        showToast('Please enter a pickup address.', 'warning');
+        return;
+    }
+    if (!date) {
+        showToast('Please select a preferred date.', 'warning');
+        return;
+    }
+
+    btn.disabled = true;
+    text.innerHTML = 'Submitting...';
+    spinner.classList.remove('d-none');
+
+    const formData = new FormData();
+    formData.append('waste_type',     document.getElementById('waste-type').value);
+    formData.append('pickup_address', address);
+    formData.append('scheduled_date', date);
+    formData.append('description',    document.getElementById('description').value.trim());
+    formData.append('latitude',       lat);
+    formData.append('longitude',      lng);
+
+    if (photoFile) {
+        formData.append('photo',           photoFile);
+        formData.append('photo_latitude',  lat);
+        formData.append('photo_longitude', lng);
+    }
+
+    try {
+        const token = await getOptionalToken();
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/waste-requests/', {
+            method: 'POST',
+            headers,
+            body: formData,
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            showToast('Request submitted successfully!', 'success');
+            document.getElementById('garbage-photo').value = '';
+            document.getElementById('pickup-address').value = '';
+            document.getElementById('scheduled-date').value = '';
+            document.getElementById('description').value = '';
+            document.getElementById('photo-preview-section').classList.add('d-none');
+            photoFile = null;
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            const errMsg = typeof data === 'object'
+                ? Object.entries(data).map(([k,v]) => `${k}: ${v}`).join(', ')
+                : JSON.stringify(data);
+            showToast('Error: ' + errMsg, 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
+    } finally {
+        btn.disabled = false;
+        text.innerHTML = '<i class="bi bi-send me-2"></i>Submit Request';
+        spinner.classList.add('d-none');
+    }
+}
+
+// ── Cancel Request ────────────────────────────────────────────────────────
+async function cancelRequest(requestId) {
+    if (!confirm('Cancel this request?')) return;
+
+    const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
+    if (data && data.id) {
+        showToast('Request cancelled.', 'success');
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Failed to cancel request.', 'danger');
+    }
+}
+
+// ── Delete Request ───────────────────────────────────────────────────────────
+async function deleteRequest(requestId) {
+    if (!confirm('Permanently delete this request? This cannot be undone.')) return;
+
+    try {
+        const res = await fetch(`/api/waste-requests/${requestId}/`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            },
+        });
+
+        if (res.ok) {
+            showToast('Request deleted.', 'success');
+            const row = document.getElementById(`home-request-row-${requestId}`);
+            if (row) row.remove();
+        } else {
+            let errMsg = 'Failed to delete request.';
+            try {
+                const data = await res.json();
+                errMsg = typeof data === 'object'
+                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                    : String(data);
+            } catch (e) {}
+            showToast(errMsg, 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
+    }
+}
+
+// ── Tooltip ──────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+
+// ── Complaint Modal Logic ─────────────────────────────────────────────────────
+let complaintPhotoFile = null;
+
+// Complaint type card selection
+document.querySelectorAll('.complaint-type-option').forEach(el => {
+    el.addEventListener('click', () => {
+        document.querySelectorAll('.complaint-type-option').forEach(o => o.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('complaint-type').value = el.dataset.value;
+    });
+});
+
+function handleComplaintPhotoUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    complaintPhotoFile = file;
+
+    const previewSection = document.getElementById('complaint-photo-preview-section');
+    const preview = document.getElementById('complaint-photo-preview');
+    preview.src = URL.createObjectURL(file);
+    previewSection.classList.remove('d-none');
+}
+
+function removeComplaintPhoto() {
+    complaintPhotoFile = null;
+    document.getElementById('complaint-photo').value = '';
+    document.getElementById('complaint-photo-preview-section').classList.add('d-none');
+}
+
+function resetComplaintForm() {
+    document.getElementById('complaint-description').value = '';
+    removeComplaintPhoto();
+    document.querySelectorAll('.complaint-type-option').forEach(o => o.classList.remove('active'));
+    document.querySelector('.complaint-type-option[data-value="missed_pickup"]').classList.add('active');
+    document.getElementById('complaint-type').value = 'missed_pickup';
+}
+
+async function submitComplaint() {
+    const description = document.getElementById('complaint-description').value.trim();
+    const complaintType = document.getElementById('complaint-type').value;
+    const btn = document.getElementById('complaint-submit-btn');
+    const text = document.getElementById('complaint-submit-text');
+    const spinner = document.getElementById('complaint-submit-spinner');
+
+    if (!description) {
+        showToast('Please describe your complaint.', 'warning');
+        return;
+    }
+
+    btn.disabled = true;
+    text.innerHTML = 'Submitting...';
+    spinner.classList.remove('d-none');
+
+    const formData = new FormData();
+    formData.append('complaint_type', complaintType);
+    formData.append('description', description);
+    if (complaintPhotoFile) {
+        formData.append('photo', complaintPhotoFile);
+    }
+
+    try {
+        const res = await fetch('/api/complaints/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            },
+            body: formData,
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            showToast('Complaint submitted successfully!', 'success');
+            resetComplaintForm();
+            bootstrap.Modal.getInstance(document.getElementById('complaintModal')).hide();
+        } else {
+            const errMsg = typeof data === 'object'
+                ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                : JSON.stringify(data);
+            showToast('Error: ' + errMsg, 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
+    } finally {
+        btn.disabled = false;
+        text.innerHTML = '<i class="bi bi-send me-1"></i>Submit Complaint';
+        spinner.classList.add('d-none');
+    }
+}
+
+// ── WebSocket Real-time Status Updates ───────────────────────────────────────
+{% if user.is_authenticated %}
+try {
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const token = localStorage.getItem('access_token');
+    const wsURL = token
+        ? `${protocol}${location.host}/ws/requests/?token=${encodeURIComponent(token)}`
+        : `${protocol}${location.host}/ws/requests/`;
+    const ws = new WebSocket(wsURL);
+    ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.type === 'request_update') {
+            showToast(`Request #${data.request_id} updated to: ${data.status}`, 'info');
+            setTimeout(() => location.reload(), 1500);
+        }
+    };
+} catch (e) {}
+{% endif %}
 </script>
 {% endblock %}

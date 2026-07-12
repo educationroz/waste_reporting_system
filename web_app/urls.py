@@ -15,20 +15,23 @@ from .views import (
     NotificationsView,
     RegisterPageView,
     RoutePlanningView,
-    UserDashboardView,
+    # UserDashboardView,
     UserRequestListView,
+    UserComplaintListView,
     web_logout,
+
 )
 
 urlpatterns = [
     # Public
     path('',          HomeView.as_view(),         name='home'),
+    path('complaints/', UserComplaintListView.as_view(), name='user-complaints'),
     path('login/',    LoginPageView.as_view(),    name='login'),
     path('logout/',   web_logout,                 name='web-logout'),
     path('register/', RegisterPageView.as_view(), name='register'),
 
     # User
-    path('dashboard/',         UserDashboardView.as_view(),   name='user-dashboard'),
+    # path('dashboard/',         UserDashboardView.as_view(),   name='user-dashboard'),
     path('my-requests/',       UserRequestListView.as_view(), name='user-requests'),
     path('notifications/',     NotificationsView.as_view(),   name='notifications'),
 

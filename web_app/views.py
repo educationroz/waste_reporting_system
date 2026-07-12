@@ -5,26 +5,65 @@ from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.generic import ListView, TemplateView
 
-from api_app.models import Driver, Notification, Route, Schedule, Vehicle, WasteRequest
+from api_app.models import Driver, Notification, Route, Schedule, Vehicle, WasteRequest, Complaint
 
 User = get_user_model()
 
 
 # ─── Public / Auth Pages ───────────────────────────────────────────────────────
 
+# class HomeView(TemplateView):
+#     template_name = 'web_app/home.html'
+
+#     def get_context_data(self, **kwargs):
+#         ctx = super().get_context_data(**kwargs)
+#         # Public: show all requests with coordinates on map (limited to 100)
+#         qs = WasteRequest.objects.filter(
+#             status__in=['pending', 'assigned', 'in_progress', 'completed'],
+#             latitude__isnull=False,
+#             longitude__isnull=False
+#         ).select_related('user', 'driver__user').order_by('-created_at')[:100]
+
+#         # Prepare JSON-serializable list
+#         public_data = []
+#         for req in qs:
+#             public_data.append({
+#                 'id': req.id,
+#                 'latitude': float(req.latitude),
+#                 'longitude': float(req.longitude),
+#                 'status': req.status,
+#                 'status_display': req.get_status_display(),
+#                 'waste_type': req.waste_type,
+#                 'waste_type_display': req.get_waste_type_display(),
+#                 'pickup_address': req.pickup_address or '',
+#                 'username': req.user.username if req.user else 'Unknown',
+#                 'driver_name': req.driver.user.username if req.driver and req.driver.user else None,
+#             })
+#         ctx['public_requests'] = public_data
+#         return ctx
+
+# ─── User Dashboard ────────────────────────────────────────────────────────────
+
 class HomeView(TemplateView):
     template_name = 'web_app/home.html'
 
+    def dispatch(self, request, *args, **kwargs):
+        # Admin/driver lai afnै dashboard ma pathaune, tara guest ra normal 'user' lai home nai dekhaune
+        if request.user.is_authenticated and request.user.role in ('admin', 'driver'):
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        # Public: show all requests with coordinates on map (limited to 100)
+        user = self.request.user
+
+        # ── Map: sabai lai dekhine (login chahidaina) ──────────────────
         qs = WasteRequest.objects.filter(
             status__in=['pending', 'assigned', 'in_progress', 'completed'],
             latitude__isnull=False,
             longitude__isnull=False
         ).select_related('user', 'driver__user').order_by('-created_at')[:100]
 
-        # Prepare JSON-serializable list
         public_data = []
         for req in qs:
             public_data.append({
@@ -40,8 +79,54 @@ class HomeView(TemplateView):
                 'driver_name': req.driver.user.username if req.driver and req.driver.user else None,
             })
         ctx['public_requests'] = public_data
+
+        if user.is_authenticated and user.role == 'user':
+            ctx['my_requests'] = (
+                WasteRequest.objects.filter(user=user)
+                .select_related('driver__user')
+                .order_by('-created_at')[:5]
+            )
+            ctx['pending_count'] = WasteRequest.objects.filter(user=user, status='pending').count()
+            ctx['completed_count'] = WasteRequest.objects.filter(user=user, status='completed').count()
+            ctx['unread_notifications'] = Notification.objects.filter(
+                user=user, is_read=False
+            ).order_by('-created_at')[:5]
+
         return ctx
 
+class UserRequestListView(LoginRequiredMixin, ListView):
+    template_name = 'web_app/user_requests.html'
+    context_object_name = 'requests'
+    paginate_by = 10
+
+    def get_queryset(self):
+        return (
+            WasteRequest.objects.filter(user=self.request.user)
+            .select_related('driver__user')
+            .order_by('-created_at')
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['waste_type_choices'] = WasteRequest.WASTE_TYPE_CHOICES
+        return ctx
+    
+class UserComplaintListView(LoginRequiredMixin, ListView):
+    template_name = 'web_app/user_complaints.html'
+    context_object_name = 'complaints'
+    paginate_by = 10
+
+    def get_queryset(self):
+        return (
+            Complaint.objects.filter(user=self.request.user)
+            .select_related('related_request', 'related_request__driver__user')
+            .order_by('-created_at')
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['complaint_type_choices'] = Complaint.COMPLAINT_TYPE_CHOICES
+        return ctx
 
 class LoginPageView(TemplateView):
     """Renders the login page. Actual login handled via REST API + JS."""
@@ -61,6 +146,7 @@ class RegisterPageView(TemplateView):
         if request.user.is_authenticated:
             return redirect_by_role(request.user)
         return super().dispatch(request, *args, **kwargs)
+
 
 
 # ─── Admin Dashboard ───────────────────────────────────────────────────────────
@@ -264,49 +350,6 @@ class AdminScheduleListView(LoginRequiredMixin, ListView):
         return ctx
 
 
-# ─── User Dashboard ────────────────────────────────────────────────────────────
-
-class UserDashboardView(LoginRequiredMixin, TemplateView):
-    template_name = 'web_app/user_dashboard.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated and request.user.role != 'user':
-            return redirect_by_role(request.user)
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        user = self.request.user
-        ctx['my_requests'] = (
-            WasteRequest.objects.filter(user=user)
-            .select_related('driver__user')
-            .order_by('-created_at')[:5]
-        )
-        ctx['pending_count'] = WasteRequest.objects.filter(user=user, status='pending').count()
-        ctx['completed_count'] = WasteRequest.objects.filter(user=user, status='completed').count()
-        ctx['unread_notifications'] = Notification.objects.filter(
-            user=user, is_read=False
-        ).order_by('-created_at')[:5]
-        return ctx
-
-
-class UserRequestListView(LoginRequiredMixin, ListView):
-    template_name = 'web_app/user_requests.html'
-    context_object_name = 'requests'
-    paginate_by = 10
-
-    def get_queryset(self):
-        return (
-            WasteRequest.objects.filter(user=self.request.user)
-            .select_related('driver__user')
-            .order_by('-created_at')
-        )
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx['waste_type_choices'] = WasteRequest.WASTE_TYPE_CHOICES
-        return ctx
-
 
 # ─── Driver Dashboard ──────────────────────────────────────────────────────────
 
@@ -480,9 +523,9 @@ def redirect_by_role(user):
     role_redirect = {
         'admin': '/admin-dashboard/',
         'driver': '/driver-dashboard/',
-        'user': '/dashboard/',
+        'user': '/',
     }
-    return redirect(role_redirect.get(user.role, '/dashboard/'))
+    return redirect(role_redirect.get(user.role, '/'))
 
 
 def web_logout(request):

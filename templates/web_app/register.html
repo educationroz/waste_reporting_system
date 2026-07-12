@@ -1,12 +1,14 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Register — Waste Management{% endblock %}
+{% load static %}
+
+{% block title %}Register — Waste Collection{% endblock %}
 
 {% block content %}
 <div class="min-vh-100 d-flex align-items-center justify-content-center bg-light py-4">
     <div class="card shadow-sm" style="width:440px">
         <div class="card-body p-4">
             <div class="text-center mb-4">
-                <i class="bi bi-recycle text-success" style="font-size:2.5rem"></i>
+                <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="Logo" width="100" height="100" class="d-inline-block align-text-top me-2">
                 <h4 class="mt-2 fw-bold">Create Account</h4>
             </div>
 
@@ -16,7 +18,7 @@
             <div class="row">
                 <div class="col-6 mb-3">
                     <label class="form-label">Username *</label>
-                    <input type="text" id="username" class="form-control">
+                    <input type="text" id="username" class="form-control" autofocus>
                 </div>
                 <div class="col-6 mb-3">
                     <label class="form-label">Email *</label>
@@ -37,11 +39,19 @@
             <div class="row">
                 <div class="col-6 mb-3">
                     <label class="form-label">Password *</label>
-                    <input type="password" id="password" class="form-control">
+                    <div class="position-relative">
+                        <input type="password" id="password" class="form-control pe-5" oninput="handlePasswordInput()">
+                        <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
+                            id="toggle-password-icon" style="cursor: pointer; display: none;" onclick="togglePassword()"></i>
+                    </div>
                 </div>
                 <div class="col-6 mb-3">
                     <label class="form-label">Confirm Password *</label>
-                    <input type="password" id="password2" class="form-control">
+                    <div class="position-relative">
+                        <input type="password" id="password2" class="form-control pe-5" oninput="handlePassword2Input()">
+                        <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
+                            id="toggle-password2-icon" style="cursor: pointer; display: none;" onclick="togglePassword2()"></i>
+                    </div>
                 </div>
             </div>
 
@@ -59,6 +69,19 @@
 {% endblock %}
 
 {% block extra_js %}
+<style>
+    /* ब्राउजरहरूको आफ्नै डिफल्ट रिभिल/क्लियर बटन पूर्ण रूपमा फाल्न */
+    input::-webkit-reveal,
+    input::-webkit-clear-button {
+        display: none !important;
+    }
+
+    input::-ms-reveal,
+    input::-ms-clear {
+        display: none !important;
+    }
+</style>
+
 <script>
 async function doRegister() {
     const errDiv = document.getElementById('error-alert');
@@ -145,6 +168,76 @@ function getCookie(name) {
         });
     }
     return cookieValue;
+}
+
+// Enter key थिच्दा अर्को इनपुट फिल्डमा फोकस लैजाने लोजिक
+const fieldOrder = ['username', 'email', 'phone', 'role', 'password', 'password2'];
+
+fieldOrder.forEach((id, idx) => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const nextId = fieldOrder[idx + 1];
+                if (nextId) {
+                    document.getElementById(nextId).focus();
+                } else {
+                    doRegister();
+                }
+            }
+        });
+    }
+});
+
+// पहिलो Password फिल्डको लागि Eye Icon कन्ट्रोल
+function handlePasswordInput() {
+    const pwdInput = document.getElementById('password');
+    const icon = document.getElementById('toggle-password-icon');
+    if (pwdInput.value.length > 0) {
+        icon.style.display = 'block';
+    } else {
+        icon.style.display = 'none';
+    }
+}
+
+function togglePassword() {
+    const pwdInput = document.getElementById('password');
+    const icon = document.getElementById('toggle-password-icon');
+    if (pwdInput.type === 'password') {
+        pwdInput.type = 'text';
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+    } else {
+        pwdInput.type = 'password';
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
+    }
+}
+
+// दोस्रो (Confirm) Password फिल्डको लागि Eye Icon कन्ट्रोल
+function handlePassword2Input() {
+    const pwdInput = document.getElementById('password2');
+    const icon = document.getElementById('toggle-password2-icon');
+    if (pwdInput.value.length > 0) {
+        icon.style.display = 'block';
+    } else {
+        icon.style.display = 'none';
+    }
+}
+
+function togglePassword2() {
+    const pwdInput = document.getElementById('password2');
+    const icon = document.getElementById('toggle-password2-icon');
+    if (pwdInput.type === 'password') {
+        pwdInput.type = 'text';
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+    } else {
+        pwdInput.type = 'password';
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
+    }
 }
 </script>
 {% endblock %}

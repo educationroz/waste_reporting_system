@@ -120,7 +120,9 @@ class WasteRequest(models.Model):
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='waste_requests',
     )
     driver = models.ForeignKey(
@@ -356,3 +358,20 @@ class SystemSettings(models.Model):
 
     def __str__(self):
         return f"{self.key}: {self.value}"
+    
+class Complaint(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    subject = models.CharField(max_length=255)
+    description = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'complaints'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"Complaint by {self.user.username}: {self.subject}"

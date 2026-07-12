@@ -1,0 +1,340 @@
+{% comment %} {% extends 'web_app/base.html' %}
+{% block title %}Waste Management System — Live Map{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+    #map {
+        height: calc(100vh - 56px);
+        width: calc(95% - 40px);
+        margin: 35px auto;
+        z-index: 1;
+    }
+    .hero-section {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        max-width: 400px;
+        display: {% if public_requests|length == 0 %}block{% else %}none{% endif %};
+    }
+    .hero-section h1 { color: #198754; font-weight: 700; }
+    .hero-section p { color: #666; }
+    .hero-section .btn { margin: 0.5rem; }
+
+   
+    /* Wrap map setup safely inside relative layouts */
+    .position-relative {
+        width: 100%;
+        overflow: hidden;
+    }
+
+    /* Modern Responsive Floating Overlay Layout */
+        .info-panel {
+        position: absolute;
+        top: 2px !important;
+        left: 100px !important;
+        z-index: 1000;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        overflow: hidden;
+        transition: all 0.25s ease;
+        max-width: 250px;
+        max-height: auto;
+    }
+    /* Headers alignment inside card layer */
+    .info-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px;
+        cursor: pointer;
+        user-select: none;
+        background-color: #fafafa;
+    }
+
+    .info-panel-header h6 {
+        margin: 0;
+        color: #198754;
+        font-weight: 600;
+        font-size: 0.88rem;
+    }
+
+    /* Scroll bar layout nested dynamically inside the collapsible component */
+    .info-panel-body {
+        padding: 12px;
+        display: block;
+        overflow-y: auto; /* Dherai records vaye vitrai scroll hos */
+        max-height: 250px; /* Max safe layer limit */
+        transition: max-height 0.25s ease, opacity 0.2s ease;
+        opacity: 1;
+    }
+
+    .info-panel-body.collapsed {
+        max-height: 0 !important;
+        opacity: 0;
+        padding: 0 12px; /* Smooth collapsible bounce */
+    }
+
+    /* Inner clean metrics */
+    .info-panel .legend-item {
+        display: flex;
+        align-items: center;
+        margin: 6px 0;
+        font-size: 0.85rem;
+    }
+    
+    .info-panel .legend-color {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 10px;
+        flex-shrink: 0;
+    }
+
+    .info-panel hr {
+        margin: 10px 0;
+        opacity: 0.15;
+    }
+    .info-panel small { color: #666; line-height: 1.4; }
+
+    .navbar { z-index: 2000; }
+    .leaflet-popup-content { min-width: 180px; }
+    .leaflet-popup-content strong { display: block; margin-bottom: 4px; }
+    .leaflet-popup-content .badge { display: inline-block; margin: 2px 0; }
+    .leaflet-popup-content small { color: #666; display: block; margin-top: 4px; }
+
+/* Mobile standard view optimizations */
+    @media (max-width: 576px) {
+        .info-panel {
+            width: 180px; /* Small phone screen layout scaling */
+            top: 10px !important;
+            left: 10px !important;
+        }
+        .info-panel-header h6 {
+            font-size: 0.78rem;
+        }
+        .info-panel-header {
+            padding: 8px;
+        }
+        .info-panel-body {
+            padding: 8px;
+            max-height: 180px;
+        }
+    }
+    
+    /* Leaflet Control adjustments so zoom triggers don't collide */
+    .leaflet-top.leaflet-left {
+        margin-top: 75px; /* Box muni zoom controls automatic line up hunchhan */
+    }
+    
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="position-relative">
+
+    <!-- Info Panel -->
+    <div class="info-panel" id="infoPanel">
+        <div class="info-panel-header" onclick="toggleInfoPanel()">
+            <h6><i class="bi bi-recycle me-2"></i>Live Waste Reports</h6>
+            <button class="info-panel-toggle" id="toggleBtn" aria-label="Toggle panel" aria-expanded="true">
+                <i class="bi bi-chevron-up"></i>
+            </button>
+        </div>
+        <div class="info-panel-body" id="infoPanelBody">
+            <div class="legend-item">
+                <span class="legend-color" style="background: #ffc107;"></span>
+                <small>Pending</small>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #6c757d;"></span>
+                <small>Assigned</small>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #0dcaf0;"></span>
+                <small>In Progress</small>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #198754;"></span>
+                <small>Completed</small>
+            </div>
+            <hr>
+            <small>
+                Showing {{ public_requests|length }} reports with locations.<br>
+                {% if user.is_authenticated %}
+                    <a href="{% if user.role == 'admin' %}{% url 'admin-dashboard' %}{% elif user.role == 'driver' %}{% url 'driver-dashboard' %}{% else %}{% url 'user-dashboard' %}{% endif %}" class="text-success">
+                        Go to Dashboard
+                    </a> to submit a report.
+                {% else %}
+                    <a href="{% url 'login' %}" class="text-success">Sign in</a> to submit your report.
+                {% endif %}
+            </small>
+        </div>
+    </div>
+
+    <!-- Map Container -->
+    <div id="map"></div>
+</div>
+ 
+<div class="card shadow-sm mb-4">
+        <div class="card-header bg-white fw-bold">
+            <i class="bi bi-plus-circle text-success me-2"></i>New Pickup Request
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+
+                <!-- Photo Upload -->
+                <div class="col-12">
+                    <label class="form-label fw-semibold">
+                        Upload Garbage Photo
+                        <span class="text-muted small fw-normal">— GPS location auto-extracted if available</span>
+                    </label>
+                    <input type="file" id="garbage-photo" class="form-control"
+                        accept="image/*" capture="environment" onchange="handlePhotoUpload(this)">
+                </div>
+
+                <!-- Photo Preview -->
+                <div class="col-12 d-none" id="photo-preview-section">
+                    <img id="photo-preview" src="" alt="Preview"
+                        class="img-thumbnail" style="max-height:200px">
+                    <div id="exif-info" class="mt-2 small"></div>
+                </div>
+
+                <!-- Leaflet Map -->
+                <div class="col-12">
+                    <label class="form-label fw-semibold">
+                        Location
+                        <span class="text-muted small fw-normal">— click map or drag pin to adjust</span>
+                    </label>
+                    <div id="map" style="height:300px; border-radius:8px; border:1px solid #dee2e6;"></div>
+                    <div class="mt-1 small text-muted">
+                        <i class="bi bi-geo-alt me-1"></i>
+                        Lat: <span id="display-lat">detecting...</span> &nbsp;
+                        Lng: <span id="display-lng">detecting...</span>
+                    </div>
+                </div>
+
+                <!-- Hidden coordinate fields -->
+                <input type="hidden" id="req-lat">
+                <input type="hidden" id="req-lng">
+
+                <!-- Form Fields -->
+                <div class="col-md-4">
+                    <label class="form-label">Waste Type</label>
+                    <select id="waste-type" class="form-select" data-bs-toggle="tooltip" data-bs-placement="top" title="Select the type of waste to be collected">
+                        <option value="general">General Waste</option>
+                        <option value="recyclable">Recyclable</option>
+                        <option value="organic">Organic</option>
+                        <option value="bulky">Bulky Item</option>
+                        <option value="hazardous">Hazardous</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Pickup Address</label>
+                    <input type="text" id="pickup-address" class="form-control"
+                        placeholder="Enter your address">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Preferred Date</label>
+                    <input type="datetime-local" id="scheduled-date" class="form-control">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Description (optional)</label>
+                    <textarea id="description" class="form-control" rows="2"
+                        placeholder="Describe the garbage..."></textarea>
+                </div>
+                <div class="col-12">
+                    <button class="btn btn-success" id="submit-btn" onclick="submitRequest()">
+                        <span id="submit-text"><i class="bi bi-send me-2"></i>Submit Request</span>
+                        <span id="submit-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{{ public_requests|json_script:"public-requests-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+function toggleInfoPanel() {
+    const body = document.getElementById('infoPanelBody');
+    const btn = document.getElementById('toggleBtn');
+    const isCollapsed = body.classList.contains('collapsed');
+    body.classList.toggle('collapsed');
+    btn.classList.toggle('collapsed');
+    btn.setAttribute('aria-expanded', isCollapsed ? 'true' : 'false');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const rawData = document.getElementById('public-requests-data').textContent;
+    const requests = JSON.parse(rawData);
+
+    const map = L.map('map').setView([28.2096, 83.9856], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    const statusColors = {
+        'pending': '#ffc107',
+        'assigned': '#6c757d',
+        'in_progress': '#0dcaf0',
+        'completed': '#198754',
+        'cancelled': '#dc3545'
+    };
+
+    function createCircleIcon(color) {
+        return L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="
+                background-color: ${color};
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                border: 2px solid white;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            "></div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+    }
+
+    const markers = [];
+    requests.forEach(req => {
+        const color = statusColors[req.status] || '#999';
+        const icon = createCircleIcon(color);
+        const marker = L.marker([req.latitude, req.longitude], { icon: icon })
+            .addTo(map)
+            .bindPopup(`
+                <div>
+                    <strong>Request #${req.id}</strong><br>
+                    <span class="badge" style="background:${color};color:white">
+                        ${req.status_display}
+                    </span><br>
+                    <small><strong>Type:</strong> ${req.waste_type_display}</small><br>
+                    <small><strong>Address:</strong> ${req.pickup_address}</small><br>
+                    <small><strong>Reported by:</strong> ${req.username}</small>
+                    ${req.driver_name ? `<small><strong>Driver:</strong> ${req.driver_name}</small>` : ''}
+                </div>
+            `);
+        markers.push(marker);
+    });
+
+    if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.1));
+    }
+});
+</script>
+{% endblock %} {% endcomment %}

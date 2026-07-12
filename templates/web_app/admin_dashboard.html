@@ -421,8 +421,16 @@
                                     {% for req in recent_requests %}
                                     <tr>
                                         <td class="fw-bold text-secondary">#{{ req.id }}</td>
+                                        {% if req.user %}
                                         <td>{{ req.user.username }}</td>
-                                        <td><span class="badge bg-light text-dark border">{{ req.get_waste_type_display }}</span></td>
+                                        {% else %}
+                                        <td><span class="badge bg-secondary bg-opacity-10 text-secondary border"><i class="bi bi-person-x me-1"></i>Guest</span></td>
+                                        {% endif %}
+                                        <td>
+                                            <span class="badge bg-secondary bg-opacity-10 text-secondary border px-2.5 py-1">
+                                                {{ req.get_waste_type_display }}
+                                            </span>
+                                        </td>
                                         <td>
                                             <span class="badge px-2 py-1
                                                 {% if req.status == 'completed' %}bg-success
@@ -443,11 +451,15 @@
                                         <td class="small text-muted">{{ req.scheduled_date|date:"d M Y" }}</td>
                                         <td>
                                             {% if req.status == 'pending' %}
-                                            <button class="btn btn-sm btn-outline-success py-1 px-2" style="font-size: 0.8rem;" onclick="openAssignModal({{ req.id }})">
-                                                <i class="bi bi-person-plus me-1"></i>Assign
+                                            <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }})">
+                                                Cancel
+                                            </button>
+                                            {% elif req.status == 'completed' or req.status == 'cancelled' or req.status == 'assigned' or req.status == 'in_progress' %}
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }})">
+                                                <i class="bi bi-trash3"></i> Delete
                                             </button>
                                             {% else %}
-                                            <span class="text-muted small">-</span>
+                                            —
                                             {% endif %}
                                         </td>
                                     </tr>
@@ -468,7 +480,7 @@
                         {% for req in recent_status_changes %}
                         <div class="list-group-item d-flex justify-content-between align-items-center p-3">
                             <div>
-                                <div class="fw-semibold text-dark">Request Record #{{ req.id }} — <span class="text-muted">{{ req.user.username }}</span></div>
+                                <div class="fw-semibold text-dark">Request Record #{{ req.id }} — <span class="text-muted">{% if req.user %}{{ req.user.username }}{% else %}<i class="bi bi-person-x"></i> Guest{% endif %}</span></div>
                                 <div class="small text-secondary mt-1">Status compiled to <strong>{{ req.get_status_display }}</strong> on {{ req.updated_at|date:"d M Y H:i" }}</div>
                             </div>
                             <span class="badge {% if req.status == 'completed' %}bg-success{% elif req.status == 'pending' %}bg-warning text-dark{% elif req.status == 'in_progress' %}bg-info{% elif req.status == 'cancelled' %}bg-danger{% else %}bg-primary{% endif %} rounded-pill px-3">{{ req.get_status_display }}</span>
@@ -633,6 +645,50 @@ async function assignDriver() {
         showToast('Failed to deploy driver node.', 'danger');
     }
 }
+
+async function cancelRequest(requestId) {
+    if (!confirm('Cancel this request?')) return;
+    const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
+    if (data && data.id) {
+        showToast('Request cancelled.', 'success');
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Failed to cancel request.', 'danger');
+    }
+}
+
+// 👇 Naya: Delete Request (completed/cancelled/assigned)
+// DELETE le 204 No Content (khali body) return garcha, tesैle
+// API.delete() (jun sadhai res.json() call garcha) nagari direct fetch() bata handle
+async function deleteRequest(requestId) {
+    if (!confirm('Permanently delete this request? This cannot be undone.')) return;
+
+    try {
+        const res = await fetch(`/api/waste-requests/${requestId}/`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+            },
+        });
+
+        if (res.ok) {
+            showToast('Request deleted.', 'success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            let errMsg = 'Failed to delete request.';
+            try {
+                const data = await res.json();
+                errMsg = typeof data === 'object'
+                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                    : String(data);
+            } catch (e) { /* body khali huna sakcha */ }
+            showToast(errMsg, 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
+    }
+}
+
 
 function applyFilters() {
     const searchTerm = document.getElementById('search-box').value.trim();
