@@ -151,11 +151,18 @@ SIMPLE_JWT = {
 
 # ─── Channels Layer ────────────────────────────────────────────────────────────
 # Redis backend requires Redis 5.0+ (BZPOPMIN support).
-# For local development, set USE_REDIS=false in .env to use in-memory channels.
-USE_REDIS = config('USE_REDIS', default=True, cast=bool)
+# For local development, the project now safely falls back to the in-memory backend
+# when Redis support is unavailable or when USE_REDIS is not enabled.
+USE_REDIS = config('USE_REDIS', default=False, cast=bool)
 REDIS_HOST = config('REDIS_HOST', default='127.0.0.1')
 REDIS_PORT = config('REDIS_PORT', default=6379, cast=int)
 REDIS_PASSWORD = config('REDIS_PASSWORD', default='')
+
+if USE_REDIS:
+    try:
+        import channels_redis  # noqa: F401
+    except ImportError:
+        USE_REDIS = False
 
 if USE_REDIS:
     redis_host_config = (REDIS_HOST, REDIS_PORT)

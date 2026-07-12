@@ -7,6 +7,7 @@ from django.db import transaction
 from django.http import FileResponse
 from django.utils import timezone
 from asgiref.sync import async_to_sync
+from channels.exceptions import InvalidChannelLayerError
 from channels.layers import get_channel_layer # type: ignore
 from rest_framework import filters, status, viewsets # type: ignore
 from rest_framework.decorators import action # type: ignore
@@ -27,7 +28,11 @@ from .serializers import (
     WasteRequestSerializer,
 )
 
-CHANNEL_LAYER = get_channel_layer()
+try:
+    CHANNEL_LAYER = get_channel_layer()
+except InvalidChannelLayerError:
+    CHANNEL_LAYER = None
+
 BACKUP_DIR = Path(settings.BASE_DIR) / 'backups'
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 

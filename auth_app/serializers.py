@@ -3,8 +3,6 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from api_app.models import Driver
-
 User = get_user_model()
 
 
@@ -60,13 +58,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
 
-        if user.role == 'driver':
-            Driver.objects.create(
-                user=user,
-                license_number=f'DRIVER-{user.id}',
-                is_available=True,
-            )
-
+        # Driver profile is auto-created by auth_app.signals.sync_driver_profile
+        # after the user is saved, so this serializer should not create it again.
         return user
 
 

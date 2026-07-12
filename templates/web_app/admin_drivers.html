@@ -249,6 +249,9 @@
                 <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-person-badge text-success me-2"></i>Drivers Management</h2>
                 <p class="text-muted mb-0">Monitor active field staff registry, verify logistics permits, and allocate municipal vehicle fleets.</p>
             </div>
+            <button type="button" class="btn btn-success fw-semibold px-4" data-bs-toggle="modal" data-bs-target="#addDriverModal">
+                <i class="bi bi-person-plus me-2"></i>Add Driver
+            </button>
         </div>
 
         <!-- Drivers Primary Records Card -->
@@ -369,10 +372,119 @@
         {% endif %}
     </main>
 </div>
+
+<!-- Add Driver Modal -->
+<div class="modal fade" id="addDriverModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white border-bottom-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Add Driver</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="addDriverForm">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Username</label>
+                        <input type="text" class="form-control" id="driver_username" placeholder="Enter driver username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Email</label>
+                        <input type="email" class="form-control" id="driver_email" placeholder="driver@municipality.org" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Phone</label>
+                        <input type="text" class="form-control" id="driver_phone" placeholder="Optional phone number">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Address</label>
+                        <textarea class="form-control" id="driver_address" rows="3" placeholder="Optional address"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Password</label>
+                        <input type="password" class="form-control" id="driver_password" placeholder="Create password" required>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label small fw-semibold text-secondary">Confirm Password</label>
+                        <input type="password" class="form-control" id="driver_password2" placeholder="Re-enter password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-light border-top-0">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success px-4" onclick="addDriver()">Create Driver</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+async function addDriver() {
+    const username = document.getElementById('driver_username').value.trim();
+    const email = document.getElementById('driver_email').value.trim();
+    const phone = document.getElementById('driver_phone').value.trim();
+    const address = document.getElementById('driver_address').value.trim();
+    const password = document.getElementById('driver_password').value;
+    const password2 = document.getElementById('driver_password2').value;
+
+    if (!username || !email || !password || !password2) {
+        showToast('Please fill in username, email, and both password fields.', 'warning');
+        return;
+    }
+
+    if (password !== password2) {
+        showToast('Passwords do not match.', 'warning');
+        return;
+    }
+
+    try {
+        const res = await fetch('/auth/register/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                username,
+                email,
+                password,
+                password2,
+                role: 'driver',
+                phone,
+                address,
+            }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data?.message || data?.detail || JSON.stringify(data));
+        }
+
+        showToast('Driver created successfully!', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('addDriverModal')).hide();
+        setTimeout(() => location.reload(), 900);
+    } catch (e) {
+        showToast('Failed to create driver: ' + e.message, 'danger');
+    }
+}
+
 async function toggleAvailability(driverId, currentlyAvailable) {
     const data = await API.patch(`/api/drivers/${driverId}/`, { is_available: !currentlyAvailable });
     if (data && data.id) {
