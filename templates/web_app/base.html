@@ -9,7 +9,63 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="{% static 'web_app/css/main.css' %}" rel="stylesheet">
-    {% block extra_css %}{% endblock %}
+    {% block extra_css %}
+    <style>
+        /* १. लोगो र ब्रान्डको नामलाई अनुवाद हुनबाट रोक्ने */
+  .navbar-brand, .navbar-brand * {
+      translate: no !important;
+  }
+
+  /* २. गुगलको माथिल्लो सेतो/निलो पट्टी (Banner Bar) पूर्ण रूपमा हटाउने */
+  .goog-te-banner-frame, 
+  .goog-te-banner-frame.skiptranslate, 
+  .goog-vi-gtrans, 
+  #goog-gt-tt, 
+  .goog-te-balloon-frame {
+      display: none !important;
+  }
+  
+  body {
+      top: 0px !important;
+  }
+
+  /* ३. भाषा छान्ने बक्सलाई स्क्रिनको बिचमा प्रोफेसनल देखाउने स्टाइल */
+  #custom-lang-switcher {
+      position: fixed;
+      top: 85px; /* नेभिगेसन बार भन्दा ठीक मुनि */
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1040; /* Navbar भन्दा माथि बस्न */
+      background: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+      border: 2px solid #049b09; /* Safha Sahar को थिम हरियो रंग */
+  }
+
+  /* ४. गुगलको आफ्नो लोगो लुकाउने */
+  .goog-logo-link {
+      display: none !important;
+  }
+  
+  .goog-te-gadget {
+      color: transparent !important;
+      font-size: 0px !important;
+  }
+
+  /* ५. ड्रपडाउन (Select Box) लाई सफा बनाउने */
+  .goog-te-gadget .goog-te-combo {
+      color: #333 !important;
+      font-size: 15px !important;
+      font-weight: 600;
+      padding: 6px 15px;
+      border-radius: 20px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      outline: none;
+  }
+    </style>
+    {% endblock %}
 </head>
 <body>
 
@@ -41,7 +97,6 @@
                 {% elif user.role == 'user' %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'home' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'user-requests' %}"><i class="bi bi-clipboard me-1"></i>My Requests</a></li>
-                    
                     <li class="nav-item"><a class="nav-link" href="{% url 'user-recycle-bin' %}"><i class="bi bi-recycle me-1"></i>Recycle Bin</a></li>
                 {% else%}
                     <li class="nav-item"><a class="nav-link" href="{% url 'login' %}"><i class="bi bi-speedometer2 me-1"></i>Login</a></li>
@@ -100,7 +155,49 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{% static 'web_app/js/main.js' %}"></script>
-{% block extra_js %}{% endblock %}
+{% block extra_js %}
+<!-- १. भाषा छान्ने बक्सको HTML (Navbar को मुनि र Main भन्दा माथि आफैं बस्छ) -->
+<div id="custom-lang-switcher" style="display: none;">
+    <div id="google_translate_element"></div>
+</div>
+
+<!-- २. गुगल ट्रान्सलेटर र अटो-गायब पार्ने स्क्रिप्ट -->
+<script type="text/javascript">
+function googleTranslateElementInit() {
+    new google.translate.TranslateElement({
+        pageLanguage: 'en',
+        includedLanguages: 'ne,en',
+        layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+        autoDisplay: false
+    }, 'google_translate_element');
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    // यदि पहिले नै भाषा छानिसकेको छ भने यो बाकसलाई देखाउँदै नदेखाउने (Auto-hide)
+    if (!localStorage.getItem("safhasahar_lang_set")) {
+        document.getElementById("custom-lang-switcher").style.display = "block";
+    }
+
+    // गुगलको ड्रपडाउन लोड हुन केही मिलिसेकेन्ड लाग्ने हुनाले चेक गर्ने
+    var checkDropdown = setInterval(function() {
+        var selectElem = document.querySelector('.goog-te-combo');
+        if (selectElem) {
+            clearInterval(checkDropdown);
+            
+            // जब प्रयोगकर्ताले कुनै भाषा (नेपाली/English) रोज्छ
+            selectElem.addEventListener('change', function() {
+                // ब्राउजरमा भाषा छानियो भनेर रेकर्ड राख्ने
+                localStorage.setItem("safhasahar_lang_set", "true");
+                
+                // बाकसलाई तुरुन्तै गायब बनाउने
+                document.getElementById("custom-lang-switcher").style.display = "none";
+            });
+        }
+    }, 100); 
+});
+</script>
+<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+{% endblock %}
 
 <script>
 function showToast(message, type = 'success') {

@@ -88,6 +88,11 @@
     .notif-item.unread-style {
         background-color: #f4faf6 !important;
         border-left-color: #198754;
+        cursor: pointer;
+    }
+
+    .notif-item.unread-style:hover {
+        background-color: #e9f7ef !important;
     }
 
     .page-link {
@@ -127,6 +132,9 @@
                             </a>
                             <a href="{% url 'admin-schedules' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                                 <i class="bi bi-calendar-week me-2"></i><span class="sidebar-link-text">Zone Schedules</span>
+                            </a>
+                            <a href="{% url 'route-planning' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-map me-2"></i><span class="sidebar-link-text">Route Planning</span>
                             </a>
                             <a href="{% url 'admin-users' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                                 <i class="bi bi-shield-check me-2"></i><span class="sidebar-link-text">Security Admins</span>
@@ -191,10 +199,12 @@
             <div class="card notif-card">
                 <div class="list-group list-group-flush" id="notif-list">
                     {% for notif in notifications %}
-                    <div class="list-group-item notif-item {% if not notif.is_read %}unread-style{% endif %}" id="notif-{{ notif.id }}">
+                    <div class="list-group-item notif-item {% if not notif.is_read %}unread-style{% endif %}"
+                        id="notif-{{ notif.id }}"
+                        {% if not notif.is_read %}onclick="markOneRead({{ notif.id }})" title="Click to mark as read"{% endif %}>
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <span class="badge rounded-pill px-2 py-1.5 me-2
+                                <span class="badge rounded-pill px-2 py-1 me-2
                                     {% if notif.notification_type == 'success' %}bg-success-subtle text-success border border-success-subtle
                                     {% elif notif.notification_type == 'warning' %}bg-warning-subtle text-warning border border-warning-subtle
                                     {% elif notif.notification_type == 'alert' %}bg-danger-subtle text-danger border border-danger-subtle
@@ -245,12 +255,47 @@
 
 {% block extra_js %}
 <script>
+// ── Mark ONE notification read (click on an unread item) ────────────────────
+async function markOneRead(notifId) {
+    const data = await API.patch(`/api/notifications/${notifId}/`, { is_read: true });
+    if (data && data.id) {
+        const el = document.getElementById(`notif-${notifId}`);
+        if (el) {
+            el.classList.remove('unread-style');
+            el.removeAttribute('onclick');
+            el.removeAttribute('title');
+            const tag = el.querySelector('.unread-tag');
+            if (tag) tag.remove();
+        }
+        decrementMainBadge();
+    } else {
+        showToast('Failed to mark as read.', 'danger');
+    }
+}
+
+function decrementMainBadge() {
+    const mainBadge = document.getElementById('notif-badge');
+    if (!mainBadge || mainBadge.classList.contains('d-none')) return;
+    const current = parseInt(mainBadge.textContent || '0', 10) - 1;
+    if (current > 0) {
+        mainBadge.textContent = current;
+    } else {
+        mainBadge.classList.add('d-none');
+        mainBadge.textContent = '';
+    }
+}
+
+// ── Mark ALL notifications read ──────────────────────────────────────────────
 async function markAllRead() {
     const unreadItems = document.querySelectorAll('.notif-item.unread-style');
     const unreadTags = document.querySelectorAll('.unread-tag');
     const mainBadge = document.getElementById('notif-badge');
 
-    unreadItems.forEach(el => el.classList.remove('unread-style'));
+    unreadItems.forEach(el => {
+        el.classList.remove('unread-style');
+        el.removeAttribute('onclick');
+        el.removeAttribute('title');
+    });
     unreadTags.forEach(el => el.remove());
     if (mainBadge) {
         mainBadge.classList.add('d-none');

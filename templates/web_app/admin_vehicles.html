@@ -116,6 +116,9 @@
                             <a href="{% url 'admin-schedules' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                                 <i class="bi bi-calendar-week me-2"></i><span class="sidebar-link-text">Zone Schedules</span>
                             </a>
+                            <a href="{% url 'route-planning' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-map me-2"></i><span class="sidebar-link-text">Route Planning</span>
+                            </a>
                             <a href="{% url 'admin-users' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                                 <i class="bi bi-shield-check me-2"></i><span class="sidebar-link-text">Security Admins</span>
                             </a>
@@ -191,7 +194,7 @@
                         </thead>
                         <tbody>
                             {% for vehicle in vehicles %}
-                            <tr>
+                            <tr id="vehicle-row-{{ vehicle.id }}">
                                 <td class="ps-4 text-muted small fw-medium">{{ vehicle.id }}</td>
                                 <td>
                                     <div class="d-flex align-items-center">
@@ -251,7 +254,7 @@
                                         </div>
                                         <div class="modal-body p-4">
                                             <input type="hidden" id="edit-vehicle-id-{{ vehicle.id }}" value="{{ vehicle.id }}">
-                                            
+
                                             <div class="mb-3">
                                                 <label class="form-label small fw-semibold text-secondary">Plate Number</label>
                                                 <input type="text" class="form-control" id="edit-plate-{{ vehicle.id }}" value="{{ vehicle.plate_number }}">
@@ -366,14 +369,40 @@ async function updateVehicle(vehicleId) {
     }
 }
 
+// ── Delete Vehicle ────────────────────────────────────────────────────────────
+// CHANGED: API.delete() sadhai res.json() call garcha, tara DELETE ley usually
+// 204 No Content (khali body) return garcha — .json() le khali body ma parse
+// error throw garcha, ra try/catch nabhako le silently fail hunthyo. Tyo bahek
+// `data.detail === 'Deleted'` check pani galat thiyo — DRF ko default destroy()
+// ley tyo response kahilyai firkaudaina (khali 204 status matra dincha).
+// Direct fetch() + status code check prayog gareko, updateVehicle() jasतै
+// reliable pattern — edit jasari refresh huncha, delete pani tesैगरी होस्।
 async function deleteVehicle(vehicleId) {
     if (!confirm('Delete this vehicle? This cannot be undone.')) return;
-    const data = await API.delete(`/api/vehicles/${vehicleId}/`);
-    if (data && data.detail === 'Deleted') {
-        showToast('Vehicle deleted.', 'success');
-        setTimeout(() => location.reload(), 1000);
-    } else {
-        showToast('Delete failed.', 'danger');
+
+    try {
+        const res = await fetch(`/api/vehicles/${vehicleId}/`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+            },
+        });
+
+        if (res.ok) {
+            showToast('Vehicle deleted.', 'success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            let errMsg = 'Delete failed.';
+            try {
+                const data = await res.json();
+                errMsg = typeof data === 'object'
+                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                    : String(data);
+            } catch (e) { /* body khali huna sakcha */ }
+            showToast(errMsg, 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
     }
 }
 
