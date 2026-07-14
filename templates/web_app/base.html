@@ -343,6 +343,42 @@ function showToast(message, type = 'success') {
             }
         })
         .catch(() => {});
+
+        // ── Recycle Bin count badge — sidebar "Recycle Bin" link mathi ──
+        // Yo badge sabai page ma dekhinxa (home, my requests, recycle bin) —
+        // jaba jaba sidebar ma id="recycle-bin-badge" wala element bhetincha,
+        // notif-badge jastैi count fetch garera populate garcha.
+        const binBadge = document.getElementById('recycle-bin-badge');
+        if (binBadge) {
+            fetch('/api/waste-requests/recycle_bin/', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (data) {
+                    let count = 0;
+                    if (Array.isArray(data)) {
+                        count = data.length;
+                    } else if (data.count !== undefined) {
+                        count = parseInt(data.count);
+                    } else if (data.results !== undefined) {
+                        count = data.results.length;
+                    }
+
+                    if (count > 0) {
+                        binBadge.classList.remove('d-none');
+                        binBadge.textContent = count;
+                    } else {
+                        binBadge.classList.add('d-none');
+                        binBadge.textContent = '';
+                    }
+                }
+            })
+            .catch(() => {});
+        }
     });
 
     window.addEventListener('beforeunload', function() {

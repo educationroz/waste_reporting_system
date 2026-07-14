@@ -135,7 +135,6 @@
                             </a>
                             <a href="{% url 'route-planning' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                                 <i class="bi bi-map me-2"></i><span class="sidebar-link-text">Route Planning</span>
-                            </a>
                             <a href="{% url 'admin-users' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                                 <i class="bi bi-shield-check me-2"></i><span class="sidebar-link-text">Security Admins</span>
                             </a>
@@ -164,18 +163,18 @@
                             </a>
 
                         {% else %}
-                            <a href="{% url 'home' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
-                                <i class="bi bi-house me-2"></i><span class="sidebar-link-text">Dashboard</span>
-                            </a>
-                            <a href="{% url 'user-requests' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
-                                <i class="bi bi-clock-history me-2"></i><span class="sidebar-link-text">My Requests</span>
-                            </a>
-                            <a href="{% url 'notifications' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
-                                <i class="bi bi-bell me-2"></i><span class="sidebar-link-text">Notifications</span>
-                            </a>
-                            <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
-                                <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
-                            </a>
+                        <a href="{% url 'home' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
+                            <i class="bi bi-house me-2"></i><span class="sidebar-link-text">Dashboard</span>
+                        </a>
+                        <a href="{% url 'user-requests' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-clock-history me-2"></i><span class="sidebar-link-text">My Requests</span>
+                        </a>
+                        <a href="{% url 'user-recycle-bin' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-recycle me-2"></i><span class="sidebar-link-text">Recycle Bin</span>
+                        </a>
+                        <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
+                        </a>
                         {% endif %}
                     </div>
                 </div>
