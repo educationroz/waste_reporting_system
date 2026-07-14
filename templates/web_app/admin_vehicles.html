@@ -86,6 +86,13 @@
         font-size: 0.75rem;
         letter-spacing: 0.5px;
     }
+
+    /* Fade-out animation for deleted rows */
+    tr.row-removing {
+        transition: opacity 0.25s ease, transform 0.25s ease;
+        opacity: 0;
+        transform: translateX(8px);
+    }
 </style>
 {% endblock %}
 
@@ -189,25 +196,25 @@
                                 <th class="pe-4 py-3 text-end">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="vehicles-tbody">
                             {% for vehicle in vehicles %}
-                            <tr>
+                            <tr id="vehicle-row-{{ vehicle.id }}">
                                 <td class="ps-4 text-muted small fw-medium">{{ vehicle.id }}</td>
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <div class="bg-light p-2 rounded me-2 border text-secondary">
                                             <i class="bi bi-hash"></i>
                                         </div>
-                                        <span class="fw-bold text-dark">{{ vehicle.plate_number }}</span>
+                                        <span class="fw-bold text-dark" data-field="plate_number">{{ vehicle.plate_number }}</span>
                                     </div>
                                 </td>
                                 <td>
-                                    <span class="text-secondary fw-medium">{{ vehicle.get_vehicle_type_display }}</span>
+                                    <span class="text-secondary fw-medium" data-field="vehicle_type">{{ vehicle.get_vehicle_type_display }}</span>
                                 </td>
                                 <td>
-                                    <span class="fw-semibold text-dark">{{ vehicle.capacity_kg }}</span> <span style="font-size: 0.8rem;" class="text-muted">kg</span>
+                                    <span class="fw-semibold text-dark" data-field="capacity_kg">{{ vehicle.capacity_kg }}</span> <span style="font-size: 0.8rem;" class="text-muted">kg</span>
                                 </td>
-                                <td>
+                                <td data-field="status-cell">
                                     <span class="badge px-2.5 py-1.5 rounded-pill border
                                         {% if vehicle.status == 'available' %}bg-success-subtle text-success border-success-subtle
                                         {% elif vehicle.status == 'on_route' %}bg-primary-subtle text-primary border-primary-subtle
@@ -251,7 +258,7 @@
                                         </div>
                                         <div class="modal-body p-4">
                                             <input type="hidden" id="edit-vehicle-id-{{ vehicle.id }}" value="{{ vehicle.id }}">
-                                            
+
                                             <div class="mb-3">
                                                 <label class="form-label small fw-semibold text-secondary">Plate Number</label>
                                                 <input type="text" class="form-control" id="edit-plate-{{ vehicle.id }}" value="{{ vehicle.plate_number }}">
@@ -285,7 +292,7 @@
                                 </div>
                             </div>
                             {% empty %}
-                            <tr>
+                            <tr id="empty-row">
                                 <td colspan="7" class="text-center py-5 text-muted">
                                     <i class="bi bi-truck fs-2 mb-2 d-block text-secondary"></i>
                                     <span class="fw-medium">No vehicles registered in the fleet infrastructure yet.</span>
@@ -346,6 +353,51 @@
 
 {% block extra_js %}
 <script>
+// ---------- Static display maps (mirror Django's get_..._display) ----------
+const VEHICLE_TYPE_LABELS = {
+    truck: 'Garbage Truck',
+    van: 'Van',
+    compactor: 'Compactor',
+};
+
+const STATUS_LABELS = {
+    available: 'Available',
+    on_route: 'On Route',
+    maintenance: 'Under Maintenance',
+    inactive: 'Inactive',
+};
+
+const STATUS_BADGE_CLASSES = {
+    available: 'bg-success-subtle text-success border-success-subtle',
+    on_route: 'bg-primary-subtle text-primary border-primary-subtle',
+    maintenance: 'bg-warning-subtle text-warning border-warning-subtle',
+    inactive: 'bg-secondary-subtle text-secondary border-secondary-subtle',
+};
+
+function getEmptyStateRowHtml() {
+    return `
+        <tr id="empty-row">
+            <td colspan="7" class="text-center py-5 text-muted">
+                <i class="bi bi-truck fs-2 mb-2 d-block text-secondary"></i>
+                <span class="fw-medium">No vehicles registered in the fleet infrastructure yet.</span>
+            </td>
+        </tr>
+    `;
+}
+
+function checkEmptyState() {
+    const tbody = document.getElementById('vehicles-tbody');
+    const hasVehicleRows = tbody.querySelector('tr[id^="vehicle-row-"]');
+    const existingEmptyRow = document.getElementById('empty-row');
+
+    if (!hasVehicleRows && !existingEmptyRow) {
+        tbody.insertAdjacentHTML('beforeend', getEmptyStateRowHtml());
+    } else if (hasVehicleRows && existingEmptyRow) {
+        existingEmptyRow.remove();
+    }
+}
+
+// ---------- UPDATE (edit) — live cell refresh, no reload ----------
 async function updateVehicle(vehicleId) {
     const payload = {
         plate_number: document.getElementById(`edit-plate-${vehicleId}`).value,
@@ -354,29 +406,70 @@ async function updateVehicle(vehicleId) {
         status: document.getElementById(`edit-status-${vehicleId}`).value,
     };
 
+    if (!payload.plate_number || isNaN(payload.capacity_kg)) {
+        showToast('Plate number and capacity required.', 'warning');
+        return;
+    }
+
     const data = await API.patch(`/api/vehicles/${vehicleId}/`, payload);
     if (data && data.id) {
         showToast('Vehicle updated!', 'success');
+
+        // Update the row's cells in place using the payload we just sent
+        const row = document.getElementById(`vehicle-row-${vehicleId}`);
+        if (row) {
+            row.querySelector('[data-field="plate_number"]').textContent = payload.plate_number;
+            row.querySelector('[data-field="vehicle_type"]').textContent =
+                VEHICLE_TYPE_LABELS[payload.vehicle_type] || payload.vehicle_type;
+            row.querySelector('[data-field="capacity_kg"]').textContent = payload.capacity_kg;
+
+            const statusCell = row.querySelector('[data-field="status-cell"]');
+            const badgeClass = STATUS_BADGE_CLASSES[payload.status] || 'bg-secondary-subtle text-secondary border-secondary-subtle';
+            const statusLabel = STATUS_LABELS[payload.status] || payload.status;
+            statusCell.innerHTML = `
+                <span class="badge px-2.5 py-1.5 rounded-pill border ${badgeClass}">
+                    <i class="bi bi-circle-fill me-1" style="font-size: 0.5rem; vertical-align: middle;"></i>
+                    ${statusLabel}
+                </span>
+            `;
+        }
+
+        // Close modal without reloading the page
         const modalEl = document.getElementById(`editVehicleModal${vehicleId}`);
         const modal = bootstrap.Modal.getInstance(modalEl);
-        modal.hide();
-        setTimeout(() => location.reload(), 800);
+        if (modal) modal.hide();
     } else {
         showToast('Update failed.', 'danger');
     }
 }
 
+// ---------- DELETE — instant row removal, no reload ----------
 async function deleteVehicle(vehicleId) {
     if (!confirm('Delete this vehicle? This cannot be undone.')) return;
+
     const data = await API.delete(`/api/vehicles/${vehicleId}/`);
-    if (data && data.detail === 'Deleted') {
+    if (data && data.success) {
         showToast('Vehicle deleted.', 'success');
-        setTimeout(() => location.reload(), 1000);
+
+        const row = document.getElementById(`vehicle-row-${vehicleId}`);
+        if (row) {
+            row.classList.add('row-removing');
+            // Wait for the fade-out transition before actually removing the node
+            setTimeout(() => {
+                row.remove();
+                checkEmptyState();
+            }, 250);
+        }
+
+        // Clean up the associated edit modal so it doesn't linger in the DOM
+        const modal = document.getElementById(`editVehicleModal${vehicleId}`);
+        if (modal) modal.remove();
     } else {
         showToast('Delete failed.', 'danger');
     }
 }
 
+// ---------- ADD — insert new row live, no reload ----------
 async function addVehicle() {
     const payload = {
         plate_number: document.getElementById('add-plate').value,
@@ -393,10 +486,63 @@ async function addVehicle() {
     const data = await API.post('/api/vehicles/', payload);
     if (data && data.id) {
         showToast('Vehicle added!', 'success');
+
+        const tbody = document.getElementById('vehicles-tbody');
+        const badgeClass = STATUS_BADGE_CLASSES[payload.status] || 'bg-secondary-subtle text-secondary border-secondary-subtle';
+        const statusLabel = STATUS_LABELS[payload.status] || payload.status;
+        const typeLabel = VEHICLE_TYPE_LABELS[payload.vehicle_type] || payload.vehicle_type;
+
+        const rowHtml = `
+            <tr id="vehicle-row-${data.id}">
+                <td class="ps-4 text-muted small fw-medium">${data.id}</td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="bg-light p-2 rounded me-2 border text-secondary">
+                            <i class="bi bi-hash"></i>
+                        </div>
+                        <span class="fw-bold text-dark" data-field="plate_number">${payload.plate_number}</span>
+                    </div>
+                </td>
+                <td>
+                    <span class="text-secondary fw-medium" data-field="vehicle_type">${typeLabel}</span>
+                </td>
+                <td>
+                    <span class="fw-semibold text-dark" data-field="capacity_kg">${payload.capacity_kg}</span> <span style="font-size: 0.8rem;" class="text-muted">kg</span>
+                </td>
+                <td data-field="status-cell">
+                    <span class="badge px-2.5 py-1.5 rounded-pill border ${badgeClass}">
+                        <i class="bi bi-circle-fill me-1" style="font-size: 0.5rem; vertical-align: middle;"></i>
+                        ${statusLabel}
+                    </span>
+                </td>
+                <td><span class="text-muted">—</span></td>
+                <td class="pe-4 text-end">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button class="btn btn-outline-secondary rounded-start" disabled title="Refresh page to edit new vehicle">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-outline-danger rounded-end" onclick="deleteVehicle(${data.id})" title="Delete Vehicle Info">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        // Remove empty-state row if present, then insert the new row
+        const emptyRow = document.getElementById('empty-row');
+        if (emptyRow) emptyRow.remove();
+        tbody.insertAdjacentHTML('beforeend', rowHtml);
+
+        // Reset form + close modal
+        document.getElementById('add-plate').value = '';
+        document.getElementById('add-capacity').value = '';
+        document.getElementById('add-type').selectedIndex = 0;
+        document.getElementById('add-status').selectedIndex = 0;
+
         const modalEl = document.getElementById('addVehicleModal');
         const modal = bootstrap.Modal.getInstance(modalEl);
-        modal.hide();
-        setTimeout(() => location.reload(), 1000);
+        if (modal) modal.hide();
     } else {
         showToast('Failed to add vehicle.', 'danger');
     }

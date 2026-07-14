@@ -25,7 +25,7 @@
                 aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
-        
+
         <div class="collapse navbar-collapse" id="navMenu">
             {% if user.is_authenticated %}
             <ul class="navbar-nav me-auto">
@@ -41,7 +41,7 @@
                 {% elif user.role == 'user' %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'home' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'user-requests' %}"><i class="bi bi-clipboard me-1"></i>My Requests</a></li>
-                    
+
                     <li class="nav-item"><a class="nav-link" href="{% url 'user-recycle-bin' %}"><i class="bi bi-recycle me-1"></i>Recycle Bin</a></li>
                 {% else%}
                     <li class="nav-item"><a class="nav-link" href="{% url 'login' %}"><i class="bi bi-speedometer2 me-1"></i>Login</a></li>
@@ -142,7 +142,13 @@ function showToast(message, type = 'success') {
             return fetch(url, opts);
         };
 
-        let res = await makeRequest(token);
+        let res;
+        try {
+            res = await makeRequest(token);
+        } catch (networkErr) {
+            console.error('Network error calling', url, networkErr);
+            return { success: false, error: 'network_error' };
+        }
 
         if (res.status === 401) {
             const refresh = localStorage.getItem('refresh_token');
@@ -164,7 +170,33 @@ function showToast(message, type = 'success') {
             }
         }
 
-        return res.json();
+        // --- FIX: safely handle empty / non-JSON bodies ---
+        // DRF returns 204 No Content (empty body) on successful DELETE.
+        // Calling res.json() directly on an empty body throws a SyntaxError,
+        // which silently rejects this promise and skips all calling code
+        // (e.g. the DOM-update logic after `await API.delete(...)`).
+        if (res.status === 204 || res.status === 205) {
+            return { success: true, status: res.status };
+        }
+
+        const text = await res.text();
+        if (!text) {
+            return { success: res.ok, status: res.status };
+        }
+
+        try {
+            const parsed = JSON.parse(text);
+            // Attach success/status so callers can rely on a consistent shape
+            // even for endpoints that don't return their own "success" field.
+            if (parsed && typeof parsed === 'object' && parsed.success === undefined) {
+                parsed.success = res.ok;
+                parsed.status = res.status;
+            }
+            return parsed;
+        } catch (e) {
+            console.error('Failed to parse API response as JSON:', text);
+            return { success: res.ok, status: res.status, raw: text };
+        }
     }
 
     async function logout() {
@@ -229,7 +261,7 @@ function showToast(message, type = 'success') {
 
                 if (Array.isArray(data)) {
                     count = data.filter(n => n.is_read === false).length;
-                } 
+                }
                 else if (data.unread_count !== undefined) {
                     count = parseInt(data.unread_count);
                 } else if (data.count !== undefined) {

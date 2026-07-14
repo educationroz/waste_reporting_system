@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AdminComplaintListView,
     AdminDashboardView,
     AdminDriverListView,
     AdminRequestListView,
@@ -16,11 +17,9 @@ from .views import (
     RegisterPageView,
     RoutePlanningView,
     UserRecycleBinView,
-    # UserDashboardView,
     UserRequestListView,
     UserComplaintListView,
     web_logout,
-
 )
 
 urlpatterns = [
@@ -33,13 +32,13 @@ urlpatterns = [
     path('register/', RegisterPageView.as_view(), name='register'),
 
     # User
-    # path('dashboard/',         UserDashboardView.as_view(),   name='user-dashboard'),
     path('my-requests/',       UserRequestListView.as_view(), name='user-requests'),
     path('notifications/',     NotificationsView.as_view(),   name='notifications'),
 
     # Admin
     path('admin-dashboard/',   AdminDashboardView.as_view(),    name='admin-dashboard'),
     path('management/requests/',    AdminRequestListView.as_view(),  name='admin-requests'),
+    path('management/complaints/',  AdminComplaintListView.as_view(), name='admin-complaints'),
     path('management/drivers/',     AdminDriverListView.as_view(),   name='admin-drivers'),
     path('management/vehicles/',    AdminVehicleListView.as_view(),  name='admin-vehicles'),
     path('management/schedules/',   AdminScheduleListView.as_view(), name='admin-schedules'),
@@ -49,7 +48,7 @@ urlpatterns = [
 
     # Driver
     path('driver-dashboard/',  DriverDashboardView.as_view(),  name='driver-dashboard'),
-    
+
     # Route Planning
     path('route-planning/',    RoutePlanningView.as_view(),    name='route-planning'),
 ]

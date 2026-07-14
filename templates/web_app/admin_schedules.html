@@ -137,6 +137,9 @@
                             <a href="{% url 'admin-schedules' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
                                 <i class="bi bi-calendar-week me-2"></i><span class="sidebar-link-text">Zone Schedules</span>
                             </a>
+                            <a href="{% url 'route-planning' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-map me-2"></i><span class="sidebar-link-text">Route Planning</span>
+                            </a>
                             <a href="{% url 'admin-users' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                                 <i class="bi bi-shield-check me-2"></i><span class="sidebar-link-text">Security Admins</span>
                             </a>
@@ -216,9 +219,9 @@
                                     <th class="text-end pe-4">Registry Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="schedules-table-body">
                                 {% for schedule in schedules %}
-                                <tr>
+                                <tr id="schedule-row-{{ schedule.id }}">
                                     <td class="fw-bold text-secondary">#{{ schedule.id }}</td>
                                     <td class="fw-bold text-dark">{{ schedule.zone_name }}</td>
                                     <td class="fw-medium text-dark">
@@ -364,12 +367,40 @@ async function toggleActive(scheduleId, isActive) {
 
 async function deleteSchedule(scheduleId) {
     if (!confirm('Are you absolutely sure you want to drop this scheduling context from system routing?')) return;
-    const data = await API.delete(`/api/schedules/${scheduleId}/`);
-    if (data && data.detail === 'Deleted') {
-        showToast('Operational route sequence entry successfully dropped.', 'success');
-        setTimeout(() => location.reload(), 800);
-    } else {
-        showToast('Failed to drop scheduling database record node.', 'danger');
+
+    try {
+        const res = await fetch(`/api/schedules/${scheduleId}/`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            },
+        });
+
+        // DELETE le 204 No Content (khali body) return garcha, tesैले
+        // API.delete() jasले res.json() call garne helper use nagari
+        // direct res.ok/status check garne — 204 body-less huncha,
+        // .json() call garda error aauthyo, tesैले toast/refresh kahile
+        // dekhdैनthyo jaba samma manually page reload nagareसमम.
+        if (res.ok || res.status === 204) {
+            showToast('Operational route sequence entry successfully dropped.', 'success');
+            const row = document.getElementById(`schedule-row-${scheduleId}`);
+            if (row) {
+                row.remove();
+            } else {
+                setTimeout(() => location.reload(), 800);
+            }
+        } else {
+            let errMsg = 'Failed to drop scheduling database record node.';
+            try {
+                const data = await res.json();
+                errMsg = typeof data === 'object'
+                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                    : String(data);
+            } catch (e) { /* body khali huna sakcha */ }
+            showToast(errMsg, 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
     }
 }
 

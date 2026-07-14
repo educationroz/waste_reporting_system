@@ -128,22 +128,46 @@ class UserRecycleBinView(LoginRequiredMixin, ListView):
 
 
 class UserComplaintListView(LoginRequiredMixin, ListView):
-    template_name = 'web_app/user_complaints.html'
+    template_name = 'web_app/home.html'
     context_object_name = 'complaints'
     paginate_by = 10
 
     def get_queryset(self):
         return (
             Complaint.objects.filter(user=self.request.user)
-            .select_related('related_request', 'related_request__driver__user')
             .order_by('-created_at')
         )
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['complaint_type_choices'] = Complaint.COMPLAINT_TYPE_CHOICES
+        ctx['complaint_type_choices'] = Complaint.TYPE_CHOICES
         return ctx
 
+class AdminComplaintListView(LoginRequiredMixin, ListView):
+    template_name = 'web_app/admin_complaints.html'
+    context_object_name = 'complaints'
+    paginate_by = 20
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role != 'admin':
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        qs = Complaint.objects.select_related('user').order_by('-created_at')
+
+        status_filter = self.request.GET.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['status_choices'] = Complaint.STATUS_CHOICES
+        ctx['current_status'] = self.request.GET.get('status', '')
+        return ctx
+    
 class LoginPageView(TemplateView):
     """Renders the login page. Actual login handled via REST API + JS."""
     template_name = 'web_app/login.html'
