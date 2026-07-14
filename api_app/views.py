@@ -14,7 +14,7 @@ from rest_framework.decorators import action # type: ignore
 from rest_framework.permissions import AllowAny, IsAuthenticated # type: ignore
 from rest_framework.response import Response # type: ignore
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser # type: ignore
-from .models import AdminLog, Bin, Driver, Notification, Route, Schedule, SystemSettings, Vehicle, WasteRequest
+from .models import AdminLog, Bin, Complaint, Driver, Notification, Route, Schedule, SystemSettings, Vehicle, WasteRequest
 from .permissions import IsAdminOrReadOnly, IsAdminUser, IsOwnerOrAdmin
 from .serializers import (
     AdminLogSerializer,
@@ -26,6 +26,7 @@ from .serializers import (
     SystemSettingsSerializer,
     VehicleSerializer,
     WasteRequestSerializer,
+    ComplaintSerializer,
 )
 
 try:
@@ -643,3 +644,61 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
+
+class ComplaintViewSet(viewsets.ModelViewSet):
+    """
+    User complaints.
+    - Regular users: create + view/edit their own complaints only.
+    - Admins: full access, plus the update_status action to move a
+      complaint through pending -> under_review -> completed.
+    """
+    serializer_class = ComplaintSerializer
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['subject', 'description', 'status', 'user__username']
+    ordering_fields = ['created_at', 'status']
+
+    def get_permissions(self):
+        if self.action == 'update_status':
+            return [IsAuthenticated(), IsAdminUser()]
+        return [IsAuthenticated(), IsOwnerOrAdmin()]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = Complaint.objects.select_related('user')
+
+        if user.role != 'admin':
+            qs = qs.filter(user=user)
+
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs.order_by('-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def update_status(self, request, pk=None):
+        """PATCH /api/complaints/{id}/update_status/ — admin updates complaint status."""
+        complaint = self.get_object()
+        new_status = request.data.get('status')
+        valid_statuses = [s[0] for s in Complaint.STATUS_CHOICES]
+        if new_status not in valid_statuses:
+            return Response({'error': f'Invalid status. Choose: {valid_statuses}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        complaint.status = new_status
+        update_fields = ['status']
+        if 'admin_response' in request.data:
+            complaint.admin_response = request.data['admin_response']
+            update_fields.append('admin_response')
+        complaint.save(update_fields=update_fields)
+
+        Notification.objects.create(
+            user=complaint.user,
+            title='Complaint Status Updated',
+            message=f'Your complaint "{complaint.subject}" status changed to: {complaint.get_status_display()}.',
+            notification_type='success' if new_status == 'completed' else 'info',
+        )
+        return Response(ComplaintSerializer(complaint, context={'request': request}).data)

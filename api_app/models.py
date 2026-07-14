@@ -362,9 +362,35 @@ class SystemSettings(models.Model):
         return f"{self.key}: {self.value}"
     
 class Complaint(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('under_review', 'Under Review'),
+        ('completed', 'Completed'),
+    ]
+    TYPE_CHOICES = [
+        ('missed_pickup', 'Missed Pickup'),
+        ('driver_behavior', 'Driver Behavior'),
+        ('illegal_dumping', 'Illegal Dumping'),
+        ('overflowing_bin', 'Overflowing Bin'),
+        ('app_issue', 'App Issue'),
+        ('other', 'Other'),
+    ]
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    subject = models.CharField(max_length=255)
+    complaint_type = models.CharField(max_length=30, choices=TYPE_CHOICES, default='other')
+    subject = models.CharField(max_length=255, blank=True)
     description = models.TextField()
+    photo = models.ImageField(
+        upload_to='complaint_photos/',
+        blank=True,
+        null=True,
+        validators=[
+            FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp'])
+        ],
+        help_text='Accepted formats: JPG, JPEG, PNG, GIF, WebP (Max 5MB)'
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    admin_response = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -373,7 +399,16 @@ class Complaint(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['complaint_type']),
         ]
 
+    def save(self, *args, **kwargs):
+        # Auto-fill subject from complaint_type if not explicitly provided,
+        # so the admin dashboard's "subject" column always has something readable.
+        if not self.subject:
+            self.subject = self.get_complaint_type_display()
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"Complaint by {self.user.username}: {self.subject}"
+        return f"Complaint #{self.id} - {self.subject}"
