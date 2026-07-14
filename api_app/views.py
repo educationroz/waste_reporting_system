@@ -181,6 +181,16 @@ class DriverViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['user__username', 'license_number']
 
+    def destroy(self, request, *args, **kwargs):
+        """Delete the driver profile and the linked auth user together."""
+        driver = self.get_object()
+        user = driver.user
+
+        with transaction.atomic():
+            user.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def toggle_availability(self, request, pk=None):
         """PATCH /api/drivers/{id}/toggle_availability/ — driver toggles their own is_available."""
@@ -267,6 +277,9 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         yaha IsOwnerOrAdmin apply garda driver "owner" nabhako le 403 aauthyo,
         tesैle yi lai IsAuthenticated matra rakheर, role-check function bhitra nai
         (already existing) garne.
+        soft_delete / restore chai request ko malik (owner) le afैle Recycle Bin
+        ma sarne / restore garne action ho, tesैle IsOwnerOrAdmin nai lagau —
+        owner ra admin duवैले use garna paaun.
         Baaki (list/retrieve/update/delete) chai login + ownership check required nai.
         """
         if self.action == 'create':
@@ -296,6 +309,20 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             qs = base_qs.filter(driver__user=user)
         else:
             qs = base_qs.filter(user=user)
+
+        # Recycle Bin ma sareko (soft-deleted) request haru default LIST
+        # (dashboard/list) ma nadekhine. Detail-level actions (restore,
+        # soft_delete, destroy, retrieve, ...) ma chai yo filter LAGAUNE HOINA —
+        # natra get_object() le Recycle Bin ma bhaisakeko item nai "list" bhitra
+        # nadekheर 404 dinthyo (Restore / Delete Forever button haru fail huनु
+        # ko karan yehi thiyo).
+        if self.action == 'list':
+            include_deleted = self.request.query_params.get('include_deleted', '').lower() == 'true'
+            only_deleted = self.request.query_params.get('deleted_only', '').lower() == 'true'
+            if only_deleted:
+                qs = qs.filter(is_deleted=True)
+            elif not include_deleted:
+                qs = qs.filter(is_deleted=False)
 
         status_filter = self.request.query_params.get('status')
         if status_filter:
@@ -337,13 +364,26 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def update_status(self, request, pk=None):
-        """PATCH /api/waste-requests/{id}/update_status/ — driver/admin updates request status."""
+        """
+        PATCH /api/waste-requests/{id}/update_status/ — driver/admin updates request status.
+        Apawad (exception): request ko malik (owner) le aफnै 'pending' request lai
+        'cancelled' ma matra move garna paaucha — home.html/user_requests.html ko
+        "Cancel" button le yehi endpoint use garcha, tesैle purano role-check le
+        normal 'user' lai 403 dinthyo.
+        """
         waste_request = self.get_object()
         user = request.user
-        if user.role not in ('admin', 'driver'):
-            return Response({'error': 'Drivers and admins only.'}, status=status.HTTP_403_FORBIDDEN)
-
         new_status = request.data.get('status')
+
+        is_owner_self_cancel = (
+            user.role == 'user'
+            and waste_request.user_id == user.id
+            and waste_request.status == 'pending'
+            and new_status == 'cancelled'
+        )
+
+        if user.role not in ('admin', 'driver') and not is_owner_self_cancel:
+            return Response({'error': 'Drivers and admins only.'}, status=status.HTTP_403_FORBIDDEN)
         valid_statuses = [s[0] for s in WasteRequest.STATUS_CHOICES]
         if new_status not in valid_statuses:
             return Response({'error': f'Invalid status. Choose: {valid_statuses}'}, status=status.HTTP_400_BAD_REQUEST)
@@ -353,6 +393,15 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         if new_status == 'completed':
             waste_request.completed_at = timezone.now()
             update_fields.append('completed_at')
+
+        # Owner le aफnै request cancel garyo bhane, seedhai Recycle Bin ma pani
+        # sarne — home/"My Requests" bata haraera Recycle Bin ma dekhincha,
+        # jahaँ bata pachi restore ya permanently delete garna milcha.
+        if is_owner_self_cancel:
+            waste_request.is_deleted = True
+            waste_request.deleted_at = timezone.now()
+            update_fields += ['is_deleted', 'deleted_at']
+
         waste_request.save(update_fields=update_fields)
 
         # Guest/anonymous requests won't have a user to notify
@@ -364,6 +413,39 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 notification_type='success' if new_status == 'completed' else 'info',
                 related_request=waste_request,
             )
+        return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
+
+    @action(detail=True, methods=['patch'])
+    def soft_delete(self, request, pk=None):
+        """
+        PATCH /api/waste-requests/{id}/soft_delete/
+        Hard-delete nagari request lai Recycle Bin ma sarne.
+        get_object() le already IsOwnerOrAdmin check garisakeko huncha, so
+        yaha thap role-check chaहिदैन.
+        """
+        waste_request = self.get_object()
+        waste_request.is_deleted = True
+        waste_request.deleted_at = timezone.now()
+        waste_request.save(update_fields=['is_deleted', 'deleted_at'])
+        return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
+
+    @action(detail=True, methods=['patch'])
+    def restore(self, request, pk=None):
+        """
+        PATCH /api/waste-requests/{id}/restore/
+        Recycle Bin bata request lai pheri saकिय (active) list ma फर्काउने.
+        Cancel garera bin ma aayeko request bhaye, restore garda status pani
+        'pending' ma farkincha — natra 'cancelled' nai rahera home/"My Requests"
+        ma active jasto dekhinthyo tara kaम nagarne huन्थ्यो.
+        """
+        waste_request = self.get_object()
+        update_fields = ['is_deleted', 'deleted_at']
+        waste_request.is_deleted = False
+        waste_request.deleted_at = None
+        if waste_request.status == 'cancelled':
+            waste_request.status = 'pending'
+            update_fields.append('status')
+        waste_request.save(update_fields=update_fields)
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
 

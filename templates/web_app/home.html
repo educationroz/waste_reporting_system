@@ -133,6 +133,9 @@
                         <a href="{% url 'user-requests' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                             <i class="bi bi-clock-history me-2"></i><span class="sidebar-link-text">My Requests</span>
                         </a>
+                        <a href="{% url 'user-recycle-bin' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-recycle me-2"></i><span class="sidebar-link-text">Recycle Bin</span>
+                        </a>
                         <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
                             <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
                         </a>
@@ -259,6 +262,12 @@
                                 Any Complaints?
                                 <a href="{% url 'login' %}">Sign in</a> for complaints.
                             </div>
+                            <div class="alert alert-light border small mb-3">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Wrong Information?
+                                <a href="{% url 'login' %}">Sign in</a> to access Recycle Bin.
+                            </div>
+
                             {% endif %}
 
                             <button class="btn btn-success" id="submit-btn" onclick="submitRequest()">
@@ -325,8 +334,8 @@
                                         Cancel
                                     </button>
                                     {% elif req.status == 'completed' or req.status == 'cancelled' or req.status == 'in_progress' %}
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }})">
-                                        <i class="bi bi-trash3"></i> Delete
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }})" title="Move to Recycle Bin">
+                                        <i class="bi bi-recycle"></i> Move to Bin
                                     </button>
                                     {% else %}
                                     —
@@ -711,24 +720,27 @@ async function cancelRequest(requestId) {
     }
 }
 
-// ── Delete Request ───────────────────────────────────────────────────────────
+// ── Move Request to Recycle Bin (soft-delete) ─────────────────────────────────
+// Yo hard DELETE hoina — request lai 'is_deleted' flag le Recycle Bin ma sarcha.
+// Recycle Bin bata pachi restore ya permanent delete garna milcha.
 async function deleteRequest(requestId) {
-    if (!confirm('Permanently delete this request? This cannot be undone.')) return;
+    if (!confirm('Move this request to Recycle Bin? You can restore it later from there.')) return;
 
     try {
-        const res = await fetch(`/api/waste-requests/${requestId}/`, {
-            method: 'DELETE',
+        const res = await fetch(`/api/waste-requests/${requestId}/soft_delete/`, {
+            method: 'PATCH',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                'Content-Type': 'application/json',
             },
         });
 
         if (res.ok) {
-            showToast('Request deleted.', 'success');
+            showToast('Request moved to Recycle Bin.', 'success');
             const row = document.getElementById(`home-request-row-${requestId}`);
             if (row) row.remove();
         } else {
-            let errMsg = 'Failed to delete request.';
+            let errMsg = 'Failed to move request to Recycle Bin.';
             try {
                 const data = await res.json();
                 errMsg = typeof data === 'object'

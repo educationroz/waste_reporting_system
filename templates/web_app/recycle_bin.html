@@ -1,0 +1,263 @@
+{% extends 'web_app/base.html' %}
+{% block title %}Recycle Bin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .nav-pills .nav-link:not(.active):hover {
+        background-color: #f8f9fa;
+        color: #198754 !important;
+    }
+
+    .layout-wrapper {
+        display: flex;
+        align-items: stretch;
+        gap: 1.5rem;
+    }
+
+    .sidebar-col {
+        flex: 0 0 220px;
+        max-width: 220px;
+        transition: flex-basis 0.15s ease, max-width 0.15s ease;
+    }
+
+    .sidebar-card {
+        height: 100%;
+        position: sticky;
+        top: 20px;
+        z-index: 1020;
+    }
+
+    .content-col {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .sidebar-logo-text,
+    .sidebar-link-text {
+        white-space: nowrap;
+    }
+
+    @media (max-width: 767.98px) {
+        .sidebar-col {
+            flex: 0 0 64px;
+            max-width: 64px;
+        }
+        .sidebar-card .card-body {
+            padding: 0.75rem 0.4rem !important;
+            align-items: center;
+        }
+        .sidebar-logo-text,
+        .sidebar-link-text {
+            display: none;
+        }
+        .sidebar-card .nav-link {
+            justify-content: center;
+            padding: 0.6rem !important;
+        }
+        .sidebar-card .nav-link i {
+            margin: 0 !important;
+            font-size: 1.15rem;
+        }
+        .sidebar-card h5 {
+            text-align: center;
+            padding: 0 !important;
+        }
+    }
+
+    .dashboard-card {
+        border: none;
+        border-radius: 14px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+        background: #ffffff;
+    }
+
+    .bin-item-fade {
+        transition: opacity 0.3s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3">
+    <div class="layout-wrapper">
+
+        <div class="sidebar-col">
+            <div class="card shadow-sm border-0 sidebar-card">
+                <div class="card-body p-3 d-flex flex-column">
+                    <h5 class="text-success fw-bold mb-3 px-2">
+                        <span class="sidebar-logo-text">SafhaSahar</span>
+                    </h5>
+                    <div class="nav flex-column nav-pills">
+                        <a href="{% url 'home' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-house me-2"></i><span class="sidebar-link-text">Dashboard</span>
+                        </a>
+                        <a href="{% url 'user-requests' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-clock-history me-2"></i><span class="sidebar-link-text">My Requests</span>
+                        </a>
+                        <a href="{% url 'user-recycle-bin' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
+                            <i class="bi bi-recycle me-2"></i><span class="sidebar-link-text">Recycle Bin</span>
+                        </a>
+                        <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-col">
+
+            <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
+                <div>
+                    <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-recycle text-success me-2"></i>Recycle Bin</h2>
+                    <p class="text-muted mb-0">Deleted requests stay here until restored or permanently removed.</p>
+                </div>
+                {% if deleted_requests %}
+                <button class="btn btn-outline-danger" onclick="emptyRecycleBin()">
+                    <i class="bi bi-trash3 me-1"></i>Empty Bin
+                </button>
+                {% endif %}
+            </div>
+
+            <div class="card dashboard-card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">#</th>
+                                    <th>Type</th>
+                                    <th>Photo</th>
+                                    <th>Status</th>
+                                    <th>Deleted On</th>
+                                    <th class="pe-4 text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recycle-bin-body">
+                                {% for req in deleted_requests %}
+                                <tr id="bin-row-{{ req.id }}" class="bin-item-fade">
+                                    <td class="ps-4 fw-bold text-secondary">#{{ req.id }}</td>
+                                    <td>{{ req.get_waste_type_display }}</td>
+                                    <td>
+                                        {% if req.photo %}
+                                        <a href="{{ req.photo.url }}" target="_blank">
+                                            <img src="{{ req.photo.url }}" alt="photo"
+                                                style="height:36px;width:36px;object-fit:cover;border-radius:4px;">
+                                        </a>
+                                        {% else %}
+                                        <span class="text-muted small">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge
+                                            {% if req.status == 'completed' %}bg-success
+                                            {% elif req.status == 'pending' %}bg-warning text-dark
+                                            {% elif req.status == 'in_progress' %}bg-info
+                                            {% elif req.status == 'cancelled' %}bg-danger
+                                            {% else %}bg-primary{% endif %}">
+                                            {{ req.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="small text-muted">{{ req.deleted_at|date:"d M Y H:i" }}</td>
+                                    <td class="pe-4 text-end">
+                                        <button class="btn btn-sm btn-outline-success me-1" onclick="restoreRequest({{ req.id }})">
+                                            <i class="bi bi-arrow-counterclockwise me-1"></i>Restore
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="permanentlyDeleteRequest({{ req.id }})">
+                                            <i class="bi bi-trash3 me-1"></i>Delete Forever
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-5">
+                                        <i class="bi bi-recycle fs-2 mb-2 d-block text-secondary"></i>
+                                        Recycle Bin is empty.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- /content-col -->
+    </div> <!-- /layout-wrapper -->
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function fadeRemoveRow(requestId) {
+    const row = document.getElementById(`bin-row-${requestId}`);
+    if (!row) return;
+    row.style.opacity = '0';
+    setTimeout(() => row.remove(), 300);
+}
+
+// ── Restore a request out of the Recycle Bin ──────────────────────────────────
+async function restoreRequest(requestId) {
+    try {
+        const res = await fetch(`/api/waste-requests/${requestId}/restore/`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (res.ok) {
+            showToast('Request restored.', 'success');
+            fadeRemoveRow(requestId);
+        } else {
+            showToast('Failed to restore request.', 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
+    }
+}
+
+// ── Permanently delete a single request ────────────────────────────────────────
+async function permanentlyDeleteRequest(requestId) {
+    if (!confirm('Permanently delete this request? This cannot be undone.')) return;
+
+    try {
+        const res = await fetch(`/api/waste-requests/${requestId}/`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            },
+        });
+
+        if (res.ok) {
+            showToast('Request permanently deleted.', 'success');
+            fadeRemoveRow(requestId);
+        } else {
+            showToast('Failed to permanently delete request.', 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
+    }
+}
+
+// ── Empty the whole bin ────────────────────────────────────────────────────────
+async function emptyRecycleBin() {
+    if (!confirm('Permanently delete ALL items in the Recycle Bin? This cannot be undone.')) return;
+
+    const rows = document.querySelectorAll('#recycle-bin-body tr[id^="bin-row-"]');
+    for (const row of rows) {
+        const requestId = row.id.replace('bin-row-', '');
+        try {
+            await fetch(`/api/waste-requests/${requestId}/`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                },
+            });
+        } catch (e) { /* continue with remaining items */ }
+    }
+    showToast('Recycle Bin emptied.', 'success');
+    setTimeout(() => location.reload(), 800);
+}
+</script>
+{% endblock %}

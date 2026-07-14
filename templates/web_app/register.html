@@ -140,9 +140,9 @@ async function doRegister() {
             const redirectMap = {
                 admin: '/admin-dashboard/',
                 driver: '/driver-dashboard/',
-                user: '/dashboard/',
+                user: '/',
             };
-            setTimeout(() => window.location.href = redirectMap[role] || '/dashboard/', 1000);
+            setTimeout(() => window.location.href = redirectMap[role] || '/', 1000);
         } else {
             const msgs = Object.entries(data).map(([k,v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('<br>');
             errDiv.innerHTML = msgs || 'Registration failed.';

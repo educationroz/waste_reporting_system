@@ -82,12 +82,12 @@ class HomeView(TemplateView):
 
         if user.is_authenticated and user.role == 'user':
             ctx['my_requests'] = (
-                WasteRequest.objects.filter(user=user)
+                WasteRequest.objects.filter(user=user, is_deleted=False)
                 .select_related('driver__user')
                 .order_by('-created_at')[:5]
             )
-            ctx['pending_count'] = WasteRequest.objects.filter(user=user, status='pending').count()
-            ctx['completed_count'] = WasteRequest.objects.filter(user=user, status='completed').count()
+            ctx['pending_count'] = WasteRequest.objects.filter(user=user, status='pending', is_deleted=False).count()
+            ctx['completed_count'] = WasteRequest.objects.filter(user=user, status='completed', is_deleted=False).count()
             ctx['unread_notifications'] = Notification.objects.filter(
                 user=user, is_read=False
             ).order_by('-created_at')[:5]
@@ -101,7 +101,7 @@ class UserRequestListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         return (
-            WasteRequest.objects.filter(user=self.request.user)
+            WasteRequest.objects.filter(user=self.request.user, is_deleted=False)
             .select_related('driver__user')
             .order_by('-created_at')
         )
@@ -110,7 +110,23 @@ class UserRequestListView(LoginRequiredMixin, ListView):
         ctx = super().get_context_data(**kwargs)
         ctx['waste_type_choices'] = WasteRequest.WASTE_TYPE_CHOICES
         return ctx
-    
+
+
+class UserRecycleBinView(LoginRequiredMixin, ListView):
+    """Naya requests haru jun user le 'delete' garyo (soft-delete), tiniharu
+    yaha dekhincha jaba samma restore ya permanently delete nagariyeko huncha."""
+    template_name = 'web_app/recycle_bin.html'
+    context_object_name = 'deleted_requests'
+    paginate_by = 20
+
+    def get_queryset(self):
+        return (
+            WasteRequest.objects.filter(user=self.request.user, is_deleted=True)
+            .select_related('driver__user')
+            .order_by('-deleted_at')
+        )
+
+
 class UserComplaintListView(LoginRequiredMixin, ListView):
     template_name = 'web_app/user_complaints.html'
     context_object_name = 'complaints'

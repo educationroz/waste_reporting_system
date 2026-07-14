@@ -15,6 +15,7 @@ from .views import (
     NotificationsView,
     RegisterPageView,
     RoutePlanningView,
+    UserRecycleBinView,
     # UserDashboardView,
     UserRequestListView,
     UserComplaintListView,
@@ -26,6 +27,7 @@ urlpatterns = [
     # Public
     path('',          HomeView.as_view(),         name='home'),
     path('complaints/', UserComplaintListView.as_view(), name='user-complaints'),
+    path('recycle-bin/', UserRecycleBinView.as_view(), name='user-recycle-bin'),
     path('login/',    LoginPageView.as_view(),    name='login'),
     path('logout/',   web_logout,                 name='web-logout'),
     path('register/', RegisterPageView.as_view(), name='register'),
