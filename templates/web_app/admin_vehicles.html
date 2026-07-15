@@ -123,6 +123,9 @@
                             <a href="{% url 'admin-schedules' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                                 <i class="bi bi-calendar-week me-2"></i><span class="sidebar-link-text">Zone Schedules</span>
                             </a>
+                            <a href="{% url 'route-planning' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-map me-2"></i><span class="sidebar-link-text">Route Planning</span>
+                            </a>
                             <a href="{% url 'admin-users' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                                 <i class="bi bi-shield-check me-2"></i><span class="sidebar-link-text">Security Admins</span>
                             </a>
@@ -181,7 +184,6 @@
                 </button>
             </div>
 
-            <!-- Fleet Logistics Table View -->
             <div class="card dashboard-card">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
@@ -248,7 +250,6 @@
                                 </td>
                             </tr>
 
-                            <!-- Edit Vehicle Modal inside loop -->
                             <div class="modal fade" id="editVehicleModal{{ vehicle.id }}" tabindex="-1">
                                 <div class="modal-dialog modal-dialog-centered">
                                     <div class="modal-content border-0 shadow">
@@ -303,11 +304,8 @@
                     </table>
                 </div>
             </div>
-        </div> <!-- /content-col -->
-    </div> <!-- /layout-wrapper -->
-</div>
+        </div> </div> </div>
 
-<!-- Add Vehicle Modal (Modern Design Sync) -->
 <div class="modal fade" id="addVehicleModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
@@ -443,29 +441,46 @@ async function updateVehicle(vehicleId) {
     }
 }
 
-// ---------- DELETE — instant row removal, no reload ----------
+// ---------- DELETE — reliable fetch status check + instant DOM row removal ----------
 async function deleteVehicle(vehicleId) {
     if (!confirm('Delete this vehicle? This cannot be undone.')) return;
 
-    const data = await API.delete(`/api/vehicles/${vehicleId}/`);
-    if (data && data.success) {
-        showToast('Vehicle deleted.', 'success');
+    try {
+        const res = await fetch(`/api/vehicles/${vehicleId}/`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+            },
+        });
 
-        const row = document.getElementById(`vehicle-row-${vehicleId}`);
-        if (row) {
-            row.classList.add('row-removing');
-            // Wait for the fade-out transition before actually removing the node
-            setTimeout(() => {
-                row.remove();
-                checkEmptyState();
-            }, 250);
+        if (res.ok) {
+            showToast('Vehicle deleted.', 'success');
+
+            const row = document.getElementById(`vehicle-row-${vehicleId}`);
+            if (row) {
+                row.classList.add('row-removing');
+                // Wait for the CSS fade-out transition before actually removing the node
+                setTimeout(() => {
+                    row.remove();
+                    checkEmptyState();
+                }, 250);
+            }
+
+            // Clean up the associated edit modal so it doesn't linger in the DOM
+            const modal = document.getElementById(`editVehicleModal${vehicleId}`);
+            if (modal) modal.remove();
+        } else {
+            let errMsg = 'Delete failed.';
+            try {
+                const data = await res.json();
+                errMsg = typeof data === 'object'
+                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                    : String(data);
+            } catch (e) { /* body can be empty on a 204 response */ }
+            showToast(errMsg, 'danger');
         }
-
-        // Clean up the associated edit modal so it doesn't linger in the DOM
-        const modal = document.getElementById(`editVehicleModal${vehicleId}`);
-        if (modal) modal.remove();
-    } else {
-        showToast('Delete failed.', 'danger');
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
     }
 }
 

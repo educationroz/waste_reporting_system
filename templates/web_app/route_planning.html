@@ -6,6 +6,74 @@
 {% block extra_css %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <style>
+    /* ==========================================
+       SIDEBAR LAYOUT — same pattern as home.html/notifications.html,
+       flexbox, always side-by-side, icon-only mode on small screens
+       ========================================== */
+    .layout-wrapper {
+        display: flex;
+        align-items: stretch;
+        gap: 1.5rem;
+    }
+
+    .sidebar-col {
+        flex: 0 0 220px;
+        max-width: 220px;
+        transition: flex-basis 0.15s ease, max-width 0.15s ease;
+    }
+
+    .sidebar-card {
+        height: 100%;
+        position: sticky;
+        top: 20px;
+        z-index: 1020;
+    }
+
+    .content-col {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .sidebar-logo-text,
+    .sidebar-link-text {
+        white-space: nowrap;
+    }
+
+    .nav-pills .nav-link:not(.active):hover {
+        background-color: #f8f9fa;
+        color: #198754 !important;
+    }
+
+    @media (max-width: 767.98px) {
+        .sidebar-col {
+            flex: 0 0 64px;
+            max-width: 64px;
+        }
+        .sidebar-card .card-body {
+            padding: 0.75rem 0.4rem !important;
+            align-items: center;
+        }
+        .sidebar-logo-text,
+        .sidebar-link-text {
+            display: none;
+        }
+        .sidebar-card .nav-link {
+            justify-content: center;
+            padding: 0.6rem !important;
+        }
+        .sidebar-card .nav-link i {
+            margin: 0 !important;
+            font-size: 1.15rem;
+        }
+        .sidebar-card h5 {
+            text-align: center;
+            padding: 0 !important;
+        }
+    }
+
+    /* ==========================================
+       ROUTE PLANNING SPECIFIC STYLING
+       ========================================== */
     #route-map {
         height: 600px;
         border-radius: 8px;
@@ -112,73 +180,156 @@
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-8">
-            <h2 class="mb-4">
-                <i class="fas fa-route"></i> Route Planning & Tracking
-            </h2>
+<div class="container-fluid px-4 py-3">
+    <div class="layout-wrapper">
 
-            <div class="route-controls">
-                <div class="row">
-                    <div class="col-md-6 mb-2">
-                        <label>Select Driver</label>
-                        <select id="driverSelect" class="form-control">
-                            <option value="">Loading drivers...</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6 mb-2">
-                        <label>Planned Date</label>
-                        <input type="date" id="plannedDate" class="form-control">
-                    </div>
-                </div>
-                <div class="row mt-2">
-                    <div class="col-md-6">
-                        <button class="btn btn-primary w-100" onclick="loadWasteRequests()">
-                            <i class="fas fa-list"></i> Select Requests
-                        </button>
-                    </div>
-                    <div class="col-md-6">
-                        <button class="btn btn-success w-100" onclick="generateRoute()" id="generateBtn" disabled>
-                            <i class="fas fa-magic"></i> Generate Optimal Route
-                        </button>
-                    </div>
-                </div>
-            </div>
+        <!-- ── साइडबार सेक्सन (Sidebar Section) ── -->
+        <div class="sidebar-col">
+            <div class="card shadow-sm border-0 sidebar-card">
+                <div class="card-body p-3 d-flex flex-column">
+                    <h5 class="text-success fw-bold mb-3 px-2">
+                        <span class="sidebar-logo-text">SafhaSahar</span>
+                    </h5>
+                    <div class="nav flex-column nav-pills">
+                        {% if user.role == 'admin' %}
+                            <a href="{% url 'admin-dashboard' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-speedometer2 me-2"></i><span class="sidebar-link-text">Dashboard</span>
+                            </a>
+                            <a href="{% url 'admin-requests' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-list-check me-2"></i><span class="sidebar-link-text">Collection Requests</span>
+                            </a>
+                            <a href="{% url 'admin-drivers' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-person-badge me-2"></i><span class="sidebar-link-text">Manage Drivers</span>
+                            </a>
+                            <a href="{% url 'admin-vehicles' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-truck me-2"></i><span class="sidebar-link-text">Fleet Logistics</span>
+                            </a>
+                            <a href="{% url 'admin-schedules' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-calendar-week me-2"></i><span class="sidebar-link-text">Zone Schedules</span>
+                            </a>
+                            <a href="{% url 'route-planning' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
+                                <i class="bi bi-map me-2"></i><span class="sidebar-link-text">Route Planning</span>
+                            </a>
+                            <a href="{% url 'admin-users' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-shield-check me-2"></i><span class="sidebar-link-text">Security Admins</span>
+                            </a>
+                            <a href="{% url 'admin-logs' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-file-earmark-text me-2"></i><span class="sidebar-link-text">Activity Logs</span>
+                            </a>
+                            <a href="{% url 'admin-settings' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-gear me-2"></i><span class="sidebar-link-text">Portal Settings</span>
+                            </a>
+                            <a href="{% url 'notifications' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-bell me-2"></i><span class="sidebar-link-text">Notifications</span>
+                            </a>
+                            <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
+                            </a>
 
-            <!-- Map -->
-            <div id="route-map"></div>
+                        {% elif user.role == 'driver' %}
+                            <a href="{% url 'driver-dashboard' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-speedometer2 me-2"></i><span class="sidebar-link-text">Dashboard</span>
+                            </a>
+                            <a href="{% url 'route-planning' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
+                                <i class="bi bi-map me-2"></i><span class="sidebar-link-text">Route Planning</span>
+                            </a>
+                            <a href="{% url 'notifications' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-bell me-2"></i><span class="sidebar-link-text">Notifications</span>
+                            </a>
+                            <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
+                            </a>
 
-            <!-- Route Info -->
-            <div id="routeInfo" style="display: none;">
-                <div class="route-info-card">
-                    <h5>Route Summary</h5>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p><strong>Total Distance:</strong> <span id="totalDistance">0</span> km</p>
-                            <p><strong>Total Stops:</strong> <span id="totalStops">0</span></p>
-                        </div>
-                        <div class="col-md-6">
-                            <p><strong>Status:</strong> <span id="routeStatus" class="route-status planned">Planned</span></p>
-                            <button class="btn btn-sm btn-success" onclick="startRoute()" id="startRouteBtn">
-                                <i class="fas fa-play"></i> Start Route
-                            </button>
-                        </div>
+                        {% else %}
+                            <a href="{% url 'home' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-house me-2"></i><span class="sidebar-link-text">Dashboard</span>
+                            </a>
+                            <a href="{% url 'user-requests' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-clock-history me-2"></i><span class="sidebar-link-text">My Requests</span>
+                            </a>
+                            <a href="{% url 'notifications' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-bell me-2"></i><span class="sidebar-link-text">Notifications</span>
+                            </a>
+                            <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
+                            </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Waypoints Sidebar -->
-        <div class="col-md-4">
-            <h5 class="mb-3">
-                <i class="fas fa-map-marker-alt"></i> Waypoints
-            </h5>
-            <div class="waypoint-list" id="waypointList">
-                <p class="text-muted text-center">Generate a route to see waypoints</p>
+        <!-- ── मुख्य सामाग्री (Main Content Area) ── -->
+        <div class="content-col">
+            <div class="row">
+
+                <div class="col-md-8">
+                    <h2 class="mb-4">
+                        <i class="fas fa-route"></i> Route Planning & Tracking
+                    </h2>
+
+                    <div class="route-controls">
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <label>Select Driver</label>
+                                <select id="driverSelect" class="form-control">
+                                    <option value="">Loading drivers...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label>Planned Date</label>
+                                <input type="date" id="plannedDate" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <button class="btn btn-primary w-100" onclick="loadWasteRequests()">
+                                    <i class="fas fa-list"></i> Select Requests
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button class="btn btn-success w-100" onclick="generateRoute()" id="generateBtn" disabled>
+                                    <i class="fas fa-magic"></i> Generate Optimal Route
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Map -->
+                    <div id="route-map"></div>
+
+                    <!-- Route Info -->
+                    <div id="routeInfo" style="display: none;">
+                        <div class="route-info-card">
+                            <h5>Route Summary</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Total Distance:</strong> <span id="totalDistance">0</span> km</p>
+                                    <p><strong>Total Stops:</strong> <span id="totalStops">0</span></p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Status:</strong> <span id="routeStatus" class="route-status planned">Planned</span></p>
+                                    <button class="btn btn-sm btn-success" onclick="startRoute()" id="startRouteBtn">
+                                        <i class="fas fa-play"></i> Start Route
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Waypoints Sidebar -->
+                <div class="col-md-4">
+                    <h5 class="mb-3">
+                        <i class="fas fa-map-marker-alt"></i> Waypoints
+                    </h5>
+                    <div class="waypoint-list" id="waypointList">
+                        <p class="text-muted text-center">Generate a route to see waypoints</p>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
+        </div> <!-- /मुख्य सामाग्री -->
+    </div> <!-- /layout-wrapper -->
 </div>
 
 <!-- Requests Modal -->

@@ -1,7 +1,203 @@
-{% extends "web_app/base.html" %}
-{% block title %}User Complaints{% endblock %}
+{% extends 'web_app/base.html' %}
+{% block title %}Complaint Management{% endblock %}
+
+{% block extra_css %}
+<style>
+    .layout-wrapper { display: flex; align-items: stretch; gap: 1.5rem; min-height: calc(100vh - 56px); }
+    .sidebar-col { flex: 0 0 220px; max-width: 220px; }
+    .sidebar-card { height: 100%; position: sticky; top: 20px; z-index: 1020; }
+    .content-col { flex: 1 1 auto; min-width: 0; }
+    .nav-pills .nav-link:not(.active):hover { background-color: #f8f9fa; color: #198754 !important; }
+    .dashboard-card { border: none; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.03); background: #fff; }
+    .dashboard-card .card-header { border-bottom: 1px solid #f1f3f5; padding: 1.25rem; }
+    .table th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; color: #6c757d; padding: 1rem; }
+    .table td { padding: 1rem; font-size: 0.88rem; vertical-align: middle; }
+    @media (max-width: 767.98px) {
+        .sidebar-col { flex: 0 0 64px; max-width: 64px; }
+        .sidebar-logo-text, .sidebar-link-text { display: none; }
+        .sidebar-card .nav-link { justify-content: center; padding: 0.6rem !important; }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-    <h2>User Complaints</h2>
-    <p>Welcome to your complaint dashboard!</p>
+<div class="container-fluid px-4 py-3">
+    <div class="layout-wrapper">
+
+        <div class="sidebar-col">
+            <div class="card shadow-sm border-0 sidebar-card">
+                <div class="card-body p-3 d-flex flex-column">
+                    <h5 class="text-success fw-bold mb-3 px-2"><span class="sidebar-logo-text">SafhaSahar</span></h5>
+                    <div class="nav flex-column nav-pills">
+                        <a href="{% url 'admin-dashboard' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-speedometer2 me-2"></i><span class="sidebar-link-text">Dashboard</span>
+                        </a>
+                        <a href="{% url 'admin-requests' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-list-check me-2"></i><span class="sidebar-link-text">Collection Requests</span>
+                        </a>
+                        <a href="{% url 'admin-complaints' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
+                            <i class="bi bi-megaphone me-2"></i><span class="sidebar-link-text">Complaints</span>
+                        </a>
+                        <a href="{% url 'admin-drivers' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-person-badge me-2"></i><span class="sidebar-link-text">Manage Drivers</span>
+                        </a>
+                        <a href="{% url 'admin-vehicles' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-truck me-2"></i><span class="sidebar-link-text">Fleet Logistics</span>
+                        </a>
+                        <a href="{% url 'admin-schedules' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-calendar-week me-2"></i><span class="sidebar-link-text">Zone Schedules</span>
+                        </a>
+                        <a href="{% url 'admin-users' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-shield-check me-2"></i><span class="sidebar-link-text">Security Admins</span>
+                        </a>
+                        <a href="{% url 'admin-logs' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-file-earmark-text me-2"></i><span class="sidebar-link-text">Activity Logs</span>
+                        </a>
+                        <a href="{% url 'admin-settings' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-gear me-2"></i><span class="sidebar-link-text">Portal Settings</span>
+                        </a>
+                        <a href="{% url 'notifications' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-bell me-2"></i><span class="sidebar-link-text">Notifications</span>
+                        </a>
+                        <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-col">
+            <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
+                <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-megaphone text-success me-2"></i>Complaint Management</h2>
+            </div>
+
+            <div class="card dashboard-card">
+                <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold">All Complaints</h6>
+                    <select id="status-filter" class="form-select form-select-sm w-auto" onchange="renderComplaints()">
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="under_review">Under Review</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID</th><th>User</th><th>Type</th><th>Description</th>
+                                <th>Photo</th><th>Status</th><th>Date</th><th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="complaint-table-body">
+                            <tr><td colspan="8" class="text-center text-muted py-4">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="reviewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-clipboard-check me-2"></i>Review Complaint</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="review-complaint-id">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Status</label>
+                    <select id="review-status" class="form-select">
+                        <option value="pending">Pending</option>
+                        <option value="under_review">Under Review</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                </div>
+                <div class="mb-1">
+                    <label class="form-label fw-semibold">Admin Response (optional)</label>
+                    <textarea id="review-response" class="form-control" rows="3" placeholder="Note visible to the complainant..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success px-4" onclick="submitReview()">Save Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allComplaints = [];
+const reviewModal = new bootstrap.Modal(document.getElementById('reviewModal'));
+
+const statusBadge = s => ({
+    pending: 'bg-warning text-dark',
+    under_review: 'bg-info',
+    completed: 'bg-success'
+}[s] || 'bg-secondary');
+
+async function loadComplaints() {
+    const data = await API.get('/api/complaints/');
+    allComplaints = (data && data.results) ? data.results : (data || []);
+    renderComplaints();
+}
+
+function renderComplaints() {
+    const filter = document.getElementById('status-filter').value;
+    const rows = allComplaints.filter(c => !filter || c.status === filter);
+    const body = document.getElementById('complaint-table-body');
+
+    if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No complaints found.</td></tr>';
+        return;
+    }
+
+    body.innerHTML = rows.map(c => `
+        <tr>
+            <td class="fw-bold text-secondary">#${c.id}</td>
+            <td>${c.username}</td>
+            <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">${c.complaint_type_display}</span></td>
+            <td class="small" style="max-width:260px;">${c.description}</td>
+            <td>${c.photo ? `<a href="${c.photo}" target="_blank"><img src="${c.photo}" style="height:36px;width:36px;object-fit:cover;border-radius:4px;"></a>` : '<span class="text-muted small">—</span>'}</td>
+            <td><span class="badge ${statusBadge(c.status)}">${c.status_display}</span></td>
+            <td class="small text-muted">${new Date(c.created_at).toLocaleDateString()}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-success" onclick='openReview(${JSON.stringify(c)})'>
+                    <i class="bi bi-clipboard-check"></i> Review
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function openReview(complaint) {
+    document.getElementById('review-complaint-id').value = complaint.id;
+    document.getElementById('review-status').value = complaint.status;
+    document.getElementById('review-response').value = complaint.admin_response || '';
+    reviewModal.show();
+}
+
+async function submitReview() {
+    const id = document.getElementById('review-complaint-id').value;
+    const status = document.getElementById('review-status').value;
+    const admin_response = document.getElementById('review-response').value;
+
+    const data = await API.patch(`/api/complaints/${id}/update_status/`, { status, admin_response });
+    if (data && data.id) {
+        showToast('Complaint updated.', 'success');
+        reviewModal.hide();
+        loadComplaints();
+    } else {
+        showToast('Failed to update complaint.', 'danger');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadComplaints);
+</script>
 {% endblock %}

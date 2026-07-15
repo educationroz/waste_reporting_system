@@ -275,7 +275,7 @@ async function toggleAvailability() {
 
     const data = await API.patch(`/api/drivers/${driverId}/toggle_availability/`, {});
     if (data && data.id) {
-        showToast('Availability updated!', 'success');
+        showToast(`Changed to ${data.is_available ? 'Available' : 'Busy'}`, 'success');
         setTimeout(() => location.reload(), 800);
     } else {
         showToast('Failed to update availability.', 'danger');
