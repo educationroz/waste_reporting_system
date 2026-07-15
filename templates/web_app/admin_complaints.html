@@ -13,10 +13,28 @@
     .table th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; color: #6c757d; padding: 1rem; }
     .table td { padding: 1rem; font-size: 0.88rem; vertical-align: middle; }
     @media (max-width: 767.98px) {
-        .sidebar-col { flex: 0 0 64px; max-width: 64px; }
-        .sidebar-logo-text, .sidebar-link-text { display: none; }
-        .sidebar-card .nav-link { justify-content: center; padding: 0.6rem !important; }
+
+    .sidebar-col{
+        flex: 0 0 70px;
+        max-width: 70px;
+        min-width: 70px;
     }
+
+    .sidebar-logo-text,
+    .sidebar-link-text{
+        display:none;
+    }
+
+    .sidebar-card .nav-link{
+        justify-content:center;
+        padding:.75rem;
+    }
+
+    .sidebar-card .nav-link i{
+        margin:0;
+        font-size:1.2rem;
+    }
+}
 </style>
 {% endblock %}
 

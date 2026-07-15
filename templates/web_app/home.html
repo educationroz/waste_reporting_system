@@ -46,32 +46,28 @@
 
     /* Screen sano huda — sidebar icon-only, tara SIDE माnai रहन्छ */
     @media (max-width: 767.98px) {
-        .sidebar-col {
-            flex: 0 0 64px;
-            max-width: 64px;
-        }
-        .sidebar-card .card-body {
-            padding: 0.75rem 0.4rem !important;
-            align-items: center;
-        }
-        .sidebar-logo-text,
-        .sidebar-link-text {
-            display: none;
-        }
-        .sidebar-card .nav-link {
-            justify-content: center;
-            padding: 0.6rem !important;
-        }
-        .sidebar-card .nav-link i {
-            margin: 0 !important;
-            font-size: 1.15rem;
-        }
-        .sidebar-card h5 {
-            text-align: center;
-            padding: 0 !important;
-        }
+
+    .sidebar-col{
+        flex: 0 0 70px;
+        max-width: 70px;
+        min-width: 70px;
     }
 
+    .sidebar-logo-text,
+    .sidebar-link-text{
+        display:none;
+    }
+
+    .sidebar-card .nav-link{
+        justify-content:center;
+        padding:.75rem;
+    }
+
+    .sidebar-card .nav-link i{
+        margin:0;
+        font-size:1.2rem;
+    }
+}
     /* Complaint modal — card-style options */
     .complaint-type-option {
         cursor: pointer;
