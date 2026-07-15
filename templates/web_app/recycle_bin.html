@@ -32,9 +32,32 @@
         min-width: 0;
     }
 
+    /* Sidebar overflow fix — translated (Nepali) text le nav-link
+       lai flex item ko default min-width:auto le grow garaera
+       card bahira overflow garcha, tyo rokne */
+    .sidebar-card .nav.flex-column {
+        min-width: 0;
+    }
+
+    .sidebar-card .nav-link {
+        min-width: 0;
+        max-width: 100%;
+    }
+
     .sidebar-logo-text,
     .sidebar-link-text {
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+
+    .sidebar-logo-text {
+        display: block;
+    }
+
+    .sidebar-link-text {
+        flex: 1 1 auto;
     }
 
     @media (max-width: 767.98px) {
