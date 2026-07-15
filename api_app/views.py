@@ -449,6 +449,31 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         waste_request.save(update_fields=update_fields)
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
+    @action(detail=False, methods=['get'])
+    def recycle_bin(self, request):
+        """
+        GET /api/waste-requests/recycle_bin/
+        Logged-in user (ya admin/driver) ko soft-deleted request haru list
+        garne — sidebar ko Recycle Bin badge (base.html) le yehi endpoint
+        fetch garcha count populate garna. Ownership scoping get_queryset()
+        sanga same rakheko (user/driver/admin), tara yaha 'list' action
+        haina, tesैle is_deleted=True lai explicitly filter garnu pareko.
+        """
+        base_qs = WasteRequest.objects.select_related(
+            'user', 'driver', 'driver__user', 'driver__vehicle',
+        )
+        user = request.user
+        if user.role == 'admin':
+            qs = base_qs
+        elif user.role == 'driver':
+            qs = base_qs.filter(driver__user=user)
+        else:
+            qs = base_qs.filter(user=user)
+
+        qs = qs.filter(is_deleted=True).order_by('-deleted_at')
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
 
 class RouteViewSet(viewsets.ModelViewSet):
     """Route planning and management. Admin only for write."""
