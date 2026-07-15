@@ -38,6 +38,24 @@ BACKUP_DIR = Path(settings.BASE_DIR) / 'backups'
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _log_admin_action(request, action_type, content_type, obj, description=''):
+    """
+    Create an AdminLog entry. Any authenticated user's tracked action gets
+    logged here — admin, driver, or regular user.
+    """
+    if not request.user.is_authenticated:
+        return
+    AdminLog.objects.create(
+        admin_user=request.user,
+        action=action_type,
+        content_type=content_type,
+        object_id=getattr(obj, 'id', None),
+        object_description=description or str(obj),
+        ip_address=request.META.get('REMOTE_ADDR'),
+        user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+    )
+
+
 def _get_backup_files():
     files = []
     for backup_path in sorted(BACKUP_DIR.glob('*.json'), key=lambda item: item.stat().st_mtime, reverse=True):
@@ -94,6 +112,8 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
         except Exception as exc:
             return Response({'error': f'Backup failed: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        _log_admin_action(request, 'other', 'DatabaseBackup', None, f'Created backup {file_name}')
+
         return Response({
             'file_name': file_name,
             'file_path': str(file_path),
@@ -125,6 +145,7 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         backup_path.unlink(missing_ok=True)
+        _log_admin_action(request, 'delete', 'DatabaseBackup', None, f'Deleted backup {file_name}')
         return Response({'message': f'Backup {file_name} deleted successfully.'})
 
     @action(detail=False, methods=['post'])
@@ -148,6 +169,8 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
         except Exception as exc:
             return Response({'error': f'Restore failed: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        _log_admin_action(request, 'other', 'DatabaseBackup', None, f'Restored from backup {uploaded_file.name}')
+
         return Response({
             'message': f'Backup {uploaded_file.name} restored successfully.',
             'restored_file': uploaded_file.name,
@@ -162,6 +185,18 @@ class VehicleViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['plate_number', 'vehicle_type', 'status']
     ordering_fields = ['created_at', 'status']
+
+    def perform_create(self, serializer):
+        vehicle = serializer.save()
+        _log_admin_action(self.request, 'create', 'Vehicle', vehicle, f'Added vehicle {vehicle.plate_number}')
+
+    def perform_update(self, serializer):
+        vehicle = serializer.save()
+        _log_admin_action(self.request, 'update', 'Vehicle', vehicle, f'Updated vehicle {vehicle.plate_number}')
+
+    def perform_destroy(self, instance):
+        _log_admin_action(self.request, 'delete', 'Vehicle', instance, f'Removed vehicle {instance.plate_number}')
+        instance.delete()
 
     @action(detail=False, methods=['get'])
     def available(self, request):
@@ -182,10 +217,19 @@ class DriverViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['user__username', 'license_number']
 
+    def perform_create(self, serializer):
+        driver = serializer.save()
+        _log_admin_action(self.request, 'create', 'Driver', driver, f'Registered driver {driver.user.username}')
+
+    def perform_update(self, serializer):
+        driver = serializer.save()
+        _log_admin_action(self.request, 'update', 'Driver', driver, f'Updated driver {driver.user.username}')
+
     def destroy(self, request, *args, **kwargs):
         """Delete the driver profile and the linked auth user together."""
         driver = self.get_object()
         user = driver.user
+        _log_admin_action(request, 'delete', 'Driver', driver, f'Removed driver {user.username}')
 
         with transaction.atomic():
             user.delete()
@@ -202,11 +246,15 @@ class DriverViewSet(viewsets.ModelViewSet):
             )
         driver.is_available = not driver.is_available
         driver.save(update_fields=['is_available'])
+
+        _log_admin_action(
+            request, 'update', 'Driver', driver,
+            f'{driver.user.username} availability set to {driver.is_available}'
+        )
         return Response(DriverSerializer(driver).data)
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def update_location(self, request, pk=None):
-        ...  # (yo already थियो, jaसको तस nai raख्नुहोस्)
         """PATCH /api/drivers/{id}/update_location/ — driver updates GPS location."""
         driver = self.get_object()
         # Only the driver themselves or admin can update location
@@ -247,6 +295,18 @@ class BinViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['bin_code', 'waste_type', 'status', 'location_address']
     ordering_fields = ['created_at', 'status']
+
+    def perform_create(self, serializer):
+        bin_obj = serializer.save()
+        _log_admin_action(self.request, 'create', 'Bin', bin_obj, f'Added bin {bin_obj.bin_code}')
+
+    def perform_update(self, serializer):
+        bin_obj = serializer.save()
+        _log_admin_action(self.request, 'update', 'Bin', bin_obj, f'Updated bin {bin_obj.bin_code}')
+
+    def perform_destroy(self, instance):
+        _log_admin_action(self.request, 'delete', 'Bin', instance, f'Removed bin {instance.bin_code}')
+        instance.delete()
 
     @action(detail=False, methods=['get'])
     def full_bins(self, request):
@@ -331,10 +391,13 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         return qs.order_by('-created_at')
 
     def perform_create(self, serializer):
-        # Login gareko user bhaye tesैle nai owner huncha,
-        # guest bhaye user=None (anonymous report) save huncha.
         user = self.request.user if self.request.user.is_authenticated else None
-        serializer.save(user=user)
+        waste_request = serializer.save(user=user)
+        if user:
+            _log_admin_action(
+                self.request, 'create', 'WasteRequest', waste_request,
+                f'{user.username} submitted pickup request #{waste_request.id}'
+            )
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def assign_driver(self, request, pk=None):
@@ -351,6 +414,11 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         waste_request.driver = driver
         waste_request.status = 'assigned'
         waste_request.save(update_fields=['driver', 'status'])
+
+        _log_admin_action(
+            request, 'assign', 'WasteRequest', waste_request,
+            f'Assigned driver {driver.user.username} to request #{waste_request.id}'
+        )
 
         # Notify user (guest/anonymous requests won't have a user to notify)
         if waste_request.user_id:
@@ -404,6 +472,13 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             update_fields += ['is_deleted', 'deleted_at']
 
         waste_request.save(update_fields=update_fields)
+
+        # Log all status changes, including self-cancels, so users' own
+        # actions on their requests appear in the audit trail too.
+        _log_admin_action(
+            request, 'status_change', 'WasteRequest', waste_request,
+            f'Request #{waste_request.id} status changed to {new_status} by {user.username}'
+        )
 
         # Guest/anonymous requests won't have a user to notify
         if waste_request.user_id:
@@ -467,6 +542,10 @@ class RouteViewSet(viewsets.ModelViewSet):
             qs = qs.filter(driver__user=self.request.user)
         return qs
 
+    def perform_create(self, serializer):
+        route = serializer.save()
+        _log_admin_action(self.request, 'create', 'Route', route, f'Created route #{route.id}')
+
     @action(detail=True, methods=['patch'])
     def start_route(self, request, pk=None):
         """PATCH /api/routes/{id}/start_route/ — mark route as active."""
@@ -474,6 +553,8 @@ class RouteViewSet(viewsets.ModelViewSet):
         route.status = 'active'
         route.started_at = timezone.now()
         route.save(update_fields=['status', 'started_at'])
+
+        _log_admin_action(request, 'status_change', 'Route', route, f'Route #{route.id} started')
         return Response(RouteSerializer(route).data)
 
     @action(detail=True, methods=['patch'])
@@ -483,6 +564,8 @@ class RouteViewSet(viewsets.ModelViewSet):
         route.status = 'completed'
         route.completed_at = timezone.now()
         route.save(update_fields=['status', 'completed_at'])
+
+        _log_admin_action(request, 'status_change', 'Route', route, f'Route #{route.id} completed')
         return Response(RouteSerializer(route).data)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
@@ -548,6 +631,11 @@ class RouteViewSet(viewsets.ModelViewSet):
         if bin_ids:
             route.bins.set(bin_ids)
 
+        _log_admin_action(
+            request, 'create' if created else 'update', 'Route', route,
+            f'Generated optimal route for driver {driver.user.username} ({route_data["total_stops"]} stops)'
+        )
+
         # Broadcast route update via WebSocket
         if CHANNEL_LAYER is not None:
             async_to_sync(CHANNEL_LAYER.group_send)(
@@ -575,6 +663,18 @@ class ScheduleViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [filters.SearchFilter]
     search_fields = ['zone_name', 'frequency', 'driver__user__username']
+
+    def perform_create(self, serializer):
+        schedule = serializer.save()
+        _log_admin_action(self.request, 'create', 'Schedule', schedule, f'Created schedule for {schedule.zone_name}')
+
+    def perform_update(self, serializer):
+        schedule = serializer.save()
+        _log_admin_action(self.request, 'update', 'Schedule', schedule, f'Updated schedule for {schedule.zone_name}')
+
+    def perform_destroy(self, instance):
+        _log_admin_action(self.request, 'delete', 'Schedule', instance, f'Removed schedule for {instance.zone_name}')
+        instance.delete()
 
 
 class NotificationViewSet(viewsets.ModelViewSet):
@@ -640,10 +740,17 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
     lookup_field = 'key'
 
     def perform_create(self, serializer):
-        serializer.save(updated_by=self.request.user)
+        settings_obj = serializer.save(updated_by=self.request.user)
+        _log_admin_action(self.request, 'create', 'SystemSettings', settings_obj, f'Created setting {settings_obj.key}')
 
     def perform_update(self, serializer):
-        serializer.save(updated_by=self.request.user)
+        settings_obj = serializer.save(updated_by=self.request.user)
+        _log_admin_action(self.request, 'update', 'SystemSettings', settings_obj, f'Updated setting {settings_obj.key}')
+
+    def perform_destroy(self, instance):
+        _log_admin_action(self.request, 'delete', 'SystemSettings', instance, f'Deleted setting {instance.key}')
+        instance.delete()
+
 
 class ComplaintViewSet(viewsets.ModelViewSet):
     """
@@ -677,7 +784,11 @@ class ComplaintViewSet(viewsets.ModelViewSet):
         return qs.order_by('-created_at')
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        complaint = serializer.save(user=self.request.user)
+        _log_admin_action(
+            self.request, 'create', 'Complaint', complaint,
+            f'{self.request.user.username} filed complaint #{complaint.id} ({complaint.get_complaint_type_display()})'
+        )
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
     def update_status(self, request, pk=None):
@@ -694,6 +805,11 @@ class ComplaintViewSet(viewsets.ModelViewSet):
             complaint.admin_response = request.data['admin_response']
             update_fields.append('admin_response')
         complaint.save(update_fields=update_fields)
+
+        _log_admin_action(
+            request, 'status_change', 'Complaint', complaint,
+            f'Complaint #{complaint.id} status changed to {new_status}'
+        )
 
         Notification.objects.create(
             user=complaint.user,

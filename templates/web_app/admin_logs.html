@@ -144,6 +144,9 @@
                         <a href="{% url 'admin-requests' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                             <i class="bi bi-list-check me-2"></i><span class="sidebar-link-text">Collection Requests</span>
                         </a>
+                        <a href="{% url 'admin-complaints' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-megaphone me-2"></i><span class="sidebar-link-text">Complaints</span>
+                        </a>
                         <a href="{% url 'admin-drivers' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                             <i class="bi bi-person-badge me-2"></i><span class="sidebar-link-text">Manage Drivers</span>
                         </a>
@@ -218,10 +221,28 @@
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold text-secondary">Filter by Security Operator</label>
                             <select name="admin" class="form-select" onchange="document.getElementById('log-filter-form').submit()">
-                                <option value="">All Authenticated Admins</option>
-                                {% for admin in admin_choices %}
-                                <option value="{{ admin.id }}" {% if admin.id|stringformat:"s" == current_admin %}selected{% endif %}>{{ admin.username }}</option>
-                                {% endfor %}
+                                <option value="">All Operators</option>
+                                {% if admin_choices %}
+                                <optgroup label="Admins">
+                                    {% for admin in admin_choices %}
+                                    <option value="{{ admin.id }}" {% if admin.id|stringformat:"s" == current_admin %}selected{% endif %}>{{ admin.username }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+                                {% if driver_choices %}
+                                <optgroup label="Drivers">
+                                    {% for driver in driver_choices %}
+                                    <option value="{{ driver.id }}" {% if driver.id|stringformat:"s" == current_admin %}selected{% endif %}>{{ driver.username }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+                                {% if user_choices %}
+                                <optgroup label="Users">
+                                    {% for u in user_choices %}
+                                    <option value="{{ u.id }}" {% if u.id|stringformat:"s" == current_admin %}selected{% endif %}>{{ u.username }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
                             </select>
                         </div>
                     </form>

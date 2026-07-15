@@ -12,38 +12,6 @@ User = get_user_model()
 
 # ─── Public / Auth Pages ───────────────────────────────────────────────────────
 
-# class HomeView(TemplateView):
-#     template_name = 'web_app/home.html'
-
-#     def get_context_data(self, **kwargs):
-#         ctx = super().get_context_data(**kwargs)
-#         # Public: show all requests with coordinates on map (limited to 100)
-#         qs = WasteRequest.objects.filter(
-#             status__in=['pending', 'assigned', 'in_progress', 'completed'],
-#             latitude__isnull=False,
-#             longitude__isnull=False
-#         ).select_related('user', 'driver__user').order_by('-created_at')[:100]
-
-#         # Prepare JSON-serializable list
-#         public_data = []
-#         for req in qs:
-#             public_data.append({
-#                 'id': req.id,
-#                 'latitude': float(req.latitude),
-#                 'longitude': float(req.longitude),
-#                 'status': req.status,
-#                 'status_display': req.get_status_display(),
-#                 'waste_type': req.waste_type,
-#                 'waste_type_display': req.get_waste_type_display(),
-#                 'pickup_address': req.pickup_address or '',
-#                 'username': req.user.username if req.user else 'Unknown',
-#                 'driver_name': req.driver.user.username if req.driver and req.driver.user else None,
-#             })
-#         ctx['public_requests'] = public_data
-#         return ctx
-
-# ─── User Dashboard ────────────────────────────────────────────────────────────
-
 class HomeView(TemplateView):
     template_name = 'web_app/home.html'
 
@@ -128,6 +96,8 @@ class UserRecycleBinView(LoginRequiredMixin, ListView):
 
 
 class UserComplaintListView(LoginRequiredMixin, ListView):
+    # NOTE: this currently renders home.html — likely should be
+    # 'web_app/user_complaints.html' unless that's intentional.
     template_name = 'web_app/home.html'
     context_object_name = 'complaints'
     paginate_by = 10
@@ -515,7 +485,7 @@ class AdminLogsView(LoginRequiredMixin, ListView):
         if action_filter:
             qs = qs.filter(action=action_filter)
         
-        # Filter by admin user if provided
+        # Filter by operator (admin/driver/user) if provided
         admin_filter = self.request.GET.get('admin')
         if admin_filter:
             qs = qs.filter(admin_user_id=admin_filter)
@@ -526,7 +496,14 @@ class AdminLogsView(LoginRequiredMixin, ListView):
         from api_app.models import AdminLog
         ctx = super().get_context_data(**kwargs)
         ctx['action_choices'] = AdminLog.ACTION_CHOICES
-        ctx['admin_choices'] = User.objects.filter(role='admin')
+
+        # Include all roles now, not just admins, since driver and user
+        # actions are logged too. Grouped by role for the template to
+        # render as <optgroup> sections.
+        ctx['admin_choices'] = User.objects.filter(role='admin').order_by('username')
+        ctx['driver_choices'] = User.objects.filter(role='driver').order_by('username')
+        ctx['user_choices'] = User.objects.filter(role='user').order_by('username')
+
         ctx['current_action'] = self.request.GET.get('action', '')
         ctx['current_admin'] = self.request.GET.get('admin', '')
         ctx['total_logs'] = AdminLog.objects.count()
