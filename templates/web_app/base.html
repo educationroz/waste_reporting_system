@@ -11,6 +11,12 @@
     <link href="{% static 'web_app/css/main.css' %}" rel="stylesheet">
     
     <style>
+        /* १. लोगो र ब्रान्डको नामलाई अनुवाद हुनबाट रोक्ने */
+  .navbar-brand, .navbar-brand * {
+      translate: no !important;
+  }
+
+  /* २. गुगलको माथिल्लो सेतो/निलो पट्टी (Banner Bar) पूर्ण रूपमा हटाउने */
   .goog-te-banner-frame, 
   .goog-te-banner-frame.skiptranslate, 
   .goog-vi-gtrans, 
@@ -23,40 +29,29 @@
       top: 0px !important;
   }
 
-
+  /* ३. भाषा छान्ने बक्सलाई स्क्रिनको बिचमा प्रोफेसनल देखाउने स्टाइल */
   #custom-lang-switcher {
       position: fixed;
-      top: 85px;
+      top: 85px; /* नेभिगेसन बार भन्दा ठीक मुनि */
       left: 50%;
-      transform: translateX(-50%) translateY(-8px);
-      z-index: 1040; 
+      transform: translateX(-50%);
+      z-index: 1040; /* Navbar भन्दा माथि बस्न */
       background: white;
       padding: 12px 24px;
       border-radius: 30px;
       box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-      border: 2px solid #049b09; 
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-      transition: opacity 0.2s ease, transform 0.2s ease;
+      border: 2px solid #049b09; /* Safha Sahar को थिम हरियो रंग */
   }
 
-  #custom-lang-switcher.show {
-      opacity: 1;
-      visibility: visible;
-      pointer-events: auto;
-      transform: translateX(-50%) translateY(0);
-  }
-
-  /* ४. गुगलको आफ्नो लोगो लुकाउने */
-  .goog-logo-link {
-      display: none !important;
-  }
-  
-  .goog-te-gadget {
-      color: transparent !important;
-      font-size: 0px !important;
-  }
+        /* ४. गुगलको आफ्नो लोगो लुकाउने */
+        .goog-logo-link {
+            display: none !important;
+        }
+        
+        .goog-te-gadget {
+            color: transparent !important;
+            font-size: 0px !important;
+        }
 
   /* ५. ड्रपडाउन (Select Box) लाई सफा बनाउने */
   .goog-te-gadget .goog-te-combo {
@@ -68,12 +63,6 @@
       border: 1px solid #ccc;
       cursor: pointer;
       outline: none;
-  }
-
-  /* ६. Translate box भित्रको Close (X) बटनलाई राम्ररी राख्ने */
-  #custom-lang-switcher .btn-close {
-      font-size: 0.65rem;
-      margin: 0;
   }
     </style>
     {% block extra_css %}{% endblock %}
@@ -92,7 +81,7 @@
                 aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
-        
+
         <div class="collapse navbar-collapse" id="navMenu">
             {% if user.is_authenticated %}
             <ul class="navbar-nav me-auto">
@@ -108,8 +97,13 @@
                 {% elif user.role == 'user' %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'home' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'user-requests' %}"><i class="bi bi-clipboard me-1"></i>My Requests</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'user-recycle-bin' %}"><i class="bi bi-recycle me-1"></i>Recycle Bin</a></li>
-                {% else%}
+                    <li class="nav-item">
+                        <a class="nav-link position-relative" href="{% url 'user-recycle-bin' %}">
+                            <i class="bi bi-recycle me-1"></i>Recycle Bin
+                            <span id="recycle-bin-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark d-none"></span>
+                        </a>
+                    </li>
+                {% else %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'login' %}"><i class="bi bi-speedometer2 me-1"></i>Login</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'register' %}"><i class="bi bi-person-plus me-1"></i>Register</a></li>
                 {% endif %}
@@ -168,15 +162,13 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{% static 'web_app/js/main.js' %}"></script>
-<div id="custom-lang-switcher">
-    <button type="button" class="btn-close position-absolute top-0 end-0"
-            style="margin: 10px; z-index: 1041;"
-            onclick="document.getElementById('custom-lang-switcher').classList.remove('show');"
-            aria-label="Close"></button>
+{% block extra_js %}
+<!-- १. भाषा छान्ने बक्सको HTML (Navbar को मुनि र Main भन्दा माथि आफैं बस्छ) -->
+<div id="custom-lang-switcher" style="display: none;">
     <div id="google_translate_element"></div>
 </div>
 
-<!-- २. गुगल ट्रान्सलेटर, टगल र अटो-गायब पार्ने स्क्रिपट -->
+<!-- २. गुगल ट्रान्सलेटर र अटो-गायब पार्ने स्क्रिप्ट -->
 <script type="text/javascript">
 var isUserLoggedIn = {% if user.is_authenticated %}true{% else %}false{% endif %};
 
@@ -216,38 +208,26 @@ function forceHideGoogleBanner() {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
-
-    if (!isUserLoggedIn && !localStorage.getItem("safhasahar_popup_shown_once")) {
-        document.getElementById("custom-lang-switcher").classList.add('show');
-        localStorage.setItem("safhasahar_popup_shown_once", "true");
+    // यदि पहिले नै भाषा छानिसकेको छ भने यो बाकसलाई देखाउँदै नदेखाउने (Auto-hide)
+    if (!localStorage.getItem("safhasahar_lang_set")) {
+        document.getElementById("custom-lang-switcher").style.display = "block";
     }
 
-    // सुरुमा तुरुन्तै एक पटक, अनि हरेक १५०ms मा दोहोर्‍याएर banner लुकाउने
-    forceHideGoogleBanner();
-    setInterval(forceHideGoogleBanner, 150);
-
-    // DOM मा नयाँ नोड थपिँदा तुरुन्तै पत्ता लगाएर लुकाउने (सबैभन्दा भरपर्दो तरिका)
-    var bannerObserver = new MutationObserver(forceHideGoogleBanner);
-    bannerObserver.observe(document.body, { childList: true, subtree: false });
-
     // गुगलको ड्रपडाउन लोड हुन केही मिलिसेकेन्ड लाग्ने हुनाले चेक गर्ने
-    var attempts = 0;
     var checkDropdown = setInterval(function() {
         var selectElem = document.querySelector('.goog-te-combo');
         attempts++;
         if (selectElem) {
             clearInterval(checkDropdown);
             
-            // जब प्रयोगकर्ताले कुनै भाषा (नेपाली/English) रोज्छ, बाकस तुरुन्तै लुकाउने
-            // (auto-popup को flag अब popup खुलेकै बेला सेट भइसक्छ, यहाँ थप गर्नु पर्दैन)
+            // जब प्रयोगकर्ताले कुनै भाषा (नेपाली/English) रोज्छ
             selectElem.addEventListener('change', function() {
-                document.getElementById("custom-lang-switcher").classList.remove('show');
+                // ब्राउजरमा भाषा छानियो भनेर रेकर्ड राख्ने
+                localStorage.setItem("safhasahar_lang_set", "true");
+                
+                // बाकसलाई तुरुन्तै गायब बनाउने
+                document.getElementById("custom-lang-switcher").style.display = "none";
             });
-        } else if (attempts > 100) {
-            // १० सेकेन्डसम्म कुर्दा पनि widget लोड भएन भने — network/adblocker ले
-            // translate.google.com लाई ब्लक गरेको हुन सक्छ
-            clearInterval(checkDropdown);
-            console.warn("Google Translate widget failed to load — check network access to translate.google.com or disable ad blockers.");
         }
     }, 100); 
 });
@@ -296,7 +276,13 @@ function showToast(message, type = 'success') {
             return fetch(url, opts);
         };
 
-        let res = await makeRequest(token);
+        let res;
+        try {
+            res = await makeRequest(token);
+        } catch (networkErr) {
+            console.error('Network error calling', url, networkErr);
+            return { success: false, error: 'network_error' };
+        }
 
         if (res.status === 401) {
             const refresh = localStorage.getItem('refresh_token');
@@ -318,7 +304,26 @@ function showToast(message, type = 'success') {
             }
         }
 
-        return res.json();
+        if (res.status === 204 || res.status === 205) {
+            return { success: true, status: res.status };
+        }
+
+        const text = await res.text();
+        if (!text) {
+            return { success: res.ok, status: res.status };
+        }
+
+        try {
+            const parsed = JSON.parse(text);
+            if (parsed && typeof parsed === 'object' && parsed.success === undefined) {
+                parsed.success = res.ok;
+                parsed.status = res.status;
+            }
+            return parsed;
+        } catch (e) {
+            console.error('Failed to parse API response as JSON:', text);
+            return { success: res.ok, status: res.status, raw: text };
+        }
     }
 
     async function logout() {
@@ -343,7 +348,6 @@ function showToast(message, type = 'success') {
         localStorage.removeItem('refresh_token');
         window.location.href = '/logout/';
     }
-
 
     try {
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -383,7 +387,7 @@ function showToast(message, type = 'success') {
 
                 if (Array.isArray(data)) {
                     count = data.filter(n => n.is_read === false).length;
-                } 
+                }
                 else if (data.unread_count !== undefined) {
                     count = parseInt(data.unread_count);
                 } else if (data.count !== undefined) {
@@ -401,10 +405,6 @@ function showToast(message, type = 'success') {
         })
         .catch(() => {});
 
-        // ── Recycle Bin count badge — sidebar "Recycle Bin" link mathi ──
-        // Yo badge sabai page ma dekhinxa (home, my requests, recycle bin) —
-        // jaba jaba sidebar ma id="recycle-bin-badge" wala element bhetincha,
-        // notif-badge jastैi count fetch garera populate garcha.
         const binBadge = document.getElementById('recycle-bin-badge');
         if (binBadge) {
             fetch('/api/waste-requests/recycle_bin/', {
@@ -446,7 +446,7 @@ function showToast(message, type = 'success') {
 
 <footer>
     <div class="text-center py-3 bg-light mt-4">
-        <small>&copy;  Safha Sahar {% now "Y" %}. All rights reserved. | RA Innovations</small>
+        <small>&copy; Safha Sahar {% now "Y" %}. All rights reserved. | RA Innovations</small>
     </div>
 </footer>
 </body>
