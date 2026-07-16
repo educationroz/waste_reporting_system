@@ -315,6 +315,13 @@
                                 </button>
                             </div>
                         </div>
+                        <div class="row mt-2">
+                            <div class="col-12">
+                                <button class="btn btn-outline-success w-100" onclick="generateRoute(true)">
+                                    <i class="fas fa-globe"></i> Auto-Generate Route (All Pending Reports)
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Map -->
@@ -381,20 +388,18 @@
     // ── State ────────────────────────────────────────────────────────────────
     let map = null;
     let currentRoute = null;
-    let currentRouteId = null;       // FIX: store route ID after generation
+    let currentRouteId = null;
     let routeMarkers = [];
-    let routePolyline = null;        // FIX: track polyline so it can be cleared
+    let routePolyline = null;
     let selectedRequests = [];
 
-    // ── Get token safely ─────────────────────────────────────────────────────
-    // FIX: always read fresh from localStorage, don't cache at page load
+    // ── Get token (still used for the raw WebSocket connection below) ───────
     function getToken() {
         return localStorage.getItem('access_token');
     }
 
     // ── Map ──────────────────────────────────────────────────────────────────
     function initMap() {
-        // FIX: default to Pokhara, Nepal (not London)
         map = L.map('route-map').setView([28.2096, 83.9856], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
@@ -404,64 +409,49 @@
 
     // ── Load drivers ─────────────────────────────────────────────────────────
     async function loadDrivers() {
-        try {
-            const res = await fetch('/api/drivers/', {
-                headers: { 'Authorization': `Bearer ${getToken()}` }
-            });
-            if (!res.ok) {
-                console.error('Failed to load drivers:', res.status);
-                return;
-            }
-            const data = await res.json();
-            // API may return paginated {results:[]} or plain array
-            const drivers = Array.isArray(data) ? data : (data.results || []);
-            const select = document.getElementById('driverSelect');
-            select.innerHTML = '<option value="">Select a driver...</option>';
-            drivers.forEach(d => {
-                const option = document.createElement('option');
-                option.value = d.id;
-                option.textContent = d.user_detail?.username || d.username || `Driver #${d.id}`;
-                select.appendChild(option);
-            });
-        } catch (e) {
-            console.error('Failed to load drivers:', e);
+        const data = await API.get('/api/drivers/');
+        if (!data) {
+            console.error('Failed to load drivers');
+            return;
         }
+        const drivers = Array.isArray(data) ? data : (data.results || []);
+        const select = document.getElementById('driverSelect');
+        select.innerHTML = '<option value="">Select a driver...</option>';
+        drivers.forEach(d => {
+            const option = document.createElement('option');
+            option.value = d.id;
+            option.textContent = d.user?.username || d.user_detail?.username || `Driver #${d.id}`;
+            select.appendChild(option);
+        });
     }
 
     // ── Load waste requests ──────────────────────────────────────────────────
     async function loadWasteRequests() {
-        try {
-            const res = await fetch('/api/waste-requests/', {
-                headers: { 'Authorization': `Bearer ${getToken()}` }
-            });
-            if (!res.ok) {
-                showToast('Failed to load requests. Are you logged in?', 'danger');
-                return;
-            }
-            const data = await res.json();
-            const requests = Array.isArray(data) ? data : (data.results || []);
-
-            if (requests.length === 0) {
-                document.getElementById('requestsList').innerHTML =
-                    '<p class="text-muted text-center">No waste requests found.</p>';
-            } else {
-                let html = '';
-                requests.forEach(r => {
-                    html += `
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" value="${r.id}" id="req${r.id}">
-                            <label class="form-check-label" for="req${r.id}">
-                                <strong>#${r.id}</strong> — ${r.pickup_address || 'No address'}
-                                <span class="badge bg-secondary ms-1">${r.status}</span>
-                            </label>
-                        </div>`;
-                });
-                document.getElementById('requestsList').innerHTML = html;
-            }
-            new bootstrap.Modal(document.getElementById('requestsModal')).show();
-        } catch (e) {
-            console.error('Failed to load requests:', e);
+        const data = await API.get('/api/waste-requests/');
+        if (!data) {
+            showToast('Failed to load requests. Are you logged in?', 'danger');
+            return;
         }
+        const requests = Array.isArray(data) ? data : (data.results || []);
+
+        if (requests.length === 0) {
+            document.getElementById('requestsList').innerHTML =
+                '<p class="text-muted text-center">No waste requests found.</p>';
+        } else {
+            let html = '';
+            requests.forEach(r => {
+                html += `
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" value="${r.id}" id="req${r.id}">
+                        <label class="form-check-label" for="req${r.id}">
+                            <strong>#${r.id}</strong> — ${r.pickup_address || 'No address'}
+                            <span class="badge bg-secondary ms-1">${r.status}</span>
+                        </label>
+                    </div>`;
+            });
+            document.getElementById('requestsList').innerHTML = html;
+        }
+        new bootstrap.Modal(document.getElementById('requestsModal')).show();
     }
 
     // ── Confirm request selection ────────────────────────────────────────────
@@ -479,7 +469,9 @@
     }
 
     // ── Generate optimal route ───────────────────────────────────────────────
-    async function generateRoute() {
+    // pass includeAllPending=true to auto-sweep every unassigned pending
+    // request into the route, instead of using manually checked ones
+    async function generateRoute(includeAllPending = false) {
         const driverId = document.getElementById('driverSelect').value;
         const plannedDate = document.getElementById('plannedDate').value;
 
@@ -487,8 +479,8 @@
             showToast('Please select a driver.', 'warning');
             return;
         }
-        if (selectedRequests.length === 0) {
-            showToast('Please select at least one waste request.', 'warning');
+        if (!includeAllPending && selectedRequests.length === 0) {
+            showToast('Please select at least one waste request, or use Auto-Generate.', 'warning');
             return;
         }
 
@@ -496,46 +488,37 @@
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Generating...';
 
-        try {
-            const res = await fetch('/api/routes/generate_optimal/', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${getToken()}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    driver_id: parseInt(driverId),
-                    waste_request_ids: selectedRequests,
-                    planned_date: plannedDate,
-                }),
-            });
+        const data = await API.post('/api/routes/generate_optimal/', {
+            driver_id: parseInt(driverId),
+            waste_request_ids: includeAllPending ? [] : selectedRequests,
+            planned_date: plannedDate,
+            include_all_pending: includeAllPending,
+        });
 
-            const data = await res.json();
-
-            if (res.ok) {
-                currentRoute = data.route_data;
-                currentRouteId = data.route?.id || null;   // FIX: save route ID
-                displayRoute(data.route_data);
-                document.getElementById('routeInfo').style.display = 'block';
-                showToast('Route generated successfully!', 'success');
-            } else {
-                showToast('Error: ' + (data.error || 'Failed to generate route'), 'danger');
-            }
-        } catch (e) {
-            showToast('Network error: ' + e.message, 'danger');
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-magic"></i> Generate Optimal Route';
+        if (data && data.route_data) {
+            currentRoute = data.route_data;
+            currentRouteId = data.route?.id || null;
+            await displayRoute(data.route_data);
+            document.getElementById('routeInfo').style.display = 'block';
+            showToast('Route generated successfully!', 'success');
+        } else {
+            showToast('Error: ' + (data?.error || 'Failed to generate route'), 'danger');
         }
+
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magic"></i> Generate Optimal Route';
     }
 
     // ── Display route on map ─────────────────────────────────────────────────
-    function displayRoute(routeData) {
+    // Now async: fetches real road-following geometry from OSRM instead of
+    // drawing a straight line between waypoints. Falls back to a straight
+    // dashed line if the routing service is unreachable or finds no path.
+    async function displayRoute(routeData) {
         // Clear previous markers
         routeMarkers.forEach(m => map.removeLayer(m));
         routeMarkers = [];
 
-        // FIX: clear previous polyline
+        // Clear previous polyline
         if (routePolyline) {
             map.removeLayer(routePolyline);
             routePolyline = null;
@@ -567,16 +550,38 @@
             routeMarkers.push(marker);
         });
 
-        // Draw route line
-        const coords = [
-            [start.latitude, start.longitude],
-            ...waypoints.map(wp => [wp.latitude, wp.longitude]),
+        // Ordered point list: depot start -> each waypoint, in route order
+        const orderedPoints = [
+            { lat: start.latitude, lon: start.longitude },
+            ...waypoints.map(wp => ({ lat: wp.latitude, lon: wp.longitude })),
         ];
-        routePolyline = L.polyline(coords, {
+
+        // Try to fetch actual road-following geometry from OSRM's public
+        // demo server. Falls back to a straight-line path if unreachable
+        // or if no drivable route exists between the points.
+        let roadCoords = null;
+        try {
+            const coordStr = orderedPoints.map(p => `${p.lon},${p.lat}`).join(';');
+            const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+            const res = await fetch(osrmUrl);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                    // GeoJSON coords are [lon, lat] — Leaflet wants [lat, lon]
+                    roadCoords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                }
+            }
+        } catch (e) {
+            console.warn('OSRM routing failed, falling back to straight line:', e);
+        }
+
+        const lineCoords = roadCoords || orderedPoints.map(p => [p.lat, p.lon]);
+
+        routePolyline = L.polyline(lineCoords, {
             color: '#28a745',
-            weight: 3,
-            opacity: 0.8,
-            dashArray: '8, 4',
+            weight: 4,
+            opacity: 0.85,
+            ...(roadCoords ? {} : { dashArray: '8, 4' }), // dashed only for straight-line fallback
         }).addTo(map);
 
         // Fit map to route
@@ -625,27 +630,19 @@
 
     // ── Start route ──────────────────────────────────────────────────────────
     async function startRoute() {
-        // FIX: use stored currentRouteId instead of broken DOM query
         if (!currentRouteId) {
             showToast('No route to start. Generate one first.', 'warning');
             return;
         }
-        try {
-            const res = await fetch(`/api/routes/${currentRouteId}/start_route/`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${getToken()}` },
-            });
-            if (res.ok) {
-                const statusEl = document.getElementById('routeStatus');
-                statusEl.textContent = 'Active';
-                statusEl.className = 'route-status active';
-                document.getElementById('startRouteBtn').disabled = true;
-                showToast('Route started!', 'success');
-            } else {
-                showToast('Failed to start route.', 'danger');
-            }
-        } catch (e) {
-            showToast('Network error: ' + e.message, 'danger');
+        const data = await API.patch(`/api/routes/${currentRouteId}/start_route/`, {});
+        if (data && data.id) {
+            const statusEl = document.getElementById('routeStatus');
+            statusEl.textContent = 'Active';
+            statusEl.className = 'route-status active';
+            document.getElementById('startRouteBtn').disabled = true;
+            showToast('Route started!', 'success');
+        } else {
+            showToast('Failed to start route.', 'danger');
         }
     }
 
@@ -660,17 +657,15 @@
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (data.type === 'route_update') {
-                // Re-display route if a new optimized route comes in for current driver
                 showToast('Route updated in real-time!', 'info');
                 if (data.waypoints) displayRoute({
                     waypoints: data.waypoints,
                     total_distance_km: data.total_distance,
                     total_stops: data.total_stops,
-                    start_location: routeData?.start_location || { latitude: 28.2096, longitude: 83.9856 },
+                    start_location: currentRoute?.start_location || { latitude: 28.2096, longitude: 83.9856 },
                 });
             }
             if (data.type === 'driver_location') {
-                // Optionally update a driver marker on the map
                 console.log('Driver location update:', data);
             }
         };

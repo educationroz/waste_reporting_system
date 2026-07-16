@@ -4,6 +4,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management import call_command
 from django.db import transaction
+from django.db.models import Q
 from django.http import FileResponse
 from django.utils import timezone
 from asgiref.sync import async_to_sync
@@ -599,9 +600,10 @@ class RouteViewSet(viewsets.ModelViewSet):
         POST /api/routes/generate_optimal/ — generate optimized route for driver.
         Request body: {
             "driver_id": int,
-            "waste_request_ids": [int, ...],
+            "waste_request_ids": [int, ...],   # optional if include_all_pending=True
             "bin_ids": [int, ...],
-            "planned_date": "YYYY-MM-DD"
+            "planned_date": "YYYY-MM-DD",
+            "include_all_pending": bool        # auto-select every unassigned pending request
         }
         """
         from .route_optimizer import generate_optimal_route
@@ -610,6 +612,7 @@ class RouteViewSet(viewsets.ModelViewSet):
         waste_request_ids = request.data.get('waste_request_ids', [])
         bin_ids = request.data.get('bin_ids', [])
         planned_date = request.data.get('planned_date')
+        include_all_pending = request.data.get('include_all_pending', False)
 
         if not driver_id:
             return Response({'error': 'driver_id is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -622,6 +625,24 @@ class RouteViewSet(viewsets.ModelViewSet):
         # Check permissions
         if request.user.role != 'admin' and driver.user != request.user:
             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Auto-select every unassigned pending request with valid coordinates,
+        # so the generated route covers all reported pickups in one sweep.
+        if include_all_pending:
+            pending_qs = WasteRequest.objects.filter(
+                status='pending',
+                driver__isnull=True,
+                is_deleted=False,
+            ).filter(
+                Q(latitude__isnull=False, longitude__isnull=False) |
+                Q(photo_latitude__isnull=False, photo_longitude__isnull=False)
+            )
+            waste_request_ids = list(pending_qs.values_list('id', flat=True))
+            if not waste_request_ids:
+                return Response(
+                    {'error': 'No pending requests with location data found.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         # Generate optimized route
         route_data = generate_optimal_route(driver, waste_request_ids, bin_ids)
@@ -655,6 +676,22 @@ class RouteViewSet(viewsets.ModelViewSet):
             route.waste_requests.set(waste_request_ids)
         if bin_ids:
             route.bins.set(bin_ids)
+
+        # Auto-assign the driver to each request on the route, so pickup
+        # status/driver reflects the plan and each user gets notified.
+        if waste_request_ids:
+            WasteRequest.objects.filter(id__in=waste_request_ids, status='pending').update(
+                driver=driver, status='assigned'
+            )
+            for wr in WasteRequest.objects.filter(id__in=waste_request_ids):
+                if wr.user_id:
+                    Notification.objects.create(
+                        user=wr.user,
+                        title='Driver Assigned',
+                        message=f'Driver {driver.user.username} has been assigned to your request and is on route #{route.id}.',
+                        notification_type='info',
+                        related_request=wr,
+                    )
 
         _log_admin_action(
             request, 'create' if created else 'update', 'Route', route,

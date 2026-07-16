@@ -47,6 +47,8 @@ class WasteRequestSerializer(serializers.ModelSerializer):
     driver_detail = DriverSerializer(source='driver', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     waste_type_display = serializers.CharField(source='get_waste_type_display', read_only=True)
+    route_id = serializers.SerializerMethodField()
+    route_status = serializers.SerializerMethodField()
 
     class Meta:
         model = WasteRequest
@@ -59,8 +61,17 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             'photo', 'photo_latitude', 'photo_longitude',
             'scheduled_date', 'completed_at',
             'notes', 'created_at', 'updated_at',
+            'route_id', 'route_status',
         )
         read_only_fields = ('user', 'completed_at', 'created_at', 'updated_at')
+
+    def get_route_id(self, obj):
+        route = obj.routes.order_by('-created_at').first()
+        return route.id if route else None
+
+    def get_route_status(self, obj):
+        route = obj.routes.order_by('-created_at').first()
+        return route.get_status_display() if route else None
 
     def validate_photo(self, file):
         """Validate photo file size (max 5MB)."""
