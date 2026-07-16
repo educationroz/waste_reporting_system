@@ -491,6 +491,42 @@ function showToast(message, type = 'success') {
             })
             .catch(() => {});
         }
+
+        // ── Pending Complaints count badge — admin sidebar "Complaints" link mathi ──
+        // Yo badge admin haruko sidebar ma dekhinxa — jaba jaba sidebar ma
+        // id="complaints-badge" wala element bhetincha, pending complaints
+        // count fetch garera populate garcha.
+        const complaintsBadge = document.getElementById('complaints-badge');
+        if (complaintsBadge) {
+            fetch('/api/complaints/?status=pending', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (data) {
+                    let count = 0;
+                    if (Array.isArray(data)) {
+                        count = data.length;
+                    } else if (data.count !== undefined) {
+                        count = parseInt(data.count);
+                    } else if (data.results !== undefined) {
+                        count = data.results.length;
+                    }
+
+                    if (count > 0) {
+                        complaintsBadge.classList.remove('d-none');
+                        complaintsBadge.textContent = count;
+                    } else {
+                        complaintsBadge.classList.add('d-none');
+                        complaintsBadge.textContent = '';
+                    }
+                }
+            })
+            .catch(() => {});
+        }
     });
 
     window.addEventListener('beforeunload', function() {

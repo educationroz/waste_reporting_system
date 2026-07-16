@@ -67,8 +67,7 @@
         flex: 1 1 auto;
     }
 
-    /* Screen sano huda — sidebar icon-only, tara SIDE माnai रहन्छ */
-    @media (max-width: 767.98px) {
+  @media (max-width: 767.98px) {
 
     .sidebar-col{
         flex: 0 0 70px;
@@ -84,11 +83,29 @@
     .sidebar-card .nav-link{
         justify-content:center;
         padding:.75rem;
+        position: relative; /* badge lai icon ko माथि absolute position garna */
     }
 
     .sidebar-card .nav-link i{
         margin:0;
         font-size:1.2rem;
+    }
+
+    /* Mobile ma badge lai icon ko top-right corner ma sano dot jasto rakhne —
+       natra ms-auto le kaam nagareर icon sanगै thelिएर विचित्र देखिन्थ्यो */
+    .sidebar-card .nav-link .badge {
+        position: absolute;
+        top: 6px;
+        right: 10px;
+        margin: 0 !important;
+        padding: 0;
+        min-width: 16px;
+        height: 16px;
+        font-size: 0.62rem;
+        line-height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 }
     /* Complaint modal — card-style options */
@@ -214,12 +231,24 @@
                         <!-- Photo Upload -->
                         <div class="col-12">
                             <label class="form-label fw-semibold">
-                                Upload Garbage Photo
+                                Garbage Photo
                                 <span class="text-muted small fw-normal">— GPS location auto-extracted if available</span>
                             </label>
-                            <input type="file" id="garbage-photo" class="form-control"
-                                accept="image/*" capture="environment" onchange="handlePhotoUpload(this)">
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-success flex-fill"
+                                    onclick="openCamera('garbage')">
+                                    <i class="bi bi-camera-fill me-1"></i>Take Photo
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary flex-fill"
+                                    onclick="document.getElementById('garbage-photo-gallery').click()">
+                                    <i class="bi bi-images me-1"></i>Choose from Gallery
+                                </button>
+                            </div>
+                            <!-- Gallery input: normal photo/file picker -->
+                            <input type="file" id="garbage-photo-gallery" class="d-none"
+                                accept="image/*" onchange="handlePhotoUpload(this)">
                         </div>
+
 
                         <!-- Photo Preview -->
                         <div class="col-12 d-none" id="photo-preview-section">
@@ -433,15 +462,26 @@
                         placeholder="Describe your complaint in detail..."></textarea>
                 </div>
 
-                <!-- Photo upload — drop-zone style -->
+                <!-- Photo upload — buttons + drop-zone style -->
                 <div class="mb-2">
                     <label class="form-label fw-semibold">
                         Attach Photo <span class="text-muted small fw-normal">(optional)</span>
                     </label>
+                    <div class="d-flex gap-2 mb-2">
+                        <button type="button" class="btn btn-outline-danger btn-sm flex-fill"
+                            onclick="openCamera('complaint')">
+                            <i class="bi bi-camera-fill me-1"></i>Take Photo
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm flex-fill"
+                            onclick="document.getElementById('complaint-photo').click()">
+                            <i class="bi bi-images me-1"></i>Choose from Gallery
+                        </button>
+                    </div>
                     <div id="complaint-photo-drop" onclick="document.getElementById('complaint-photo').click()">
                         <i class="bi bi-camera fs-3 text-muted d-block mb-1"></i>
-                        <span class="small text-muted">Click to upload an image as evidence</span>
+                        <span class="small text-muted">Or click here to upload an image as evidence</span>
                     </div>
+                    <!-- Gallery/drop-zone input -->
                     <input type="file" id="complaint-photo" class="d-none"
                         accept="image/*" onchange="handleComplaintPhotoUpload(this)">
                 </div>
@@ -468,6 +508,38 @@
     </div>
 </div>
 
+<!-- ── Live Camera Modal — uses getUserMedia so it opens the actual webcam
+     on laptop/desktop and the phone's camera on mobile, instead of a
+     file-picker dialog. ─────────────────────────────────────────────── -->
+<div class="modal fade" id="cameraModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow bg-dark">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold text-white"><i class="bi bi-camera-fill me-2"></i>Take Photo</h5>
+                <button type="button" class="btn-close btn-close-white" onclick="closeCamera()"></button>
+            </div>
+            <div class="modal-body p-0 position-relative">
+                <video id="camera-video" autoplay playsinline class="w-100" style="max-height:70vh; background:#000; display:block;"></video>
+                <canvas id="camera-canvas" class="d-none"></canvas>
+                <div id="camera-error" class="d-none text-center text-white p-4">
+                    <i class="bi bi-camera-video-off fs-1 d-block mb-2"></i>
+                    <p class="mb-2">Could not access the camera. Please allow camera permission, or use "Choose from Gallery" instead.</p>
+                </div>
+            </div>
+            <div class="modal-footer border-0 justify-content-center bg-dark pb-4">
+                <button type="button" class="btn btn-outline-light" id="camera-switch-btn" onclick="switchCamera()" title="Switch camera">
+                    <i class="bi bi-arrow-repeat"></i>
+                </button>
+                <button type="button" class="btn btn-success btn-lg rounded-circle p-0" id="camera-shutter-btn"
+                    style="width:64px;height:64px;" onclick="capturePhoto()">
+                    <i class="bi bi-camera-fill fs-4"></i>
+                </button>
+                <button type="button" class="btn btn-outline-light" onclick="closeCamera()">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -477,6 +549,11 @@
 let map = null;
 let marker = null;
 let photoFile = null;
+
+// Live camera modal state
+let cameraStream = null;
+let cameraTarget = null;      // 'garbage' or 'complaint' — which form the photo goes to
+let cameraFacingMode = 'environment'; // 'environment' (rear) or 'user' (front)
 
 // Default location — Pokhara, Nepal
 const DEFAULT_LAT = 28.2096;
@@ -569,6 +646,114 @@ window.addEventListener('load', () => {
         initMap(DEFAULT_LAT, DEFAULT_LNG);
     }
 });
+
+// ── Live Camera Modal (getUserMedia) ─────────────────────────────────────────
+// Opens the actual webcam on laptop/desktop and the phone's camera on mobile —
+// works the same everywhere, unlike a file input's "capture" attribute which
+// only forces the camera on some mobile browsers and does nothing on desktop.
+const cameraModalEl = document.getElementById('cameraModal');
+const cameraModal = new bootstrap.Modal(cameraModalEl);
+
+async function openCamera(target) {
+    cameraTarget = target; // 'garbage' or 'complaint'
+    cameraFacingMode = 'environment';
+
+    document.getElementById('camera-error').classList.add('d-none');
+    document.getElementById('camera-video').classList.remove('d-none');
+    document.getElementById('camera-shutter-btn').disabled = false;
+
+    cameraModal.show();
+    await startCameraStream();
+}
+
+async function startCameraStream() {
+    stopCameraStream(); // make sure any previous stream is closed first
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showCameraError();
+        return;
+    }
+
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: cameraFacingMode },
+            audio: false,
+        });
+        const video = document.getElementById('camera-video');
+        video.srcObject = cameraStream;
+    } catch (err) {
+        showCameraError();
+    }
+}
+
+function showCameraError() {
+    document.getElementById('camera-error').classList.remove('d-none');
+    document.getElementById('camera-video').classList.add('d-none');
+    document.getElementById('camera-shutter-btn').disabled = true;
+}
+
+function stopCameraStream() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+}
+
+function closeCamera() {
+    stopCameraStream();
+    cameraModal.hide();
+}
+
+async function switchCamera() {
+    cameraFacingMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
+    await startCameraStream();
+}
+
+function capturePhoto() {
+    const video = document.getElementById('camera-video');
+    const canvas = document.getElementById('camera-canvas');
+
+    if (!video.videoWidth) return; // stream not ready yet
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob((blob) => {
+        if (!blob) return;
+        const fileName = `photo-${Date.now()}.jpg`;
+        const file = new File([blob], fileName, { type: 'image/jpeg' });
+
+        if (cameraTarget === 'garbage') {
+            useCapturedGarbagePhoto(file);
+        } else if (cameraTarget === 'complaint') {
+            useCapturedComplaintPhoto(file);
+        }
+
+        closeCamera();
+    }, 'image/jpeg', 0.9);
+}
+
+// Feed a captured File into the same handling path as a normal file-input upload
+function useCapturedGarbagePhoto(file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const input = document.getElementById('garbage-photo-gallery');
+    input.files = dt.files;
+    handlePhotoUpload(input);
+}
+
+function useCapturedComplaintPhoto(file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const input = document.getElementById('complaint-photo');
+    input.files = dt.files;
+    handleComplaintPhotoUpload(input);
+}
+
+// Stop the camera if the modal is dismissed (backdrop click blocked, but Cancel/X call closeCamera already;
+// this also covers the case where the browser back button or Esc triggers Bootstrap's hidden event)
+cameraModalEl.addEventListener('hidden.bs.modal', stopCameraStream);
 
 // ── EXIF Photo Handler ───────────────────────────────────────────────────────
 async function handlePhotoUpload(input) {
@@ -706,7 +891,7 @@ async function submitRequest() {
 
         if (res.ok) {
             showToast('Request submitted successfully!', 'success');
-            document.getElementById('garbage-photo').value = '';
+            document.getElementById('garbage-photo-gallery').value = '';
             document.getElementById('pickup-address').value = '';
             document.getElementById('scheduled-date').value = '';
             document.getElementById('description').value = '';
