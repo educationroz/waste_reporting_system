@@ -554,6 +554,7 @@ let photoFile = null;
 let cameraStream = null;
 let cameraTarget = null;      // 'garbage' or 'complaint' — which form the photo goes to
 let cameraFacingMode = 'environment'; // 'environment' (rear) or 'user' (front)
+let liveCameraGPS = null;     // { lat, lng } — camera खोल्नेबित्तिकै background मा फेच गरिने
 
 // Default location — Pokhara, Nepal
 const DEFAULT_LAT = 28.2096;
@@ -657,6 +658,7 @@ const cameraModal = new bootstrap.Modal(cameraModalEl);
 async function openCamera(target) {
     cameraTarget = target; // 'garbage' or 'complaint'
     cameraFacingMode = 'environment';
+    liveCameraGPS = null; // reset every time camera opens
 
     document.getElementById('camera-error').classList.add('d-none');
     document.getElementById('camera-video').classList.remove('d-none');
@@ -664,6 +666,22 @@ async function openCamera(target) {
 
     cameraModal.show();
     await startCameraStream();
+
+    // Camera खुलेकै बेला background मा GPS पनि फेच गरिराख्ने,
+    // ताकि shutter थिच्दा coordinates already ready भइसकोस्
+    // (canvas बाट बनेको photo मा EXIF हुँदैन, त्यसैले यहीँबाट लिनुपर्छ)
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                liveCameraGPS = {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude
+                };
+            },
+            () => { liveCameraGPS = null; },
+            { enableHighAccuracy: true, timeout: 8000 }
+        );
+    }
 }
 
 async function startCameraStream() {
@@ -725,7 +743,8 @@ function capturePhoto() {
         const file = new File([blob], fileName, { type: 'image/jpeg' });
 
         if (cameraTarget === 'garbage') {
-            useCapturedGarbagePhoto(file);
+            // liveCameraGPS पास गर्ने — canvas photo मा EXIF हुँदैन भनेर
+            useCapturedGarbagePhoto(file, liveCameraGPS);
         } else if (cameraTarget === 'complaint') {
             useCapturedComplaintPhoto(file);
         }
@@ -735,12 +754,12 @@ function capturePhoto() {
 }
 
 // Feed a captured File into the same handling path as a normal file-input upload
-function useCapturedGarbagePhoto(file) {
+function useCapturedGarbagePhoto(file, gps = null) {
     const dt = new DataTransfer();
     dt.items.add(file);
     const input = document.getElementById('garbage-photo-gallery');
     input.files = dt.files;
-    handlePhotoUpload(input);
+    handlePhotoUpload(input, gps);
 }
 
 function useCapturedComplaintPhoto(file) {
@@ -755,8 +774,8 @@ function useCapturedComplaintPhoto(file) {
 // this also covers the case where the browser back button or Esc triggers Bootstrap's hidden event)
 cameraModalEl.addEventListener('hidden.bs.modal', stopCameraStream);
 
-// ── EXIF Photo Handler ───────────────────────────────────────────────────────
-async function handlePhotoUpload(input) {
+// ── Photo Handler (EXIF for gallery photos, live GPS for camera captures) ────
+async function handlePhotoUpload(input, liveGPS = null) {
     const file = input.files[0];
     if (!file) return;
     photoFile = file;
@@ -767,6 +786,27 @@ async function handlePhotoUpload(input) {
 
     preview.src = URL.createObjectURL(file);
     previewSection.classList.remove('d-none');
+
+    // ── Case 1: Live camera बाट खिचेको फोटो — canvas ले बनाएको भएर
+    //    EXIF हुँदैन, त्यसैले सिधै geolocation बाट लिएको coordinates प्रयोग गर्ने ──
+    if (liveGPS && liveGPS.lat && liveGPS.lng) {
+        exifInfo.innerHTML = `
+            <span class="text-success">
+                <i class="bi bi-geo-alt-fill me-1"></i>
+                Current location used:
+                <strong>${liveGPS.lat.toFixed(6)}, ${liveGPS.lng.toFixed(6)}</strong>
+            </span>`;
+        initMap(liveGPS.lat, liveGPS.lng);
+        showToast('Location captured!', 'success');
+        return;
+    }
+
+    // ── Case 2: Live camera बाट हो तर GPS permission deny/fail भयो ──
+    if (liveGPS === null && cameraTarget === 'garbage' && !input.files[0].type.startsWith('image/') === false && file.name.startsWith('photo-')) {
+        // (fallback message — no manual EXIF check needed for canvas photos)
+    }
+
+    // ── Case 3: Gallery बाट select गरेको — EXIF बाट GPS निकाल्ने कोशिस ──
     exifInfo.innerHTML = '<span class="text-muted">Reading EXIF data...</span>';
 
     try {

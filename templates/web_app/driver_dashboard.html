@@ -167,6 +167,17 @@
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-warning bg-opacity-10 h-100">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">
+                                This Month
+                                <span class="text-muted" style="font-size:0.7rem;">({{ current_month_label }})</span>
+                            </div>
+                            <div class="fs-2 fw-bold text-warning">{{ completed_this_month }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
                     <div class="card border-0 {% if driver.is_available %}bg-success{% else %}bg-secondary{% endif %} bg-opacity-10 h-100">
                         <div class="card-body text-center">
                             <div class="text-muted small">Status</div>

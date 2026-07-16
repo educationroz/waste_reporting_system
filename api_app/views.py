@@ -4,7 +4,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management import call_command
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import F, Q
 from django.http import FileResponse
 from django.utils import timezone
 from asgiref.sync import async_to_sync
@@ -458,6 +458,8 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         if new_status not in valid_statuses:
             return Response({'error': f'Invalid status. Choose: {valid_statuses}'}, status=status.HTTP_400_BAD_REQUEST)
 
+        old_status = waste_request.status
+
         waste_request.status = new_status
         update_fields = ['status']
         if new_status == 'completed':
@@ -473,6 +475,16 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             update_fields += ['is_deleted', 'deleted_at']
 
         waste_request.save(update_fields=update_fields)
+
+        # Bump the driver's lifetime trip counter the FIRST time a request
+        # becomes 'completed' (guarded by old_status != 'completed' so
+        # re-saving/re-triggering an already-completed request doesn't
+        # double-count it). This is what "Total Trips" on the driver
+        # dashboard reads from — without this it always stays at 0.
+        if new_status == 'completed' and old_status != 'completed' and waste_request.driver_id:
+            Driver.objects.filter(pk=waste_request.driver_id).update(
+                total_trips=F('total_trips') + 1
+            )
 
         # Log all status changes, including self-cancels, so users' own
         # actions on their requests appear in the audit trail too.

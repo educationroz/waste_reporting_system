@@ -238,7 +238,7 @@ function renderComplaints() {
     }
 
     body.innerHTML = rows.map(c => `
-        <tr>
+        <tr id="complaint-row-${c.id}">
             <td class="fw-bold text-secondary">#${c.id}</td>
             <td>${c.username}</td>
             <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">${c.complaint_type_display}</span></td>
@@ -247,9 +247,14 @@ function renderComplaints() {
             <td><span class="badge ${statusBadge(c.status)}">${c.status_display}</span></td>
             <td class="small text-muted">${new Date(c.created_at).toLocaleDateString()}</td>
             <td>
-                <button class="btn btn-sm btn-outline-success" onclick='openReview(${JSON.stringify(c)})'>
-                    <i class="bi bi-clipboard-check"></i> Review
-                </button>
+                <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-success" onclick='openReview(${JSON.stringify(c)})'>
+                        <i class="bi bi-clipboard-check"></i> Review
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteComplaint(${c.id})" title="Delete complaint">
+                        <i class="bi bi-trash3"></i>
+                    </button>
+                </div>
             </td>
         </tr>
     `).join('');
@@ -288,6 +293,50 @@ async function submitReview() {
         loadComplaints();
     } else {
         showToast('Failed to update complaint.', 'danger');
+    }
+}
+
+// ── Delete Complaint ──────────────────────────────────────────────────────
+async function deleteComplaint(id) {
+    if (!confirm('Delete this complaint permanently? This cannot be undone.')) return;
+
+    const complaint = allComplaints.find(c => c.id == id);
+    const wasPending = complaint && complaint.status === 'pending';
+
+    try {
+        const res = await fetch(`/api/complaints/${id}/`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            },
+        });
+
+        if (res.ok || res.status === 204) {
+            showToast('Complaint deleted.', 'success');
+
+            // list बाट हटाउने र row पनि DOM बाट सिधै हटाउने — full reload नगरी
+            allComplaints = allComplaints.filter(c => c.id != id);
+            if (wasPending) adjustComplaintsBadge(-1);
+
+            const row = document.getElementById(`complaint-row-${id}`);
+            if (row) row.remove();
+
+            // यदि सबै row हट्यो भने "No complaints found" देखाउने
+            if (!allComplaints.length) {
+                renderComplaints();
+            }
+        } else {
+            let errMsg = 'Failed to delete complaint.';
+            try {
+                const data = await res.json();
+                errMsg = typeof data === 'object'
+                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                    : String(data);
+            } catch (e) {}
+            showToast(errMsg, 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
     }
 }
 

@@ -390,9 +390,27 @@ class DriverDashboardView(LoginRequiredMixin, TemplateView):
         ctx['active_route'] = Route.objects.filter(
             driver=driver, status='active'
         ).first()
+
+        now = timezone.now()
+
+        # Filtered by `completed_at` — set once by update_status() the moment
+        # a request's status first becomes 'completed'. This is accurate and
+        # won't shift if the request is edited again later for other reasons.
         ctx['completed_today'] = WasteRequest.objects.filter(
-            driver=driver, status='completed'
+            driver=driver,
+            status='completed',
+            completed_at__date=now.date(),
         ).count()
+
+        # Trips completed in the current calendar month — used for salary calc.
+        ctx['completed_this_month'] = WasteRequest.objects.filter(
+            driver=driver,
+            status='completed',
+            completed_at__year=now.year,
+            completed_at__month=now.month,
+        ).count()
+        ctx['current_month_label'] = now.strftime('%B %Y')
+
         ctx['today_schedule'] = Schedule.objects.filter(
             driver=driver, is_active=True
         )
