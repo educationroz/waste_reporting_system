@@ -57,11 +57,29 @@
     .sidebar-card .nav-link{
         justify-content:center;
         padding:.75rem;
+        position: relative; /* badge lai icon ko माथि absolute position garna */
     }
 
     .sidebar-card .nav-link i{
         margin:0;
         font-size:1.2rem;
+    }
+
+    /* Mobile ma badge lai icon ko top-right corner ma sano dot jasto rakhne —
+       natra ms-auto le kaam nagareर icon sanगै thelिएर विचित्र देखिन्थ्यो */
+    .sidebar-card .nav-link .badge {
+        position: absolute;
+        top: 6px;
+        right: 10px;
+        margin: 0 !important;
+        padding: 0;
+        min-width: 16px;
+        height: 16px;
+        font-size: 0.62rem;
+        line-height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 }
 </style>
@@ -83,7 +101,9 @@
                             <i class="bi bi-list-check me-2"></i><span class="sidebar-link-text">Collection Requests</span>
                         </a>
                         <a href="{% url 'admin-complaints' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
-                            <i class="bi bi-exclamation-circle me-2"></i><span class="sidebar-link-text">Complaints</span>
+                            <i class="bi bi-exclamation-circle me-2"></i>
+                            <span class="sidebar-link-text">Complaints</span>
+                            <span id="complaints-badge" class="badge rounded-pill bg-danger ms-auto d-none">0</span>
                         </a>
                         <a href="{% url 'admin-drivers' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                             <i class="bi bi-person-badge me-2"></i><span class="sidebar-link-text">Manage Drivers</span>
@@ -93,6 +113,9 @@
                         </a>
                         <a href="{% url 'admin-schedules' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                             <i class="bi bi-calendar-week me-2"></i><span class="sidebar-link-text">Zone Schedules</span>
+                        </a>
+                        <a href="{% url 'route-planning' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
+                            <i class="bi bi-map me-2"></i><span class="sidebar-link-text">Route Planning</span>
                         </a>
                         <a href="{% url 'admin-users' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
                             <i class="bi bi-shield-check me-2"></i><span class="sidebar-link-text">Security Admins</span>
@@ -183,6 +206,15 @@
 let allComplaints = [];
 const reviewModal = new bootstrap.Modal(document.getElementById('reviewModal'));
 
+// Modal band huनु agadि, focus lai close button bata hataune —
+// natra Bootstrap ley aria-hidden set garda, focused element nai
+// hidden huन्छ, jasले accessibility warning dincha.
+document.getElementById('reviewModal').addEventListener('hide.bs.modal', function () {
+    if (document.activeElement) {
+        document.activeElement.blur();
+    }
+});
+
 const statusBadge = s => ({
     pending: 'bg-warning text-dark',
     under_review: 'bg-info',
@@ -235,13 +267,44 @@ async function submitReview() {
     const status = document.getElementById('review-status').value;
     const admin_response = document.getElementById('review-response').value;
 
+    // Update huनु agadि ko complaint ko purano status pattaउने —
+    // pending bata arू ma gaएko bhaye badge ghataune, arू bata
+    // pending ma फर्केको bhaye badge badhaune.
+    const oldComplaint = allComplaints.find(c => c.id == id);
+    const wasPending = oldComplaint && oldComplaint.status === 'pending';
+    const isPending = status === 'pending';
+
     const data = await API.patch(`/api/complaints/${id}/update_status/`, { status, admin_response });
     if (data && data.id) {
         showToast('Complaint updated.', 'success');
         reviewModal.hide();
+
+        if (wasPending && !isPending) {
+            adjustComplaintsBadge(-1);
+        } else if (!wasPending && isPending) {
+            adjustComplaintsBadge(1);
+        }
+
         loadComplaints();
     } else {
         showToast('Failed to update complaint.', 'danger');
+    }
+}
+
+// Sidebar ko "Complaints" badge lai reload नगरिकनै tuरुन्तै update garne —
+// delta chai +1 (pending ma फर्कदा) ya -1 (pending bata अरू ma jaँda) huन्छ.
+function adjustComplaintsBadge(delta) {
+    const badge = document.getElementById('complaints-badge');
+    if (!badge) return;
+    const current = parseInt(badge.textContent || '0', 10) || 0;
+    const updated = Math.max(0, current + delta);
+
+    if (updated > 0) {
+        badge.classList.remove('d-none');
+        badge.textContent = updated;
+    } else {
+        badge.classList.add('d-none');
+        badge.textContent = '';
     }
 }
 
