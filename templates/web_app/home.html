@@ -10,11 +10,6 @@
         color: #198754 !important;
     }
 
-    /* ==========================================
-       SIDEBAR LAYOUT — flexbox, always side-by-side,
-       kahilyai top मा जाँदैन, screen sano hunda
-       icon-only mode मा खुम्चिन्छ (top मा जाँदैन)
-       ========================================== */
     .layout-wrapper {
         display: flex;
         align-items: stretch;
@@ -36,12 +31,9 @@
 
     .content-col {
         flex: 1 1 auto;
-        min-width: 0; /* overflow bata jogauna (map/table le parent nafutaos) */
+        min-width: 0;
     }
 
-    /* Sidebar overflow fix — translated (Nepali) text le nav-link
-       lai flex item ko default min-width:auto le grow garaera
-       card bahira overflow garcha, tyo rokne */
     .sidebar-card .nav.flex-column {
         min-width: 0;
     }
@@ -83,7 +75,7 @@
     .sidebar-card .nav-link{
         justify-content:center;
         padding:.75rem;
-        position: relative; /* badge lai icon ko माथि absolute position garna */
+        position: relative;
     }
 
     .sidebar-card .nav-link i{
@@ -91,8 +83,6 @@
         font-size:1.2rem;
     }
 
-    /* Mobile ma badge lai icon ko top-right corner ma sano dot jasto rakhne —
-       natra ms-auto le kaam nagareर icon sanगै thelिएर विचित्र देखिन्थ्यो */
     .sidebar-card .nav-link .badge {
         position: absolute;
         top: 6px;
@@ -108,7 +98,6 @@
         justify-content: center;
     }
 }
-    /* Complaint modal — card-style options */
     .complaint-type-option {
         cursor: pointer;
         border: 1.5px solid #e9ecef;
@@ -147,6 +136,73 @@
         border-color: #198754;
         background: #f1f8f5;
     }
+
+    /* ── Multi-photo preview grid ── */
+    .photo-thumb-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+    }
+    .photo-thumb {
+        position: relative;
+        width: 90px;
+        height: 90px;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #dee2e6;
+    }
+    .photo-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .photo-thumb .thumb-remove-btn {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(220, 53, 69, 0.9);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        line-height: 1;
+        cursor: pointer;
+    }
+    .photo-thumb .thumb-gps-badge {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(25,135,84,0.85);
+        color: #fff;
+        font-size: 0.55rem;
+        text-align: center;
+        padding: 1px 0;
+    }
+    .photo-thumb-add {
+        width: 90px;
+        height: 90px;
+        border-radius: 8px;
+        border: 2px dashed #ced4da;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #6c757d;
+        font-size: 1.4rem;
+        transition: all 0.15s ease;
+    }
+    .photo-thumb-add:hover {
+        border-color: #198754;
+        color: #198754;
+        background: #f1f8f5;
+    }
 </style>
 {% endblock %}
 
@@ -154,7 +210,7 @@
 <div class="container-fluid px-4 py-3">
     <div class="layout-wrapper {% if not user.is_authenticated or user.role != 'user' %}justify-content-center{% endif %}">
 
-        <!-- ── १. साइडबार सेक्सन (Sidebar Section) — login gareko 'user' role lai matra ── -->
+        <!-- ── १. साइडबार सेक्सन ── -->
         {% if user.is_authenticated and user.role == 'user' %}
         <div class="sidebar-col">
             <div class="card shadow-sm border-0 sidebar-card">
@@ -183,14 +239,13 @@
         </div>
         {% endif %}
 
-        <!-- ── २. मुख्य सामाग्री (Main Content Area) ── -->
+        <!-- ── २. मुख्य सामाग्री ── -->
         <div class="content-col {% if not user.is_authenticated or user.role != 'user' %}mx-auto{% endif %}"
              {% if not user.is_authenticated or user.role != 'user' %}style="max-width: 900px;"{% endif %}>
 
             {% if user.is_authenticated and user.role == 'user' %}
             <h2 class="mb-4"><i class="bi bi-house text-success me-2"></i>Welcome, {{ user.first_name|default:user.username }}!</h2>
 
-            <!-- Stats -->
             <div class="row g-3 mb-4">
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-warning bg-opacity-10 h-100">
@@ -220,7 +275,7 @@
             </div>
             {% endif %}
 
-            <!-- New Request Card — sabai lai (login chahidaina) -->
+            <!-- New Request Card -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white fw-bold">
                     <i class="bi bi-plus-circle text-success me-2"></i>New Pickup Request
@@ -231,8 +286,8 @@
                         <!-- Photo Upload -->
                         <div class="col-12">
                             <label class="form-label fw-semibold">
-                                Garbage Photo
-                                <span class="text-muted small fw-normal">— GPS location auto-extracted if available</span>
+                                Garbage Photo(s)
+                                <span class="text-muted small fw-normal">— GPS location auto-extracted if available. All photos must be of the same location.</span>
                             </label>
                             <div class="d-flex gap-2">
                                 <button type="button" class="btn btn-outline-success flex-fill"
@@ -244,16 +299,14 @@
                                     <i class="bi bi-images me-1"></i>Choose from Gallery
                                 </button>
                             </div>
-                            <!-- Gallery input: normal photo/file picker -->
+                            <!-- Gallery input: multiple photo/file picker -->
                             <input type="file" id="garbage-photo-gallery" class="d-none"
-                                accept="image/*" onchange="handlePhotoUpload(this)">
+                                accept="image/*" multiple onchange="handlePhotoUpload(this)">
                         </div>
 
-
-                        <!-- Photo Preview -->
+                        <!-- Multi-Photo Preview Grid -->
                         <div class="col-12 d-none" id="photo-preview-section">
-                            <img id="photo-preview" src="" alt="Preview"
-                                class="img-thumbnail" style="max-height:200px">
+                            <div class="photo-thumb-grid" id="photo-thumb-grid"></div>
                             <div id="exif-info" class="mt-2 small"></div>
                         </div>
 
@@ -405,8 +458,8 @@
             </div>
             {% endif %}
 
-        </div> <!-- /मुख्य सामाग्री -->
-    </div> <!-- /layout-wrapper -->
+        </div>
+    </div>
 </div>
 
 <!-- ── Complaint Modal ─────────────────────────────────────────────────────── -->
@@ -419,7 +472,6 @@
             </div>
             <div class="modal-body p-4">
 
-                <!-- Complaint Type — card-style options -->
                 <label class="form-label fw-semibold mb-2">What's the issue?</label>
                 <div class="row g-2 mb-3" id="complaint-type-group">
                     <div class="col-4">
@@ -455,14 +507,12 @@
                 </div>
                 <input type="hidden" id="complaint-type" value="missed_pickup">
 
-                <!-- Description -->
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Description *</label>
                     <textarea id="complaint-description" class="form-control" rows="3"
                         placeholder="Describe your complaint in detail..."></textarea>
                 </div>
 
-                <!-- Photo upload — buttons + drop-zone style -->
                 <div class="mb-2">
                     <label class="form-label fw-semibold">
                         Attach Photo <span class="text-muted small fw-normal">(optional)</span>
@@ -481,7 +531,6 @@
                         <i class="bi bi-camera fs-3 text-muted d-block mb-1"></i>
                         <span class="small text-muted">Or click here to upload an image as evidence</span>
                     </div>
-                    <!-- Gallery/drop-zone input -->
                     <input type="file" id="complaint-photo" class="d-none"
                         accept="image/*" onchange="handleComplaintPhotoUpload(this)">
                 </div>
@@ -508,9 +557,7 @@
     </div>
 </div>
 
-<!-- ── Live Camera Modal — uses getUserMedia so it opens the actual webcam
-     on laptop/desktop and the phone's camera on mobile, instead of a
-     file-picker dialog. ─────────────────────────────────────────────── -->
+<!-- ── Live Camera Modal ─────────────────────────────────────────────────── -->
 <div class="modal fade" id="cameraModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow bg-dark">
@@ -525,6 +572,10 @@
                     <i class="bi bi-camera-video-off fs-1 d-block mb-2"></i>
                     <p class="mb-2">Could not access the camera. Please allow camera permission, or use "Choose from Gallery" instead.</p>
                 </div>
+                <!-- Live camera shot counter — garbage target मा मात्र देखिने, धेरै फोटो लिन सकिन्छ भन्ने संकेत -->
+                <div id="camera-shot-counter" class="d-none position-absolute top-0 start-0 m-2 badge bg-success">
+                    0 photo(s) taken
+                </div>
             </div>
             <div class="modal-footer border-0 justify-content-center bg-dark pb-4">
                 <button type="button" class="btn btn-outline-light" id="camera-switch-btn" onclick="switchCamera()" title="Switch camera">
@@ -534,7 +585,9 @@
                     style="width:64px;height:64px;" onclick="capturePhoto()">
                     <i class="bi bi-camera-fill fs-4"></i>
                 </button>
-                <button type="button" class="btn btn-outline-light" onclick="closeCamera()">Cancel</button>
+                <button type="button" class="btn btn-outline-light" onclick="closeCamera()" id="camera-done-btn">
+                    Done
+                </button>
             </div>
         </div>
     </div>
@@ -548,17 +601,40 @@
 // ── State ────────────────────────────────────────────────────────────────────
 let map = null;
 let marker = null;
-let photoFile = null;
+
+// photoFiles अब array हो — multiple photo राख्न मिल्ने
+// हरेक item: { file: File, gps: {lat, lng} | null }
+let photoFiles = [];
+
+// पहिलो फोटोको GPS — reference location, बाँकी सबै फोटो यसैसँग compare हुन्छन्
+let firstPhotoGPS = null;
+
+// यो थ्रेसहोल्ड भन्दा टाढाको फोटो भए "फरक ठाउँ" मानेर reject गर्ने
+const SAME_LOCATION_THRESHOLD_METERS = 150;
 
 // Live camera modal state
 let cameraStream = null;
-let cameraTarget = null;      // 'garbage' or 'complaint' — which form the photo goes to
-let cameraFacingMode = 'environment'; // 'environment' (rear) or 'user' (front)
-let liveCameraGPS = null;     // { lat, lng } — camera खोल्नेबित्तिकै background मा फेच गरिने
+let cameraTarget = null;      // 'garbage' or 'complaint'
+let cameraFacingMode = 'environment';
+let liveCameraGPS = null;     // { lat, lng } — camera खोल्नेबित्तिकै फेच गरिने
+let cameraShotCount = 0;      // garbage target मा कति फोटो live camera बाट खिचियो
 
 // Default location — Pokhara, Nepal
 const DEFAULT_LAT = 28.2096;
 const DEFAULT_LNG = 83.9856;
+
+// ── Distance helper (Haversine formula, मिटरमा) ────────────────────────────
+function distanceInMeters(lat1, lng1, lat2, lng2) {
+    const R = 6371000; // Earth radius in meters
+    const toRad = deg => deg * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
 
 // ── Map ──────────────────────────────────────────────────────────────────────
 function initMap(lat, lng) {
@@ -649,27 +725,34 @@ window.addEventListener('load', () => {
 });
 
 // ── Live Camera Modal (getUserMedia) ─────────────────────────────────────────
-// Opens the actual webcam on laptop/desktop and the phone's camera on mobile —
-// works the same everywhere, unlike a file input's "capture" attribute which
-// only forces the camera on some mobile browsers and does nothing on desktop.
 const cameraModalEl = document.getElementById('cameraModal');
 const cameraModal = new bootstrap.Modal(cameraModalEl);
 
 async function openCamera(target) {
     cameraTarget = target; // 'garbage' or 'complaint'
     cameraFacingMode = 'environment';
-    liveCameraGPS = null; // reset every time camera opens
+    liveCameraGPS = null;
+    cameraShotCount = 0;
 
     document.getElementById('camera-error').classList.add('d-none');
     document.getElementById('camera-video').classList.remove('d-none');
     document.getElementById('camera-shutter-btn').disabled = false;
 
+    // 'garbage' target मा multiple shot counter देखाउने, complaint मा एउटै फोटो पर्याप्त
+    const counter = document.getElementById('camera-shot-counter');
+    if (target === 'garbage') {
+        counter.textContent = '0 photo(s) taken';
+        counter.classList.remove('d-none');
+        document.getElementById('camera-done-btn').textContent = 'Done';
+    } else {
+        counter.classList.add('d-none');
+        document.getElementById('camera-done-btn').textContent = 'Cancel';
+    }
+
     cameraModal.show();
     await startCameraStream();
 
-    // Camera खुलेकै बेला background मा GPS पनि फेच गरिराख्ने,
-    // ताकि shutter थिच्दा coordinates already ready भइसकोस्
-    // (canvas बाट बनेको photo मा EXIF हुँदैन, त्यसैले यहीँबाट लिनुपर्छ)
+    // Camera खुलेकै बेला background मा GPS पनि फेच गरिराख्ने
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             pos => {
@@ -685,7 +768,7 @@ async function openCamera(target) {
 }
 
 async function startCameraStream() {
-    stopCameraStream(); // make sure any previous stream is closed first
+    stopCameraStream();
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         showCameraError();
@@ -743,23 +826,17 @@ function capturePhoto() {
         const file = new File([blob], fileName, { type: 'image/jpeg' });
 
         if (cameraTarget === 'garbage') {
-            // liveCameraGPS पास गर्ने — canvas photo मा EXIF हुँदैन भनेर
-            useCapturedGarbagePhoto(file, liveCameraGPS);
+            // Garbage photo मा multiple shot मिल्ने — camera modal खुलै राखेर list मा थप्ने
+            addGarbagePhoto(file, liveCameraGPS);
+            cameraShotCount++;
+            document.getElementById('camera-shot-counter').textContent =
+                `${cameraShotCount} photo(s) taken`;
+            // camera modal यहीँ खुलै रहन्छ — प्रयोगकर्ताले "Done" थिचेपछि मात्र बन्द हुन्छ
         } else if (cameraTarget === 'complaint') {
             useCapturedComplaintPhoto(file);
+            closeCamera(); // complaint मा एउटा फोटो पर्याप्त, तुरुन्तै बन्द
         }
-
-        closeCamera();
     }, 'image/jpeg', 0.9);
-}
-
-// Feed a captured File into the same handling path as a normal file-input upload
-function useCapturedGarbagePhoto(file, gps = null) {
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    const input = document.getElementById('garbage-photo-gallery');
-    input.files = dt.files;
-    handlePhotoUpload(input, gps);
 }
 
 function useCapturedComplaintPhoto(file) {
@@ -770,76 +847,151 @@ function useCapturedComplaintPhoto(file) {
     handleComplaintPhotoUpload(input);
 }
 
-// Stop the camera if the modal is dismissed (backdrop click blocked, but Cancel/X call closeCamera already;
-// this also covers the case where the browser back button or Esc triggers Bootstrap's hidden event)
 cameraModalEl.addEventListener('hidden.bs.modal', stopCameraStream);
 
-// ── Photo Handler (EXIF for gallery photos, live GPS for camera captures) ────
-async function handlePhotoUpload(input, liveGPS = null) {
-    const file = input.files[0];
-    if (!file) return;
-    photoFile = file;
+// ── Multi-Photo Handling (gallery multi-select + live camera captures) ──────
 
-    const previewSection = document.getElementById('photo-preview-section');
-    const preview = document.getElementById('photo-preview');
-    const exifInfo = document.getElementById('exif-info');
+// Gallery बाट एकसाथ धेरै फोटो select गर्दा
+async function handlePhotoUpload(input) {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
 
-    preview.src = URL.createObjectURL(file);
-    previewSection.classList.remove('d-none');
+    for (const file of files) {
+        await addGarbagePhotoWithExif(file);
+    }
+    input.value = ''; // reset ताकि उही फोटो फेरि select गर्दा पनि change event चल्छ
+}
 
-    // ── Case 1: Live camera बाट खिचेको फोटो — canvas ले बनाएको भएर
-    //    EXIF हुँदैन, त्यसैले सिधै geolocation बाट लिएको coordinates प्रयोग गर्ने ──
-    if (liveGPS && liveGPS.lat && liveGPS.lng) {
-        exifInfo.innerHTML = `
-            <span class="text-success">
-                <i class="bi bi-geo-alt-fill me-1"></i>
-                Current location used:
-                <strong>${liveGPS.lat.toFixed(6)}, ${liveGPS.lng.toFixed(6)}</strong>
-            </span>`;
-        initMap(liveGPS.lat, liveGPS.lng);
-        showToast('Location captured!', 'success');
+// Live camera बाट खिचेको फोटो — EXIF हुँदैन, geolocation प्रयोग गर्ने।
+// पहिलो फोटो भए reference बनाउने, पछिका फोटो भए same-location check गर्ने।
+function addGarbagePhoto(file, gps) {
+    if (photoFiles.length === 0) {
+        // पहिलो फोटो — यसैको GPS लाई reference बनाउने
+        photoFiles.push({ file, gps: gps || null });
+        firstPhotoGPS = gps || null;
+        renderPhotoThumbnails();
+        if (gps) initMap(gps.lat, gps.lng);
         return;
     }
 
-    // ── Case 2: Live camera बाट हो तर GPS permission deny/fail भयो ──
-    if (liveGPS === null && cameraTarget === 'garbage' && !input.files[0].type.startsWith('image/') === false && file.name.startsWith('photo-')) {
-        // (fallback message — no manual EXIF check needed for canvas photos)
+    if (!firstPhotoGPS) {
+        // पहिलो फोटोमा नै GPS थिएन — तुलना गर्न सकिँदैन, accept गरिदिने
+        photoFiles.push({ file, gps: gps || null });
+        renderPhotoThumbnails();
+        return;
     }
 
-    // ── Case 3: Gallery बाट select गरेको — EXIF बाट GPS निकाल्ने कोशिस ──
-    exifInfo.innerHTML = '<span class="text-muted">Reading EXIF data...</span>';
+    if (!gps) {
+        showToast('Could not detect location for this photo. Please take the photo at the same spot as the first one.', 'warning');
+        return;
+    }
 
+    const dist = distanceInMeters(firstPhotoGPS.lat, firstPhotoGPS.lng, gps.lat, gps.lng);
+    if (dist > SAME_LOCATION_THRESHOLD_METERS) {
+        showToast(`This photo looks like it's from a different location (~${Math.round(dist)}m away). Please use a photo of the same location as the first one.`, 'danger');
+        return;
+    }
+
+    photoFiles.push({ file, gps });
+    renderPhotoThumbnails();
+}
+
+// Gallery फोटो — EXIF बाट GPS निकाल्ने कोशिस, अनि उही same-location check
+async function addGarbagePhotoWithExif(file) {
+    let gps = null;
     try {
         const exifr = await import('https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.esm.js');
-        const gps = await exifr.gps(file);
-
-        if (gps && gps.latitude && gps.longitude) {
-            const lat = gps.latitude;
-            const lng = gps.longitude;
-
-            exifInfo.innerHTML = `
-                <span class="text-success">
-                    <i class="bi bi-geo-alt-fill me-1"></i>
-                    GPS extracted from photo:
-                    <strong>${lat.toFixed(6)}, ${lng.toFixed(6)}</strong>
-                </span>`;
-
-            initMap(lat, lng);
-            showToast('GPS location extracted from photo!', 'success');
-        } else {
-            exifInfo.innerHTML = `
-                <span class="text-warning">
-                    <i class="bi bi-exclamation-circle me-1"></i>
-                    No GPS in this photo — set location manually on the map.
-                </span>`;
+        const exifGps = await exifr.gps(file);
+        if (exifGps && exifGps.latitude && exifGps.longitude) {
+            gps = { lat: exifGps.latitude, lng: exifGps.longitude };
         }
     } catch (err) {
+        // EXIF पढ्न सकिएन — gps null नै रहन्छ
+    }
+
+    if (photoFiles.length === 0) {
+        // पहिलो फोटो — reference set गर्ने
+        photoFiles.push({ file, gps });
+        firstPhotoGPS = gps;
+        renderPhotoThumbnails();
+        if (gps) initMap(gps.lat, gps.lng);
+        return;
+    }
+
+    if (!firstPhotoGPS) {
+        // पहिलो फोटोमा नै GPS थिएन — तुलना गर्न सकिँदैन, accept गरिदिने
+        photoFiles.push({ file, gps });
+        renderPhotoThumbnails();
+        return;
+    }
+
+    if (!gps) {
+        showToast('This photo has no location data. Please use a photo of the same location as the first one.', 'warning');
+        return;
+    }
+
+    const dist = distanceInMeters(firstPhotoGPS.lat, firstPhotoGPS.lng, gps.lat, gps.lng);
+    if (dist > SAME_LOCATION_THRESHOLD_METERS) {
+        showToast(`This photo looks like it's from a different location (~${Math.round(dist)}m away). Please use a photo of the same location as the first one.`, 'danger');
+        return;
+    }
+
+    photoFiles.push({ file, gps });
+    renderPhotoThumbnails();
+}
+
+// सबै thumbnail फेरि draw गर्ने
+function renderPhotoThumbnails() {
+    const section = document.getElementById('photo-preview-section');
+    const grid = document.getElementById('photo-thumb-grid');
+    const exifInfo = document.getElementById('exif-info');
+
+    if (!photoFiles.length) {
+        section.classList.add('d-none');
+        grid.innerHTML = '';
+        exifInfo.innerHTML = '';
+        return;
+    }
+
+    section.classList.remove('d-none');
+
+    grid.innerHTML = photoFiles.map((item, idx) => `
+        <div class="photo-thumb">
+            <img src="${URL.createObjectURL(item.file)}" alt="photo ${idx + 1}">
+            <button type="button" class="thumb-remove-btn" onclick="removeGarbagePhoto(${idx})" title="Remove">
+                <i class="bi bi-x" style="font-size:0.85rem;"></i>
+            </button>
+            ${item.gps ? '<div class="thumb-gps-badge"><i class="bi bi-geo-alt-fill"></i> GPS</div>' : ''}
+        </div>
+    `).join('');
+
+    const withGps = photoFiles.filter(p => p.gps).length;
+    if (withGps > 0) {
         exifInfo.innerHTML = `
-            <span class="text-muted">
-                <i class="bi bi-info-circle me-1"></i>
-                No GPS data available — set location manually on the map.
+            <span class="text-success">
+                <i class="bi bi-geo-alt-fill me-1"></i>
+                ${photoFiles.length} photo(s) attached — ${withGps} with location data.
+            </span>`;
+    } else {
+        exifInfo.innerHTML = `
+            <span class="text-warning">
+                <i class="bi bi-exclamation-circle me-1"></i>
+                ${photoFiles.length} photo(s) attached — no GPS found, set location manually on the map.
             </span>`;
     }
+}
+
+// एउटा फोटो हटाउने — पहिलो फोटो (index 0) हटायो भने reference पनि reset गर्ने
+function removeGarbagePhoto(index) {
+    photoFiles.splice(index, 1);
+
+    if (index === 0) {
+        // पहिलो फोटो नै हट्यो — अब बाँकी रहेको (नयाँ) पहिलो फोटोको GPS लाई
+        // reference बनाउने, फोटो नै नरहे reference पनि clear गर्ने
+        firstPhotoGPS = photoFiles.length > 0 ? photoFiles[0].gps : null;
+    }
+
+    renderPhotoThumbnails();
 }
 
 // ── Token helper ─────────────────────────────────────────────────────────────
@@ -910,10 +1062,23 @@ async function submitRequest() {
     formData.append('latitude',       lat);
     formData.append('longitude',      lng);
 
-    if (photoFile) {
-        formData.append('photo',           photoFile);
-        formData.append('photo_latitude',  lat);
-        formData.append('photo_longitude', lng);
+    // ── नोट: backend को WasteRequest model मा अहिले एउटै 'photo' field छ,
+    // त्यसैले पहिलो फोटो मात्र त्यसमा पठाइन्छ। धेरै फोटो save गर्नु छ भने
+    // backend मा separate photo model (ForeignKey) चाहिन्छ। ──
+    if (photoFiles.length > 0) {
+        const first = photoFiles[0];
+        formData.append('photo', first.file);
+        if (first.gps) {
+            formData.append('photo_latitude',  first.gps.lat);
+            formData.append('photo_longitude', first.gps.lng);
+        }
+        // बाँकी फोटोहरू पनि पठाउने, हरेकको आफ्नै GPS सहित (backend ले
+        // 'extra_photos' / 'extra_photos_latitude' / 'extra_photos_longitude' handle गर्छ भने)
+        photoFiles.slice(1).forEach((item) => {
+            formData.append('extra_photos', item.file);
+            formData.append('extra_photos_latitude', item.gps ? item.gps.lat : '');
+            formData.append('extra_photos_longitude', item.gps ? item.gps.lng : '');
+        });
     }
 
     try {
@@ -931,12 +1096,12 @@ async function submitRequest() {
 
         if (res.ok) {
             showToast('Request submitted successfully!', 'success');
-            document.getElementById('garbage-photo-gallery').value = '';
             document.getElementById('pickup-address').value = '';
             document.getElementById('scheduled-date').value = '';
             document.getElementById('description').value = '';
-            document.getElementById('photo-preview-section').classList.add('d-none');
-            photoFile = null;
+            photoFiles = [];
+            firstPhotoGPS = null;
+            renderPhotoThumbnails();
             setTimeout(() => location.reload(), 1200);
         } else {
             const errMsg = typeof data === 'object'
@@ -967,8 +1132,6 @@ async function cancelRequest(requestId) {
 }
 
 // ── Move Request to Recycle Bin (soft-delete) ─────────────────────────────────
-// Yo hard DELETE hoina — request lai 'is_deleted' flag le Recycle Bin ma sarcha.
-// Recycle Bin bata pachi restore ya permanent delete garna milcha.
 async function deleteRequest(requestId) {
     if (!confirm('Move this request to Recycle Bin? You can restore it later from there.')) return;
 
@@ -1011,7 +1174,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // ── Complaint Modal Logic ─────────────────────────────────────────────────────
 let complaintPhotoFile = null;
 
-// Complaint type card selection
 document.querySelectorAll('.complaint-type-option').forEach(el => {
     el.addEventListener('click', () => {
         document.querySelectorAll('.complaint-type-option').forEach(o => o.classList.remove('active'));

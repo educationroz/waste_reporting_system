@@ -15,7 +15,10 @@ from rest_framework.decorators import action # type: ignore
 from rest_framework.permissions import AllowAny, IsAuthenticated # type: ignore
 from rest_framework.response import Response # type: ignore
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser # type: ignore
-from .models import AdminLog, Bin, Complaint, Driver, Notification, Route, Schedule, SystemSettings, Vehicle, WasteRequest
+from .models import (
+    AdminLog, Bin, Complaint, Driver, Notification, Route, Schedule,
+    SystemSettings, Vehicle, WasteRequest, WasteRequestPhoto,
+)
 from .permissions import IsAdminOrReadOnly, IsAdminUser, IsOwnerOrAdmin
 from .serializers import (
     AdminLogSerializer,
@@ -357,7 +360,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             'driver',
             'driver__user',
             'driver__vehicle',
-        )
+        ).prefetch_related('extra_photos')
 
         # Anonymous user le create bahek arko kunai action hit garyo bhane
         # (theoretically hunu hudaina kina ki get_permissions le block garcha),
@@ -394,10 +397,32 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         waste_request = serializer.save(user=user)
+
+        # Frontend le 'extra_photos' key ma pahilo photo bahekका baँki sabai
+        # photo haru pathaउँछ — tiनीहरूलाई WasteRequestPhoto table ma save garne.
+        # GPS chai frontend le 'extra_photos_latitude' / 'extra_photos_longitude'
+        # array haru pathayo bhane (same index alignment), tyo pani save garne —
+        # natra photo_latitude/longitude sabै NULL nai rahanchha.
+        extra_files = self.request.FILES.getlist('extra_photos')
+        extra_lats = self.request.POST.getlist('extra_photos_latitude')
+        extra_lngs = self.request.POST.getlist('extra_photos_longitude')
+
+        for idx, photo_file in enumerate(extra_files):
+            lat = extra_lats[idx] if idx < len(extra_lats) and extra_lats[idx] else None
+            lng = extra_lngs[idx] if idx < len(extra_lngs) and extra_lngs[idx] else None
+            WasteRequestPhoto.objects.create(
+                request=waste_request,
+                photo=photo_file,
+                latitude=lat,
+                longitude=lng,
+            )
+
         if user:
+            total_photos = len(extra_files) + (1 if waste_request.photo else 0)
+            photo_note = f' with {total_photos} photo(s)' if total_photos else ''
             _log_admin_action(
                 self.request, 'create', 'WasteRequest', waste_request,
-                f'{user.username} submitted pickup request #{waste_request.id}'
+                f'{user.username} submitted pickup request #{waste_request.id}{photo_note}'
             )
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
@@ -549,7 +574,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         """
         base_qs = WasteRequest.objects.select_related(
             'user', 'driver', 'driver__user', 'driver__vehicle',
-        )
+        ).prefetch_related('extra_photos')
         user = request.user
         if user.role == 'admin':
             qs = base_qs

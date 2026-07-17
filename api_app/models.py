@@ -173,6 +173,37 @@ class WasteRequest(models.Model):
         return f"Request #{self.id} - {self.user.username} ({self.status})"
 
 
+class WasteRequestPhoto(models.Model):
+    """
+    WasteRequest sanga jodिएका extra photo haru — user ले multiple photo
+    upload/capture garda pahilo photo chai WasteRequest.photo field ma
+    janchha (backward compatible), baँki sabai yaha save huन्छन्.
+    """
+    request = models.ForeignKey(
+        WasteRequest,
+        on_delete=models.CASCADE,
+        related_name='extra_photos',
+    )
+    photo = models.ImageField(
+        upload_to='waste_photos/extra/',
+        validators=[
+            FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp'])
+        ],
+    )
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True,
+        validators=[MinValueValidator(-90), MaxValueValidator(90)])
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True,
+        validators=[MinValueValidator(-180), MaxValueValidator(180)])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'waste_request_photos'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Photo for Request #{self.request_id}"
+
+
 class Route(models.Model):
     STATUS_CHOICES = [
         ('planned', 'Planned'),

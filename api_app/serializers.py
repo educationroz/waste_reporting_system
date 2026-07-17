@@ -1,7 +1,10 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers # type: ignore
 
-from .models import AdminLog, Bin, Driver, Notification, Route, Schedule, SystemSettings, Vehicle, WasteRequest, Complaint
+from .models import (
+    AdminLog, Bin, Driver, Notification, Route, Schedule,
+    SystemSettings, Vehicle, WasteRequest, WasteRequestPhoto, Complaint,
+)
 User = get_user_model()
 
 
@@ -42,6 +45,14 @@ class BinSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class WasteRequestPhotoSerializer(serializers.ModelSerializer):
+    """Read-only representation of an extra photo attached to a WasteRequest."""
+    class Meta:
+        model = WasteRequestPhoto
+        fields = ('id', 'photo', 'latitude', 'longitude', 'created_at')
+        read_only_fields = fields
+
+
 class WasteRequestSerializer(serializers.ModelSerializer):
     user = UserMinimalSerializer(read_only=True)
     driver_detail = DriverSerializer(source='driver', read_only=True)
@@ -49,6 +60,9 @@ class WasteRequestSerializer(serializers.ModelSerializer):
     waste_type_display = serializers.CharField(source='get_waste_type_display', read_only=True)
     route_id = serializers.SerializerMethodField()
     route_status = serializers.SerializerMethodField()
+    # Extra photos beyond the primary 'photo' field — populated in the view's
+    # perform_create() from the 'extra_photos' multipart key, read-only here.
+    extra_photos = WasteRequestPhotoSerializer(many=True, read_only=True)
 
     class Meta:
         model = WasteRequest
@@ -59,6 +73,7 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             'description', 'pickup_address',
             'latitude', 'longitude',
             'photo', 'photo_latitude', 'photo_longitude',
+            'extra_photos',
             'scheduled_date', 'completed_at',
             'notes', 'created_at', 'updated_at',
             'route_id', 'route_status',
