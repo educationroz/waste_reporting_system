@@ -2,6 +2,7 @@
 {% block title %}Driver Dashboard{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
     /* साइडबारका लिङ्कहरू होभर गर्दा ब्याकग्राउन्ड चेन्ज हुने सानो स्टाइल */
     .nav-pills .nav-link:not(.active):hover {
@@ -108,6 +109,52 @@
         justify-content: center;
     }
 }
+
+    /* ==========================================
+       MAP CARD
+       ========================================== */
+    #driver-map {
+        height: 420px;
+        width: 100%;
+        border-radius: 0 0 14px 14px;
+        z-index: 1; /* keep below modals/dropdowns */
+    }
+
+    .map-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        padding: 0.75rem 1rem;
+        font-size: 0.82rem;
+        border-top: 1px solid #f1f3f5;
+    }
+
+    .map-legend .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: #495057;
+    }
+
+    .map-legend .legend-dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+
+    .driver-marker-icon {
+        font-size: 1.4rem;
+        text-align: center;
+        line-height: 1;
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+    }
+
+    .map-empty-note {
+        padding: 2.5rem 1rem;
+        text-align: center;
+        color: #6c757d;
+    }
 </style>
 {% endblock %}
 
@@ -202,6 +249,35 @@
                 </div>
             </div>
 
+            <!-- Route & Reports Map -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-map text-success me-2"></i>My Route &amp; Reported Locations</span>
+                    <div>
+                        <span id="map-route-info" class="text-muted small me-3"></span>
+                        <button class="btn btn-sm btn-outline-secondary me-1" onclick="centerMap()" title="Re-center and fit all pins">
+                            <i class="bi bi-crosshair"></i> Center Map
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" onclick="loadMapData()" title="Refresh map">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div id="driver-map"></div>
+                <div id="map-empty-note" class="map-empty-note d-none">
+                    <i class="bi bi-geo fs-3 d-block mb-1"></i>
+                    No location data available yet for your assigned reports.
+                </div>
+                <div class="map-legend">
+                    <span class="legend-item"><span class="legend-dot" style="background:#fd7e14;"></span>Pending</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#0d6efd;"></span>Assigned</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#0dcaf0;"></span>In Progress</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#198754;"></span>Completed</span>
+                    <span class="legend-item">🚛 Your last known location</span>
+                    <span class="legend-item"><span style="border-top:3px solid #198754; width:20px; display:inline-block;"></span>Admin-generated route (road path)</span>
+                </div>
+            </div>
+
             <!-- Location Update -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white fw-bold">
@@ -275,6 +351,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
 const token = localStorage.getItem('access_token');
@@ -306,6 +383,11 @@ async function updateLocation() {
         await API.patch(`/api/drivers/${driverId}/update_location/`, { latitude: lat, longitude: lng });
     }
     showToast('Location updated!', 'success');
+
+    // Move the driver marker on the map immediately, no need to refetch
+    if (typeof updateDriverMarker === 'function') {
+        updateDriverMarker(parseFloat(lat), parseFloat(lng));
+    }
 }
 
 async function updateStatus(requestId, newStatus) {
@@ -330,5 +412,244 @@ async function toggleAvailability() {
         showToast('Failed to update availability.', 'danger');
     }
 }
+
+/* ==========================================================
+   ROUTE & REPORTS MAP
+   Plots:
+     - Every WasteRequest assigned to this driver (colored by status),
+       pulled from GET /api/waste-requests/ (already scoped server-side
+       to this driver via WasteRequestViewSet.get_queryset()).
+     - A dashed line connecting the stops belonging to this driver's
+       current active/planned Route, pulled from GET /api/routes/
+       (already scoped to this driver via RouteViewSet.get_queryset())
+       using its waste_request_ids field.
+     - The driver's own last-known position (from the Django context,
+       Driver.current_latitude/current_longitude).
+   Refreshes on: manual button click, a 30s interval, and any
+   'route_update' broadcast arriving on the existing driver_locations
+   WebSocket (sent by RouteViewSet.generate_optimal when admin builds
+   a new route for this driver).
+   ========================================================== */
+
+{% if driver %}
+const DRIVER_ID = {{ driver.id }};
+const INITIAL_DRIVER_LAT = {{ driver.current_latitude|default:'null' }};
+const INITIAL_DRIVER_LNG = {{ driver.current_longitude|default:'null' }};
+
+const STATUS_COLORS = {
+    pending: '#fd7e14',
+    assigned: '#0d6efd',
+    in_progress: '#0dcaf0',
+    completed: '#198754',
+    cancelled: '#6c757d',
+};
+
+const DEFAULT_CENTER = [28.2096, 83.9856]; // Pokhara fallback center
+// The route optimizer (route_optimizer.py) always starts each generated
+// route from a depot location read from SystemSettings, which drivers
+// aren't permitted to fetch (admin-only endpoint). We fall back to the
+// same default the backend itself uses when no custom depot is set, so
+// the drawn line is at least consistent with the common case.
+const DEFAULT_DEPOT = [28.2096, 83.9856];
+
+let driverMap = null;
+let driverMarker = null;
+let routeLine = null;
+let requestMarkersLayer = null;
+let hasFittedBounds = false; // only auto-fit the view once, on first load
+
+function initDriverMap() {
+    driverMap = L.map('driver-map', { scrollWheelZoom: true }).setView(DEFAULT_CENTER, 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(driverMap);
+
+    requestMarkersLayer = L.layerGroup().addTo(driverMap);
+
+    if (INITIAL_DRIVER_LAT !== null && INITIAL_DRIVER_LNG !== null) {
+        updateDriverMarker(INITIAL_DRIVER_LAT, INITIAL_DRIVER_LNG);
+    }
+
+    loadMapData();
+    setInterval(loadMapData, 30000); // fallback auto-refresh every 30s
+}
+
+function updateDriverMarker(lat, lng) {
+    if (!driverMap || isNaN(lat) || isNaN(lng)) return;
+    const icon = L.divIcon({
+        html: '🚛',
+        className: 'driver-marker-icon',
+        iconSize: [30, 30],
+    });
+    if (driverMarker) {
+        driverMarker.setLatLng([lat, lng]);
+    } else {
+        driverMarker = L.marker([lat, lng], { icon }).addTo(driverMap).bindPopup('Your last known location');
+    }
+}
+
+// DRF list endpoints may or may not be paginated depending on project
+// settings, so handle both a bare array and a {results: [...]} shape.
+function extractList(data) {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.results)) return data.results;
+    return [];
+}
+
+function pickCoords(req) {
+    // Prefer the request's own latitude/longitude; fall back to the
+    // photo's GPS tag if the request itself has none.
+    const lat = req.latitude !== null && req.latitude !== undefined ? parseFloat(req.latitude) : parseFloat(req.photo_latitude);
+    const lng = req.longitude !== null && req.longitude !== undefined ? parseFloat(req.longitude) : parseFloat(req.photo_longitude);
+    if (isNaN(lat) || isNaN(lng)) return null;
+    return [lat, lng];
+}
+
+// Draws the route line following actual roads via OSRM's free public
+// routing server, same approach used on the admin Route Planning page.
+// Falls back to a dashed straight line between points if OSRM is
+// unreachable or can't find a drivable path (e.g. points across water,
+// or the demo server being rate-limited).
+async function drawRoadFollowingLine(stopCoords) {
+    const orderedPoints = [DEFAULT_DEPOT, ...stopCoords];
+
+    let roadCoords = null;
+    try {
+        const coordStr = orderedPoints.map(([lat, lon]) => `${lon},${lat}`).join(';');
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+        const res = await fetch(osrmUrl);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                // GeoJSON gives [lon, lat] pairs — Leaflet wants [lat, lon]
+                roadCoords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+            }
+        }
+    } catch (e) {
+        console.warn('OSRM routing failed, falling back to straight line:', e);
+    }
+
+    const lineCoords = roadCoords || orderedPoints;
+
+    routeLine = L.polyline(lineCoords, {
+        color: '#198754',
+        weight: 4,
+        opacity: 0.85,
+        ...(roadCoords ? {} : { dashArray: '8,8' }), // dashed only for the straight-line fallback
+    }).addTo(driverMap);
+}
+
+let lastBoundsPoints = []; // cached so centerMap() can re-fit on demand without a refetch
+
+function centerMap() {
+    if (!driverMap || lastBoundsPoints.length === 0) return;
+    const allPoints = driverMarker ? lastBoundsPoints.concat([driverMarker.getLatLng()]) : lastBoundsPoints;
+    driverMap.fitBounds(allPoints, { padding: [30, 30], maxZoom: 15 });
+}
+
+async function loadMapData() {
+    if (!driverMap) return;
+
+    const [requestsData, routesData] = await Promise.all([
+        API.get('/api/waste-requests/'),
+        API.get('/api/routes/'),
+    ]);
+
+    const requests = extractList(requestsData);
+    const routes = extractList(routesData);
+
+    requestMarkersLayer.clearLayers();
+    if (routeLine) {
+        driverMap.removeLayer(routeLine);
+        routeLine = null;
+    }
+
+    const coordsById = {};
+    const boundsPoints = [];
+
+    requests.forEach(req => {
+        const coords = pickCoords(req);
+        if (!coords) return;
+
+        coordsById[req.id] = coords;
+        boundsPoints.push(coords);
+
+        const color = STATUS_COLORS[req.status] || '#6c757d';
+        const marker = L.circleMarker(coords, {
+            radius: 8,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.85,
+            weight: 2,
+        });
+
+        marker.bindPopup(`
+            <strong>#${req.id} — ${req.status_display || req.status}</strong><br>
+            ${req.pickup_address ? req.pickup_address : 'No address given'}<br>
+            <span class="text-muted">${req.waste_type_display || req.waste_type || ''}</span>
+        `);
+        marker.addTo(requestMarkersLayer);
+    });
+
+    // Find this driver's current route: prefer 'active', then 'planned',
+    // most recently created first (routes are already scoped to this
+    // driver by the backend, no need to filter by driver id here).
+    const myRoutes = routes.filter(r => r.status === 'active')
+        .concat(routes.filter(r => r.status === 'planned'))
+        .sort((a, b) => (b.id || 0) - (a.id || 0));
+    const currentRoute = myRoutes[0];
+
+    const infoEl = document.getElementById('map-route-info');
+    if (currentRoute) {
+        const stopCoords = (currentRoute.waste_request_ids || [])
+            .map(id => coordsById[id])
+            .filter(Boolean);
+
+        if (stopCoords.length > 0) {
+            await drawRoadFollowingLine(stopCoords);
+        }
+
+        infoEl.textContent = `Route #${currentRoute.id} (${currentRoute.status_display || currentRoute.status}) — ${currentRoute.total_distance_km ? currentRoute.total_distance_km + ' km' : ''}`;
+    } else {
+        infoEl.textContent = 'No active route assigned yet';
+    }
+
+    const emptyNote = document.getElementById('map-empty-note');
+    lastBoundsPoints = boundsPoints;
+    if (boundsPoints.length === 0) {
+        emptyNote.classList.remove('d-none');
+    } else {
+        emptyNote.classList.add('d-none');
+        // Only auto-fit the view the very first time data loads. On every
+        // later refresh (manual, 30s interval, or a live route_update),
+        // keep whatever zoom/pan the driver has set — don't yank it back
+        // out. They can hit "Center Map" any time to re-fit manually.
+        if (!hasFittedBounds) {
+            const allPoints = driverMarker ? boundsPoints.concat([driverMarker.getLatLng()]) : boundsPoints;
+            driverMap.fitBounds(allPoints, { padding: [30, 30], maxZoom: 15 });
+            hasFittedBounds = true;
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', initDriverMap);
+{% endif %}
+
+// Listen for live route broadcasts pushed by RouteViewSet.generate_optimal()
+// when an admin builds/regenerates a route for this driver.
+locationWS.onmessage = (event) => {
+    try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'route_update' && data.driver_id === {{ driver.id|default:'null' }}) {
+            showToast(`New route generated: ${data.total_stops} stops, ${data.total_distance} km`, 'info');
+            loadMapData();
+        }
+    } catch (e) {
+        // non-JSON or unrelated message, ignore
+    }
+};
+locationWS.onerror = () => {};
 </script>
 {% endblock %}

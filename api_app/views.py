@@ -38,6 +38,10 @@ try:
 except InvalidChannelLayerError:
     CHANNEL_LAYER = None
 
+import logging
+logger = logging.getLogger('notif_debug')
+logging.basicConfig(level=logging.INFO)
+
 BACKUP_DIR = Path(settings.BASE_DIR) / 'backups'
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -57,6 +61,75 @@ def _log_admin_action(request, action_type, content_type, obj, description=''):
         object_description=description or str(obj),
         ip_address=request.META.get('REMOTE_ADDR'),
         user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+    )
+
+
+def _push_ws_notification(notification):
+    """
+    Push a just-created Notification over its owner's personal WebSocket
+    group (NotificationConsumer, group name 'notifications_user_{id}').
+
+    This is the piece that was missing everywhere: Notification.objects.create()
+    only writes to the DB. The base.html WebSocket client listens for a live
+    'notification' event on this group to pop the toast/badge — without this
+    group_send, nothing ever arrives over the socket and the notification only
+    shows up after a manual refresh/poll.
+    """
+    group_name = f'notifications_user_{notification.user_id}'
+    logger.info(
+        f'[NOTIF PUSH] attempting push: user_id={notification.user_id} '
+        f'group={group_name} channel_layer_is_none={CHANNEL_LAYER is None} '
+        f'title={notification.title!r}'
+    )
+    if CHANNEL_LAYER is None or not notification.user_id:
+        logger.warning('[NOTIF PUSH] skipped — no channel layer or no user_id')
+        return
+    async_to_sync(CHANNEL_LAYER.group_send)(
+        group_name,
+        {
+            'type': 'send_notification',
+            'title': notification.title,
+            'message': notification.message,
+            'notification_type': notification.notification_type,
+        }
+    )
+    logger.info(f'[NOTIF PUSH] group_send completed for group={group_name}')
+
+
+def _create_notification(user, title, message, notification_type='info', related_request=None):
+    """
+    Single entry point for creating a Notification: writes the DB row AND
+    pushes it live over the WebSocket, so every call site gets both for free
+    instead of relying on each caller to remember the group_send.
+    """
+    notification = Notification.objects.create(
+        user=user,
+        title=title,
+        message=message,
+        notification_type=notification_type,
+        related_request=related_request,
+    )
+    _push_ws_notification(notification)
+    return notification
+
+
+def _notify_driver(driver, title, message, notification_type='info', related_request=None):
+    """
+    Create a Notification for a driver's linked user account.
+    This is what makes the toast/badge show up on the driver dashboard —
+    base.html's notifications WebSocket already listens for any Notification
+    created for the logged-in user; it just needed the live group_send too
+    (see _create_notification / _push_ws_notification above), since before
+    this it was never being pushed live for anyone, driver or not.
+    """
+    if not driver or not driver.user_id:
+        return
+    _create_notification(
+        user=driver.user,
+        title=title,
+        message=message,
+        notification_type=notification_type,
+        related_request=related_request,
     )
 
 
@@ -448,13 +521,27 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
         # Notify user (guest/anonymous requests won't have a user to notify)
         if waste_request.user_id:
-            Notification.objects.create(
+            _create_notification(
                 user=waste_request.user,
                 title='Driver Assigned',
                 message=f'Driver {driver.user.username} has been assigned to your request.',
                 notification_type='info',
                 related_request=waste_request,
             )
+
+        # Also notify the driver themselves — this is what makes the
+        # toast/badge show up on their dashboard when admin hands them a
+        # new pickup directly (as opposed to via generate_optimal below).
+        # This is the ESSENTIAL notification for the driver on this action.
+        _notify_driver(
+            driver,
+            title='New Pickup Assigned',
+            message=f'You have been assigned pickup request #{waste_request.id}'
+                    f'{" at " + waste_request.pickup_address if waste_request.pickup_address else ""}.',
+            notification_type='info',
+            related_request=waste_request,
+        )
+
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
@@ -520,13 +607,28 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
         # Guest/anonymous requests won't have a user to notify
         if waste_request.user_id:
-            Notification.objects.create(
+            _create_notification(
                 user=waste_request.user,
                 title='Request Status Updated',
                 message=f'Your request status changed to: {new_status}.',
                 notification_type='success' if new_status == 'completed' else 'info',
                 related_request=waste_request,
             )
+
+        # If an admin (not the driver themselves) changes the status
+        # on a request that has an assigned driver, let that driver know
+        # too — e.g. admin marks something cancelled/reassigned on their
+        # behalf while they're out on the road. Essential for the driver
+        # so they don't keep working a job that's been pulled/changed.
+        if user.role == 'admin' and waste_request.driver_id:
+            _notify_driver(
+                waste_request.driver,
+                title='Request Status Changed',
+                message=f'Request #{waste_request.id} was updated to "{new_status}" by an admin.',
+                notification_type='info',
+                related_request=waste_request,
+            )
+
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
     @action(detail=True, methods=['patch'])
@@ -722,13 +824,25 @@ class RouteViewSet(viewsets.ModelViewSet):
             )
             for wr in WasteRequest.objects.filter(id__in=waste_request_ids):
                 if wr.user_id:
-                    Notification.objects.create(
+                    _create_notification(
                         user=wr.user,
                         title='Driver Assigned',
                         message=f'Driver {driver.user.username} has been assigned to your request and is on route #{route.id}.',
                         notification_type='info',
                         related_request=wr,
                     )
+
+        # Notify the driver once about the whole route (not per-request —
+        # that would spam them with one toast per stop). This is the main
+        # ESSENTIAL notification for a driver: a new route has been
+        # planned for them and they should check the dashboard/map.
+        _notify_driver(
+            driver,
+            title='New Route Generated',
+            message=f'A new route (#{route.id}) with {route_data["total_stops"]} stop(s) '
+                    f'and {route_data["total_distance_km"]} km has been planned for {planned_date}.',
+            notification_type='info',
+        )
 
         _log_admin_action(
             request, 'create' if created else 'update', 'Route', route,
@@ -767,9 +881,30 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         schedule = serializer.save()
         _log_admin_action(self.request, 'create', 'Schedule', schedule, f'Created schedule for {schedule.zone_name}')
 
+        # Let the assigned driver know they've got a new recurring
+        # zone schedule — essential info for planning their week.
+        if schedule.driver_id:
+            _notify_driver(
+                schedule.driver,
+                title='New Zone Schedule Assigned',
+                message=f'You have been assigned to the "{schedule.zone_name}" collection '
+                        f'schedule ({schedule.get_frequency_display()}).',
+                notification_type='info',
+            )
+
     def perform_update(self, serializer):
         schedule = serializer.save()
         _log_admin_action(self.request, 'update', 'Schedule', schedule, f'Updated schedule for {schedule.zone_name}')
+
+        # Same as above, for edits (e.g. day/frequency changed, or a
+        # driver newly assigned via the edit flow rather than at creation).
+        if schedule.driver_id:
+            _notify_driver(
+                schedule.driver,
+                title='Zone Schedule Updated',
+                message=f'Your collection schedule for "{schedule.zone_name}" has been updated.',
+                notification_type='info',
+            )
 
     def perform_destroy(self, instance):
         _log_admin_action(self.request, 'delete', 'Schedule', instance, f'Removed schedule for {instance.zone_name}')
@@ -910,7 +1045,7 @@ class ComplaintViewSet(viewsets.ModelViewSet):
             f'Complaint #{complaint.id} status changed to {new_status}'
         )
 
-        Notification.objects.create(
+        _create_notification(
             user=complaint.user,
             title='Complaint Status Updated',
             message=f'Your complaint "{complaint.subject}" status changed to: {complaint.get_status_display()}.',
