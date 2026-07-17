@@ -16,6 +16,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(','
 
 # ─── Apps ─────────────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
+    'jazzmin',  # Admin theme
     'daphne',  # must be FIRST for ASGI
     'django.contrib.admin',
     'django.contrib.auth',
