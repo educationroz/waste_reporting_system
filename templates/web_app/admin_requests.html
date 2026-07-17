@@ -138,6 +138,42 @@
         padding: 1rem;
         font-size: 0.88rem;
     }
+
+    /* ==========================================
+       3. PHOTO THUMBNAIL + MULTI-PHOTO BADGE
+       ========================================== */
+    .photo-thumb-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+
+    .photo-thumb-wrapper img {
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .photo-thumb-wrapper:hover img {
+        transform: scale(1.06);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+
+    .photo-extra-badge {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 4px;
+        font-size: 0.65rem;
+        border-radius: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #fff;
+    }
+
+    #gallery-photo-container img {
+        cursor: zoom-in;
+    }
 </style>
 {% endblock %}
 
@@ -281,6 +317,7 @@
                                     <th># ID</th>
                                     <th>Citizen User</th>
                                     <th>Waste Vector Classification</th>
+                                    <th>Waste Photo</th>
                                     <th>Geospatial Address Context</th>
                                     <th>Status Sign</th>
                                     <th>Scheduled Timeline</th>
@@ -302,6 +339,34 @@
                                             {{ req.get_waste_type_display }}
                                         </span>
                                     </td>
+
+                                    {# ===== WASTE PHOTO CELL — thumbnail + gallery trigger for multiple photos ===== #}
+                                    <td class="text-center">
+                                        {% with extra=req.extra_photos.all %}
+                                        {% if req.photo or extra %}
+                                            <div class="photo-thumb-wrapper" onclick="openPhotoGallery({{ req.id }})">
+                                                <img src="{% if req.photo %}{{ req.photo.url }}{% else %}{{ extra.0.photo.url }}{% endif %}"
+                                                     alt="Waste Photo"
+                                                     class="rounded"
+                                                     style="width: 60px; height: 60px; object-fit: cover; cursor: pointer;">
+                                                {% if req.photo and extra %}
+                                                    <span class="photo-extra-badge bg-dark text-white">+{{ extra|length }}</span>
+                                                {% elif not req.photo and extra|length > 1 %}
+                                                    <span class="photo-extra-badge bg-dark text-white">+{{ extra|length|add:"-1" }}</span>
+                                                {% endif %}
+                                            </div>
+
+                                            {# hidden JSON store of all photo URLs, read by JS on click #}
+                                            <div id="photo-data-{{ req.id }}" class="d-none"
+                                                 data-photos='[{% if req.photo %}"{{ req.photo.url|escapejs }}"{% if extra %},{% endif %}{% endif %}{% for p in extra %}"{{ p.photo.url|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}]'>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted small"><i class="bi bi-image me-1"></i>No Photo</span>
+                                        {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    {# ===== END WASTE PHOTO CELL ===== #}
+
                                     <td>
                                         <span class="text-dark d-block" title="{{ req.pickup_address }}" style="max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                             {{ req.pickup_address }}
@@ -341,7 +406,7 @@
                                     </td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>
+                                <tr><td colspan="9" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -377,6 +442,25 @@
         </div>
     </div>
 </div>
+
+{# ===== PHOTO GALLERY MODAL — shows all photos for a request ===== #}
+<div class="modal fade" id="photoGalleryModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-images me-2"></i>Waste Photos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div id="gallery-photo-container" class="d-flex flex-wrap gap-3 justify-content-center">
+                    <!-- JS le yaha images inject garcha -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{# ===== END PHOTO GALLERY MODAL ===== #}
+
 {% endblock %}
 
 {% block extra_js %}
@@ -410,6 +494,40 @@ async function cancelRequest(requestId) {
     } else {
         showToast('Failed to drop request pipeline node state.', 'danger');
     }
+}
+
+/* ===== PHOTO GALLERY LOGIC ===== */
+const photoGalleryModal = new bootstrap.Modal(document.getElementById('photoGalleryModal'));
+
+function openPhotoGallery(requestId) {
+    const dataDiv = document.getElementById(`photo-data-${requestId}`);
+    if (!dataDiv) return;
+
+    let photos = [];
+    try {
+        photos = JSON.parse(dataDiv.dataset.photos);
+    } catch (e) {
+        console.error('Failed to parse photo data', e);
+        return;
+    }
+
+    const container = document.getElementById('gallery-photo-container');
+    container.innerHTML = '';
+
+    if (photos.length === 0) {
+        container.innerHTML = '<p class="text-muted">No photos available.</p>';
+    } else {
+        photos.forEach(url => {
+            const img = document.createElement('img');
+            img.src = url;
+            img.className = 'rounded shadow-sm';
+            img.style.cssText = 'width: 200px; height: 200px; object-fit: cover;';
+            img.onclick = () => window.open(url, '_blank');
+            container.appendChild(img);
+        });
+    }
+
+    photoGalleryModal.show();
 }
 </script>
 {% endblock %}

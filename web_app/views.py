@@ -271,14 +271,14 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_template_names(self):
-        # AJAX request bhaye table partial matra return garne,
-        # normal request bhaye full page
         if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return ['web_app/partials/admin_requests_table.html']
         return ['web_app/admin_requests.html']
 
     def get_queryset(self):
-        qs = WasteRequest.objects.select_related('user', 'driver__user').order_by('-created_at')
+        qs = WasteRequest.objects.select_related('user', 'driver__user') \
+                                   .prefetch_related('extra_photos') \
+                                   .order_by('-created_at')
 
         status_filter = self.request.GET.get('status')
         search_query = self.request.GET.get('search', '').strip()
@@ -290,8 +290,6 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
             filters = Q(user__username__icontains=search_query) | \
                       Q(pickup_address__icontains=search_query)
 
-            # ID le exact numeric match matra garne, so "12" jasto
-            # search garda ID=12 pani match hos
             if search_query.isdigit():
                 filters |= Q(id=int(search_query))
 
@@ -306,7 +304,6 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         ctx['current_status'] = self.request.GET.get('status', '')
         ctx['current_search'] = self.request.GET.get('search', '')
         return ctx
-
 
 class AdminDriverListView(LoginRequiredMixin, ListView):
     template_name = 'web_app/admin_drivers.html'
