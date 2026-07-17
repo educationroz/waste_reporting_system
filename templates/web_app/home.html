@@ -1065,19 +1065,23 @@ async function submitRequest() {
     // ── नोट: backend को WasteRequest model मा अहिले एउटै 'photo' field छ,
     // त्यसैले पहिलो फोटो मात्र त्यसमा पठाइन्छ। धेरै फोटो save गर्नु छ भने
     // backend मा separate photo model (ForeignKey) चाहिन्छ। ──
+    // GPS values .toFixed(6) ले round गरिएको छ — backend को
+    // max_digits=12, decimal_places=8 भन्दा बढी digits आउँदा 400 error
+    // दिन्थ्यो (EXIF/geolocation ले raw float precision दिन्छ, जुन
+    // धेरैजसो 12+ digits हुन्छ)।
     if (photoFiles.length > 0) {
         const first = photoFiles[0];
         formData.append('photo', first.file);
         if (first.gps) {
-            formData.append('photo_latitude',  first.gps.lat);
-            formData.append('photo_longitude', first.gps.lng);
+            formData.append('photo_latitude',  first.gps.lat.toFixed(6));
+            formData.append('photo_longitude', first.gps.lng.toFixed(6));
         }
         // बाँकी फोटोहरू पनि पठाउने, हरेकको आफ्नै GPS सहित (backend ले
         // 'extra_photos' / 'extra_photos_latitude' / 'extra_photos_longitude' handle गर्छ भने)
         photoFiles.slice(1).forEach((item) => {
             formData.append('extra_photos', item.file);
-            formData.append('extra_photos_latitude', item.gps ? item.gps.lat : '');
-            formData.append('extra_photos_longitude', item.gps ? item.gps.lng : '');
+            formData.append('extra_photos_latitude', item.gps ? item.gps.lat.toFixed(6) : '');
+            formData.append('extra_photos_longitude', item.gps ? item.gps.lng.toFixed(6) : '');
         });
     }
 

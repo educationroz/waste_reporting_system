@@ -146,9 +146,9 @@ class WasteRequest(models.Model):
         ],
         help_text='Accepted formats: JPG, JPEG, PNG, GIF, WebP (Max 5MB)'
     )
-    photo_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True,
+    photo_latitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True,
         validators=[MinValueValidator(-90), MaxValueValidator(90)])
-    photo_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True,
+    photo_longitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True,
         validators=[MinValueValidator(-180), MaxValueValidator(180)])
     scheduled_date = models.DateTimeField(db_index=True)
     completed_at = models.DateTimeField(null=True, blank=True)
@@ -190,9 +190,9 @@ class WasteRequestPhoto(models.Model):
             FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp'])
         ],
     )
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True,
+    latitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True,
         validators=[MinValueValidator(-90), MaxValueValidator(90)])
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True,
+    longitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True,
         validators=[MinValueValidator(-180), MaxValueValidator(180)])
     created_at = models.DateTimeField(auto_now_add=True)
 
