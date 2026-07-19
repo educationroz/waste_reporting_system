@@ -1,5 +1,5 @@
 import io
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -168,8 +168,13 @@ def _notify_all_users(title, message, notification_type='info'):
 def _get_backup_files():
     files = []
     for backup_path in sorted(BACKUP_DIR.glob('*.json'), key=lambda item: item.stat().st_mtime, reverse=True):
-        # Use datetime.timezone.utc to avoid relying on django.utils.timezone.utc
-        created_ts = datetime.fromtimestamp(backup_path.stat().st_mtime, tz=datetime.timezone.utc)
+        # FIX: `from datetime import datetime` above binds `datetime` to the
+        # *class*, not the module — so `datetime.timezone` doesn't exist on
+        # it (that only lives on the datetime *module*). Using the
+        # `dt_timezone` alias imported at the top avoids the collision with
+        # `django.utils.timezone` (imported as `timezone`) while still
+        # getting the real UTC tzinfo object.
+        created_ts = datetime.fromtimestamp(backup_path.stat().st_mtime, tz=dt_timezone.utc)
         files.append({
             'file_name': backup_path.name,
             'size_bytes': backup_path.stat().st_size,
@@ -906,7 +911,6 @@ class RouteViewSet(viewsets.ModelViewSet):
             return Response(route_data, status=status.HTTP_400_BAD_REQUEST)
 
         # Create or update route
-        from datetime import datetime
         if planned_date:
             planned_date = datetime.strptime(planned_date, '%Y-%m-%d').date()
         else:
