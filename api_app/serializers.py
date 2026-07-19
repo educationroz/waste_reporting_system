@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers # type: ignore
 
 from .models import (
-    AdminLog, Bin, Driver, Notification, Route, Schedule,
+    AdminLog, Bin, Checkpoint, Driver, Notification, Route, Schedule,
     SystemSettings, Vehicle, WasteRequest, WasteRequestPhoto, Complaint,
 )
 User = get_user_model()
@@ -45,6 +45,12 @@ class BinSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class CheckpointSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Checkpoint
+        fields = '__all__'
+
+
 class WasteRequestPhotoSerializer(serializers.ModelSerializer):
     """Read-only representation of an extra photo attached to a WasteRequest."""
     class Meta:
@@ -56,6 +62,14 @@ class WasteRequestPhotoSerializer(serializers.ModelSerializer):
 class WasteRequestSerializer(serializers.ModelSerializer):
     user = UserMinimalSerializer(read_only=True)
     driver_detail = DriverSerializer(source='driver', read_only=True)
+    dropoff_checkpoint = CheckpointSerializer(read_only=True)
+    dropoff_checkpoint_id = serializers.PrimaryKeyRelatedField(
+        queryset=Checkpoint.objects.filter(is_active=True),
+        source='dropoff_checkpoint',
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     waste_type_display = serializers.CharField(source='get_waste_type_display', read_only=True)
     route_id = serializers.SerializerMethodField()
@@ -68,6 +82,7 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         model = WasteRequest
         fields = (
             'id', 'user', 'driver', 'driver_detail',
+            'dropoff_checkpoint', 'dropoff_checkpoint_id',
             'waste_type', 'waste_type_display',
             'status', 'status_display',
             'description', 'pickup_address',

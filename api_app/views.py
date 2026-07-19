@@ -1,7 +1,10 @@
 import io
+from datetime import datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.db import transaction
 from django.db.models import F, Q
@@ -16,13 +19,14 @@ from rest_framework.permissions import AllowAny, IsAuthenticated # type: ignore
 from rest_framework.response import Response # type: ignore
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser # type: ignore
 from .models import (
-    AdminLog, Bin, Complaint, Driver, Notification, Route, Schedule,
+    AdminLog, Bin, Checkpoint, Complaint, Driver, Notification, Route, Schedule,
     SystemSettings, Vehicle, WasteRequest, WasteRequestPhoto,
 )
 from .permissions import IsAdminOrReadOnly, IsAdminUser, IsOwnerOrAdmin
 from .serializers import (
     AdminLogSerializer,
     BinSerializer,
+    CheckpointSerializer,
     DriverSerializer,
     NotificationSerializer,
     RouteSerializer,
@@ -102,6 +106,18 @@ def _create_notification(user, title, message, notification_type='info', related
     pushes it live over the WebSocket, so every call site gets both for free
     instead of relying on each caller to remember the group_send.
     """
+    # Prevent spamming the same notification repeatedly to the same user
+    recent_cutoff = timezone.now() - timedelta(seconds=30)
+    exists = Notification.objects.filter(
+        user=user,
+        title=title,
+        message=message,
+        created_at__gte=recent_cutoff,
+    ).exists()
+    if exists:
+        logger.info(f"[NOTIF SKIP] duplicate notification skipped for user={user.id} title={title!r}")
+        return None
+
     notification = Notification.objects.create(
         user=user,
         title=title,
@@ -133,13 +149,31 @@ def _notify_driver(driver, title, message, notification_type='info', related_req
     )
 
 
+def _notify_all_users(title, message, notification_type='info'):
+    """
+    Broadcast a Notification (DB row + live WS push) to every active
+    account — admin, driver, and regular user — so everyone hears about
+    checkpoint changes and their map can react to it live.
+    """
+    User = get_user_model()
+    for user in User.objects.filter(is_active=True):
+        _create_notification(
+            user=user,
+            title=title,
+            message=message,
+            notification_type=notification_type,
+        )
+
+
 def _get_backup_files():
     files = []
     for backup_path in sorted(BACKUP_DIR.glob('*.json'), key=lambda item: item.stat().st_mtime, reverse=True):
+        # Use datetime.timezone.utc to avoid relying on django.utils.timezone.utc
+        created_ts = datetime.fromtimestamp(backup_path.stat().st_mtime, tz=datetime.timezone.utc)
         files.append({
             'file_name': backup_path.name,
             'size_bytes': backup_path.stat().st_size,
-            'created_at': timezone.datetime.fromtimestamp(backup_path.stat().st_mtime, tz=timezone.utc).isoformat(),
+            'created_at': created_ts.isoformat(),
             'download_url': f'/api/database-backups/download/?file_name={backup_path.name}',
         })
     return files
@@ -391,6 +425,88 @@ class BinViewSet(viewsets.ModelViewSet):
         qs = Bin.objects.filter(status__in=['full', 'overflow']).prefetch_related('routes')
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
+
+
+class CheckpointViewSet(viewsets.ModelViewSet):
+    """Admin-managed designated drop-off locations."""
+    queryset = Checkpoint.objects.all().order_by('-created_at')
+    serializer_class = CheckpointSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'description']
+    ordering_fields = ['created_at', 'name']
+
+    def get_permissions(self):
+        if self.request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return [AllowAny()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+    def perform_create(self, serializer):
+        # Standard create path used by non-API callers — keep minimal.
+        serializer.save()
+
+    def create(self, request, *args, **kwargs):
+        # Full create flow for API: include idempotency/dedupe info in response
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        name = data.get('name')
+        lat = data.get('latitude')
+        lng = data.get('longitude')
+
+        deduped = False
+        existing_id = None
+
+        if lat is not None and lng is not None:
+            tol = Decimal('0.000001')
+            recent = Checkpoint.objects.filter(
+                name=name,
+                latitude__gte=lat - tol,
+                latitude__lte=lat + tol,
+                longitude__gte=lng - tol,
+                longitude__lte=lng + tol,
+            ).order_by('-created_at').first()
+            if recent:
+                checkpoint = recent
+                deduped = True
+                existing_id = recent.id
+            else:
+                checkpoint = serializer.save()
+        else:
+            checkpoint = serializer.save()
+
+        _log_admin_action(request, 'create', 'Checkpoint', checkpoint, f'Created checkpoint {checkpoint.name}')
+        # Only notify users when a new checkpoint was actually created
+        if not deduped:
+            _notify_all_users(
+                title='New Checkpoint Added',
+                message=f'A new checkpoint "{checkpoint.name}" is now available on the map.',
+                notification_type='info',
+            )
+
+        out = CheckpointSerializer(checkpoint, context={'request': request}).data
+        out.update({'deduped': deduped})
+        if deduped:
+            out.update({'existing_checkpoint_id': existing_id})
+
+        return Response(out, status=status.HTTP_200_OK)
+
+    def perform_update(self, serializer):
+        checkpoint = serializer.save()
+        _log_admin_action(self.request, 'update', 'Checkpoint', checkpoint, f'Updated checkpoint {checkpoint.name}')
+        _notify_all_users(
+            title='Checkpoint Updated',
+            message=f'Checkpoint "{checkpoint.name}" was moved or edited — the map has been refreshed.',
+            notification_type='info',
+        )
+
+    def perform_destroy(self, instance):
+        _log_admin_action(self.request, 'delete', 'Checkpoint', instance, f'Deleted checkpoint {instance.name}')
+        _notify_all_users(
+            title='Checkpoint Removed',
+            message=f'Checkpoint "{instance.name}" has been removed.',
+            notification_type='warning',
+        )
+        instance.delete()
 
 
 class WasteRequestViewSet(viewsets.ModelViewSet):

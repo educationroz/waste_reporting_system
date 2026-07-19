@@ -102,6 +102,31 @@ class Bin(models.Model):
         return f"{self.bin_code} ({self.waste_type}) - {self.status}"
 
 
+class Checkpoint(models.Model):
+    """Admin-defined designated waste drop-off locations."""
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6,
+        validators=[MinValueValidator(-90), MaxValueValidator(90)])
+    longitude = models.DecimalField(max_digits=9, decimal_places=6,
+        validators=[MinValueValidator(-180), MaxValueValidator(180)])
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'checkpoints'
+        verbose_name = 'Checkpoint'
+        verbose_name_plural = 'Checkpoints'
+        indexes = [
+            models.Index(fields=['is_active']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.latitude}, {self.longitude})"
+
+
 class WasteRequest(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -137,6 +162,10 @@ class WasteRequest(models.Model):
         validators=[MinValueValidator(-90), MaxValueValidator(90)])
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True,
         validators=[MinValueValidator(-180), MaxValueValidator(180)])
+    dropoff_checkpoint = models.ForeignKey(
+        'Checkpoint', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='waste_requests'
+    )
     photo = models.ImageField(
         upload_to='waste_photos/',
         blank=True,

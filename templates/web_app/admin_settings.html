@@ -273,6 +273,11 @@
                             </button>
                         </li>
                         <li class="nav-item">
+                            <button class="nav-link fw-semibold text-secondary" id="checkpoint-tab" data-bs-toggle="tab" data-bs-target="#checkpoint-panel" type="button" role="tab">
+                                <i class="bi bi-flag-fill me-2"></i>Checkpoints
+                            </button>
+                        </li>
+                        <li class="nav-item">
                             <button class="nav-link fw-semibold text-secondary" id="email-tab" data-bs-toggle="tab" data-bs-target="#email-panel" type="button" role="tab">
                                 <i class="bi bi-envelope me-2"></i>Email Configuration
                             </button>
@@ -372,6 +377,84 @@
                                 <button class="btn btn-success px-4" onclick="saveDepotLocation()" id="depot-save-btn">
                                     <i class="bi bi-check-circle me-2"></i>Save Depot Location
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade p-4" id="checkpoint-panel" role="tabpanel">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <div>
+                                        <h6 class="fw-bold text-dark mb-1">
+                                            <i class="bi bi-flag-fill me-2 text-success"></i>Designated Checkpoints
+                                        </h6>
+                                        <p class="text-muted small mb-0">
+                                            Create and manage pickup/drop-off checkpoints that users can select when submitting a request.
+                                        </p>
+                                    </div>
+                                    <button class="btn btn-outline-success" onclick="resetCheckpointForm()">
+                                        <i class="bi bi-plus-circle me-1"></i>New Checkpoint
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold text-secondary">Checkpoint Name</label>
+                                <input type="text" class="form-control" id="checkpoint_name" placeholder="e.g. Main Street Depot">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold text-secondary">Description</label>
+                                <input type="text" class="form-control" id="checkpoint_description" placeholder="Optional message for users">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold text-secondary">Latitude</label>
+                                <input type="number" step="any" class="form-control" id="checkpoint_lat" placeholder="28.209600">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold text-secondary">Longitude</label>
+                                <input type="number" step="any" class="form-control" id="checkpoint_lng" placeholder="83.985600">
+                            </div>
+                            <div class="col-12 d-flex flex-column flex-sm-row gap-2">
+                                <button class="btn btn-outline-secondary" onclick="initCheckpointMap()">
+                                    <i class="bi bi-map me-1"></i>Load Map
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="useCheckpointGPS()">
+                                    <i class="bi bi-crosshair me-1"></i>Use My GPS
+                                </button>
+                                <button class="btn btn-success" onclick="saveCheckpoint()" id="checkpoint-save-btn">
+                                    <i class="bi bi-check-circle me-1"></i>Save Checkpoint
+                                </button>
+                            </div>
+                            <div class="col-12">
+                                <div id="checkpoint-status" class="d-none alert alert-success py-2 small mb-0">
+                                    <i class="bi bi-check-circle me-2"></i>
+                                    <span id="checkpoint-status-text"></span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div id="checkpoint-map" style="height:300px; border-radius:8px; border:1px solid #dee2e6;"></div>
+                                <small class="text-muted mt-1 d-block">
+                                    Click the map or drag the marker to position the checkpoint.
+                                </small>
+                            </div>
+                            <div class="col-12">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered align-middle mb-0">
+                                        <thead class="table-light text-secondary small">
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Coordinates</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="checkpoint-table-body" class="small text-dark">
+                                            <tr>
+                                                <td colspan="4" class="text-muted text-center py-3">Loading checkpoints...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -544,12 +627,20 @@
 // ── Depot Map Logic ──────────────────────────────────────────────────────────
 let depotMap = null;
 let depotMarker = null;
+let checkpointMap = null;
+let checkpointMarker = null;
+let editingCheckpointId = null;
 const DEFAULT_LAT = 28.2096;
 const DEFAULT_LNG = 83.9856;
 
 document.getElementById('depot-tab').addEventListener('shown.bs.tab', function () {
     initDepotMap();
     loadDepotLocation();
+});
+
+document.getElementById('checkpoint-tab').addEventListener('shown.bs.tab', function () {
+    initCheckpointMap();
+    loadCheckpoints();
 });
 
 function initDepotMap() {
@@ -682,6 +773,214 @@ function showDepotStatus(text) {
     const el = document.getElementById('depot-status');
     document.getElementById('depot-status-text').textContent = text;
     el.classList.remove('d-none');
+}
+
+function initCheckpointMap() {
+    if (checkpointMap) return;
+
+    checkpointMap = L.map('checkpoint-map').setView([DEFAULT_LAT, DEFAULT_LNG], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
+    }).addTo(checkpointMap);
+
+    checkpointMarker = L.marker([DEFAULT_LAT, DEFAULT_LNG], { draggable: true })
+        .addTo(checkpointMap)
+        .bindPopup('<strong>🏁 Checkpoint Location</strong><br>Drag to adjust')
+        .openPopup();
+
+    checkpointMarker.on('dragend', function () {
+        const pos = checkpointMarker.getLatLng();
+        setCheckpointInputs(pos.lat, pos.lng);
+    });
+
+    checkpointMap.on('click', function (e) {
+        checkpointMarker.setLatLng(e.latlng);
+        setCheckpointInputs(e.latlng.lat, e.latlng.lng);
+    });
+}
+
+function setCheckpointInputs(lat, lng) {
+    document.getElementById('checkpoint_lat').value = parseFloat(lat).toFixed(6);
+    document.getElementById('checkpoint_lng').value = parseFloat(lng).toFixed(6);
+}
+
+function moveCheckpointMarker(lat, lng) {
+    if (checkpointMarker) {
+        checkpointMarker.setLatLng([lat, lng]);
+        checkpointMap.setView([lat, lng], 15);
+    }
+    setCheckpointInputs(lat, lng);
+}
+
+function resetCheckpointForm() {
+    editingCheckpointId = null;
+    document.getElementById('checkpoint_name').value = '';
+    document.getElementById('checkpoint_description').value = '';
+    setCheckpointInputs(DEFAULT_LAT, DEFAULT_LNG);
+    if (checkpointMarker) {
+        moveCheckpointMarker(DEFAULT_LAT, DEFAULT_LNG);
+    }
+    hideCheckpointStatus();
+}
+
+function showCheckpointStatus(text, type = 'success') {
+    const el = document.getElementById('checkpoint-status');
+    document.getElementById('checkpoint-status-text').textContent = text;
+    el.classList.remove('d-none', 'alert-danger', 'alert-success');
+    el.classList.add(`alert-${type}`);
+}
+
+function hideCheckpointStatus() {
+    const el = document.getElementById('checkpoint-status');
+    el.classList.add('d-none');
+}
+
+async function loadCheckpoints() {
+    try {
+        const raw = (typeof API !== 'undefined') ? await API.get('/api/checkpoints/') : await (await fetch('/api/checkpoints/')).json();
+        const checkpoints = Array.isArray(raw) ? raw : (raw.results || []);
+        renderCheckpointTable(checkpoints);
+    } catch (e) {
+        console.error('Checkpoint load failed:', e);
+        document.getElementById('checkpoint-table-body').innerHTML =
+            '<tr><td colspan="4" class="text-danger text-center py-3">Unable to load checkpoints.</td></tr>';
+    }
+}
+
+function renderCheckpointTable(checkpoints) {
+    const tbody = document.getElementById('checkpoint-table-body');
+    if (!checkpoints.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted text-center py-3">No checkpoints configured.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = checkpoints.map(ch => `
+        <tr>
+            <td>${ch.name}</td>
+            <td>${parseFloat(ch.latitude).toFixed(6)}, ${parseFloat(ch.longitude).toFixed(6)}</td>
+            <td>${ch.is_active ? 'Active' : 'Inactive'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="editCheckpoint(${ch.id})">Edit</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteCheckpoint(${ch.id})">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function saveCheckpoint() {
+    if (window._savingCheckpoint) return;
+
+    const name = document.getElementById('checkpoint_name').value.trim();
+    const description = document.getElementById('checkpoint_description').value.trim();
+    const lat = parseFloat(document.getElementById('checkpoint_lat').value);
+    const lng = parseFloat(document.getElementById('checkpoint_lng').value);
+    const btn = document.getElementById('checkpoint-save-btn');
+
+    if (!name) {
+        showCheckpointStatus('Please enter a checkpoint name.', 'danger');
+        return;
+    }
+    if (isNaN(lat) || isNaN(lng)) {
+        showCheckpointStatus('Please select a valid checkpoint location.', 'danger');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+    window._savingCheckpoint = true;
+
+    const payload = {
+        name,
+        description,
+        latitude: lat,
+        longitude: lng,
+        is_active: true,
+    };
+
+    const url = editingCheckpointId ? `/api/checkpoints/${editingCheckpointId}/` : '/api/checkpoints/';
+    const method = editingCheckpointId ? 'PATCH' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.detail || 'Unable to save checkpoint');
+        }
+
+        const checkpoint = await res.json();
+        if (checkpoint.deduped) {
+            showCheckpointStatus(`Checkpoint already exists — using existing checkpoint (ID ${checkpoint.existing_checkpoint_id}).`, 'info');
+            editingCheckpointId = checkpoint.existing_checkpoint_id;
+        } else {
+            showCheckpointStatus(`Checkpoint ${editingCheckpointId ? 'updated' : 'created'} successfully.`);
+            editingCheckpointId = checkpoint.id;
+        }
+        loadCheckpoints();
+    } catch (e) {
+        showCheckpointStatus(e.message || 'Failed to save checkpoint.', 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Save Checkpoint';
+        window._savingCheckpoint = false;
+    }
+}
+
+async function editCheckpoint(id) {
+    try {
+        const checkpoint = (typeof API !== 'undefined') ? await API.get(`/api/checkpoints/${id}/`) : await (await fetch(`/api/checkpoints/${id}/`)).json();
+        editingCheckpointId = checkpoint.id;
+        document.getElementById('checkpoint_name').value = checkpoint.name;
+        document.getElementById('checkpoint_description').value = checkpoint.description || '';
+        if (!checkpointMap) initCheckpointMap();
+        moveCheckpointMarker(parseFloat(checkpoint.latitude), parseFloat(checkpoint.longitude));
+        showCheckpointStatus(`Editing checkpoint ${checkpoint.name}.`);
+    } catch (e) {
+        showCheckpointStatus(e.message || 'Unable to edit checkpoint.', 'danger');
+    }
+}
+
+async function deleteCheckpoint(id) {
+    if (!confirm('Delete this checkpoint?')) return;
+
+    try {
+        const res = await fetch(`/api/checkpoints/${id}/`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+            },
+        });
+        if (!res.ok) throw new Error('Delete failed');
+        showCheckpointStatus('Checkpoint deleted.', 'success');
+        if (editingCheckpointId === id) resetCheckpointForm();
+        loadCheckpoints();
+    } catch (e) {
+        showCheckpointStatus(e.message || 'Failed to delete checkpoint.', 'danger');
+    }
+}
+
+function useCheckpointGPS() {
+    if (!navigator.geolocation) {
+        showCheckpointStatus('GPS not available in your browser.', 'danger');
+        return;
+    }
+    showCheckpointStatus('Getting GPS location...', 'success');
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            moveCheckpointMarker(pos.coords.latitude, pos.coords.longitude);
+            showCheckpointStatus('GPS location captured. Adjust marker if needed and save.');
+        },
+        () => showCheckpointStatus('Could not get GPS location. Allow location access and try again.', 'danger'),
+        { timeout: 8000 }
+    );
 }
 
 // ── Database Backup / Restore ──────────────────────────────────────────────

@@ -281,10 +281,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const requests = JSON.parse(rawData);
 
     const map = L.map('map').setView([28.2096, 83.9856], 13);
+    // expose the map globally so the shared refreshCheckpoints helper can find it
+    window.map = map;
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
+
+    // Load admin-created checkpoints (if any) onto the public map
+    if (typeof window.refreshCheckpoints === 'function') {
+        try { window.refreshCheckpoints(); } catch (e) { console.warn('refreshCheckpoints error', e); }
+    }
 
     const statusColors = {
         'pending': '#ffc107',

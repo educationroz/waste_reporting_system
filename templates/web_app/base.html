@@ -415,6 +415,16 @@ function showToast(message, type = 'success') {
                 const badge = document.getElementById('notif-badge');
                 badge.classList.remove('d-none');
                 badge.textContent = (parseInt(badge.textContent || '0') + 1).toString();
+
+                // If this notification is about a checkpoint, and the current
+                // page has defined a refresh function for its map, call it —
+                // this is what makes checkpoints appear live on every open
+                // map (admin, driver, user) without a manual page reload.
+                if (data.title && data.title.toLowerCase().includes('checkpoint')) {
+                    if (typeof window.refreshCheckpoints === 'function') {
+                        window.refreshCheckpoints();
+                    }
+                }
             }
         };
         notifSocket.onerror = () => {};
@@ -529,7 +539,48 @@ function showToast(message, type = 'success') {
         }
     });
 
-    window.addEventListener('beforeunload', function() {
+    // Global helper: fetch admin-created checkpoints and render them on any
+    // Leaflet map present on the page. Exposed as `window.refreshCheckpoints`
+    // so other pages (and the WebSocket notification handler) can call it.
+    window.refreshCheckpoints = async function() {
+        try {
+            const res = await fetch('/api/checkpoints/');
+            if (!res.ok) return;
+            const data = await res.json();
+            const list = Array.isArray(data) ? data : (data.results || []);
+            const checkpoints = list.filter(ch => ch.is_active);
+
+            // Prefer common map globals used across templates (map, driverMap)
+            const targetMap = window.map || window.driverMap || window.checkpointMap || null;
+            if (!targetMap || typeof L === 'undefined') return;
+
+            if (!window._checkpointLayer) {
+                window._checkpointLayer = L.layerGroup().addTo(targetMap);
+            }
+            window._checkpointLayer.clearLayers();
+
+            checkpoints.forEach(ch => {
+                const lat = parseFloat(ch.latitude);
+                const lng = parseFloat(ch.longitude);
+                if (isNaN(lat) || isNaN(lng)) return;
+                const marker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        className: 'checkpoint-icon',
+                        html: '<i class="bi bi-flag-fill text-danger fs-4"></i>',
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 24],
+                    }),
+                }).bindPopup(`<strong>${ch.name}</strong><br>${ch.description || 'Designated checkpoint'}`);
+
+                marker.addTo(window._checkpointLayer);
+            });
+        } catch (e) {
+            console.warn('refreshCheckpoints failed', e);
+        }
+    };
+
+    // Close WebSocket on page unload
++    window.addEventListener('beforeunload', function() {
         if (window._notifSocket) window._notifSocket.close();
     });
 </script>

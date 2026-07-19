@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AdminLogViewSet,
     BinViewSet,
+    CheckpointViewSet,
     ComplaintViewSet,
     DatabaseBackupViewSet,
     DriverViewSet,
@@ -20,6 +21,7 @@ router.register('vehicles',       VehicleViewSet,      basename='vehicle')
 router.register('drivers',        DriverViewSet,       basename='driver')
 router.register('bins',           BinViewSet,          basename='bin')
 router.register('waste-requests', WasteRequestViewSet, basename='waste-request')
+router.register('checkpoints',     CheckpointViewSet,   basename='checkpoint')
 router.register('routes',         RouteViewSet,        basename='route')
 router.register('schedules',      ScheduleViewSet,     basename='schedule')
 router.register('notifications',  NotificationViewSet, basename='notification')
