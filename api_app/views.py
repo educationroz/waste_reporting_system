@@ -4,7 +4,9 @@ from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
+from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.management import call_command
 from django.db import transaction
 from django.db.models import F, Q
@@ -18,6 +20,7 @@ from rest_framework.decorators import action # type: ignore
 from rest_framework.permissions import AllowAny, IsAuthenticated # type: ignore
 from rest_framework.response import Response # type: ignore
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser # type: ignore
+from rest_framework.views import APIView
 from .models import (
     AdminLog, Bin, Checkpoint, Complaint, Driver, Notification, Route, Schedule,
     SystemSettings, Vehicle, WasteRequest, WasteRequestPhoto,
@@ -36,6 +39,8 @@ from .serializers import (
     WasteRequestSerializer,
     ComplaintSerializer,
 )
+
+User = get_user_model()
 
 try:
     CHANNEL_LAYER = get_channel_layer()
@@ -66,6 +71,219 @@ def _log_admin_action(request, action_type, content_type, obj, description=''):
         ip_address=request.META.get('REMOTE_ADDR'),
         user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
     )
+
+
+def _serialize_admin_user(user):
+    return {
+        'id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'full_name': user.get_full_name(),
+        'is_active': user.is_active,
+        'created_at': user.created_at.isoformat() if user.created_at else None,
+    }
+
+
+class AdminUserCreateView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def post(self, request):
+        username = (request.data.get('username') or '').strip()
+        email = (request.data.get('email') or '').strip()
+        password = request.data.get('password') or ''
+        first_name = (request.data.get('first_name') or '').strip()
+        last_name = (request.data.get('last_name') or '').strip()
+        is_active = request.data.get('is_active', True)
+
+        if not username or not email or not password:
+            return Response(
+                {'success': False, 'message': 'Username, email, and password are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if User.objects.filter(username__iexact=username).exists():
+            return Response(
+                {'success': False, 'message': 'That username is already taken.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if User.objects.filter(email__iexact=email).exists():
+            return Response(
+                {'success': False, 'message': 'That email is already registered.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            validate_password(password)
+        except DjangoValidationError as exc:
+            return Response(
+                {'success': False, 'message': ' '.join(exc.messages)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if isinstance(is_active, str):
+            is_active = is_active.lower() in ('1', 'true', 'yes', 'on')
+
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+            role='admin',
+            is_active=bool(is_active),
+        )
+
+        _log_admin_action(
+            request,
+            'create',
+            'User',
+            user,
+            f'Created admin user {user.username}',
+        )
+
+        return Response(
+            {
+                'success': True,
+                'message': 'Admin user created successfully.',
+                'admin': _serialize_admin_user(user),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AdminUserUpdateView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def patch(self, request, admin_id):
+        try:
+            user = User.objects.get(pk=admin_id, role='admin')
+        except User.DoesNotExist:
+            return Response(
+                {'success': False, 'message': 'Admin user not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        username = (request.data.get('username') or user.username).strip()
+        email = (request.data.get('email') or user.email).strip()
+        first_name = (request.data.get('first_name') or user.first_name).strip()
+        last_name = (request.data.get('last_name') or user.last_name).strip()
+        password = request.data.get('password') or ''
+        is_active = request.data.get('is_active', user.is_active)
+
+        if not username or not email:
+            return Response(
+                {'success': False, 'message': 'Username and email are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if User.objects.exclude(pk=user.pk).filter(username__iexact=username).exists():
+            return Response(
+                {'success': False, 'message': 'That username is already taken.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if User.objects.exclude(pk=user.pk).filter(email__iexact=email).exists():
+            return Response(
+                {'success': False, 'message': 'That email is already registered.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if isinstance(is_active, str):
+            is_active = is_active.lower() in ('1', 'true', 'yes', 'on')
+
+        changes = {}
+        if user.username != username:
+            changes['username'] = {'old': user.username, 'new': username}
+            user.username = username
+        if user.email != email:
+            changes['email'] = {'old': user.email, 'new': email}
+            user.email = email
+        if user.first_name != first_name:
+            changes['first_name'] = {'old': user.first_name, 'new': first_name}
+            user.first_name = first_name
+        if user.last_name != last_name:
+            changes['last_name'] = {'old': user.last_name, 'new': last_name}
+            user.last_name = last_name
+        if user.is_active != bool(is_active):
+            changes['is_active'] = {'old': user.is_active, 'new': bool(is_active)}
+            user.is_active = bool(is_active)
+
+        if password:
+            try:
+                validate_password(password, user=user)
+            except DjangoValidationError as exc:
+                return Response(
+                    {'success': False, 'message': ' '.join(exc.messages)},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            user.set_password(password)
+            changes['password'] = {'old': 'unchanged', 'new': 'updated'}
+
+        user.role = 'admin'
+        user.save()
+
+        if changes:
+            AdminLog.objects.create(
+                admin_user=request.user,
+                action='update',
+                content_type='User',
+                object_id=user.id,
+                object_description=f'Updated admin user {user.username}',
+                changes=changes,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+            )
+
+        return Response(
+            {
+                'success': True,
+                'message': 'Admin user updated successfully.',
+                'admin': _serialize_admin_user(user),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AdminUserDeleteView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def delete(self, request, admin_id):
+        try:
+            user = User.objects.get(pk=admin_id, role='admin')
+        except User.DoesNotExist:
+            return Response(
+                {'success': False, 'message': 'Admin user not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if user.pk == request.user.pk:
+            return Response(
+                {'success': False, 'message': 'You cannot delete your own admin account from this screen.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if User.objects.filter(role='admin').count() <= 1:
+            return Response(
+                {'success': False, 'message': 'At least one admin account must remain active.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        _log_admin_action(
+            request,
+            'delete',
+            'User',
+            user,
+            f'Deleted admin user {user.username}',
+        )
+        user.delete()
+
+        return Response(
+            {'success': True, 'message': 'Admin user removed successfully.'},
+            status=status.HTTP_200_OK,
+        )
 
 
 def _push_ws_notification(notification):

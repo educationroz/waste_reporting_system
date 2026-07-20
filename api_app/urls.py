@@ -2,6 +2,9 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    AdminUserCreateView,
+    AdminUserDeleteView,
+    AdminUserUpdateView,
     AdminLogViewSet,
     BinViewSet,
     CheckpointViewSet,
@@ -31,5 +34,9 @@ router.register('system-settings', SystemSettingsViewSet, basename='system-setti
 router.register('database-backups', DatabaseBackupViewSet, basename='database-backup')
 
 urlpatterns = [
+    path('auth/create-admin/', AdminUserCreateView.as_view(), name='create-admin'),
+    path('auth/admin/<int:admin_id>/update/', AdminUserUpdateView.as_view(), name='update-admin'),
+    path('auth/admin/<int:admin_id>/delete/', AdminUserDeleteView.as_view(), name='delete-admin'),
+
     path('', include(router.urls)),
 ]

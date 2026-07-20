@@ -609,15 +609,17 @@ async function loadMapData() {
 
         boundsPoints.push([lat, lng]);
 
-        const icon = L.divIcon({
-            html: '🚩',
-            className: 'driver-marker-icon',
-            iconSize: [24, 24],
+        const marker = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'checkpoint-marker-icon',
+                html: '<span style="font-size:1.4rem;">🚩</span>',
+                iconSize: [24, 24],
+                iconAnchor: [12, 24],
+            }),
         });
-        const marker = L.marker([lat, lng], { icon });
         marker.bindPopup(`
-            <strong>🚩 Checkpoint: ${cp.name || 'Unnamed'}</strong><br>
-            ${cp.description ? cp.description : ''}
+            <strong>🚩 ${cp.name || 'Checkpoint'}</strong><br>
+            ${cp.description ? cp.description : 'Designated checkpoint'}
             ${cp.status ? `<br><span class="text-muted">${cp.status}</span>` : ''}
         `);
         marker.addTo(checkpointsLayer);
