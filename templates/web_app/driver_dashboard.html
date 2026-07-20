@@ -273,6 +273,7 @@
                     <span class="legend-item"><span class="legend-dot" style="background:#0d6efd;"></span>Assigned</span>
                     <span class="legend-item"><span class="legend-dot" style="background:#0dcaf0;"></span>In Progress</span>
                     <span class="legend-item"><span class="legend-dot" style="background:#198754;"></span>Completed</span>
+                    <span class="legend-item">🚩 Checkpoint (drop-off point)</span>
                     <span class="legend-item">🚛 Your last known location</span>
                     <span class="legend-item"><span style="border-top:3px solid #198754; width:20px; display:inline-block;"></span>Admin-generated route (road path)</span>
                 </div>
@@ -456,7 +457,7 @@ let driverMap = null;
 let driverMarker = null;
 let routeLine = null;
 let requestMarkersLayer = null;
-let checkpointMarkersLayer = null;
+let checkpointsLayer = null;
 let hasFittedBounds = false; // only auto-fit the view once, on first load
 
 function initDriverMap() {
@@ -468,7 +469,7 @@ function initDriverMap() {
     }).addTo(driverMap);
 
     requestMarkersLayer = L.layerGroup().addTo(driverMap);
-    checkpointMarkersLayer = L.layerGroup().addTo(driverMap);
+    checkpointsLayer = L.layerGroup().addTo(driverMap);
 
     if (INITIAL_DRIVER_LAT !== null && INITIAL_DRIVER_LNG !== null) {
         updateDriverMarker(INITIAL_DRIVER_LAT, INITIAL_DRIVER_LNG);
@@ -551,30 +552,6 @@ function centerMap() {
     driverMap.fitBounds(allPoints, { padding: [30, 30], maxZoom: 15 });
 }
 
-function renderDriverCheckpoints(checkpoints) {
-    if (!checkpointMarkersLayer || !Array.isArray(checkpoints)) return;
-
-    checkpoints.forEach(ch => {
-        const lat = parseFloat(ch.latitude);
-        const lng = parseFloat(ch.longitude);
-        if (isNaN(lat) || isNaN(lng)) return;
-
-        const marker = L.marker([lat, lng], {
-            icon: L.divIcon({
-                className: 'driver-checkpoint-icon',
-                html: '<i class="bi bi-flag-fill text-danger fs-4"></i>',
-                iconSize: [24, 24],
-                iconAnchor: [12, 24],
-            }),
-        }).bindPopup(`
-            <strong>${ch.name}</strong><br>
-            ${ch.description || 'Designated checkpoint'}
-        `);
-
-        marker.addTo(checkpointMarkersLayer);
-    });
-}
-
 async function loadMapData() {
     if (!driverMap) return;
 
@@ -586,13 +563,10 @@ async function loadMapData() {
 
     const requests = extractList(requestsData);
     const routes = extractList(routesData);
-    const checkpoints = extractList(checkpointsData).filter(ch => ch.is_active);
-
-    checkpointMarkersLayer.clearLayers();
-    renderDriverCheckpoints(checkpoints);
+    const checkpoints = extractList(checkpointsData);
 
     requestMarkersLayer.clearLayers();
-    checkpointMarkersLayer.clearLayers();
+    checkpointsLayer.clearLayers();
     if (routeLine) {
         driverMap.removeLayer(routeLine);
         routeLine = null;
@@ -623,6 +597,30 @@ async function loadMapData() {
             <span class="text-muted">${req.waste_type_display || req.waste_type || ''}</span>
         `);
         marker.addTo(requestMarkersLayer);
+    });
+
+    // Admin-managed checkpoints (designated drop-off points) — always
+    // shown regardless of route/request status, using a distinct flag
+    // icon so they're not confused with pickup pins.
+    checkpoints.forEach(cp => {
+        const lat = parseFloat(cp.latitude);
+        const lng = parseFloat(cp.longitude);
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        boundsPoints.push([lat, lng]);
+
+        const icon = L.divIcon({
+            html: '🚩',
+            className: 'driver-marker-icon',
+            iconSize: [24, 24],
+        });
+        const marker = L.marker([lat, lng], { icon });
+        marker.bindPopup(`
+            <strong>🚩 Checkpoint: ${cp.name || 'Unnamed'}</strong><br>
+            ${cp.description ? cp.description : ''}
+            ${cp.status ? `<br><span class="text-muted">${cp.status}</span>` : ''}
+        `);
+        marker.addTo(checkpointsLayer);
     });
 
     // Find this driver's current route: prefer 'active', then 'planned',
@@ -667,12 +665,6 @@ async function loadMapData() {
 }
 
 document.addEventListener('DOMContentLoaded', initDriverMap);
-
-// Let base.html's WebSocket handler call this whenever an admin adds,
-// edits, or deletes a checkpoint — refreshes this driver's map live.
-// (Reuses loadMapData since checkpoints are already fetched there
-// alongside requests/routes — no separate lightweight fetch needed.)
-window.refreshCheckpoints = loadMapData;
 {% endif %}
 
 // Listen for live route broadcasts pushed by RouteViewSet.generate_optimal()

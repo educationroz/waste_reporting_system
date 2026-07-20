@@ -665,6 +665,16 @@ function initMap(lat, lng) {
 
     checkpointMarkersLayer = L.layerGroup().addTo(map);
 
+    // FIX (race condition): loadCheckpoints() is fired at the same time as
+    // the geolocation request, and usually finishes BEFORE the user responds
+    // to the browser's location permission prompt — meaning
+    // checkpointMarkersLayer was still null when renderCheckpointMarkers()
+    // tried to run, so it silently did nothing. Now that the layer exists,
+    // immediately render whatever's already been fetched (checkpointData
+    // starts as [] and gets replaced once the fetch resolves, at which point
+  // loadCheckpoints() below re-renders again using the now-existing layer).
+    renderCheckpointMarkers(checkpointData);
+
     marker = L.marker([lat, lng], { draggable: true })
         .addTo(map)
         .bindPopup('<b>Garbage location</b><br>Drag to adjust')
@@ -738,6 +748,31 @@ window.addEventListener('load', () => {
     loadCheckpoints();
 });
 
+// DRF list endpoints may or may not be paginated depending on project
+// settings — handle both a bare array and a {results: [...]} shape instead
+// of assuming .filter() always works on whatever comes back.
+function extractCheckpointList(data) {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.results)) return data.results;
+    return [];
+}
+
+// FIX: the original code did `checkpoints.filter(ch => ch.is_active)`,
+// assuming a boolean `is_active` field. Your Portal Settings table shows a
+// "STATUS" column with the text "Active", which strongly suggests the real
+// field is a string `status` (e.g. 'active' / 'inactive'), not a boolean —
+// meaning `ch.is_active` was always undefined and every checkpoint got
+// filtered out silently, before the map ever got a chance to draw them.
+// This checks whichever field is actually present, and defaults to
+// "include it" if neither field exists at all (fail-open rather than
+// fail-closed, so a checkpoint isn't invisible just because of a field
+// mismatch).
+function isCheckpointActive(ch) {
+    if (typeof ch.is_active === 'boolean') return ch.is_active;
+    if (typeof ch.status === 'string') return ch.status.toLowerCase() === 'active';
+    return true;
+}
+
 async function loadCheckpoints() {
     const select = document.getElementById('checkpoint-select');
     if (!select) return;
@@ -745,14 +780,20 @@ async function loadCheckpoints() {
     try {
         const res = await fetch('/api/checkpoints/');
         if (!res.ok) throw new Error('Failed to load checkpoints');
-        const checkpoints = await res.json();
-        checkpointData = checkpoints.filter(ch => ch.is_active);
+        const data = await res.json();
+        const checkpoints = extractCheckpointList(data);
+        checkpointData = checkpoints.filter(isCheckpointActive);
+
         select.innerHTML = '<option value="">Use custom location on map</option>' +
             checkpointData.map(ch =>
                 `<option value="${ch.id}" data-lat="${ch.latitude}" data-lng="${ch.longitude}">` +
                 `${ch.name} — ${parseFloat(ch.latitude).toFixed(6)}, ${parseFloat(ch.longitude).toFixed(6)}` +
                 `</option>`
             ).join('');
+
+        // Render immediately if the map's already up; if not, initMap()
+        // will render this same checkpointData once it finishes setting up
+        // (see the renderCheckpointMarkers(checkpointData) call added there).
         renderCheckpointMarkers(checkpointData);
     } catch (e) {
         console.warn('Checkpoint load failed:', e);

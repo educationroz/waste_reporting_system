@@ -213,6 +213,19 @@
         background: #fff3cd;
         color: #856404;
     }
+
+    .map-legend-inline {
+        background: white;
+        padding: 8px 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        font-size: 0.85em;
+        display: flex;
+        gap: 1.25rem;
+        flex-wrap: wrap;
+        color: #555;
+    }
 </style>
 {% endblock %}
 
@@ -344,6 +357,13 @@
                         </div>
                     </div>
 
+                    <!-- Checkpoint legend -->
+                    <div class="map-legend-inline">
+                        <span>🚩 Checkpoint (drop-off point)</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#007bff;"></span> Driver start / depot</span>
+                        <span><i class="fas fa-map-marker-alt" style="color:#28a745;"></i> Route stop</span>
+                    </div>
+
                     <!-- Map -->
                     <div id="route-map"></div>
 
@@ -422,28 +442,46 @@
     // ── Map ──────────────────────────────────────────────────────────────────
     function initMap() {
         map = L.map('route-map').setView([28.2096, 83.9856], 13);
-        // ensure global exposure for the shared checkpoint loader
-        window.map = map;
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
             maxZoom: 19
         }).addTo(map);
+
+        checkpointMarkersLayer = L.layerGroup().addTo(map);
     }
 
-    // ── Checkpoints on the route-planning map ────────────────────────────────
+    // ── Checkpoints (admin-managed drop-off points) ──────────────────────────
+    // Same defensive handling as home.html/driver_dashboard.html: the API
+    // may return a bare array or a paginated {results: [...]} shape, and the
+    // "active" flag might be a boolean is_active or a string status field —
+    // check both instead of assuming one, so a field-name mismatch doesn't
+    // silently hide every checkpoint on this map too.
+    function extractCheckpointList(data) {
+        if (Array.isArray(data)) return data;
+        if (data && Array.isArray(data.results)) return data.results;
+        return [];
+    }
+
+    function isCheckpointActive(ch) {
+        if (typeof ch.is_active === 'boolean') return ch.is_active;
+        if (typeof ch.status === 'string') return ch.status.toLowerCase() === 'active';
+        return true;
+    }
+
     async function loadCheckpoints() {
         try {
-            const checkpoints = (typeof API !== 'undefined') ? await API.get('/api/checkpoints/') : await (await fetch('/api/checkpoints/')).json();
-            renderCheckpointMarkers((Array.isArray(checkpoints) ? checkpoints : (checkpoints.results || [])).filter(ch => ch.is_active));
+            const res = await fetch('/api/checkpoints/');
+            if (!res.ok) throw new Error('Failed to load checkpoints');
+            const data = await res.json();
+            const checkpoints = extractCheckpointList(data).filter(isCheckpointActive);
+            renderCheckpointMarkers(checkpoints);
         } catch (e) {
             console.warn('Checkpoint load failed:', e);
         }
     }
 
     function renderCheckpointMarkers(checkpoints) {
-        if (!checkpointMarkersLayer) {
-            checkpointMarkersLayer = L.layerGroup().addTo(map);
-        }
+        if (!checkpointMarkersLayer) return;
         checkpointMarkersLayer.clearLayers();
 
         checkpoints.forEach(ch => {
@@ -451,21 +489,18 @@
             const lng = parseFloat(ch.longitude);
             if (isNaN(lat) || isNaN(lng)) return;
 
-            L.marker([lat, lng], {
+            const checkpointMarker = L.marker([lat, lng], {
                 icon: L.divIcon({
                     className: 'checkpoint-marker-icon',
-                    html: '<i class="bi bi-flag-fill text-danger fs-4"></i>',
+                    html: '<span style="font-size:1.4rem;">🚩</span>',
                     iconSize: [24, 24],
                     iconAnchor: [12, 24],
                 }),
-            }).bindPopup(`<strong>${ch.name}</strong><br>${ch.description || 'Designated checkpoint'}`)
-              .addTo(checkpointMarkersLayer);
+            }).bindPopup(`<strong>🚩 ${ch.name || 'Checkpoint'}</strong><br>${ch.description || 'Designated checkpoint'}`);
+
+            checkpointMarker.addTo(checkpointMarkersLayer);
         });
     }
-
-    // Let base.html's WebSocket handler call this whenever an admin adds,
-    // edits, or deletes a checkpoint — keeps this page's map in sync live.
-    window.refreshCheckpoints = loadCheckpoints;
 
     // ── Load drivers ─────────────────────────────────────────────────────────
     async function loadDrivers() {
