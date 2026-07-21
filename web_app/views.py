@@ -516,10 +516,10 @@ class AdminLogsView(LoginRequiredMixin, ListView):
         if action_filter:
             qs = qs.filter(action=action_filter)
         
-        # Filter by operator (admin/driver/user) if provided
-        admin_filter = self.request.GET.get('admin')
-        if admin_filter:
-            qs = qs.filter(admin_user_id=admin_filter)
+        # Filter by operator username if provided
+        operator_filter = self.request.GET.get('operator', '').strip()
+        if operator_filter:
+            qs = qs.filter(admin_user__username__icontains=operator_filter)
         
         return qs
 
@@ -528,15 +528,8 @@ class AdminLogsView(LoginRequiredMixin, ListView):
         ctx = super().get_context_data(**kwargs)
         ctx['action_choices'] = AdminLog.ACTION_CHOICES
 
-        # Include all roles now, not just admins, since driver and user
-        # actions are logged too. Grouped by role for the template to
-        # render as <optgroup> sections.
-        ctx['admin_choices'] = User.objects.filter(role='admin').order_by('username')
-        ctx['driver_choices'] = User.objects.filter(role='driver').order_by('username')
-        ctx['user_choices'] = User.objects.filter(role='user').order_by('username')
-
         ctx['current_action'] = self.request.GET.get('action', '')
-        ctx['current_admin'] = self.request.GET.get('admin', '')
+        ctx['current_operator'] = self.request.GET.get('operator', '')
         ctx['total_logs'] = AdminLog.objects.count()
         return ctx
 

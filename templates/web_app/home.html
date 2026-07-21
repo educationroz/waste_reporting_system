@@ -611,6 +611,8 @@
 let map = null;
 let marker = null;
 let checkpointMarkersLayer = null;
+let driverMarkersLayer = null;
+let driverMarkers = new Map();
 let checkpointData = [];
 
 // photoFiles अब array हो — multiple photo राख्न मिल्ने
@@ -664,6 +666,7 @@ function initMap(lat, lng) {
     }).addTo(map);
 
     checkpointMarkersLayer = L.layerGroup().addTo(map);
+    driverMarkersLayer = L.layerGroup().addTo(map);
 
     // FIX (race condition): loadCheckpoints() is fired at the same time as
     // the geolocation request, and usually finishes BEFORE the user responds
@@ -674,6 +677,7 @@ function initMap(lat, lng) {
     // starts as [] and gets replaced once the fetch resolves, at which point
   // loadCheckpoints() below re-renders again using the now-existing layer).
     renderCheckpointMarkers(checkpointData);
+    loadDriverMarkers();
 
     marker = L.marker([lat, lng], { draggable: true })
         .addTo(map)
@@ -839,6 +843,58 @@ function renderCheckpointMarkers(checkpoints) {
 
         checkpointMarker.addTo(checkpointMarkersLayer);
     });
+}
+
+function renderDriverMarkers(drivers) {
+    if (!driverMarkersLayer) return;
+
+    const nextIds = new Set();
+
+    drivers.forEach(driver => {
+        const lat = parseFloat(driver.current_latitude);
+        const lng = parseFloat(driver.current_longitude);
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        nextIds.add(driver.id);
+
+        const name = driver.user?.username || driver.user_detail?.username || `Driver #${driver.id}`;
+        const popupHtml = `<strong>🚛 ${name}</strong><br>Live driver location`;
+        const icon = L.divIcon({
+            className: 'driver-marker-icon',
+            html: '<span style="font-size:1.4rem; line-height:1;">🚛</span>',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+        });
+
+        let driverMarker = driverMarkers.get(driver.id);
+        if (driverMarker) {
+            driverMarker.setLatLng([lat, lng]);
+            driverMarker.setPopupContent(popupHtml);
+        } else {
+            driverMarker = L.marker([lat, lng], { icon })
+                .addTo(driverMarkersLayer)
+                .bindPopup(popupHtml);
+            driverMarkers.set(driver.id, driverMarker);
+        }
+    });
+
+    driverMarkers.forEach((driverMarker, driverId) => {
+        if (!nextIds.has(driverId)) {
+            driverMarkersLayer.removeLayer(driverMarker);
+            driverMarkers.delete(driverId);
+        }
+    });
+}
+
+async function loadDriverMarkers() {
+    try {
+        const data = await API.get('/api/drivers/');
+        if (!data) return;
+        const drivers = Array.isArray(data) ? data : (data.results || []);
+        renderDriverMarkers(drivers);
+    } catch (e) {
+        console.warn('Driver marker load failed:', e);
+    }
 }
 
 
@@ -1402,6 +1458,43 @@ try {
             setTimeout(() => location.reload(), 1500);
         }
     };
+} catch (e) {}
+
+try {
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const token = localStorage.getItem('access_token');
+    if (token) {
+        const driverWS = new WebSocket(`${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`);
+        driverWS.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type !== 'driver_location') return;
+
+            const driverId = data.driver_id;
+            const lat = parseFloat(data.latitude);
+            const lng = parseFloat(data.longitude);
+            if (!driverId || isNaN(lat) || isNaN(lng)) return;
+
+            const name = data.driver_name || `Driver #${driverId}`;
+            const popupHtml = `<strong>🚛 ${name}</strong><br>Live driver location`;
+            const icon = L.divIcon({
+                className: 'driver-marker-icon',
+                html: '<span style="font-size:1.4rem; line-height:1;">🚛</span>',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+            });
+
+            let driverMarker = driverMarkers.get(driverId);
+            if (driverMarker) {
+                driverMarker.setLatLng([lat, lng]);
+                driverMarker.setPopupContent(popupHtml);
+            } else if (driverMarkersLayer) {
+                driverMarker = L.marker([lat, lng], { icon })
+                    .addTo(driverMarkersLayer)
+                    .bindPopup(popupHtml);
+                driverMarkers.set(driverId, driverMarker);
+            }
+        };
+    }
 } catch (e) {}
 {% endif %}
 </script>

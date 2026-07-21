@@ -373,7 +373,16 @@ function showToast(message, type = 'success') {
             }
         }
 
-        return res.json();
+        const text = await res.text();
+        if (!text) {
+            return {};
+        }
+
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            return text;
+        }
     }
 
     async function logout() {

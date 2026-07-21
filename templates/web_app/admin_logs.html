@@ -248,7 +248,7 @@
                 </div>
                 <div class="card-body">
                     <form method="get" class="row g-3" id="log-filter-form">
-                        <div class="col-md-6">
+                        <div class="col-lg-5 col-md-6">
                             <label class="form-label small fw-semibold text-secondary">Filter by Action type</label>
                             <select name="action" class="form-select" onchange="document.getElementById('log-filter-form').submit()">
                                 <option value="">All Actions Categories</option>
@@ -257,32 +257,14 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-secondary">Filter by Security Operator</label>
-                            <select name="admin" class="form-select" onchange="document.getElementById('log-filter-form').submit()">
-                                <option value="">All Operators</option>
-                                {% if admin_choices %}
-                                <optgroup label="Admins">
-                                    {% for admin in admin_choices %}
-                                    <option value="{{ admin.id }}" {% if admin.id|stringformat:"s" == current_admin %}selected{% endif %}>{{ admin.username }}</option>
-                                    {% endfor %}
-                                </optgroup>
-                                {% endif %}
-                                {% if driver_choices %}
-                                <optgroup label="Drivers">
-                                    {% for driver in driver_choices %}
-                                    <option value="{{ driver.id }}" {% if driver.id|stringformat:"s" == current_admin %}selected{% endif %}>{{ driver.username }}</option>
-                                    {% endfor %}
-                                </optgroup>
-                                {% endif %}
-                                {% if user_choices %}
-                                <optgroup label="Users">
-                                    {% for u in user_choices %}
-                                    <option value="{{ u.id }}" {% if u.id|stringformat:"s" == current_admin %}selected{% endif %}>{{ u.username }}</option>
-                                    {% endfor %}
-                                </optgroup>
-                                {% endif %}
-                            </select>
+                        <div class="col-lg-7 col-md-6">
+                            <label class="form-label small fw-semibold text-secondary">Search by Security Operator</label>
+                            <div class="input-group">
+                                <input type="search" name="operator" class="form-control"
+                                       placeholder="Type admin, driver, or user name"
+                                       value="{{ current_operator|default:'' }}">
+                                <button class="btn btn-success px-4" type="submit">Search</button>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -397,10 +379,10 @@
                 <ul class="pagination justify-content-center">
                     {% if page_obj.has_previous %}
                         <li class="page-item">
-                            <a class="page-link text-success" href="?page=1{% if current_action %}&action={{ current_action }}{% endif %}{% if current_admin %}&admin={{ current_admin }}{% endif %}">First</a>
+                            <a class="page-link text-success" href="?page=1{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">First</a>
                         </li>
                         <li class="page-item">
-                            <a class="page-link text-success" href="?page={{ page_obj.previous_page_number }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_admin %}&admin={{ current_admin }}{% endif %}">Previous</a>
+                            <a class="page-link text-success" href="?page={{ page_obj.previous_page_number }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">Previous</a>
                         </li>
                     {% endif %}
 
@@ -409,17 +391,17 @@
                             <li class="page-item active"><span class="page-link bg-success border-success text-white">{{ num }}</span></li>
                         {% else %}
                             <li class="page-item">
-                                <a class="page-link text-success" href="?page={{ num }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_admin %}&admin={{ current_admin }}{% endif %}">{{ num }}</a>
+                                <a class="page-link text-success" href="?page={{ num }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">{{ num }}</a>
                             </li>
                         {% endif %}
                     {% endfor %}
 
                     {% if page_obj.has_next %}
                         <li class="page-item">
-                            <a class="page-link text-success" href="?page={{ page_obj.next_page_number }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_admin %}&admin={{ current_admin }}{% endif %}">Next</a>
+                            <a class="page-link text-success" href="?page={{ page_obj.next_page_number }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">Next</a>
                         </li>
                         <li class="page-item">
-                            <a class="page-link text-success" href="?page={{ page_obj.paginator.num_pages }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_admin %}&admin={{ current_admin }}{% endif %}">Last</a>
+                            <a class="page-link text-success" href="?page={{ page_obj.paginator.num_pages }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">Last</a>
                         </li>
                     {% endif %}
                 </ul>

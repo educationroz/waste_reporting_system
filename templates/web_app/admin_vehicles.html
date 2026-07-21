@@ -488,14 +488,9 @@ async function deleteVehicle(vehicleId) {
     if (!confirm('Delete this vehicle? This cannot be undone.')) return;
 
     try {
-        const res = await fetch(`/api/vehicles/${vehicleId}/`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${getToken()}`,
-            },
-        });
+        const data = await API.delete(`/api/vehicles/${vehicleId}/`);
 
-        if (res.ok) {
+        if (data && !data.error && !data.detail) {
             showToast('Vehicle deleted.', 'success');
 
             const row = document.getElementById(`vehicle-row-${vehicleId}`);
@@ -513,12 +508,11 @@ async function deleteVehicle(vehicleId) {
             if (modal) modal.remove();
         } else {
             let errMsg = 'Delete failed.';
-            try {
-                const data = await res.json();
-                errMsg = typeof data === 'object'
-                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
-                    : String(data);
-            } catch (e) { /* body can be empty on a 204 response */ }
+            if (data && typeof data === 'object') {
+                errMsg = data.detail || data.error || Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ');
+            } else if (typeof data === 'string' && data.trim()) {
+                errMsg = data;
+            }
             showToast(errMsg, 'danger');
         }
     } catch (e) {

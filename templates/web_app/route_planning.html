@@ -433,6 +433,8 @@
     let routePolyline = null;
     let selectedRequests = [];
     let checkpointMarkersLayer = null;
+    let driverMarkersLayer = null;
+    let driverMarkers = new Map();
 
     // ── Get token (still used for the raw WebSocket connection below) ───────
     function getToken() {
@@ -448,6 +450,7 @@
         }).addTo(map);
 
         checkpointMarkersLayer = L.layerGroup().addTo(map);
+        driverMarkersLayer = L.layerGroup().addTo(map);
     }
 
     // ── Checkpoints (admin-managed drop-off points) ──────────────────────────
@@ -500,6 +503,58 @@
 
             checkpointMarker.addTo(checkpointMarkersLayer);
         });
+    }
+
+    function renderDriverMarkers(drivers) {
+        if (!driverMarkersLayer) return;
+
+        const nextIds = new Set();
+
+        drivers.forEach(driver => {
+            const lat = parseFloat(driver.current_latitude);
+            const lng = parseFloat(driver.current_longitude);
+            if (isNaN(lat) || isNaN(lng)) return;
+
+            nextIds.add(driver.id);
+
+            const name = driver.user?.username || driver.user_detail?.username || `Driver #${driver.id}`;
+            const popupHtml = `<strong>🚛 ${name}</strong><br>Live driver location`;
+            const icon = L.divIcon({
+                className: 'driver-marker-icon',
+                html: '<span style="font-size:1.4rem; line-height:1;">🚛</span>',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+            });
+
+            let driverMarker = driverMarkers.get(driver.id);
+            if (driverMarker) {
+                driverMarker.setLatLng([lat, lng]);
+                driverMarker.setPopupContent(popupHtml);
+            } else {
+                driverMarker = L.marker([lat, lng], { icon })
+                    .addTo(driverMarkersLayer)
+                    .bindPopup(popupHtml);
+                driverMarkers.set(driver.id, driverMarker);
+            }
+        });
+
+        driverMarkers.forEach((driverMarker, driverId) => {
+            if (!nextIds.has(driverId)) {
+                driverMarkersLayer.removeLayer(driverMarker);
+                driverMarkers.delete(driverId);
+            }
+        });
+    }
+
+    async function loadDriverMarkers() {
+        try {
+            const data = await API.get('/api/drivers/');
+            if (!data) return;
+            const drivers = Array.isArray(data) ? data : (data.results || []);
+            renderDriverMarkers(drivers);
+        } catch (e) {
+            console.warn('Driver marker load failed:', e);
+        }
     }
 
     // ── Load drivers ─────────────────────────────────────────────────────────
@@ -761,7 +816,30 @@
                 });
             }
             if (data.type === 'driver_location') {
-                console.log('Driver location update:', data);
+                const driverId = data.driver_id;
+                const lat = parseFloat(data.latitude);
+                const lng = parseFloat(data.longitude);
+                if (isNaN(lat) || isNaN(lng) || !driverId) return;
+
+                const name = data.driver_name || `Driver #${driverId}`;
+                const popupHtml = `<strong>🚛 ${name}</strong><br>Live driver location`;
+                const icon = L.divIcon({
+                    className: 'driver-marker-icon',
+                    html: '<span style="font-size:1.4rem; line-height:1;">🚛</span>',
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                });
+
+                let driverMarker = driverMarkers.get(driverId);
+                if (driverMarker) {
+                    driverMarker.setLatLng([lat, lng]);
+                    driverMarker.setPopupContent(popupHtml);
+                } else if (driverMarkersLayer) {
+                    driverMarker = L.marker([lat, lng], { icon })
+                        .addTo(driverMarkersLayer)
+                        .bindPopup(popupHtml);
+                    driverMarkers.set(driverId, driverMarker);
+                }
             }
         };
         ws.onerror = () => {};
@@ -773,6 +851,7 @@
         initMap();
         loadDrivers();
         loadCheckpoints();
+        loadDriverMarkers();
         document.getElementById('plannedDate').valueAsDate = new Date();
         connectRouteWebSocket();
     });
