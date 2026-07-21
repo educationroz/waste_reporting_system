@@ -271,7 +271,7 @@
                 <div class="card-body p-3">
                     <form method="get" class="row g-3" id="requests-filter-form">
 
-                        <div class="col-md-7 col-sm-12">
+                        <div class="col-lg-6 col-md-12">
                             <label class="form-label small fw-semibold text-secondary mb-1">Search Requests</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-white border-end-0 text-muted">
@@ -284,7 +284,7 @@
                             </div>
                         </div>
 
-                        <div class="col-md-5 col-sm-12">
+                        <div class="col-lg-3 col-md-6 col-sm-12">
                             <label class="form-label small fw-semibold text-secondary mb-1">Filter Pipeline Lifecycle</label>
                             <select name="status" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').submit()">
                                 <option value="">All Lifecycles / Statuses</option>
@@ -294,7 +294,23 @@
                             </select>
                         </div>
 
-                        {% if current_status or current_search %}
+                        <div class="col-lg-3 col-md-6 col-sm-12">
+                            <label class="form-label small fw-semibold text-secondary mb-1">Filter Waste Type</label>
+                            <select name="waste_type" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').submit()">
+                                <option value="">All Waste Types</option>
+                                {% for key, label in waste_type_choices %}
+                                <option value="{{ key }}" {% if current_waste_type == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-lg-3 col-md-6 col-sm-12">
+                            <label class="form-label small fw-semibold text-secondary mb-1">Filter Report Date</label>
+                            <input type="date" name="report_date" class="form-control" value="{{ current_report_date|default:'' }}"
+                                   style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').submit()">
+                        </div>
+
+                        {% if current_status or current_search or current_waste_type or current_report_date %}
                         <div class="col-12 mt-2 text-end">
                             <a href="{% url 'admin-requests' %}" class="btn btn-sm btn-outline-secondary px-3">
                                 <i class="bi bi-x-circle me-1"></i>Clear All Active Filters

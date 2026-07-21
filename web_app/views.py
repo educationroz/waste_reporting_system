@@ -255,6 +255,7 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
 
 
 from django.db.models import Q
+from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect
@@ -281,19 +282,31 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
                                    .order_by('-created_at')
 
         status_filter = self.request.GET.get('status')
+        waste_type_filter = self.request.GET.get('waste_type')
         search_query = self.request.GET.get('search', '').strip()
+        report_date = parse_date(self.request.GET.get('report_date', '').strip())
 
         if status_filter:
             qs = qs.filter(status=status_filter)
 
+        if waste_type_filter:
+            qs = qs.filter(waste_type=waste_type_filter)
+
         if search_query:
-            filters = Q(user__username__icontains=search_query) | \
-                      Q(pickup_address__icontains=search_query)
+            filters = Q(user__username__iexact=search_query) | \
+                      Q(pickup_address__iexact=search_query) | \
+                      Q(waste_type__iexact=search_query)
 
             if search_query.isdigit():
                 filters |= Q(id=int(search_query))
 
             qs = qs.filter(filters)
+
+        if report_date:
+            qs = qs.filter(
+                Q(created_at__date=report_date) |
+                Q(scheduled_date__date=report_date)
+            )
 
         return qs
 
@@ -301,8 +314,11 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         ctx = super().get_context_data(**kwargs)
         ctx['drivers'] = Driver.objects.filter(is_available=True).select_related('user')
         ctx['status_choices'] = WasteRequest.STATUS_CHOICES
+        ctx['waste_type_choices'] = WasteRequest.WASTE_TYPE_CHOICES
         ctx['current_status'] = self.request.GET.get('status', '')
         ctx['current_search'] = self.request.GET.get('search', '')
+        ctx['current_waste_type'] = self.request.GET.get('waste_type', '')
+        ctx['current_report_date'] = self.request.GET.get('report_date', '')
         return ctx
 
 class AdminDriverListView(LoginRequiredMixin, ListView):
