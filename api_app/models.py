@@ -150,6 +150,11 @@ class WasteRequest(models.Model):
         blank=True,
         related_name='waste_requests',
     )
+    submitting_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name='shared_waste_requests',
+    )
     driver = models.ForeignKey(
         Driver, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='assigned_requests',

@@ -86,6 +86,53 @@ def _serialize_admin_user(user):
     }
 
 
+def _normalize_request_address(pickup_address):
+    return ' '.join((pickup_address or '').split()).strip()
+
+
+def _waste_request_location_filter(pickup_address=None, latitude=None, longitude=None):
+    location_filter = Q()
+
+    if latitude is not None and longitude is not None:
+        lat = Decimal(str(latitude))
+        lng = Decimal(str(longitude))
+        # Roughly 11 meters at the equator. This keeps nearby reports at the
+        # same physical location grouped together even if the map marker or
+        # geocoder shifts slightly.
+        tolerance = Decimal('0.0001')
+        location_filter |= Q(
+            latitude__gte=lat - tolerance,
+            latitude__lte=lat + tolerance,
+            longitude__gte=lng - tolerance,
+            longitude__lte=lng + tolerance,
+        )
+    else:
+        normalized_address = _normalize_request_address(pickup_address)
+        if normalized_address:
+            location_filter |= Q(pickup_address__iexact=normalized_address)
+
+    return location_filter
+
+
+def _related_waste_requests_for_location(pickup_address=None, latitude=None, longitude=None):
+    location_filter = _waste_request_location_filter(
+        pickup_address=pickup_address,
+        latitude=latitude,
+        longitude=longitude,
+    )
+    if not location_filter.children:
+        return WasteRequest.objects.none()
+
+    return (
+        WasteRequest.objects.filter(is_deleted=False)
+        .exclude(status='cancelled')
+        .filter(location_filter)
+        .select_related('user')
+        .prefetch_related('submitting_users')
+        .order_by('-created_at')
+    )
+
+
 class AdminUserCreateView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
@@ -806,6 +853,14 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             qs = qs.filter(status=status_filter)
         return qs.order_by('-created_at')
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        response_data = dict(serializer.data)
+        headers = self.get_success_headers(serializer.data)
+        return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
+
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         waste_request = serializer.save(user=user)
@@ -849,24 +904,53 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         except Driver.DoesNotExist:
             return Response({'error': 'Driver not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        waste_request.driver = driver
-        waste_request.status = 'assigned'
-        waste_request.save(update_fields=['driver', 'status'])
+        related_requests = list(
+            _related_waste_requests_for_location(
+                pickup_address=waste_request.pickup_address,
+                latitude=waste_request.latitude,
+                longitude=waste_request.longitude,
+            ).filter(status__in=['pending', 'assigned', 'in_progress'])
+        )
+        if waste_request not in related_requests:
+            related_requests.append(waste_request)
+
+        related_ids = [item.id for item in related_requests]
+        WasteRequest.objects.filter(id__in=related_ids).update(driver=driver, status='assigned')
+        waste_request.refresh_from_db()
 
         _log_admin_action(
             request, 'assign', 'WasteRequest', waste_request,
             f'Assigned driver {driver.user.username} to request #{waste_request.id}'
         )
 
-        # Notify user (guest/anonymous requests won't have a user to notify)
-        if waste_request.user_id:
-            _create_notification(
-                user=waste_request.user,
-                title='Driver Assigned',
-                message=f'Driver {driver.user.username} has been assigned to your request.',
-                notification_type='info',
-                related_request=waste_request,
-            )
+        notified_user_ids = set()
+        for related_request in related_requests:
+            if related_request.user_id and related_request.user_id not in notified_user_ids:
+                notified_user_ids.add(related_request.user_id)
+                _create_notification(
+                    user=related_request.user,
+                    title='Driver Assigned',
+                    message=(
+                        f'Driver {driver.user.username} has been assigned to your '
+                        f'waste report #{related_request.id}.'
+                    ),
+                    notification_type='info',
+                    related_request=related_request,
+                )
+            for linked_user in related_request.submitting_users.all():
+                if linked_user.id in notified_user_ids:
+                    continue
+                notified_user_ids.add(linked_user.id)
+                _create_notification(
+                    user=linked_user,
+                    title='Driver Assigned',
+                    message=(
+                        f'Driver {driver.user.username} has been assigned to your '
+                        f'waste report #{related_request.id}.'
+                    ),
+                    notification_type='info',
+                    related_request=related_request,
+                )
 
         # Also notify the driver themselves — this is what makes the
         # toast/badge show up on their dashboard when admin hands them a
@@ -913,8 +997,10 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
         waste_request.status = new_status
         update_fields = ['status']
+        completion_timestamp = None
         if new_status == 'completed':
-            waste_request.completed_at = timezone.now()
+            completion_timestamp = timezone.now()
+            waste_request.completed_at = completion_timestamp
             update_fields.append('completed_at')
 
         # Owner le aफnै request cancel garyo bhane, seedhai Recycle Bin ma pani
@@ -926,6 +1012,49 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             update_fields += ['is_deleted', 'deleted_at']
 
         waste_request.save(update_fields=update_fields)
+
+        if new_status == 'completed':
+            related_requests = list(
+                _related_waste_requests_for_location(
+                    pickup_address=waste_request.pickup_address,
+                    latitude=waste_request.latitude,
+                    longitude=waste_request.longitude,
+                )
+            )
+            if waste_request not in related_requests:
+                related_requests.append(waste_request)
+
+            related_ids = [
+                item.id for item in related_requests
+                if item.id != waste_request.id and item.status != 'completed'
+            ]
+            if related_ids and completion_timestamp is not None:
+                WasteRequest.objects.filter(id__in=related_ids).update(
+                    status='completed',
+                    completed_at=completion_timestamp,
+                )
+
+            notified_user_ids = set()
+            for related_request in related_requests:
+                target_users = []
+                if related_request.user_id:
+                    target_users.append(related_request.user)
+                target_users.extend(list(related_request.submitting_users.all()))
+
+                for target_user in target_users:
+                    if target_user.id in notified_user_ids:
+                        continue
+                    notified_user_ids.add(target_user.id)
+                    _create_notification(
+                        user=target_user,
+                        title='Report Completed',
+                        message=(
+                            f'Your waste report #{related_request.id} has been completed and '
+                            f'is now closed.'
+                        ),
+                        notification_type='success',
+                        related_request=related_request,
+                    )
 
         # Bump the driver's lifetime trip counter the FIRST time a request
         # becomes 'completed' (guarded by old_status != 'completed' so

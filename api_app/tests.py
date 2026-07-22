@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from .views import _create_notification
-from .models import Notification
+from .models import Notification, WasteRequest
 
 User = get_user_model()
 
@@ -121,3 +121,113 @@ class NotificationDedupeTest(TestCase):
         self.assertEqual(qs.count(), 1)
         self.assertIsNotNone(n1)
         self.assertIsNone(n2)
+
+
+class WasteRequestLocationGroupingTest(TestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_user(
+            username='requestadmin',
+            password='StrongPass123!',
+            role='admin',
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.user_one = User.objects.create_user(
+            username='reporter1',
+            password='StrongPass123!',
+            role='user',
+        )
+        self.user_two = User.objects.create_user(
+            username='reporter2',
+            password='StrongPass123!',
+            role='user',
+        )
+        self.client = APIClient()
+
+    def _payload(self):
+        return {
+            'waste_type': 'general',
+            'pickup_address': 'Same Location Road 1',
+            'scheduled_date': '2026-07-23T10:00:00Z',
+            'description': 'Test pickup',
+            'latitude': '28.209600',
+            'longitude': '83.985600',
+        }
+
+    def test_same_location_requests_are_registered_and_completed_together(self):
+        self.client.force_authenticate(user=self.user_one)
+        first_response = self.client.post('/api/waste-requests/', self._payload(), format='json')
+        self.assertEqual(first_response.status_code, 201, first_response.content)
+
+        self.client.force_authenticate(user=self.user_two)
+        second_response = self.client.post('/api/waste-requests/', self._payload(), format='json')
+        self.assertEqual(second_response.status_code, 201, second_response.content)
+        self.assertEqual(WasteRequest.objects.count(), 2)
+
+        request_obj = WasteRequest.objects.order_by('id').first()
+        self.assertIsNotNone(request_obj)
+
+        self.client.force_authenticate(user=self.admin_user)
+        complete_response = self.client.patch(
+            f'/api/waste-requests/{request_obj.id}/update_status/',
+            {'status': 'completed'},
+            format='json',
+        )
+        self.assertEqual(complete_response.status_code, 200, complete_response.content)
+
+        request_obj.refresh_from_db()
+        self.assertEqual(request_obj.status, 'completed')
+        self.assertIsNotNone(request_obj.completed_at)
+
+        sibling_request = WasteRequest.objects.exclude(id=request_obj.id).get()
+        sibling_request.refresh_from_db()
+        self.assertEqual(sibling_request.status, 'completed')
+        self.assertIsNotNone(sibling_request.completed_at)
+
+        notifications = Notification.objects.filter(title='Report Completed')
+        self.assertEqual(notifications.count(), 2)
+        self.assertSetEqual(set(notifications.values_list('user_id', flat=True)), {self.user_one.id, self.user_two.id})
+
+    def test_assign_driver_applies_to_same_location_siblings(self):
+        driver_user = User.objects.create_user(
+            username='route-driver',
+            password='StrongPass123!',
+            role='driver',
+        )
+        driver = driver_user.driver_profile
+
+        first_request = WasteRequest.objects.create(
+            user=self.user_one,
+            waste_type='general',
+            status='pending',
+            description='Test pickup',
+            pickup_address='Same Location Road 2',
+            latitude='28.209600',
+            longitude='83.985600',
+            scheduled_date='2026-07-23T10:00:00Z',
+        )
+        second_request = WasteRequest.objects.create(
+            user=self.user_two,
+            waste_type='general',
+            status='pending',
+            description='Test pickup',
+            pickup_address='Same Location Road 2 nearby',
+            latitude='28.209628',
+            longitude='83.985598',
+            scheduled_date='2026-07-23T11:00:00Z',
+        )
+
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.patch(
+            f'/api/waste-requests/{first_request.id}/assign_driver/',
+            {'driver_id': driver.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+
+        first_request.refresh_from_db()
+        second_request.refresh_from_db()
+        self.assertEqual(first_request.status, 'assigned')
+        self.assertEqual(second_request.status, 'assigned')
+        self.assertEqual(first_request.driver_id, driver.id)
+        self.assertEqual(second_request.driver_id, driver.id)

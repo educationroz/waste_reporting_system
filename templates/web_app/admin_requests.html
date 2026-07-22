@@ -403,20 +403,26 @@
                                         {% if req.driver %}
                                             <div class="text-dark"><i class="bi bi-person me-1 text-success"></i>{{ req.driver.user.username }}</div>
                                         {% else %}
-                                            <span class="text-muted small italic"><i class="bi bi-exclamation-circle me-1"></i>Unassigned</span>
+                                            <div class="d-flex flex-column gap-1 align-items-start">
+                                                <span class="text-muted small italic"><i class="bi bi-exclamation-circle me-1"></i>Unassigned</span>
+                                                {% if req.status != 'completed' and req.status != 'cancelled' %}
+                                                <button class="btn btn-sm btn-outline-success py-1 px-2" style="font-size: 0.75rem;" onclick="openAssignModal({{ req.id }})">
+                                                    <i class="bi bi-person-plus me-1"></i>Assign Driver
+                                                </button>
+                                                {% endif %}
+                                            </div>
                                         {% endif %}
                                     </td>
                                     <td class="text-end pe-4">
                                         <div class="d-inline-flex gap-2">
                                             {% if req.status == 'pending' %}
-                                            <button class="btn btn-sm btn-outline-success py-1 px-3" style="font-size: 0.82rem;" onclick="openAssignModal({{ req.id }})">
-                                                <i class="bi bi-person-plus me-1"></i>Assign Driver
-                                            </button>
                                             <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="cancelRequest({{ req.id }})">
                                                 <i class="bi bi-slash-circle me-1"></i>Cancel
                                             </button>
                                             {% else %}
+                                            {% if req.status == 'completed' or req.status == 'cancelled' %}
                                             <span class="text-muted small italic px-2">Lifecycle Locked</span>
+                                            {% endif %}
                                             {% endif %}
                                         </div>
                                     </td>
