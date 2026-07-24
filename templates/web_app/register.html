@@ -55,7 +55,7 @@
                 </div>
             </div>
 
-            <button class="btn btn-success w-100" onclick="doRegister()">
+            <button class="btn btn-success w-100" id="reg-btn" onclick="doRegister()">
                 <span id="reg-text">Create Account</span>
                 <span id="reg-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
             </button>
@@ -83,11 +83,14 @@
 </style>
 
 <script>
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 async function doRegister() {
     const errDiv = document.getElementById('error-alert');
     const sucDiv = document.getElementById('success-alert');
     const spinner = document.getElementById('reg-spinner');
     const text = document.getElementById('reg-text');
+    const btn = document.getElementById('reg-btn');
     errDiv.classList.add('d-none');
     sucDiv.classList.add('d-none');
 
@@ -106,6 +109,12 @@ async function doRegister() {
         return;
     }
 
+    if (!emailRegex.test(payload.email)) {
+        errDiv.textContent = 'Please enter a valid email address.';
+        errDiv.classList.remove('d-none');
+        return;
+    }
+
     spinner.classList.remove('d-none');
     text.textContent = 'Creating...';
 
@@ -118,31 +127,14 @@ async function doRegister() {
         const data = await res.json();
 
         if (res.ok) {
-            localStorage.setItem('access_token', data.access);
-            localStorage.setItem('refresh_token', data.refresh);
-            sucDiv.textContent = 'Account created! Redirecting...';
+            // No tokens are issued at this point — the account is inactive
+            // until the user clicks the verification link emailed to them.
+            sucDiv.textContent = data.message || 'Account created! Please check your email to verify your account before logging in.';
             sucDiv.classList.remove('d-none');
+            btn.disabled = true;
+            text.textContent = 'Check your email';
 
-            // Create Django session so LoginRequiredMixin works
-            await fetch('/auth/session-login/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken'),
-                },
-                body: JSON.stringify({
-                    username: payload.username,
-                    password: payload.password,
-                }),
-            });
-
-            const role = data.user?.role || 'user';
-            const redirectMap = {
-                admin: '/admin-dashboard/',
-                driver: '/driver-dashboard/',
-                user: '/',
-            };
-            setTimeout(() => window.location.href = redirectMap[role] || '/', 1000);
+            setTimeout(() => window.location.href = "{% url 'login' %}", 3000);
         } else {
             const msgs = Object.entries(data).map(([k,v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('<br>');
             errDiv.innerHTML = msgs || 'Registration failed.';
@@ -153,7 +145,9 @@ async function doRegister() {
         errDiv.classList.remove('d-none');
     } finally {
         spinner.classList.add('d-none');
-        text.textContent = 'Create Account';
+        if (!btn.disabled) {
+            text.textContent = 'Create Account';
+        }
     }
 }
 

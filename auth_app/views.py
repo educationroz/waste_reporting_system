@@ -1,4 +1,8 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -15,8 +19,31 @@ from .serializers import (
     UserSerializer,
 )
 from django.contrib.auth import authenticate
+from .tokens import email_verification_token
 
 User = get_user_model()
+
+
+def send_verification_email(user, request):
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = email_verification_token.make_token(user)
+    verify_path = f'/auth/verify-email/{uid}/{token}/'
+    verify_url = request.build_absolute_uri(verify_path)
+
+    send_mail(
+        subject='Verify your email — Waste Collection',
+        message=(
+            f'Hi {user.username},\n\n'
+            f'Please confirm your email address by clicking the link below:\n'
+            f'{verify_url}\n\n'
+            f'If you did not create this account, you can ignore this email.'
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+
 class SessionLoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -29,6 +56,7 @@ class SessionLoginView(APIView):
             return Response({'message': 'Session created.'})
         return Response({'error': 'Invalid credentials.'}, status=400)
 
+
 @method_decorator(csrf_exempt, name='dispatch')
 class CustomTokenObtainPairView(TokenObtainPairView):
     """Login — returns access + refresh tokens plus user info."""
@@ -37,7 +65,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 class RegisterView(generics.CreateAPIView):
-    """Register a new user. No auth required."""
+    """Register a new user. No auth required. Sends an email verification link."""
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
@@ -47,17 +75,54 @@ class RegisterView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        # Auto-issue tokens on registration
-        refresh = RefreshToken.for_user(user)
+        send_verification_email(user, request)
+
         return Response(
             {
                 'user': UserSerializer(user).data,
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-                'message': 'Account created successfully.',
+                'message': 'Account created. Please check your email to verify your account before logging in.',
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class VerifyEmailView(APIView):
+    """Confirms a user's email from the link sent at registration."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, uidb64, token):
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+
+        if user is not None and email_verification_token.check_token(user, token):
+            user.is_verified = True
+            user.is_active = True
+            user.save()
+            return Response({'message': 'Email verified successfully. You can now log in.'})
+
+        return Response({'error': 'This verification link is invalid or has expired.'}, status=400)
+
+
+class ResendVerificationEmailView(APIView):
+    """Re-sends the verification email for an unverified account."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            # Don't reveal whether the email exists.
+            return Response({'message': 'If that account exists and is unverified, an email has been sent.'})
+
+        if user.is_verified:
+            return Response({'message': 'This account is already verified.'})
+
+        send_verification_email(user, request)
+        return Response({'message': 'If that account exists and is unverified, an email has been sent.'})
 
 
 class LogoutView(APIView):

@@ -218,3 +218,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ─── Login Redirect ───────────────────────────────────────────────────────────
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
+
+# ─── Email (used for account verification links) ──────────────────────────────
+# Dev default: prints emails to the runserver console instead of sending them.
+# In production, set EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+# and the EMAIL_HOST_* / EMAIL_PORT / EMAIL_USE_TLS vars in your .env.
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend',
+)
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@wastesystem.local')

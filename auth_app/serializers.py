@@ -1,7 +1,9 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from email_validator import validate_email, EmailNotValidError
 
 User = get_user_model()
 
@@ -44,6 +46,15 @@ class RegisterSerializer(serializers.ModelSerializer):
             'email': {'required': True},
         }
 
+    def validate_email(self, value):
+        """Reject malformed emails and, outside DEBUG, domains with no valid MX record."""
+        try:
+            emailinfo = validate_email(value, check_deliverability=not settings.DEBUG)
+            value = emailinfo.normalized
+        except EmailNotValidError as e:
+            raise serializers.ValidationError(str(e))
+        return value
+
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({'password': 'Passwords do not match.'})
@@ -56,6 +67,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password')
         user = User(**validated_data)
         user.set_password(password)
+        # Account stays inactive/unverified until the emailed link is clicked.
+        # authenticate() already refuses inactive users, so login/token
+        # endpoints are blocked automatically without any extra checks there.
+        user.is_active = False
+        user.is_verified = False
         user.save()
 
         # Driver profile is auto-created by auth_app.signals.sync_driver_profile
