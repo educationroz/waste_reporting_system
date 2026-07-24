@@ -1381,41 +1381,36 @@ class ScheduleViewSet(viewsets.ModelViewSet):
 class NotificationViewSet(viewsets.ModelViewSet):
     """
     User notifications.
-    Users see only their own. Admins see all.
+    Users see only their own — including admins. Broadcast notifications
+    (e.g. new checkpoint) already create one row PER active user via
+    _notify_all_users(), and admins are part of that loop too, so admin's
+    own row is enough without also pulling everyone else's on top of it.
     """
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
     http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
-        user = self.request.user
-        qs = Notification.objects.select_related(
+        return Notification.objects.select_related(
             'user',
             'related_request',
             'related_request__user',
             'related_request__driver',
             'related_request__driver__user',
             'related_request__driver__vehicle',
-        )
-        if user.role == 'admin':
-            return qs
-        return qs.filter(user=user)
+        ).filter(user=self.request.user)
 
     @action(detail=False, methods=['patch'])
     def mark_all_read(self, request):
-        qs = Notification.objects.filter(is_read=False)
-        if request.user.role != 'admin':
-            qs = qs.filter(user=request.user)
+        qs = Notification.objects.filter(is_read=False, user=request.user)
         qs.update(is_read=True)
         return Response({'message': 'All notifications marked as read.'})
 
     @action(detail=False, methods=['get'])
     def unread(self, request):
         qs = self.get_queryset().filter(is_read=False)
-        # get_queryset() le admin ko lagi sabai notifications return garcha — correct chha
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
-
 
 class AdminLogViewSet(viewsets.ReadOnlyModelViewSet):
     """
