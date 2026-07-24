@@ -142,6 +142,11 @@ class WasteRequest(models.Model):
         ('bulky', 'Bulky Item'),
         ('hazardous', 'Hazardous'),
     ]
+    SEVERITY_CHOICES = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+    ]
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -184,6 +189,21 @@ class WasteRequest(models.Model):
         validators=[MinValueValidator(-90), MaxValueValidator(90)])
     photo_longitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True,
         validators=[MinValueValidator(-180), MaxValueValidator(180)])
+
+    # ── ML Gatekeeper Classification (auto-filled on photo upload) ──────
+    severity = models.CharField(
+        max_length=10, choices=SEVERITY_CHOICES, blank=True, null=True,
+        help_text='Auto-detected waste severity from the gatekeeper ML model.'
+    )
+    ml_confidence = models.FloatField(
+        blank=True, null=True,
+        help_text='ML model confidence percentage (0-100) for the severity prediction.'
+    )
+    needs_manual_review = models.BooleanField(
+        default=False,
+        help_text='True if ML confidence was below the review threshold — admin should verify manually.'
+    )
+
     scheduled_date = models.DateTimeField(db_index=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)

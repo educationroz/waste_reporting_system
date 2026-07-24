@@ -157,6 +157,15 @@
         padding: 1rem;
         font-size: 0.88rem;
     }
+
+    /* ==========================================
+       4. ML SEVERITY BADGE
+       ========================================== */
+    .severity-badge {
+        font-size: 0.72rem;
+        padding: 0.32rem 0.65rem;
+        white-space: nowrap;
+    }
 </style>
 {% endblock %}
 
@@ -400,7 +409,7 @@
                                 <table class="table table-hover mb-0 align-middle">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>ID</th><th>Client</th><th>Waste Context</th><th>Status Check</th><th>Assigned Driver</th><th>Date</th><th>Action Control</th>
+                                            <th>ID</th><th>Client</th><th>Waste Context</th><th>AI Severity</th><th>Status Check</th><th>Assigned Driver</th><th>Date</th><th>Action Control</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -417,6 +426,20 @@
                                                     {{ req.get_waste_type_display }}
                                                 </span>
                                             </td>
+                                            {# ===== AI SEVERITY CELL — ML gatekeeper model prediction ===== #}
+                                            <td>
+                                                {% if req.severity %}
+                                                    <span class="badge severity-badge rounded-pill
+                                                        {% if req.severity == 'high' %}bg-danger text-white
+                                                        {% elif req.severity == 'medium' %}bg-warning text-dark
+                                                        {% else %}bg-primary text-white{% endif %}">
+                                                        {{ req.get_severity_display }}
+                                                    </span>
+                                                {% else %}
+                                                    <span class="text-muted small">—</span>
+                                                {% endif %}
+                                            </td>
+                                            {# ===== END AI SEVERITY CELL ===== #}
                                             <td>
                                                 <span class="badge px-2 py-1
                                                     {% if req.status == 'completed' %}bg-success
@@ -450,7 +473,7 @@
                                             </td>
                                         </tr>
                                         {% empty %}
-                                        <tr><td colspan="7" class="text-center text-muted py-4">No requests reported in this pipeline node yet.</td></tr>
+                                        <tr><td colspan="8" class="text-center text-muted py-4">No requests reported in this pipeline node yet.</td></tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>

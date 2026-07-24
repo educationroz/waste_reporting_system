@@ -72,6 +72,7 @@ class WasteRequestSerializer(serializers.ModelSerializer):
     )
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     waste_type_display = serializers.CharField(source='get_waste_type_display', read_only=True)
+    severity_display = serializers.CharField(source='get_severity_display', read_only=True)
     route_id = serializers.SerializerMethodField()
     route_status = serializers.SerializerMethodField()
     # Extra photos beyond the primary 'photo' field — populated in the view's
@@ -89,11 +90,15 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             'latitude', 'longitude',
             'photo', 'photo_latitude', 'photo_longitude',
             'extra_photos',
+            'severity', 'severity_display', 'ml_confidence', 'needs_manual_review',
             'scheduled_date', 'completed_at',
             'notes', 'created_at', 'updated_at',
             'route_id', 'route_status',
         )
-        read_only_fields = ('user', 'completed_at', 'created_at', 'updated_at')
+        read_only_fields = (
+            'user', 'completed_at', 'created_at', 'updated_at',
+            'severity', 'ml_confidence', 'needs_manual_review',
+        )
 
     def get_route_id(self, obj):
         route = obj.routes.order_by('-created_at').first()
@@ -104,32 +109,54 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         return route.get_status_display() if route else None
 
     def validate_photo(self, file):
-        """Validate photo file size (max 5MB)."""
+        """Validate photo file size (max 5MB) AND run it through the ML gatekeeper."""
         MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
         if file and file.size > MAX_FILE_SIZE:
             raise serializers.ValidationError(
                 f"File too large. Maximum size is 5MB, but got {file.size / (1024*1024):.2f}MB"
             )
+
+        if file:
+            from ml_models.waste_classifier.inference import predict_waste
+            result = predict_waste(file)
+            file.seek(0)  # PIL le padhepachi pointer reset — natra Django save fail huन्छ
+
+            if not result['is_waste']:
+                raise serializers.ValidationError(
+                    f"This doesn't look like waste "
+                    f"Please upload a valid waste photo."
+                )
+
+            # Stash the ML result so validate() can attach it to validated_data below
+            self._ml_result = result
+
         return file
 
     def validate(self, data):
-        """Validate latitude/longitude are within valid ranges."""
+        """Validate latitude/longitude are within valid ranges, and attach ML result."""
         if 'latitude' in data and data['latitude'] is not None:
             if not (-90 <= data['latitude'] <= 90):
                 raise serializers.ValidationError({'latitude': 'Latitude must be between -90 and 90'})
-        
+
         if 'longitude' in data and data['longitude'] is not None:
             if not (-180 <= data['longitude'] <= 180):
                 raise serializers.ValidationError({'longitude': 'Longitude must be between -180 and 180'})
-        
+
         if 'photo_latitude' in data and data['photo_latitude'] is not None:
             if not (-90 <= data['photo_latitude'] <= 90):
                 raise serializers.ValidationError({'photo_latitude': 'Latitude must be between -90 and 90'})
-        
+
         if 'photo_longitude' in data and data['photo_longitude'] is not None:
             if not (-180 <= data['photo_longitude'] <= 180):
                 raise serializers.ValidationError({'photo_longitude': 'Longitude must be between -180 and 180'})
-        
+
+        # Attach ML gatekeeper result (set in validate_photo above) so it gets saved
+        ml_result = getattr(self, '_ml_result', None)
+        if ml_result:
+            data['severity'] = ml_result['severity']
+            data['ml_confidence'] = ml_result['confidence']
+            data['needs_manual_review'] = ml_result['needs_manual_review']
+
         return data
 
     # def create(self, validated_data):
