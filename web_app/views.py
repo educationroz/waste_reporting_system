@@ -463,14 +463,14 @@ class NotificationsView(LoginRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        user = self.request.user
-        if user.role == 'admin':
-            return Notification.objects.order_by('-created_at')  # ← admins see all
         return Notification.objects.filter(
-            user=user
+            user=self.request.user
+        ).select_related(
+            'related_request',
+            'related_request__user',
+            'related_request__driver',
+            'related_request__driver__user',
         ).order_by('-created_at')
-
-
 # ─── Admin Management Views ────────────────────────────────────────────────────
 
 class AdminUsersManagementView(LoginRequiredMixin, ListView):
