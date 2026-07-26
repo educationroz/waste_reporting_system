@@ -354,6 +354,7 @@
                                     <th>Scheduled Timeline</th>
                                     <th>Assigned Logistics Crew</th>
                                     <th class="text-end pe-4">Pipeline Action Dispatch</th>
+                                    <th> Action Control </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -440,6 +441,7 @@
                                             {% else %}bg-primary bg-opacity-10 text-primary{% endif %}">
                                             {{ req.get_status_display }}
                                         </span>
+                                        <span class="d-block text-muted small" style="font-size: 0.68rem;">{{ req.created_at|date:"d M Y, H:i" }}</span>
                                     </td>
                                     <td class="font-monospace text-secondary fw-semibold">{{ req.scheduled_date|date:"d M Y" }}</td>
                                     <td class="fw-medium">
@@ -469,9 +471,19 @@
                                             {% endif %}
                                         </div>
                                     </td>
+                                    <td>
+                                        {% if req.status == 'completed' or req.status == 'cancelled' or req.status == 'assigned' or req.status == 'in_progress' %}
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }})">
+                                            <i class="bi bi-trash3"></i> Delete
+                                        </button>
+                                        {% else %}
+                                        —
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 {% empty %}
                                 <tr><td colspan="10" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>
+                                
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -558,6 +570,21 @@ async function cancelRequest(requestId) {
         setTimeout(() => location.reload(), 800);
     } else {
         showToast('Failed to drop request pipeline node state.', 'danger');
+    }
+}
+
+async function deleteRequest(requestId) {
+    if (!confirm("Are you sure you want to delete this request?")) return;
+
+    try {
+        const response = await API.delete(`/api/waste-requests/${requestId}/`);
+
+        showToast("Request deleted successfully.", "success");
+        setTimeout(() => location.reload(), 800);
+
+    } catch (err) {
+        console.error(err);
+        showToast("Delete failed.", "danger");
     }
 }
 

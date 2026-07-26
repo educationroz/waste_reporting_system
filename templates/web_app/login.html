@@ -128,25 +128,33 @@ async function doLogin() {
         console.log('Login response:', data);
 
         if (res.ok) {
-            localStorage.setItem('access_token', data.access);
-            localStorage.setItem('refresh_token', data.refresh);
+        localStorage.setItem('access_token', data.access);
+        localStorage.setItem('refresh_token', data.refresh);
 
-            // ← यो line थप्नुहोस्
+        const role = data.user?.role || '';
+
+        // User मात्रले guest request claim गर्ने
+        if (role === 'user') {
             await claimGuestRequests(data.access);
-    
-            // Django session login
-            await fetch('/auth/session-login/', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken'),
-                },
-                body: JSON.stringify({ username, password }),
-            });
+        }
 
-            const role = data.user?.role || '';
-            const redirectMap = { admin: '/admin-dashboard/', driver: '/driver-dashboard/', user: '/' };
-            window.location.href = redirectMap[role] || '/dashboard/';
+        await fetch('/auth/session-login/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ username, password }),
+        });
+
+        const redirectMap = {
+            admin: '/admin-dashboard/',
+            driver: '/driver-dashboard/',
+            user: '/',
+        };
+
+        window.location.href = redirectMap[role] || '/dashboard/';
+
         } else {
             errDiv.textContent = data.detail || JSON.stringify(data);
             errDiv.classList.remove('d-none');
