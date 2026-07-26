@@ -158,6 +158,30 @@ class RegisterPageView(TemplateView):
         return super().dispatch(request, *args, **kwargs)
 
 
+class ForgotPasswordPageView(TemplateView):
+    """Renders the forgot-password page (collects email). Actual request
+    handled via REST API + JS, POSTing to auth_app's /auth/password-reset/."""
+    template_name = 'web_app/forgot_password.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+
+class ResetPasswordPageView(TemplateView):
+    """Renders the reset-password page reached from the emailed link
+    (/reset-password/<uidb64>/<token>/). The page's JS reads uidb64/token
+    from the URL itself and POSTs them, along with the new password, to
+    auth_app's /auth/password-reset-confirm/."""
+    template_name = 'web_app/reset_password.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
+
 
 # ─── Admin Dashboard ───────────────────────────────────────────────────────────
 

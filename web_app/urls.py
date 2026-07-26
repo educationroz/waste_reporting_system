@@ -11,10 +11,12 @@ from .views import (
     AdminLogsView,
     AdminSettingsView,
     DriverDashboardView,
+    ForgotPasswordPageView,
     HomeView,
     LoginPageView,
     NotificationsView,
     RegisterPageView,
+    ResetPasswordPageView,
     RoutePlanningView,
     UserRecycleBinView,
     UserRequestListView,
@@ -30,6 +32,12 @@ urlpatterns = [
     path('login/',    LoginPageView.as_view(),    name='login'),
     path('logout/',   web_logout,                 name='web-logout'),
     path('register/', RegisterPageView.as_view(), name='register'),
+
+    # Password reset (pages only — the actual reset logic lives in
+    # auth_app's /auth/password-reset/ and /auth/password-reset-confirm/
+    # JSON endpoints, which these pages call via fetch())
+    path('forgot-password/', ForgotPasswordPageView.as_view(), name='forgot-password'),
+    path('reset-password/<str:uidb64>/<str:token>/', ResetPasswordPageView.as_view(), name='reset-password'),
 
     # User
     path('my-requests/',       UserRequestListView.as_view(), name='user-requests'),

@@ -4,6 +4,8 @@ from .views import (
     ChangePasswordView,
     CustomTokenObtainPairView,
     LogoutView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
     ProfileView,
     RegisterView,
     ResendVerificationEmailView,
@@ -22,4 +24,6 @@ urlpatterns = [
     path('session-login/',  SessionLoginView.as_view(), name='session-login'),
     path('verify-email/<str:uidb64>/<str:token>/', VerifyEmailView.as_view(), name='verify-email'),
     path('resend-verification/', ResendVerificationEmailView.as_view(), name='resend-verification'),
+    path('password-reset/', PasswordResetRequestView.as_view(), name='password-reset-request'),
+    path('password-reset-confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
 ]

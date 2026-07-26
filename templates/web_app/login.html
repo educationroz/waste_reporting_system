@@ -33,7 +33,11 @@
                 <span id="login-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
             </button>
 
-            <p class="text-center mt-3 mb-0 small">
+            <p class="text-center mt-3 mb-0">
+                <a href="{% url 'forgot-password' %}" class="small text-decoration-none" style="color:#6fcf97;">Forgot password?</a>
+            </p>
+
+            <p class="text-center mt-2 mb-0 small">
                 Don't have an account? <a href="{% url 'register' %}" class="text-success">Register</a>
             </p>
         </div>
