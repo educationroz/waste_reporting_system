@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
+from django.http import HttpResponse
+from django.shortcuts import redirect
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from rest_framework import generics, status
@@ -87,7 +89,16 @@ class RegisterView(generics.CreateAPIView):
 
 
 class VerifyEmailView(APIView):
-    """Confirms a user's email from the link sent at registration."""
+    """
+    Confirms a user's email from the link sent at registration.
+    On success: activates the account, creates BOTH a Django session
+    (for session-authenticated views/websockets) AND JWT tokens (because
+    the frontend's API.get()/patch()/etc and the notifications websocket
+    read the access token from localStorage, same as the normal login flow
+    in login.html). A tiny bounce page stores the tokens client-side, then
+    redirects by role — mirroring login.html's redirectMap — so the user
+    lands fully authenticated with no re-login required.
+    """
     permission_classes = [AllowAny]
 
     def get(self, request, uidb64, token):
@@ -101,9 +112,63 @@ class VerifyEmailView(APIView):
             user.is_verified = True
             user.is_active = True
             user.save()
-            return Response({'message': 'Email verified successfully. You can now log in.'})
 
-        return Response({'error': 'This verification link is invalid or has expired.'}, status=400)
+            # Session login (websockets / session-authenticated endpoints)
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+
+            # JWT tokens (frontend's localStorage-based API auth)
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            refresh_token_str = str(refresh)
+
+            redirect_map = {
+                'admin': '/admin-dashboard/',
+                'driver': '/driver-dashboard/',
+                'user': '/',
+            }
+            target_path = redirect_map.get(user.role, '/')
+
+            html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head><title>Verifying your account...</title></head>
+            <body style="font-family: sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0;">
+                <p>Verifying your account, please wait...</p>
+                <script>
+                    localStorage.setItem('access_token', '{access_token}');
+                    localStorage.setItem('refresh_token', '{refresh_token_str}');
+
+                    (async function() {{
+                        const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
+                        if (tokens.length) {{
+                            try {{
+                                const res = await fetch('/api/waste-requests/claim_guest_requests/', {{
+                                    method: 'POST',
+                                    headers: {{
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer {access_token}`,
+                                    }},
+                                    body: JSON.stringify({{ guest_tokens: tokens }}),
+                                }});
+                                if (res.ok) {{
+                                    const data = await res.json();
+                                    if (data.claimed > 0) {{
+                                        localStorage.removeItem('guest_claim_tokens');
+                                    }}
+                                }}
+                            }} catch (e) {{}}
+                        }}
+                        window.location.href = '{target_path}';
+                    }})();
+                </script>
+            </body>
+            </html>
+            """
+            return HttpResponse(html)
+
+        # Invalid/expired link — send them to login with an error flag so
+        # the frontend can show a message instead of a raw JSON error.
+        return redirect('/login/?verify_error=1')
 
 
 class ResendVerificationEmailView(APIView):

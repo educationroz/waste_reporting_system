@@ -91,6 +91,7 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             'photo', 'photo_latitude', 'photo_longitude',
             'extra_photos',
             'severity', 'severity_display', 'ml_confidence', 'needs_manual_review',
+            'guest_token',  # for guest submissions that can later be claimed
             'scheduled_date', 'completed_at',
             'notes', 'created_at', 'updated_at',
             'route_id', 'route_status',

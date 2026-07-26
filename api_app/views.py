@@ -892,6 +892,39 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 f'{user.username} submitted pickup request #{waste_request.id}{photo_note}'
             )
 
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def claim_guest_requests(self, request):
+        """
+        POST /api/waste-requests/claim_guest_requests/
+        Body: { "guest_tokens": ["abc123", "def456", ...] }
+        """
+        guest_tokens = request.data.get('guest_tokens', [])
+        if not isinstance(guest_tokens, list) or not guest_tokens:
+            return Response({'claimed': 0})
+
+        qs = WasteRequest.objects.filter(
+            guest_token__in=guest_tokens,
+            user__isnull=True,
+        )
+        claimed_ids = list(qs.values_list('id', flat=True))
+        qs.update(user=request.user)
+
+        if claimed_ids:
+            _log_admin_action(
+                request, 'update', 'WasteRequest', None,
+                f'{request.user.username} claimed {len(claimed_ids)} guest '
+                f'submission(s): {claimed_ids}'
+            )
+            for req_id in claimed_ids:
+                _create_notification(
+                    user=request.user,
+                    title='Request Linked to Your Account',
+                    message=f'Your previously submitted report #{req_id} is now linked to your account.',
+                    notification_type='success',
+                )
+
+        return Response({'claimed': len(claimed_ids), 'request_ids': claimed_ids})
+
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def assign_driver(self, request, pk=None):
         """PATCH /api/waste-requests/{id}/assign_driver/ — admin assigns driver."""

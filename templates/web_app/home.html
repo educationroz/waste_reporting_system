@@ -1205,6 +1205,24 @@ async function getOptionalToken() {
     }
 }
 
+// ── Guest token helper ──────────────────────────────────────────────
+function getOrCreateGuestToken() {
+    let token = localStorage.getItem('current_guest_token');
+    if (!token) {
+        token = crypto.randomUUID();
+        localStorage.setItem('current_guest_token', token);
+    }
+    return token;
+}
+
+function savePendingClaimToken(token) {
+    const list = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
+    if (!list.includes(token)) {
+        list.push(token);
+        localStorage.setItem('guest_claim_tokens', JSON.stringify(list));
+    }
+}
+
 // ── Submit Request ───────────────────────────────────────────────────────────
 async function submitRequest() {
     const address  = document.getElementById('pickup-address').value.trim();
@@ -1240,6 +1258,11 @@ async function submitRequest() {
         formData.append('dropoff_checkpoint_id', checkpointId);
     }
 
+    let currentGuestToken = null;
+    if (!localStorage.getItem('access_token')) {
+        currentGuestToken = getOrCreateGuestToken();
+        formData.append('guest_token', currentGuestToken);
+    }
     // ── नोट: backend को WasteRequest model मा अहिले एउटै 'photo' field छ,
     // त्यसैले पहिलो फोटो मात्र त्यसमा पठाइन्छ। धेरै फोटो save गर्नु छ भने
     // backend मा separate photo model (ForeignKey) चाहिन्छ। ──
@@ -1278,6 +1301,11 @@ async function submitRequest() {
 
         if (res.ok) {
             showToast('Request submitted successfully!', 'success');
+            if (currentGuestToken) {
+                savePendingClaimToken(currentGuestToken);
+                localStorage.removeItem('current_guest_token');
+                //showToast('Tip: Login or register to track this request and get notifications!', 'info');
+            }
             document.getElementById('pickup-address').value = '';
             document.getElementById('scheduled-date').value = '';
             document.getElementById('description').value = '';

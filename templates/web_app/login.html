@@ -69,7 +69,29 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+async function claimGuestRequests(accessToken) {
+    const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
+    if (!tokens.length) return;
 
+    try {
+        const res = await fetch('/api/waste-requests/claim_guest_requests/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({ guest_tokens: tokens }),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.claimed > 0) {
+                localStorage.removeItem('guest_claim_tokens');
+            }
+        }
+    } catch (e) {
+        console.warn('Guest claim failed', e);
+    }
+}
 async function doLogin() {
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
@@ -104,6 +126,9 @@ async function doLogin() {
         if (res.ok) {
             localStorage.setItem('access_token', data.access);
             localStorage.setItem('refresh_token', data.refresh);
+
+            // ← यो line थप्नुहोस्
+            await claimGuestRequests(data.access);
     
             // Django session login
             await fetch('/auth/session-login/', {

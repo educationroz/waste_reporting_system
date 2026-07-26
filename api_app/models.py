@@ -190,6 +190,14 @@ class WasteRequest(models.Model):
     photo_longitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True,
         validators=[MinValueValidator(-180), MaxValueValidator(180)])
 
+    # ── Guest submission claiming ──────────────────────────────────
+    guest_token = models.CharField(
+        max_length=64, blank=True, null=True, db_index=True,
+        help_text='Random token set client-side when a guest (not logged in) '
+                   'submits a request, so it can later be claimed/linked to '
+                   'their account once they register or log in.'
+    )
+
     # ── ML Gatekeeper Classification (auto-filled on photo upload) ──────
     severity = models.CharField(
         max_length=10, choices=SEVERITY_CHOICES, blank=True, null=True,
