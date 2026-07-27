@@ -220,6 +220,23 @@ class WasteRequest(models.Model):
     photo_longitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True,
         validators=[MinValueValidator(-180), MaxValueValidator(180)])
 
+
+    # ── Completion GPS verification ──────────────────────────────────
+    # Driver ले "Completed" mark गर्ने बेला उनको वास्तविक GPS यहाँ save हुन्छ।
+    # Pickup location बाट टाढा भए completion_flagged=True हुन्छ — admin ले
+    # यही flag हेरेर driver लाई कारवाही/warning गर्न सक्छ।
+    completion_latitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True,
+        validators=[MinValueValidator(-90), MaxValueValidator(90)],
+        help_text="Driver's GPS location captured when marking this request completed.")
+    completion_longitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True,
+        validators=[MinValueValidator(-180), MaxValueValidator(180)])
+    completion_distance_meters = models.FloatField(
+        null=True, blank=True,
+        help_text="Distance (meters) between driver's completion GPS and the reported pickup location.")
+    completion_flagged = models.BooleanField(
+        default=False, db_index=True,
+        help_text="True if driver completed >500m away from pickup location — needs admin review.")
+
     # ── Guest submission claiming ──────────────────────────────────
     guest_token = models.CharField(
         max_length=64, blank=True, null=True, db_index=True,

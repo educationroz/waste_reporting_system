@@ -464,6 +464,12 @@ class DriverDashboardView(LoginRequiredMixin, TemplateView):
         ).count()
         ctx['current_month_label'] = now.strftime('%B %Y')
 
+        ctx['completed_history'] = (
+            WasteRequest.objects.filter(driver=driver, status='completed')
+            .select_related('user')
+            .order_by('-completed_at')[:25]
+        )
+
         ctx['today_schedule'] = Schedule.objects.filter(
             driver=driver, is_active=True
         )

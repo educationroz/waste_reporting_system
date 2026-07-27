@@ -105,6 +105,8 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             'latitude', 'longitude',
             'photo', 'photo_latitude', 'photo_longitude',
             'extra_photos',
+            'completion_latitude', 'completion_longitude',
+            'completion_distance_meters', 'completion_flagged',
             'severity', 'severity_display', 'ml_confidence', 'needs_manual_review',
             'guest_token',  # for guest submissions that can later be claimed
             'scheduled_date', 'completed_at',
@@ -114,6 +116,8 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         read_only_fields = (
             'user', 'completed_at', 'created_at', 'updated_at',
             'severity', 'ml_confidence', 'needs_manual_review',
+            'completion_latitude', 'completion_longitude',
+            'completion_distance_meters', 'completion_flagged',
         )
 
     def get_route_id(self, obj):

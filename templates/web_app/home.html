@@ -321,6 +321,9 @@
                                 <i class="bi bi-geo-alt me-1"></i>
                                 Lat: <span id="display-lat">detecting...</span> &nbsp;
                                 Lng: <span id="display-lng">detecting...</span>
+                                <span id="location-lock-note" class="text-success fw-semibold d-none ms-2">
+                                    <i class="bi bi-lock-fill"></i> Locked to photo GPS
+                                </span>
                             </div>
                         </div>
 
@@ -622,6 +625,11 @@ let photoFiles = [];
 // पहिलो फोटोको GPS — reference location, बाँकी सबै फोटो यसैसँग compare हुन्छन्
 let firstPhotoGPS = null;
 
+// पहिलो GPS-भएको फोटो थपिएपछि pin लाई त्यसैमा lock गर्ने — drag/click दुबै
+// disable हुन्छ, ताकि फोटोको real GPS भन्दा फरक ठाउँमा pin सार्न नमिलोस्।
+// फोटो हटाएपछि (वा कहिल्यै GPS नआएको भए) unlock हुन्छ।
+let locationLockedByPhoto = false;
+
 // यो थ्रेसहोल्ड भन्दा टाढाको फोटो भए "फरक ठाउँ" मानेर reject गर्ने
 const SAME_LOCATION_THRESHOLD_METERS = 150;
 
@@ -650,10 +658,24 @@ function distanceInMeters(lat1, lng1, lat2, lng2) {
 }
 
 // ── Map ──────────────────────────────────────────────────────────────────────
+function updateLocationLockUI() {
+    const note = document.getElementById('location-lock-note');
+    if (!note) return;
+    note.classList.toggle('d-none', !locationLockedByPhoto);
+}
+
 function initMap(lat, lng) {
     if (map) {
         marker.setLatLng([lat, lng]);
         map.setView([lat, lng], 16);
+        if (locationLockedByPhoto) {
+            marker.dragging.disable();
+            marker.setPopupContent('<b>Garbage location</b><br>Locked to photo GPS — remove photo to change');
+        } else {
+            marker.dragging.enable();
+            marker.setPopupContent('<b>Garbage location</b><br>Drag to adjust');
+        }
+        updateLocationLockUI();
         updateCoords(lat, lng);
         return;
     }
@@ -679,9 +701,11 @@ function initMap(lat, lng) {
     renderCheckpointMarkers(checkpointData);
     loadDriverMarkers();
 
-    marker = L.marker([lat, lng], { draggable: true })
+    marker = L.marker([lat, lng], { draggable: !locationLockedByPhoto })
         .addTo(map)
-        .bindPopup('<b>Garbage location</b><br>Drag to adjust')
+        .bindPopup(locationLockedByPhoto
+            ? '<b>Garbage location</b><br>Locked to photo GPS — remove photo to change'
+            : '<b>Garbage location</b><br>Drag to adjust')
         .openPopup();
 
     marker.on('dragend', function () {
@@ -690,10 +714,15 @@ function initMap(lat, lng) {
     });
 
     map.on('click', function (e) {
+        if (locationLockedByPhoto) {
+            showToast('Location is locked to the photo\'s GPS. Remove the photo to set a custom location.', 'warning');
+            return;
+        }
         marker.setLatLng(e.latlng);
         updateCoords(e.latlng.lat, e.latlng.lng);
     });
 
+    updateLocationLockUI();
     updateCoords(lat, lng);
 }
 
@@ -806,6 +835,13 @@ async function loadCheckpoints() {
 
 function onCheckpointSelect(value) {
     if (!value) {
+        return;
+    }
+    if (locationLockedByPhoto) {
+        showToast('Location is locked to the photo\'s GPS. Remove the photo to pick a checkpoint instead.', 'warning');
+        // Selection revert garne — pin lock bhaisakeko bela checkpoint choose
+        // gareko dropdown value le confuse nagaros.
+        document.getElementById('checkpoint-select').value = '';
         return;
     }
     const select = document.getElementById('checkpoint-select');
@@ -1040,11 +1076,14 @@ async function handlePhotoUpload(input) {
 // पहिलो फोटो भए reference बनाउने, पछिका फोटो भए same-location check गर्ने।
 function addGarbagePhoto(file, gps) {
     if (photoFiles.length === 0) {
-        // पहिलो फोटो — यसैको GPS लाई reference बनाउने
+        // पहिलो फोटो — यसैको GPS लाई reference बनाउने, ra pin lock गर्ने
         photoFiles.push({ file, gps: gps || null });
         firstPhotoGPS = gps || null;
         renderPhotoThumbnails();
-        if (gps) initMap(gps.lat, gps.lng);
+        if (gps) {
+            locationLockedByPhoto = true;
+            initMap(gps.lat, gps.lng);
+        }
         return;
     }
 
@@ -1084,11 +1123,14 @@ async function addGarbagePhotoWithExif(file) {
     }
 
     if (photoFiles.length === 0) {
-        // पहिलो फोटो — reference set गर्ने
+        // पहिलो फोटो — reference set गर्ने, ra GPS भए pin lock गर्ने
         photoFiles.push({ file, gps });
         firstPhotoGPS = gps;
         renderPhotoThumbnails();
-        if (gps) initMap(gps.lat, gps.lng);
+        if (gps) {
+            locationLockedByPhoto = true;
+            initMap(gps.lat, gps.lng);
+        }
         return;
     }
 
@@ -1155,7 +1197,8 @@ function renderPhotoThumbnails() {
     }
 }
 
-// एउटा फोटो हटाउने — पहिलो फोटो (index 0) हटायो भने reference पनि reset गर्ने
+// एउटा फोटो हटाउने — पहिलो फोटो (index 0) हटायो भने reference र location-lock
+// दुबै त्यसअनुसार पुनः-मूल्याङ्कन गर्ने।
 function removeGarbagePhoto(index) {
     photoFiles.splice(index, 1);
 
@@ -1163,6 +1206,20 @@ function removeGarbagePhoto(index) {
         // पहिलो फोटो नै हट्यो — अब बाँकी रहेको (नयाँ) पहिलो फोटोको GPS लाई
         // reference बनाउने, फोटो नै नरहे reference पनि clear गर्ने
         firstPhotoGPS = photoFiles.length > 0 ? photoFiles[0].gps : null;
+
+        if (photoFiles.length > 0 && photoFiles[0].gps) {
+            // नयाँ पहिलो फोटोमा GPS छ — pin लाई त्यहीँ lock गर्ने
+            locationLockedByPhoto = true;
+            initMap(photoFiles[0].gps.lat, photoFiles[0].gps.lng);
+        } else {
+            // फोटो नै छैन, वा बाँकी पहिलो फोटोमा GPS छैन — lock हटाउने
+            locationLockedByPhoto = false;
+            if (marker) {
+                marker.dragging.enable();
+                marker.setPopupContent('<b>Garbage location</b><br>Drag to adjust');
+            }
+            updateLocationLockUI();
+        }
     }
 
     renderPhotoThumbnails();
@@ -1311,6 +1368,7 @@ async function submitRequest() {
             document.getElementById('description').value = '';
             photoFiles = [];
             firstPhotoGPS = null;
+            locationLockedByPhoto = false;
             renderPhotoThumbnails();
             setTimeout(() => location.reload(), 1200);
         } else {
