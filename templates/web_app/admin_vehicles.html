@@ -308,11 +308,19 @@
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label small fw-semibold text-secondary">Vehicle Type</label>
-                                                <select class="form-select" id="edit-type-{{ vehicle.id }}">
+                                                <select class="form-select" id="edit-type-{{ vehicle.id }}" onchange="toggleCustomType('edit', {{ vehicle.id }})">
                                                     {% for key, label in vehicle.TYPE_CHOICES %}
                                                     <option value="{{ key }}" {% if vehicle.vehicle_type == key %}selected{% endif %}>{{ label }}</option>
                                                     {% endfor %}
+                                                    {% for custom_type in custom_vehicle_types %}
+                                                    <option value="{{ custom_type }}" {% if vehicle.vehicle_type == custom_type %}selected{% endif %}>{{ custom_type }}</option>
+                                                    {% endfor %}
+                                                    {% if vehicle.vehicle_type != 'truck' and vehicle.vehicle_type != 'van' and vehicle.vehicle_type != 'compactor' and vehicle.vehicle_type not in custom_vehicle_types %}
+                                                    <option value="{{ vehicle.vehicle_type }}" selected>{{ vehicle.vehicle_type }}</option>
+                                                    {% endif %}
+                                                    <option value="__custom__">+ Add New Type...</option>
                                                 </select>
+                                                <input type="text" class="form-control mt-2 d-none" id="edit-type-custom-{{ vehicle.id }}" placeholder="Enter new vehicle type">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label small fw-semibold text-secondary">Capacity (kg)</label>
@@ -362,11 +370,16 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label small fw-semibold text-secondary">Vehicle Type Classification</label>
-                    <select class="form-select" id="add-type">
+                    <select class="form-select" id="add-type" onchange="toggleCustomType('add')">
                         <option value="truck">Garbage Truck</option>
                         <option value="van">Van</option>
                         <option value="compactor">Compactor</option>
+                        {% for custom_type in custom_vehicle_types %}
+                        <option value="{{ custom_type }}">{{ custom_type }}</option>
+                        {% endfor %}
+                        <option value="__custom__">+ Add New Type...</option>
                     </select>
+                    <input type="text" class="form-control mt-2 d-none" id="add-type-custom" placeholder="Enter new vehicle type">
                 </div>
                 <div class="mb-3">
                     <label class="form-label small fw-semibold text-secondary">Volumetric Capacity (kg)</label>
@@ -394,6 +407,9 @@
 {% block extra_js %}
 <script>
 // ---------- Static display maps (mirror Django's get_..._display) ----------
+// Base/legacy types keep their friendly labels. Any custom type an admin
+// types in is used as both its own value and its own display label, so
+// it always shows back exactly what was typed — no lookup needed.
 const VEHICLE_TYPE_LABELS = {
     truck: 'Garbage Truck',
     van: 'Van',
@@ -413,6 +429,38 @@ const STATUS_BADGE_CLASSES = {
     maintenance: 'bg-warning-subtle text-warning border-warning-subtle',
     inactive: 'bg-secondary-subtle text-secondary border-secondary-subtle',
 };
+
+// ---------- Custom vehicle type toggle ----------
+// `context` is 'add' or 'edit'; `vehicleId` only applies to 'edit' (each
+// edit modal has its own select + text input, scoped by vehicle id).
+function toggleCustomType(context, vehicleId) {
+    const selectId = context === 'add' ? 'add-type' : `edit-type-${vehicleId}`;
+    const customInputId = context === 'add' ? 'add-type-custom' : `edit-type-custom-${vehicleId}`;
+
+    const select = document.getElementById(selectId);
+    const customInput = document.getElementById(customInputId);
+
+    if (select.value === '__custom__') {
+        customInput.classList.remove('d-none');
+        customInput.focus();
+    } else {
+        customInput.classList.add('d-none');
+        customInput.value = '';
+    }
+}
+
+// Resolves the actual vehicle_type string to submit: if "+ Add New Type..."
+// is selected, use the typed custom value instead of the sentinel.
+function resolveVehicleType(context, vehicleId) {
+    const selectId = context === 'add' ? 'add-type' : `edit-type-${vehicleId}`;
+    const customInputId = context === 'add' ? 'add-type-custom' : `edit-type-custom-${vehicleId}`;
+
+    const select = document.getElementById(selectId);
+    if (select.value === '__custom__') {
+        return document.getElementById(customInputId).value.trim();
+    }
+    return select.value;
+}
 
 function getEmptyStateRowHtml() {
     return `
@@ -439,9 +487,16 @@ function checkEmptyState() {
 
 // ---------- UPDATE (edit) — live cell refresh, no reload ----------
 async function updateVehicle(vehicleId) {
+    const vehicleType = resolveVehicleType('edit', vehicleId);
+
+    if (!vehicleType) {
+        showToast('Please enter a vehicle type.', 'warning');
+        return;
+    }
+
     const payload = {
         plate_number: document.getElementById(`edit-plate-${vehicleId}`).value,
-        vehicle_type: document.getElementById(`edit-type-${vehicleId}`).value,
+        vehicle_type: vehicleType,
         capacity_kg: parseFloat(document.getElementById(`edit-capacity-${vehicleId}`).value),
         status: document.getElementById(`edit-status-${vehicleId}`).value,
     };
@@ -522,9 +577,16 @@ async function deleteVehicle(vehicleId) {
 
 // ---------- ADD — insert new row live, no reload ----------
 async function addVehicle() {
+    const vehicleType = resolveVehicleType('add');
+
+    if (!vehicleType) {
+        showToast('Please enter a vehicle type.', 'warning');
+        return;
+    }
+
     const payload = {
         plate_number: document.getElementById('add-plate').value,
-        vehicle_type: document.getElementById('add-type').value,
+        vehicle_type: vehicleType,
         capacity_kg: parseFloat(document.getElementById('add-capacity').value),
         status: document.getElementById('add-status').value,
     };
@@ -590,6 +652,8 @@ async function addVehicle() {
         document.getElementById('add-capacity').value = '';
         document.getElementById('add-type').selectedIndex = 0;
         document.getElementById('add-status').selectedIndex = 0;
+        document.getElementById('add-type-custom').value = '';
+        document.getElementById('add-type-custom').classList.add('d-none');
 
         const modalEl = document.getElementById('addVehicleModal');
         const modal = bootstrap.Modal.getInstance(modalEl);

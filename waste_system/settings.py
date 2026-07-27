@@ -69,6 +69,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'waste_system.wsgi.application'
 ASGI_APPLICATION = 'waste_system.asgi.application'
 
+X_FRAME_OPTIONS = 'SAMEORIGIN'
 # ─── Database ─────────────────────────────────────────────────────────────────
 # Use SQLite for development, PostgreSQL for production
 DB_ENGINE = config('DB_ENGINE', default='sqlite3')  # 'postgresql' or 'sqlite3'

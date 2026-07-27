@@ -138,6 +138,68 @@
         padding: 1rem;
         font-size: 0.88rem;
     }
+
+    /* ==========================================
+       3. DRIVER PROFILE MODAL
+       ========================================== */
+    .profile-avatar-circle {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: #e8f5ec;
+        color: #198754;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.6rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .profile-detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.55rem 0;
+        border-bottom: 1px solid #f1f3f5;
+        font-size: 0.88rem;
+    }
+
+    .profile-detail-row:last-child {
+        border-bottom: none;
+    }
+
+    .profile-detail-label {
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    .profile-detail-value {
+        color: #212529;
+        font-weight: 600;
+        text-align: right;
+    }
+
+    .license-pdf-frame {
+        width: 100%;
+        height: 340px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+    }
+
+    .license-upload-zone {
+        border: 2px dashed #dee2e6;
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+        background: #fafafa;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .license-upload-zone:hover {
+        border-color: #198754;
+        background: #f1f8f5;
+    }
 </style>
 {% endblock %}
 
@@ -254,6 +316,9 @@
                                     <td class="fw-semibold font-monospace">{{ driver.total_trips }}</td>
                                     <td class="text-end pe-4">
                                         <div class="d-inline-flex gap-2">
+                                            <button class="btn btn-sm btn-outline-dark py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#profileModal{{ driver.id }}">
+                                                <i class="bi bi-person-vcard me-1"></i>View Profile
+                                            </button>
                                             <button class="btn btn-sm btn-outline-{% if driver.is_available %}secondary{% else %}success{% endif %} py-1 px-3" style="font-size: 0.82rem;"
                                                 onclick="toggleAvailability({{ driver.id }}, {{ driver.is_available|yesno:'true,false' }})">
                                                 {% if driver.is_available %}<i class="bi bi-dash-circle me-1"></i>Set Busy{% else %}<i class="bi bi-check-circle me-1"></i>Set Available{% endif %}
@@ -268,6 +333,103 @@
                                         </div>
                                     </td>
                                 </tr>
+
+                                <!-- View Profile Modal Context Loop -->
+                                <div class="modal fade" id="profileModal{{ driver.id }}" tabindex="-1">
+                                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                                        <div class="modal-content border-0 shadow">
+                                            <div class="modal-header bg-dark text-white border-bottom-0">
+                                                <h5 class="modal-title fw-bold"><i class="bi bi-person-vcard me-2"></i>Driver Profile</h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body p-4">
+                                                <div class="d-flex align-items-center gap-3 mb-4">
+                                                    <div class="profile-avatar-circle">
+                                                        {{ driver.user.username|slice:":1"|upper }}
+                                                    </div>
+                                                    <div>
+                                                        <div class="fs-5 fw-bold text-dark">{{ driver.user.get_full_name|default:driver.user.username }}</div>
+                                                        <div class="text-muted small">Driver #{{ driver.id }} &middot; Registered {{ driver.created_at|date:"d M Y" }}</div>
+                                                    </div>
+                                                    <span class="badge {% if driver.is_available %}bg-success bg-opacity-10 text-success{% else %}bg-secondary bg-opacity-10 text-secondary{% endif %} px-3 rounded-pill ms-auto">
+                                                        {% if driver.is_available %}Available{% else %}Busy{% endif %}
+                                                    </span>
+                                                </div>
+
+                                                <div class="row g-4">
+                                                    <div class="col-md-6">
+                                                        <h6 class="fw-bold text-secondary small text-uppercase mb-2">Contact &amp; Identity</h6>
+                                                        <div class="profile-detail-row">
+                                                            <span class="profile-detail-label">Username</span>
+                                                            <span class="profile-detail-value">{{ driver.user.username }}</span>
+                                                        </div>
+                                                        <div class="profile-detail-row">
+                                                            <span class="profile-detail-label">Email</span>
+                                                            <span class="profile-detail-value">{{ driver.user.email|default:"—" }}</span>
+                                                        </div>
+                                                        <div class="profile-detail-row">
+                                                            <span class="profile-detail-label">Phone</span>
+                                                            <span class="profile-detail-value">{{ driver.user.phone|default:"—" }}</span>
+                                                        </div>
+                                                        <div class="profile-detail-row">
+                                                            <span class="profile-detail-label">Address</span>
+                                                            <span class="profile-detail-value">{{ driver.user.address|default:"—" }}</span>
+                                                        </div>
+
+                                                        <h6 class="fw-bold text-secondary small text-uppercase mb-2 mt-4">Assignment &amp; Performance</h6>
+                                                        <div class="profile-detail-row">
+                                                            <span class="profile-detail-label">License Number</span>
+                                                            <span class="profile-detail-value font-monospace">{{ driver.license_number|default:"—" }}</span>
+                                                        </div>
+                                                        <div class="profile-detail-row">
+                                                            <span class="profile-detail-label">Assigned Vehicle</span>
+                                                            <span class="profile-detail-value">{{ driver.vehicle.plate_number|default:"Not assigned" }}</span>
+                                                        </div>
+                                                        <div class="profile-detail-row">
+                                                            <span class="profile-detail-label">Total Trips</span>
+                                                            <span class="profile-detail-value">{{ driver.total_trips }}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="col-md-6">
+                                                        <h6 class="fw-bold text-secondary small text-uppercase mb-2">Driving License Document</h6>
+
+                                                        {% if driver.license_document %}
+                                                        <div class="mb-2">
+                                                            <a href="{{ driver.license_document.url }}" target="_blank" class="btn btn-sm btn-outline-success w-100 mb-2">
+                                                                <i class="bi bi-file-earmark-pdf me-1"></i>Open Full PDF in New Tab
+                                                            </a>
+                                                            <embed src="{{ driver.license_document.url }}" type="application/pdf" class="license-pdf-frame">
+                                                        </div>
+                                                        {% else %}
+                                                        <div class="text-center text-muted py-4 bg-light rounded-3 mb-3">
+                                                            <i class="bi bi-file-earmark-x fs-2 d-block mb-1"></i>
+                                                            <span class="small">No license document uploaded yet.</span>
+                                                        </div>
+                                                        {% endif %}
+
+                                                        <label class="form-label small fw-semibold text-secondary mt-2">
+                                                            {% if driver.license_document %}Replace document{% else %}Upload license document{% endif %}
+                                                            <span class="text-muted fw-normal">(PDF only, max 5MB)</span>
+                                                        </label>
+                                                        <div class="license-upload-zone" onclick="document.getElementById('license-file-{{ driver.id }}').click()">
+                                                            <i class="bi bi-cloud-arrow-up fs-4 text-muted d-block mb-1"></i>
+                                                            <span class="small text-muted" id="license-file-label-{{ driver.id }}">Click to choose a PDF file</span>
+                                                        </div>
+                                                        <input type="file" id="license-file-{{ driver.id }}" class="d-none" accept="application/pdf"
+                                                            onchange="handleLicenseFileSelect({{ driver.id }}, this)">
+                                                        <button type="button" class="btn btn-success w-100 mt-2" id="license-upload-btn-{{ driver.id }}" onclick="uploadLicense({{ driver.id }})" disabled>
+                                                            <i class="bi bi-upload me-1"></i>Upload Document
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer bg-light border-top-0">
+                                                <button class="btn btn-light border px-4" data-bs-dismiss="modal">Close</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
                                 <!-- Assign Vehicle Modal Context Loop -->
                                 <div class="modal fade" id="assignVehicleModal{{ driver.id }}" tabindex="-1">
@@ -496,5 +658,171 @@ async function removeDriver(driverId) {
         showToast('Network error: ' + e.message, 'danger');
     }
 }
+
+// ── Driver License Upload (View Profile modal) ───────────────────────────────
+// Keeps the selected File object per driver id, since a plain <input type=file>
+// value can't be read back out later without re-selecting it.
+const pendingLicenseFiles = {};
+
+function handleLicenseFileSelect(driverId, input) {
+    const file = input.files[0];
+    const label = document.getElementById(`license-file-label-${driverId}`);
+    const uploadBtn = document.getElementById(`license-upload-btn-${driverId}`);
+
+    if (!file) {
+        pendingLicenseFiles[driverId] = null;
+        uploadBtn.disabled = true;
+        return;
+    }
+
+    if (file.type !== 'application/pdf') {
+        showToast('Only PDF files are accepted for the license document.', 'warning');
+        input.value = '';
+        pendingLicenseFiles[driverId] = null;
+        uploadBtn.disabled = true;
+        return;
+    }
+
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB, matches backend validate_license_document
+    if (file.size > MAX_SIZE) {
+        showToast(`File too large (${(file.size / (1024*1024)).toFixed(2)}MB). Max is 5MB.`, 'warning');
+        input.value = '';
+        pendingLicenseFiles[driverId] = null;
+        uploadBtn.disabled = true;
+        return;
+    }
+
+    pendingLicenseFiles[driverId] = file;
+    label.textContent = file.name;
+    uploadBtn.disabled = false;
+}
+
+// ── Token refresh helper (mirrors home.html's getOptionalToken) ──────────────
+async function getValidAccessToken() {
+    let access = localStorage.getItem('access_token');
+    const refresh = localStorage.getItem('refresh_token');
+    if (!access) return null;
+
+    // Probe with a cheap authenticated endpoint to check if the token's still good
+    const probe = await fetch('/api/notifications/unread/', {
+        headers: { 'Authorization': `Bearer ${access}` }
+    });
+
+    if (probe.status !== 401) {
+        return access; // still valid
+    }
+
+    if (!refresh) return null;
+
+    const refreshRes = await fetch('/auth/token/refresh/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh }),
+    });
+
+    if (refreshRes.ok) {
+        const data = await refreshRes.json();
+        localStorage.setItem('access_token', data.access);
+        return data.access;
+    }
+
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    return null;
+}
+
+async function uploadLicense(driverId) {
+    const file = pendingLicenseFiles[driverId];
+    if (!file) {
+        showToast('Please choose a PDF file first.', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById(`license-upload-btn-${driverId}`);
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Uploading...';
+
+    const token = await getValidAccessToken();
+    if (!token) {
+        showToast('Your session has expired. Please log in again.', 'danger');
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('license_document', file);
+
+    try {
+        // Raw fetch (not API.patch) because API.patch always JSON.stringifies
+        // its payload and sets Content-Type: application/json — that can't
+        // carry a file. The browser sets the correct multipart Content-Type
+        // (with boundary) automatically when the body is a FormData object,
+        // so we deliberately don't set Content-Type here ourselves.
+        const res = await fetch(`/api/drivers/${driverId}/`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+            body: formData,
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.id) {
+            showToast('License document uploaded successfully!', 'success');
+            setTimeout(() => location.reload(), 900);
+        } else {
+            const errMsg = typeof data === 'object'
+                ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                : String(data);
+            showToast('Upload failed: ' + errMsg, 'danger');
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+    
+async function removeDriver(driverId) {
+    if (!confirm('Are you sure you want to remove this driver from the system?')) return;
+
+    const token = await getValidAccessToken();
+    if (!token) {
+        showToast('Your session has expired. Please log in again.', 'danger');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/drivers/${driverId}/`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+
+        if (res.ok || res.status === 204) {
+            showToast('Driver removed successfully.', 'success');
+            const row = document.getElementById(`driver-row-${driverId}`);
+            if (row) row.remove();
+        } else {
+            let errMsg = 'Failed to remove driver.';
+            try {
+                const data = await res.json();
+                errMsg = typeof data === 'object'
+                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                    : String(data);
+            } catch (e) {}
+            showToast(errMsg, 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
+    }
+}
+}
+
 </script>
 {% endblock %}

@@ -4,9 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
-from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.management import call_command
 from django.db import transaction
 from django.db.models import F, Q
@@ -19,8 +17,8 @@ from rest_framework import filters, status, viewsets # type: ignore
 from rest_framework.decorators import action # type: ignore
 from rest_framework.permissions import AllowAny, IsAuthenticated # type: ignore
 from rest_framework.response import Response # type: ignore
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser # type: ignore
 from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser # type: ignore
 from .models import (
     AdminLog, Bin, Checkpoint, Complaint, Driver, Notification, Route, Schedule,
     SystemSettings, Vehicle, WasteRequest, WasteRequestPhoto,
@@ -40,12 +38,12 @@ from .serializers import (
     ComplaintSerializer,
 )
 
-User = get_user_model()
-
 try:
     CHANNEL_LAYER = get_channel_layer()
 except InvalidChannelLayerError:
     CHANNEL_LAYER = None
+
+User = get_user_model()
 
 import logging
 logger = logging.getLogger('notif_debug')
@@ -71,266 +69,6 @@ def _log_admin_action(request, action_type, content_type, obj, description=''):
         ip_address=request.META.get('REMOTE_ADDR'),
         user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
     )
-
-
-def _serialize_admin_user(user):
-    return {
-        'id': user.id,
-        'username': user.username,
-        'email': user.email,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'full_name': user.get_full_name(),
-        'is_active': user.is_active,
-        'created_at': user.created_at.isoformat() if user.created_at else None,
-    }
-
-
-def _normalize_request_address(pickup_address):
-    return ' '.join((pickup_address or '').split()).strip()
-
-
-def _waste_request_location_filter(pickup_address=None, latitude=None, longitude=None):
-    location_filter = Q()
-
-    if latitude is not None and longitude is not None:
-        lat = Decimal(str(latitude))
-        lng = Decimal(str(longitude))
-        # Roughly 11 meters at the equator. This keeps nearby reports at the
-        # same physical location grouped together even if the map marker or
-        # geocoder shifts slightly.
-        tolerance = Decimal('0.0001')
-        location_filter |= Q(
-            latitude__gte=lat - tolerance,
-            latitude__lte=lat + tolerance,
-            longitude__gte=lng - tolerance,
-            longitude__lte=lng + tolerance,
-        )
-    else:
-        normalized_address = _normalize_request_address(pickup_address)
-        if normalized_address:
-            location_filter |= Q(pickup_address__iexact=normalized_address)
-
-    return location_filter
-
-
-def _related_waste_requests_for_location(pickup_address=None, latitude=None, longitude=None):
-    location_filter = _waste_request_location_filter(
-        pickup_address=pickup_address,
-        latitude=latitude,
-        longitude=longitude,
-    )
-    if not location_filter.children:
-        return WasteRequest.objects.none()
-
-    return (
-        WasteRequest.objects.filter(is_deleted=False)
-        .exclude(status='cancelled')
-        .filter(location_filter)
-        .select_related('user')
-        .prefetch_related('submitting_users')
-        .order_by('-created_at')
-    )
-
-
-class AdminUserCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
-
-    def post(self, request):
-        username = (request.data.get('username') or '').strip()
-        email = (request.data.get('email') or '').strip()
-        password = request.data.get('password') or ''
-        first_name = (request.data.get('first_name') or '').strip()
-        last_name = (request.data.get('last_name') or '').strip()
-        is_active = request.data.get('is_active', True)
-
-        if not username or not email or not password:
-            return Response(
-                {'success': False, 'message': 'Username, email, and password are required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if User.objects.filter(username__iexact=username).exists():
-            return Response(
-                {'success': False, 'message': 'That username is already taken.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if User.objects.filter(email__iexact=email).exists():
-            return Response(
-                {'success': False, 'message': 'That email is already registered.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            validate_password(password)
-        except DjangoValidationError as exc:
-            return Response(
-                {'success': False, 'message': ' '.join(exc.messages)},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if isinstance(is_active, str):
-            is_active = is_active.lower() in ('1', 'true', 'yes', 'on')
-
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password,
-            first_name=first_name,
-            last_name=last_name,
-            role='admin',
-            is_active=bool(is_active),
-        )
-
-        _log_admin_action(
-            request,
-            'create',
-            'User',
-            user,
-            f'Created admin user {user.username}',
-        )
-
-        return Response(
-            {
-                'success': True,
-                'message': 'Admin user created successfully.',
-                'admin': _serialize_admin_user(user),
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
-
-class AdminUserUpdateView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
-
-    def patch(self, request, admin_id):
-        try:
-            user = User.objects.get(pk=admin_id, role='admin')
-        except User.DoesNotExist:
-            return Response(
-                {'success': False, 'message': 'Admin user not found.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        username = (request.data.get('username') or user.username).strip()
-        email = (request.data.get('email') or user.email).strip()
-        first_name = (request.data.get('first_name') or user.first_name).strip()
-        last_name = (request.data.get('last_name') or user.last_name).strip()
-        password = request.data.get('password') or ''
-        is_active = request.data.get('is_active', user.is_active)
-
-        if not username or not email:
-            return Response(
-                {'success': False, 'message': 'Username and email are required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if User.objects.exclude(pk=user.pk).filter(username__iexact=username).exists():
-            return Response(
-                {'success': False, 'message': 'That username is already taken.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if User.objects.exclude(pk=user.pk).filter(email__iexact=email).exists():
-            return Response(
-                {'success': False, 'message': 'That email is already registered.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if isinstance(is_active, str):
-            is_active = is_active.lower() in ('1', 'true', 'yes', 'on')
-
-        changes = {}
-        if user.username != username:
-            changes['username'] = {'old': user.username, 'new': username}
-            user.username = username
-        if user.email != email:
-            changes['email'] = {'old': user.email, 'new': email}
-            user.email = email
-        if user.first_name != first_name:
-            changes['first_name'] = {'old': user.first_name, 'new': first_name}
-            user.first_name = first_name
-        if user.last_name != last_name:
-            changes['last_name'] = {'old': user.last_name, 'new': last_name}
-            user.last_name = last_name
-        if user.is_active != bool(is_active):
-            changes['is_active'] = {'old': user.is_active, 'new': bool(is_active)}
-            user.is_active = bool(is_active)
-
-        if password:
-            try:
-                validate_password(password, user=user)
-            except DjangoValidationError as exc:
-                return Response(
-                    {'success': False, 'message': ' '.join(exc.messages)},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            user.set_password(password)
-            changes['password'] = {'old': 'unchanged', 'new': 'updated'}
-
-        user.role = 'admin'
-        user.save()
-
-        if changes:
-            AdminLog.objects.create(
-                admin_user=request.user,
-                action='update',
-                content_type='User',
-                object_id=user.id,
-                object_description=f'Updated admin user {user.username}',
-                changes=changes,
-                ip_address=request.META.get('REMOTE_ADDR'),
-                user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
-            )
-
-        return Response(
-            {
-                'success': True,
-                'message': 'Admin user updated successfully.',
-                'admin': _serialize_admin_user(user),
-            },
-            status=status.HTTP_200_OK,
-        )
-
-
-class AdminUserDeleteView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
-
-    def delete(self, request, admin_id):
-        try:
-            user = User.objects.get(pk=admin_id, role='admin')
-        except User.DoesNotExist:
-            return Response(
-                {'success': False, 'message': 'Admin user not found.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        if user.pk == request.user.pk:
-            return Response(
-                {'success': False, 'message': 'You cannot delete your own admin account from this screen.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if User.objects.filter(role='admin').count() <= 1:
-            return Response(
-                {'success': False, 'message': 'At least one admin account must remain active.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        _log_admin_action(
-            request,
-            'delete',
-            'User',
-            user,
-            f'Deleted admin user {user.username}',
-        )
-        user.delete()
-
-        return Response(
-            {'success': True, 'message': 'Admin user removed successfully.'},
-            status=status.HTTP_200_OK,
-        )
 
 
 def _push_ws_notification(notification):
@@ -384,22 +122,15 @@ def _create_notification(user, title, message, notification_type='info', related
         return None
 
     notification = Notification.objects.create(
-    user=user,
-    title=title,
-    message=message,
-    notification_type=notification_type,
-    related_request=related_request,
+        user=user,
+        title=title,
+        message=message,
+        notification_type=notification_type,
+        related_request=related_request,
     )
-
-    # User ले आफ्नै request cancel गर्दा live toast नपठाउने
-    if not (
-        related_request
-        and related_request.status == "cancelled"
-        and related_request.user_id == user.id
-    ):
-        _push_ws_notification(notification)
-
+    _push_ws_notification(notification)
     return notification
+
 
 def _notify_driver(driver, title, message, notification_type='info', related_request=None):
     """
@@ -604,6 +335,10 @@ class DriverViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [filters.SearchFilter]
     search_fields = ['user__username', 'license_number']
+    # NEW: needed so the license_document PDF (and any other file field)
+    # can be uploaded via multipart/form-data on PATCH — without this,
+    # DriverViewSet only accepted JSON bodies and a file upload would 400.
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def perform_create(self, serializer):
         driver = serializer.save()
@@ -784,7 +519,118 @@ class CheckpointViewSet(viewsets.ModelViewSet):
             notification_type='warning',
         )
         instance.delete()
+        
+class AdminUserCreateView(APIView):
+    """POST /api/auth/create-admin/ — superadmin creates a new admin account."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        email = request.data.get('email', '')
+        first_name = request.data.get('first_name', '')
+        last_name = request.data.get('last_name', '')
+
+        if not username or not password:
+            return Response(
+                {'error': 'username and password are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if User.objects.filter(username=username).exists():
+            return Response(
+                {'error': 'That username is already taken.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        admin_user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+        )
+        admin_user.role = 'admin'
+        admin_user.is_staff = True
+        admin_user.save(update_fields=['role', 'is_staff'])
+
+        _log_admin_action(
+            request, 'create', 'AdminUser', admin_user,
+            f'Created admin account {admin_user.username}'
+        )
+
+        return Response({
+            'id': admin_user.id,
+            'username': admin_user.username,
+            'email': admin_user.email,
+            'first_name': admin_user.first_name,
+            'last_name': admin_user.last_name,
+            'role': admin_user.role,
+        }, status=status.HTTP_201_CREATED)
+
+
+class AdminUserUpdateView(APIView):
+    """PATCH/PUT /api/auth/admin/{admin_id}/update/ — edit an admin account."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def patch(self, request, admin_id):
+        try:
+            admin_user = User.objects.get(id=admin_id, role='admin')
+        except User.DoesNotExist:
+            return Response({'error': 'Admin user not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        for field in ('first_name', 'last_name', 'email'):
+            if field in request.data:
+                setattr(admin_user, field, request.data[field])
+
+        new_password = request.data.get('password')
+        if new_password:
+            admin_user.set_password(new_password)
+
+        admin_user.save()
+
+        _log_admin_action(
+            request, 'update', 'AdminUser', admin_user,
+            f'Updated admin account {admin_user.username}'
+        )
+
+        return Response({
+            'id': admin_user.id,
+            'username': admin_user.username,
+            'email': admin_user.email,
+            'first_name': admin_user.first_name,
+            'last_name': admin_user.last_name,
+            'role': admin_user.role,
+        })
+
+    def put(self, request, admin_id):
+        return self.patch(request, admin_id)
+
+
+class AdminUserDeleteView(APIView):
+    """DELETE /api/auth/admin/{admin_id}/delete/ — remove an admin account."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def delete(self, request, admin_id):
+        try:
+            admin_user = User.objects.get(id=admin_id, role='admin')
+        except User.DoesNotExist:
+            return Response({'error': 'Admin user not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if admin_user.id == request.user.id:
+            return Response(
+                {'error': "You can't delete your own account."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        username = admin_user.username
+        _log_admin_action(request, 'delete', 'AdminUser', admin_user, f'Deleted admin account {username}')
+        admin_user.delete()
+
+        return Response(
+            {'message': f'Admin {username} deleted successfully.'},
+            status=status.HTTP_204_NO_CONTENT,
+        )
 
 class WasteRequestViewSet(viewsets.ModelViewSet):
     """
@@ -860,14 +706,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             qs = qs.filter(status=status_filter)
         return qs.order_by('-created_at')
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        response_data = dict(serializer.data)
-        headers = self.get_success_headers(serializer.data)
-        return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
-
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         waste_request = serializer.save(user=user)
@@ -899,66 +737,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 f'{user.username} submitted pickup request #{waste_request.id}{photo_note}'
             )
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
-    def claim_guest_requests(self, request):
-        """
-        POST /api/waste-requests/claim_guest_requests/
-        Body:
-        {
-            "guest_tokens": ["abc123", "def456"]
-        }
-        """
-
-        # ===== Only regular users can claim guest requests =====
-        if request.user.role != "user":
-            return Response(
-                {
-                    "claimed": 0,
-                    "request_ids": [],
-                    "message": "Only regular users can claim guest requests."
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        guest_tokens = request.data.get("guest_tokens", [])
-
-        if not isinstance(guest_tokens, list) or not guest_tokens:
-            return Response({
-                "claimed": 0,
-                "request_ids": []
-            })
-
-        qs = WasteRequest.objects.filter(
-            guest_token__in=guest_tokens,
-            user__isnull=True,
-        )
-
-        claimed_ids = list(qs.values_list("id", flat=True))
-
-        qs.update(user=request.user)
-
-        if claimed_ids:
-            _log_admin_action(
-                request,
-                "update",
-                "WasteRequest",
-                None,
-                f"{request.user.username} claimed {len(claimed_ids)} guest submission(s): {claimed_ids}"
-            )
-
-            for req_id in claimed_ids:
-                _create_notification(
-                    user=request.user,
-                    title="Request Linked to Your Account",
-                    message=f"Your previously submitted report #{req_id} is now linked to your account.",
-                    notification_type="success",
-                )
-
-        return Response({
-            "claimed": len(claimed_ids),
-            "request_ids": claimed_ids,
-        })
-
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def assign_driver(self, request, pk=None):
         """PATCH /api/waste-requests/{id}/assign_driver/ — admin assigns driver."""
@@ -971,53 +749,24 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         except Driver.DoesNotExist:
             return Response({'error': 'Driver not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        related_requests = list(
-            _related_waste_requests_for_location(
-                pickup_address=waste_request.pickup_address,
-                latitude=waste_request.latitude,
-                longitude=waste_request.longitude,
-            ).filter(status__in=['pending', 'assigned', 'in_progress'])
-        )
-        if waste_request not in related_requests:
-            related_requests.append(waste_request)
-
-        related_ids = [item.id for item in related_requests]
-        WasteRequest.objects.filter(id__in=related_ids).update(driver=driver, status='assigned')
-        waste_request.refresh_from_db()
+        waste_request.driver = driver
+        waste_request.status = 'assigned'
+        waste_request.save(update_fields=['driver', 'status'])
 
         _log_admin_action(
             request, 'assign', 'WasteRequest', waste_request,
             f'Assigned driver {driver.user.username} to request #{waste_request.id}'
         )
 
-        notified_user_ids = set()
-        for related_request in related_requests:
-            if related_request.user_id and related_request.user_id not in notified_user_ids:
-                notified_user_ids.add(related_request.user_id)
-                _create_notification(
-                    user=related_request.user,
-                    title='Driver Assigned',
-                    message=(
-                        f'Driver {driver.user.username} has been assigned to your '
-                        f'waste report #{related_request.id}.'
-                    ),
-                    notification_type='info',
-                    related_request=related_request,
-                )
-            for linked_user in related_request.submitting_users.all():
-                if linked_user.id in notified_user_ids:
-                    continue
-                notified_user_ids.add(linked_user.id)
-                _create_notification(
-                    user=linked_user,
-                    title='Driver Assigned',
-                    message=(
-                        f'Driver {driver.user.username} has been assigned to your '
-                        f'waste report #{related_request.id}.'
-                    ),
-                    notification_type='info',
-                    related_request=related_request,
-                )
+        # Notify user (guest/anonymous requests won't have a user to notify)
+        if waste_request.user_id:
+            _create_notification(
+                user=waste_request.user,
+                title='Driver Assigned',
+                message=f'Driver {driver.user.username} has been assigned to your request.',
+                notification_type='info',
+                related_request=waste_request,
+            )
 
         # Also notify the driver themselves — this is what makes the
         # toast/badge show up on their dashboard when admin hands them a
@@ -1064,10 +813,8 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
         waste_request.status = new_status
         update_fields = ['status']
-        completion_timestamp = None
         if new_status == 'completed':
-            completion_timestamp = timezone.now()
-            waste_request.completed_at = completion_timestamp
+            waste_request.completed_at = timezone.now()
             update_fields.append('completed_at')
 
         # Owner le aफnै request cancel garyo bhane, seedhai Recycle Bin ma pani
@@ -1079,49 +826,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             update_fields += ['is_deleted', 'deleted_at']
 
         waste_request.save(update_fields=update_fields)
-
-        if new_status == 'completed':
-            related_requests = list(
-                _related_waste_requests_for_location(
-                    pickup_address=waste_request.pickup_address,
-                    latitude=waste_request.latitude,
-                    longitude=waste_request.longitude,
-                )
-            )
-            if waste_request not in related_requests:
-                related_requests.append(waste_request)
-
-            related_ids = [
-                item.id for item in related_requests
-                if item.id != waste_request.id and item.status != 'completed'
-            ]
-            if related_ids and completion_timestamp is not None:
-                WasteRequest.objects.filter(id__in=related_ids).update(
-                    status='completed',
-                    completed_at=completion_timestamp,
-                )
-
-            notified_user_ids = set()
-            for related_request in related_requests:
-                target_users = []
-                if related_request.user_id:
-                    target_users.append(related_request.user)
-                target_users.extend(list(related_request.submitting_users.all()))
-
-                for target_user in target_users:
-                    if target_user.id in notified_user_ids:
-                        continue
-                    notified_user_ids.add(target_user.id)
-                    _create_notification(
-                        user=target_user,
-                        title='Report Completed',
-                        message=(
-                            f'Your waste report #{related_request.id} has been completed and '
-                            f'is now closed.'
-                        ),
-                        notification_type='success',
-                        related_request=related_request,
-                    )
 
         # Bump the driver's lifetime trip counter the FIRST time a request
         # becomes 'completed' (guarded by old_status != 'completed' so
@@ -1448,36 +1152,41 @@ class ScheduleViewSet(viewsets.ModelViewSet):
 class NotificationViewSet(viewsets.ModelViewSet):
     """
     User notifications.
-    Users see only their own — including admins. Broadcast notifications
-    (e.g. new checkpoint) already create one row PER active user via
-    _notify_all_users(), and admins are part of that loop too, so admin's
-    own row is enough without also pulling everyone else's on top of it.
+    Users see only their own. Admins see all.
     """
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
     http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
-        return Notification.objects.select_related(
+        user = self.request.user
+        qs = Notification.objects.select_related(
             'user',
             'related_request',
             'related_request__user',
             'related_request__driver',
             'related_request__driver__user',
             'related_request__driver__vehicle',
-        ).filter(user=self.request.user)
+        )
+        if user.role == 'admin':
+            return qs
+        return qs.filter(user=user)
 
     @action(detail=False, methods=['patch'])
     def mark_all_read(self, request):
-        qs = Notification.objects.filter(is_read=False, user=request.user)
+        qs = Notification.objects.filter(is_read=False)
+        if request.user.role != 'admin':
+            qs = qs.filter(user=request.user)
         qs.update(is_read=True)
         return Response({'message': 'All notifications marked as read.'})
 
     @action(detail=False, methods=['get'])
     def unread(self, request):
         qs = self.get_queryset().filter(is_read=False)
+        # get_queryset() le admin ko lagi sabai notifications return garcha — correct chha
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
+
 
 class AdminLogViewSet(viewsets.ReadOnlyModelViewSet):
     """

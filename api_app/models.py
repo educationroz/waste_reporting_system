@@ -10,6 +10,9 @@ class Vehicle(models.Model):
         ('maintenance', 'Under Maintenance'),
         ('inactive', 'Inactive'),
     ]
+    # Base/legacy types — still used as the default suggestions in the UI,
+    # but vehicle_type itself is now free text (no `choices=` enforcement),
+    # so admins can add their own custom vehicle types beyond this list.
     TYPE_CHOICES = [
         ('truck', 'Garbage Truck'),
         ('van', 'Van'),
@@ -17,7 +20,7 @@ class Vehicle(models.Model):
     ]
 
     plate_number = models.CharField(max_length=20, unique=True)
-    vehicle_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='truck')
+    vehicle_type = models.CharField(max_length=50, default='truck')
     capacity_kg = models.FloatField(default=0.0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available', db_index=True)
     last_service_date = models.DateField(blank=True, null=True)
@@ -32,6 +35,26 @@ class Vehicle(models.Model):
 
     def __str__(self):
         return f"{self.plate_number} ({self.vehicle_type})"
+
+
+class VehicleType(models.Model):
+    """
+    Manageable list of vehicle type options shown in the Add/Edit Vehicle
+    dropdowns. This is purely a picklist — Vehicle.vehicle_type stores
+    whatever string was chosen directly (it's a plain CharField, not a
+    ForeignKey to this table), so deleting an entry here only removes it
+    from future suggestions; it never touches or breaks existing Vehicle
+    rows that already have that type set.
+    """
+    name = models.CharField(max_length=50, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'vehicle_types'
+        ordering = ['id']
+
+    def __str__(self):
+        return self.name
 
 
 class Driver(models.Model):
@@ -52,6 +75,13 @@ class Driver(models.Model):
         validators=[MinValueValidator(-180), MaxValueValidator(180)])
     total_trips = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    license_document = models.FileField(
+        upload_to='driver_licenses/',
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=['pdf'])],
+        help_text='Driving license document (PDF only, max 5MB)'
+    )
 
     class Meta:
         db_table = 'drivers'

@@ -378,6 +378,22 @@ class AdminVehicleListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         return Vehicle.objects.order_by('-created_at')
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        # Any vehicle_type values already in the DB that aren't part of the
+        # base TYPE_CHOICES — these are custom types admins have typed in
+        # before, surfaced here so they're reusable from the dropdown instead
+        # of having to be retyped every time.
+        base_keys = [key for key, _ in Vehicle.TYPE_CHOICES]
+        ctx['custom_vehicle_types'] = list(
+            Vehicle.objects.exclude(vehicle_type__in=base_keys)
+            .exclude(vehicle_type='')
+            .values_list('vehicle_type', flat=True)
+            .distinct()
+            .order_by('vehicle_type')
+        )
+        return ctx
+
 class AdminScheduleListView(LoginRequiredMixin, ListView):
     template_name = 'web_app/admin_schedules.html'
     context_object_name = 'schedules'

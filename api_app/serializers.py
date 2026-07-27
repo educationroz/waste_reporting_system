@@ -3,7 +3,7 @@ from rest_framework import serializers # type: ignore
 
 from .models import (
     AdminLog, Bin, Checkpoint, Driver, Notification, Route, Schedule,
-    SystemSettings, Vehicle, WasteRequest, WasteRequestPhoto, Complaint,
+    SystemSettings, Vehicle, VehicleType, WasteRequest, WasteRequestPhoto, Complaint,
 )
 User = get_user_model()
 
@@ -13,6 +13,13 @@ class UserMinimalSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('id', 'username', 'email', 'phone', 'role')
+
+
+class VehicleTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VehicleType
+        fields = ('id', 'name', 'created_at')
+        read_only_fields = ('created_at',)
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -32,11 +39,19 @@ class DriverSerializer(serializers.ModelSerializer):
         model = Driver
         fields = (
             'id', 'user', 'user_id', 'vehicle', 'vehicle_detail',
-            'license_number', 'is_available',
+            'license_number', 'license_document', 'is_available',
             'current_latitude', 'current_longitude',
             'total_trips', 'created_at',
         )
         read_only_fields = ('total_trips', 'created_at')
+
+    def validate_license_document(self, file):
+        MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+        if file and file.size > MAX_FILE_SIZE:
+            raise serializers.ValidationError(
+                f"File too large. Maximum size is 5MB, but got {file.size / (1024*1024):.2f}MB"
+            )
+        return file
 
 
 class BinSerializer(serializers.ModelSerializer):
