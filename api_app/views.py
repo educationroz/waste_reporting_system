@@ -799,6 +799,37 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def claim_guest_requests(self, request):
+        tokens = request.data.get('guest_tokens', [])
+        if not tokens or not isinstance(tokens, list):
+            return Response({'error': 'guest_tokens (list) is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = WasteRequest.objects.filter(guest_token__in=tokens, user__isnull=True)
+        claimed_requests = list(qs)  # update() अघि instance haru चाहिन्छ (id र notification को लागि)
+        claimed_ids = [wr.id for wr in claimed_requests]
+        claimed_count = qs.update(user=request.user)
+
+        if claimed_ids:
+            _log_admin_action(
+                request, 'update', 'WasteRequest', None,
+                f'{request.user.username} claimed {claimed_count} guest request(s): {claimed_ids}'
+            )
+
+            # ── User लाई notify गर्ने — यही हिस्सा हराएको थियो ──────────────
+            for wr in claimed_requests:
+                _create_notification(
+                    user=request.user,
+                    title='Request Linked to Your Account',
+                    message=f'Your previously submitted report #{wr.id} is now linked to your account.',
+                    notification_type='success',
+                    related_request=wr,
+                )
+
+        return Response({
+            'claimed': claimed_count,
+            'claimed_ids': claimed_ids,
+        })
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def update_status(self, request, pk=None):
         """

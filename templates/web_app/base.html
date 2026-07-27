@@ -420,7 +420,7 @@ function showToast(message, type = 'success') {
         notifSocket.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (data.type === 'notification') {
-                showToast(`${data.title}: ${data.message}`, 'info');
+                // Auto-popup toast हटाइयो — notification bell/badge मा मात्र देखिने, screen मा auto pop-up हुँदैन
                 const badge = document.getElementById('notif-badge');
                 badge.classList.remove('d-none');
                 badge.textContent = (parseInt(badge.textContent || '0') + 1).toString();
