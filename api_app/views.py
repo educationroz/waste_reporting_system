@@ -54,6 +54,22 @@ logging.basicConfig(level=logging.INFO)
 BACKUP_DIR = Path(settings.BASE_DIR) / 'backups'
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
+# ── Completion GPS verification ──────────────────────────────────────────────
+# Driver ले "Completed" mark गर्ने बेला उनको GPS pickup location भन्दा यो
+# थ्रेसहोल्ड (मिटरमा) भन्दा टाढा भए suspicious मानिन्छ — admin लाई flag देखाइन्छ।
+COMPLETION_DISTANCE_THRESHOLD_METERS = 500
+
+
+def _haversine_meters(lat1, lng1, lat2, lng2):
+    """Distance in meters between two lat/lng points (Haversine formula)."""
+    import math
+    R = 6371000  # Earth radius in meters
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lng2 - lng1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
 
 def _log_admin_action(request, action_type, content_type, obj, description=''):
     """
@@ -1042,6 +1058,12 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         'cancelled' ma matra move garna paaucha — home.html/user_requests.html ko
         "Cancel" button le yehi endpoint use garcha, tesैle purano role-check le
         normal 'user' lai 403 dinthyo.
+
+        GPS ENFORCEMENT (new): new_status == 'completed' huda driver/admin le
+        latitude/longitude pathaunai parcha — natra hard-block, DB ma kehi
+        pani save hunna. Yo GPS lai pickup location sanga compare gareर
+        completion_flagged set garincha, jasले admin lai suspicious
+        (location mismatch) completion haru chinnu dincha.
         """
         waste_request = self.get_object()
         user = request.user
@@ -1060,6 +1082,22 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         if new_status not in valid_statuses:
             return Response({'error': f'Invalid status. Choose: {valid_statuses}'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # ── HARD BLOCK: GPS चाहिन्छ, नत्र "Completed" mark गर्न मिल्दैन ──────
+        comp_lat = comp_lng = None
+        if new_status == 'completed':
+            raw_lat = request.data.get('latitude')
+            raw_lng = request.data.get('longitude')
+            if raw_lat in (None, '') or raw_lng in (None, ''):
+                return Response(
+                    {'error': 'GPS location is required to mark this request as completed. Please enable location access and try again.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                comp_lat = float(raw_lat)
+                comp_lng = float(raw_lng)
+            except (TypeError, ValueError):
+                return Response({'error': 'Invalid GPS coordinates.'}, status=status.HTTP_400_BAD_REQUEST)
+
         old_status = waste_request.status
 
         waste_request.status = new_status
@@ -1069,6 +1107,34 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             completion_timestamp = timezone.now()
             waste_request.completed_at = completion_timestamp
             update_fields.append('completed_at')
+
+            # Driver ले पठाएको वास्तविक GPS save गर्ने
+            waste_request.completion_latitude = comp_lat
+            waste_request.completion_longitude = comp_lng
+            update_fields += ['completion_latitude', 'completion_longitude']
+
+            # Pickup location (लगभग जहाँ फोहोर रिपोर्ट भएको थियो) सँग तुलना गर्ने —
+            # latitude/longitude नभए photo_latitude/longitude fallback गर्ने
+            pickup_lat = waste_request.latitude if waste_request.latitude is not None else waste_request.photo_latitude
+            pickup_lng = waste_request.longitude if waste_request.longitude is not None else waste_request.photo_longitude
+
+            if pickup_lat is not None and pickup_lng is not None:
+                dist = _haversine_meters(float(pickup_lat), float(pickup_lng), comp_lat, comp_lng)
+                waste_request.completion_distance_meters = round(dist, 1)
+                waste_request.completion_flagged = dist > COMPLETION_DISTANCE_THRESHOLD_METERS
+                update_fields += ['completion_distance_meters', 'completion_flagged']
+
+                if waste_request.completion_flagged:
+                    _log_admin_action(
+                        request, 'other', 'WasteRequest', waste_request,
+                        f'⚠️ Request #{waste_request.id} marked completed {round(dist)}m away from the '
+                        f'reported pickup location by driver {user.username} — flagged for admin review.'
+                    )
+            else:
+                # Pickup को आफ्नै GPS छैन भने compare गर्न सकिँदैन — flag नगर्ने
+                waste_request.completion_distance_meters = None
+                waste_request.completion_flagged = False
+                update_fields += ['completion_distance_meters', 'completion_flagged']
 
         # Owner le aफnै request cancel garyo bhane, seedhai Recycle Bin ma pani
         # sarne — home/"My Requests" bata haraera Recycle Bin ma dekhincha,

@@ -446,13 +446,56 @@ async function updateLocation() {
     }
 }
 
+// ── Update Request Status ────────────────────────────────────────────────
+// "Completed" mark गर्नु अघि GPS चाहिन्छ — HARD BLOCK. GPS नपाए backend सम्म
+// request नै पुग्दैन। GPS पाए, backend मा पुगेपछि pickup location सँग
+// compare भएर completion_flagged set हुन्छ (admin ले हेर्न पाउँछ)।
 async function updateStatus(requestId, newStatus) {
-    const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: newStatus });
-    if (data && data.id) {
-        showToast(`Status updated to ${newStatus}`, 'success');
-        setTimeout(() => location.reload(), 800);
-    } else {
-        showToast('Update failed.', 'danger');
+    let payload = { status: newStatus };
+
+    if (newStatus === 'completed') {
+        if (!navigator.geolocation) {
+            showToast('GPS is not supported on this device. Cannot mark as completed.', 'danger');
+            return;
+        }
+
+        showToast('Getting your location, please wait...', 'info');
+
+        try {
+            const position = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                });
+            });
+            payload.latitude = position.coords.latitude;
+            payload.longitude = position.coords.longitude;
+        } catch (err) {
+            showToast('Location access is required to mark this job as completed. Please enable GPS/location permission and try again.', 'danger');
+            return;
+        }
+    }
+
+    try {
+        const res = await fetch(`/api/waste-requests/${requestId}/update_status/`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.id) {
+            showToast(`Status updated to ${newStatus}`, 'success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            showToast(data.error || 'Update failed.', 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
     }
 }
 

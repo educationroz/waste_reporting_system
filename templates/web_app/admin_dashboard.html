@@ -166,6 +166,16 @@
         padding: 0.32rem 0.65rem;
         white-space: nowrap;
     }
+
+    /* ==========================================
+       5. LOCATION MISMATCH BADGE — driver ले pickup
+          location भन्दा टाढा complete मार्क गरेको alert
+       ========================================== */
+    .location-mismatch-badge {
+        font-size: 0.62rem;
+        padding: 0.28rem 0.45rem;
+        cursor: help;
+    }
 </style>
 {% endblock %}
 
@@ -449,6 +459,15 @@
                                                     {% else %}bg-primary{% endif %}">
                                                     {{ req.get_status_display }}
                                                 </span>
+
+                                                {# ===== LOCATION MISMATCH FLAG — driver ले pickup location भन्दा टाढा complete मार्क गर्यो ===== #}
+                                                {% if req.completion_flagged %}
+                                                <span class="badge bg-danger text-white mt-1 d-inline-flex align-items-center gap-1 location-mismatch-badge"
+                                                      title="Driver was ~{{ req.completion_distance_meters|floatformat:0 }}m away from the reported pickup location when marking this completed.">
+                                                    <i class="bi bi-exclamation-triangle-fill"></i>{{ req.completion_distance_meters|floatformat:0 }}m off
+                                                </span>
+                                                {% endif %}
+                                                {# ===== END LOCATION MISMATCH FLAG ===== #}
                                             </td>
                                             <td>
                                                 {% if req.driver %}
