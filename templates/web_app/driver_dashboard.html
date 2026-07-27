@@ -155,6 +155,16 @@
         text-align: center;
         color: #6c757d;
     }
+
+    /* ==========================================
+       COMPLETED WORK HISTORY
+       ========================================== */
+    .history-photo-thumb {
+        width: 40px;
+        height: 40px;
+        object-fit: cover;
+        border-radius: 6px;
+    }
 </style>
 {% endblock %}
 
@@ -266,13 +276,12 @@
                 <div id="driver-map"></div>
                 <div id="map-empty-note" class="map-empty-note d-none">
                     <i class="bi bi-geo fs-3 d-block mb-1"></i>
-                    No location data available yet for your assigned reports.
+                    No active locations right now — completed jobs are removed from the map automatically.
                 </div>
                 <div class="map-legend">
                     <span class="legend-item"><span class="legend-dot" style="background:#fd7e14;"></span>Pending</span>
                     <span class="legend-item"><span class="legend-dot" style="background:#0d6efd;"></span>Assigned</span>
                     <span class="legend-item"><span class="legend-dot" style="background:#0dcaf0;"></span>In Progress</span>
-                    <span class="legend-item"><span class="legend-dot" style="background:#198754;"></span>Completed</span>
                     <span class="legend-item">🚩 Checkpoint (drop-off point)</span>
                     <span class="legend-item">🚛 Your last known location</span>
                     <span class="legend-item"><span style="border-top:3px solid #198754; width:20px; display:inline-block;"></span>Admin-generated route (road path)</span>
@@ -305,7 +314,7 @@
             </div>
 
             <!-- Assigned Requests -->
-            <div class="card shadow-sm">
+            <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white fw-bold">
                     <i class="bi bi-clipboard-check text-success me-2"></i>My Assigned Requests
                 </div>
@@ -345,6 +354,52 @@
                     </table>
                 </div>
             </div>
+
+            {# ===== COMPLETED WORK HISTORY — "kaam garyo kaha bata uthayo" log ===== #}
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-check2-circle text-success me-2"></i>Completed Pickup History</span>
+                    <span class="text-muted small">Last {{ completed_history|length }} completed job(s)</span>
+                </div>
+                <div class="card-body p-0 table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Photo</th>
+                                <th>Picked Up From</th>
+                                <th>Waste Type</th>
+                                <th>Citizen</th>
+                                <th>Completed On</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in completed_history %}
+                            <tr>
+                                <td class="fw-bold text-secondary">#{{ req.id }}</td>
+                                <td>
+                                    {% if req.photo %}
+                                    <a href="{{ req.photo.url }}" target="_blank">
+                                        <img src="{{ req.photo.url }}" alt="photo" class="history-photo-thumb">
+                                    </a>
+                                    {% else %}
+                                    <span class="text-muted small">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small" style="max-width: 260px;">{{ req.pickup_address|truncatechars:50 }}</td>
+                                <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">{{ req.get_waste_type_display }}</span></td>
+                                <td class="small">{% if req.user %}{{ req.user.username }}{% else %}<i class="bi bi-person-x"></i> Guest{% endif %}</td>
+                                <td class="small text-muted">{{ req.completed_at|date:"d M Y, h:i A"|default:"—" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="6" class="text-center text-muted py-4">No completed pickups yet — finished jobs will show up here.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {# ===== END COMPLETED WORK HISTORY ===== #}
+
             {% endif %}
         </div> <!-- /मुख्य सामाग्री -->
     </div> <!-- /layout-wrapper -->
@@ -416,20 +471,17 @@ async function toggleAvailability() {
 
 /* ==========================================================
    ROUTE & REPORTS MAP
-   Plots:
-     - Every WasteRequest assigned to this driver (colored by status),
-       pulled from GET /api/waste-requests/ (already scoped server-side
-       to this driver via WasteRequestViewSet.get_queryset()).
-     - A dashed line connecting the stops belonging to this driver's
-       current active/planned Route, pulled from GET /api/routes/
-       (already scoped to this driver via RouteViewSet.get_queryset())
-       using its waste_request_ids field.
-     - The driver's own last-known position (from the Django context,
-       Driver.current_latitude/current_longitude).
+   Plots only ACTIVE work: pending / assigned / in_progress.
+   Completed and cancelled requests are intentionally excluded
+   from the map (see ACTIVE_MAP_STATUSES below) — once a job is
+   done it belongs in the "Completed Pickup History" table, not
+   the live map, so the map doesn't fill up with stale green pins.
+   Also plots:
+     - A dashed/road line connecting the stops belonging to this
+       driver's current active/planned Route.
+     - The driver's own last-known position.
    Refreshes on: manual button click, a 30s interval, and any
-   'route_update' broadcast arriving on the existing driver_locations
-   WebSocket (sent by RouteViewSet.generate_optimal when admin builds
-   a new route for this driver).
+   'route_update' broadcast on the driver_locations WebSocket.
    ========================================================== */
 
 {% if driver %}
@@ -437,20 +489,17 @@ const DRIVER_ID = {{ driver.id }};
 const INITIAL_DRIVER_LAT = {{ driver.current_latitude|default:'null' }};
 const INITIAL_DRIVER_LNG = {{ driver.current_longitude|default:'null' }};
 
+// Only these statuses are considered "active work" and shown on the map.
+// completed/cancelled requests are filtered out entirely below.
+const ACTIVE_MAP_STATUSES = ['pending', 'assigned', 'in_progress'];
+
 const STATUS_COLORS = {
     pending: '#fd7e14',
     assigned: '#0d6efd',
     in_progress: '#0dcaf0',
-    completed: '#198754',
-    cancelled: '#6c757d',
 };
 
 const DEFAULT_CENTER = [28.2096, 83.9856]; // Pokhara fallback center
-// The route optimizer (route_optimizer.py) always starts each generated
-// route from a depot location read from SystemSettings, which drivers
-// aren't permitted to fetch (admin-only endpoint). We fall back to the
-// same default the backend itself uses when no custom depot is set, so
-// the drawn line is at least consistent with the common case.
 const DEFAULT_DEPOT = [28.2096, 83.9856];
 
 let driverMap = null;
@@ -493,8 +542,6 @@ function updateDriverMarker(lat, lng) {
     }
 }
 
-// DRF list endpoints may or may not be paginated depending on project
-// settings, so handle both a bare array and a {results: [...]} shape.
 function extractList(data) {
     if (Array.isArray(data)) return data;
     if (data && Array.isArray(data.results)) return data.results;
@@ -502,19 +549,12 @@ function extractList(data) {
 }
 
 function pickCoords(req) {
-    // Prefer the request's own latitude/longitude; fall back to the
-    // photo's GPS tag if the request itself has none.
     const lat = req.latitude !== null && req.latitude !== undefined ? parseFloat(req.latitude) : parseFloat(req.photo_latitude);
     const lng = req.longitude !== null && req.longitude !== undefined ? parseFloat(req.longitude) : parseFloat(req.photo_longitude);
     if (isNaN(lat) || isNaN(lng)) return null;
     return [lat, lng];
 }
 
-// Draws the route line following actual roads via OSRM's free public
-// routing server, same approach used on the admin Route Planning page.
-// Falls back to a dashed straight line between points if OSRM is
-// unreachable or can't find a drivable path (e.g. points across water,
-// or the demo server being rate-limited).
 async function drawRoadFollowingLine(stopCoords) {
     const orderedPoints = [DEFAULT_DEPOT, ...stopCoords];
 
@@ -526,7 +566,6 @@ async function drawRoadFollowingLine(stopCoords) {
         if (res.ok) {
             const data = await res.json();
             if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                // GeoJSON gives [lon, lat] pairs — Leaflet wants [lat, lon]
                 roadCoords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
             }
         }
@@ -540,11 +579,11 @@ async function drawRoadFollowingLine(stopCoords) {
         color: '#198754',
         weight: 4,
         opacity: 0.85,
-        ...(roadCoords ? {} : { dashArray: '8,8' }), // dashed only for the straight-line fallback
+        ...(roadCoords ? {} : { dashArray: '8,8' }),
     }).addTo(driverMap);
 }
 
-let lastBoundsPoints = []; // cached so centerMap() can re-fit on demand without a refetch
+let lastBoundsPoints = [];
 
 function centerMap() {
     if (!driverMap || lastBoundsPoints.length === 0) return;
@@ -561,9 +600,13 @@ async function loadMapData() {
         API.get('/api/checkpoints/'),
     ]);
 
-    const requests = extractList(requestsData);
+    const allRequests = extractList(requestsData);
     const routes = extractList(routesData);
     const checkpoints = extractList(checkpointsData);
+
+    // ── Only active work goes on the map — completed/cancelled requests
+    // are dropped here so finished pins don't keep showing green forever.
+    const requests = allRequests.filter(req => ACTIVE_MAP_STATUSES.includes(req.status));
 
     requestMarkersLayer.clearLayers();
     checkpointsLayer.clearLayers();
@@ -599,9 +642,6 @@ async function loadMapData() {
         marker.addTo(requestMarkersLayer);
     });
 
-    // Admin-managed checkpoints (designated drop-off points) — always
-    // shown regardless of route/request status, using a distinct flag
-    // icon so they're not confused with pickup pins.
     checkpoints.forEach(cp => {
         const lat = parseFloat(cp.latitude);
         const lng = parseFloat(cp.longitude);
@@ -625,9 +665,6 @@ async function loadMapData() {
         marker.addTo(checkpointsLayer);
     });
 
-    // Find this driver's current route: prefer 'active', then 'planned',
-    // most recently created first (routes are already scoped to this
-    // driver by the backend, no need to filter by driver id here).
     const myRoutes = routes.filter(r => r.status === 'active')
         .concat(routes.filter(r => r.status === 'planned'))
         .sort((a, b) => (b.id || 0) - (a.id || 0));
@@ -654,10 +691,6 @@ async function loadMapData() {
         emptyNote.classList.remove('d-none');
     } else {
         emptyNote.classList.add('d-none');
-        // Only auto-fit the view the very first time data loads. On every
-        // later refresh (manual, 30s interval, or a live route_update),
-        // keep whatever zoom/pan the driver has set — don't yank it back
-        // out. They can hit "Center Map" any time to re-fit manually.
         if (!hasFittedBounds) {
             const allPoints = driverMarker ? boundsPoints.concat([driverMarker.getLatLng()]) : boundsPoints;
             driverMap.fitBounds(allPoints, { padding: [30, 30], maxZoom: 15 });
@@ -669,8 +702,6 @@ async function loadMapData() {
 document.addEventListener('DOMContentLoaded', initDriverMap);
 {% endif %}
 
-// Listen for live route broadcasts pushed by RouteViewSet.generate_optimal()
-// when an admin builds/regenerates a route for this driver.
 locationWS.onmessage = (event) => {
     try {
         const data = JSON.parse(event.data);
