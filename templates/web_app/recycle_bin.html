@@ -228,94 +228,127 @@
 
 {% block extra_js %}
 <script>
-function fadeRemoveRow(requestId) {
-    const row = document.getElementById(`bin-row-${requestId}`);
-    if (!row) return;
-    row.style.opacity = '0';
-    setTimeout(() => row.remove(), 300);
-    decrementBinBadge();
-}
-
-function decrementBinBadge() {
-    const badge = document.getElementById('recycle-bin-badge');
-    if (!badge || badge.classList.contains('d-none')) return;
-    const current = parseInt(badge.textContent || '0', 10) - 1;
-    if (current > 0) {
-        badge.textContent = current;
-    } else {
-        badge.classList.add('d-none');
-        badge.textContent = '';
+(function() {
+    function fadeRemoveRow(requestId) {
+        const row = document.getElementById(`bin-row-${requestId}`);
+        if (!row) return;
+        row.style.opacity = '0';
+        setTimeout(() => row.remove(), 300);
+        decrementBinBadge();
     }
-}
 
-// ── Restore a request out of the Recycle Bin ──────────────────────────────────
-async function restoreRequest(requestId) {
-    try {
-        const res = await fetch(`/api/waste-requests/${requestId}/restore/`, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (res.ok) {
-            showToast('Request restored.', 'success');
-            fadeRemoveRow(requestId);
+    function decrementBinBadge() {
+        const badge = document.getElementById('recycle-bin-badge');
+        if (!badge || badge.classList.contains('d-none')) return;
+        const current = parseInt(badge.textContent || '0', 10) - 1;
+        if (current > 0) {
+            badge.textContent = current;
         } else {
-            showToast('Failed to restore request.', 'danger');
+            badge.classList.add('d-none');
+            badge.textContent = '';
         }
-    } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
     }
-}
 
-// ── Permanently delete a single request ────────────────────────────────────────
-async function permanentlyDeleteRequest(requestId) {
-    if (!confirm('Permanently delete this request? This cannot be undone.')) return;
-
-    try {
-        const res = await fetch(`/api/waste-requests/${requestId}/`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-            },
-        });
-
-        if (res.ok) {
-            showToast('Request permanently deleted.', 'success');
-            fadeRemoveRow(requestId);
-        } else {
-            showToast('Failed to permanently delete request.', 'danger');
+    function showEmptyStateIfNeeded() {
+        const tbody = document.getElementById('recycle-bin-body');
+        if (!tbody) return;
+        if (!tbody.querySelector('tr[id^="bin-row-"]')) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-5">
+                        <i class="bi bi-recycle fs-2 mb-2 d-block text-secondary"></i>
+                        Recycle Bin is empty.
+                    </td>
+                </tr>`;
+            const emptyBtn = document.querySelector('button[onclick="emptyRecycleBin()"]');
+            if (emptyBtn) emptyBtn.remove();
         }
-    } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
     }
-}
 
-// ── Empty the whole bin ────────────────────────────────────────────────────────
-async function emptyRecycleBin() {
-    if (!confirm('Permanently delete ALL items in the Recycle Bin? This cannot be undone.')) return;
-
-    const rows = document.querySelectorAll('#recycle-bin-body tr[id^="bin-row-"]');
-    for (const row of rows) {
-        const requestId = row.id.replace('bin-row-', '');
+    window.restoreRequest = async function(requestId) {
         try {
-            await fetch(`/api/waste-requests/${requestId}/`, {
+            const res = await fetch(`/api/waste-requests/${requestId}/restore/`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (res.ok) {
+                showToast('Request restored.', 'success');
+                fadeRemoveRow(requestId);
+                setTimeout(showEmptyStateIfNeeded, 350);
+            } else {
+                showToast('Failed to restore request.', 'danger');
+            }
+        } catch (e) {
+            showToast('Network error: ' + e.message, 'danger');
+        }
+    };
+
+    window.permanentlyDeleteRequest = async function(requestId) {
+        if (!confirm('Permanently delete this request? This cannot be undone.')) return;
+
+        try {
+            const res = await fetch(`/api/waste-requests/${requestId}/`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                 },
             });
-        } catch (e) { /* continue with remaining items */ }
-    }
-    showToast('Recycle Bin emptied.', 'success');
-    const badge = document.getElementById('recycle-bin-badge');
-    if (badge) {
-        badge.classList.add('d-none');
-        badge.textContent = '';
-    }
-    setTimeout(() => location.reload(), 800);
-}
+
+            if (res.ok) {
+                showToast('Request permanently deleted.', 'success');
+                fadeRemoveRow(requestId);
+                setTimeout(showEmptyStateIfNeeded, 350);
+            } else {
+                showToast('Failed to permanently delete request.', 'danger');
+            }
+        } catch (e) {
+            showToast('Network error: ' + e.message, 'danger');
+        }
+    };
+
+    window.emptyRecycleBin = async function() {
+        if (!confirm('Permanently delete ALL items in the Recycle Bin? This cannot be undone.')) return;
+
+        const rows = Array.from(document.querySelectorAll('#recycle-bin-body tr[id^="bin-row-"]'));
+        let failedCount = 0;
+
+        for (const row of rows) {
+            const requestId = row.id.replace('bin-row-', '');
+            try {
+                const res = await fetch(`/api/waste-requests/${requestId}/`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    },
+                });
+                if (res.ok) {
+                    row.remove();
+                } else {
+                    failedCount++;
+                }
+            } catch (e) {
+                failedCount++;
+            }
+        }
+
+        if (failedCount === 0) {
+            showToast('Recycle Bin emptied.', 'success');
+        } else {
+            showToast(`Emptied with ${failedCount} item(s) failing to delete.`, 'warning');
+        }
+
+        const badge = document.getElementById('recycle-bin-badge');
+        if (badge) {
+            badge.classList.add('d-none');
+            badge.textContent = '';
+        }
+
+        showEmptyStateIfNeeded();
+    };
+})();
 </script>
 {% endblock %}

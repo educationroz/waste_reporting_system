@@ -229,25 +229,25 @@
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-success bg-opacity-10 p-3 rounded-3 shadow-sm">
                         <div class="text-muted small fw-medium">Total Admins</div>
-                        <div class="fs-3 fw-bold text-success">{{ total_admins }}</div>
+                        <div class="fs-3 fw-bold text-success" id="stat-total-admins">{{ total_admins }}</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-primary bg-opacity-10 p-3 rounded-3 shadow-sm">
                         <div class="text-muted small fw-medium">Active Admins</div>
-                        <div class="fs-3 fw-bold text-primary">{{ active_admins }}</div>
+                        <div class="fs-3 fw-bold text-primary" id="stat-active-admins">{{ active_admins }}</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-warning bg-opacity-10 p-3 rounded-3 shadow-sm">
                         <div class="text-muted small fw-medium">Inactive Admins</div>
-                        <div class="fs-3 fw-bold text-warning">{{ inactive_admins }}</div>
+                        <div class="fs-3 fw-bold text-warning" id="stat-inactive-admins">{{ inactive_admins }}</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-info bg-opacity-10 p-3 rounded-3 shadow-sm">
                         <div class="text-muted small fw-medium">Total Users</div>
-                        <div class="fs-3 fw-bold text-info">{{ all_users }}</div>
+                        <div class="fs-3 fw-bold text-info" id="stat-all-users">{{ all_users }}</div>
                     </div>
                 </div>
             </div>
@@ -266,9 +266,9 @@
                                 <th class="pe-4 py-3 text-end">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="admins-table-body">
                             {% for admin in admin_users %}
-                            <tr>
+                            <tr id="admin-row-{{ admin.id }}">
                                 <td class="ps-4">
                                     <div class="d-flex align-items-center">
                                         {% if admin.profile_picture %}
@@ -470,114 +470,6 @@ function splitFullName(fullName) {
     return [firstName, lastName];
 }
 
-function addAdmin() {
-    const username = document.getElementById('username').value;
-    const email = document.getElementById('email').value;
-    const full_name = document.getElementById('full_name').value;
-    const password = document.getElementById('password').value;
-    const [first_name, last_name] = splitFullName(full_name);
-    
-    if (!username || !email || !password) {
-        alert('Please fill in all required fields');
-        return;
-    }
-    
-    fetch('/api/auth/create-admin/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken'),
-        },
-        body: JSON.stringify({
-            username: username,
-            email: email,
-            first_name: first_name,
-            last_name: last_name,
-            password: password,
-            role: 'admin',
-        }),
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Admin user created successfully!');
-            location.reload();
-        } else {
-            alert('Error: ' + (data.message || 'Failed to create admin'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error creating admin user');
-    });
-}
-
-function updateAdmin() {
-    const adminId = document.getElementById('edit_admin_id').value;
-    const username = document.getElementById('edit_username').value;
-    const email = document.getElementById('edit_email').value;
-    const fullName = document.getElementById('edit_full_name').value;
-    const password = document.getElementById('edit_password').value;
-    const isActive = document.getElementById('edit_is_active').checked;
-    const [first_name, last_name] = splitFullName(fullName);
-
-    if (!adminId || !username || !email) {
-        alert('Username and email are required');
-        return;
-    }
-
-    fetch(`/api/auth/admin/${adminId}/update/`, {
-        method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken'),
-        },
-        body: JSON.stringify({
-            username: username,
-            email: email,
-            first_name: first_name,
-            last_name: last_name,
-            password: password,
-            is_active: isActive,
-        }),
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Admin user updated successfully!');
-            location.reload();
-        } else {
-            alert('Error: ' + (data.message || 'Failed to update admin'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error updating admin user');
-    });
-}
-
-function removeAdmin(adminId) {
-    fetch(`/api/auth/admin/${adminId}/delete/`, {
-        method: 'DELETE',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Admin user removed successfully!');
-            location.reload();
-        } else {
-            alert('Error: ' + (data.message || 'Failed to remove admin'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error removing admin user');
-    });
-}
-
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -591,6 +483,278 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+// ── Live DOM helpers (no reload) ──────────────────────────────────────────
+
+function bumpStat(elId, delta) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const current = parseInt(el.textContent) || 0;
+    el.textContent = Math.max(0, current + delta);
+}
+
+function adminFullName(admin) {
+    const fn = (admin.first_name || '').trim();
+    const ln = (admin.last_name || '').trim();
+    const full = `${fn} ${ln}`.trim();
+    return full || admin.username;
+}
+
+function todayDateStr() {
+    const d = new Date();
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function buildAdminRowHtml(admin, isActive) {
+    const name = adminFullName(admin);
+    const statusBadge = isActive
+        ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5"><i class="bi bi-check-circle me-1"></i>Active</span>'
+        : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5"><i class="bi bi-x-circle me-1"></i>Inactive</span>';
+
+    return `
+        <tr id="admin-row-${admin.id}">
+            <td class="ps-4">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle bg-success bg-opacity-10 me-3 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                        <i class="bi bi-person text-success fs-5"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-dark">${name}</div>
+                        <div class="small text-muted">-</div>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <a href="mailto:${admin.email}" class="text-decoration-none text-success fw-medium">${admin.email}</a>
+            </td>
+            <td>
+                <span class="badge bg-success bg-opacity-10 text-success fw-semibold px-2 py-1.5">${admin.username}</span>
+            </td>
+            <td>${statusBadge}</td>
+            <td>
+                <span class="text-muted small fw-medium">${todayDateStr()}</span>
+            </td>
+            <td class="pe-4 text-end">
+                <div class="btn-group btn-group-sm" role="group">
+                    <button
+                        class="btn btn-outline-secondary btn-sm rounded-start"
+                        data-bs-toggle="modal"
+                        data-bs-target="#editAdminModal"
+                        data-admin-id="${admin.id}"
+                        data-admin-username="${admin.username}"
+                        data-admin-email="${admin.email}"
+                        data-admin-first-name="${admin.first_name || ''}"
+                        data-admin-last-name="${admin.last_name || ''}"
+                        data-admin-full-name="${name}"
+                        data-admin-active="${isActive}"
+                        title="Edit Administrative Access"
+                    >
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm rounded-end" onclick="if(confirm('Are you absolute sure to remove this admin?')) { removeAdmin(${admin.id}); }" title="Remove Administrative Access">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
+function insertAdminRow(admin) {
+    const tbody = document.getElementById('admins-table-body');
+    if (!tbody) return;
+    const emptyRow = tbody.querySelector('tr td[colspan]');
+    if (emptyRow) emptyRow.closest('tr').remove();
+    tbody.insertAdjacentHTML('afterbegin', buildAdminRowHtml(admin, true));
+}
+
+function updateAdminRowDom(admin, isActive) {
+    const row = document.getElementById(`admin-row-${admin.id}`);
+    if (!row) return;
+    const name = adminFullName(admin);
+
+    const nameEl = row.children[0].querySelector('.fw-bold');
+    if (nameEl) nameEl.textContent = name;
+
+    const emailLink = row.children[1].querySelector('a');
+    if (emailLink) {
+        emailLink.href = `mailto:${admin.email}`;
+        emailLink.textContent = admin.email;
+    }
+
+    const usernameBadge = row.children[2].querySelector('.badge');
+    if (usernameBadge) usernameBadge.textContent = admin.username;
+
+    row.children[3].innerHTML = isActive
+        ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5"><i class="bi bi-check-circle me-1"></i>Active</span>'
+        : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5"><i class="bi bi-x-circle me-1"></i>Inactive</span>';
+
+    const editBtn = row.querySelector('button[data-bs-target="#editAdminModal"]');
+    if (editBtn) {
+        editBtn.dataset.adminUsername = admin.username;
+        editBtn.dataset.adminEmail = admin.email;
+        editBtn.dataset.adminFirstName = admin.first_name || '';
+        editBtn.dataset.adminLastName = admin.last_name || '';
+        editBtn.dataset.adminFullName = name;
+        editBtn.dataset.adminActive = isActive;
+    }
+}
+
+// ── Add / Update / Remove — reload nagari live DOM update ─────────────────
+
+async function addAdmin() {
+    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const full_name = document.getElementById('full_name').value.trim();
+    const password = document.getElementById('password').value;
+    const [first_name, last_name] = splitFullName(full_name);
+
+    if (!username || !email || !password) {
+        showToast('Please fill in all required fields.', 'warning');
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/auth/create-admin/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({
+                username: username,
+                email: email,
+                first_name: first_name,
+                last_name: last_name,
+                password: password,
+                role: 'admin',
+            }),
+        });
+
+        const data = await res.json();
+
+        // NOTE: यो backend ले kahilyai `success` key फर्काउँदैन — यो field
+        // check गर्दा पहिलेको कोड सधैँ "error" branch मा जान्थ्यो, admin
+        // बनिसके पनि। `data.id` check गर्नु नै सहि तरिका हो।
+        if (res.ok && data.id) {
+            showToast('Admin user created successfully!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('addAdminModal')).hide();
+            document.getElementById('addAdminForm').reset();
+            insertAdminRow(data);
+            bumpStat('stat-total-admins', 1);
+            bumpStat('stat-active-admins', 1);
+        } else {
+            const errMsg = typeof data === 'object'
+                ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                : String(data);
+            showToast('Error: ' + errMsg, 'danger');
+        }
+    } catch (e) {
+        showToast('Error creating admin user: ' + e.message, 'danger');
+    }
+}
+
+async function updateAdmin() {
+    const adminId = document.getElementById('edit_admin_id').value;
+    const username = document.getElementById('edit_username').value.trim();
+    const email = document.getElementById('edit_email').value.trim();
+    const fullName = document.getElementById('edit_full_name').value.trim();
+    const password = document.getElementById('edit_password').value;
+    const isActive = document.getElementById('edit_is_active').checked;
+    const [first_name, last_name] = splitFullName(fullName);
+
+    if (!adminId || !username || !email) {
+        showToast('Username and email are required.', 'warning');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/auth/admin/${adminId}/update/`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({
+                username: username,
+                email: email,
+                first_name: first_name,
+                last_name: last_name,
+                password: password,
+                is_active: isActive,
+            }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.id) {
+            showToast('Admin user updated successfully!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editAdminModal')).hide();
+
+            const row = document.getElementById(`admin-row-${adminId}`);
+            const wasActive = row ? !!row.querySelector('.bg-success-subtle') : true;
+
+            updateAdminRowDom(data, isActive);
+
+            if (wasActive !== isActive) {
+                bumpStat('stat-active-admins', isActive ? 1 : -1);
+                bumpStat('stat-inactive-admins', isActive ? -1 : 1);
+            }
+        } else {
+            const errMsg = typeof data === 'object'
+                ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                : String(data);
+            showToast('Error: ' + errMsg, 'danger');
+        }
+    } catch (e) {
+        showToast('Error updating admin user: ' + e.message, 'danger');
+    }
+}
+
+async function removeAdmin(adminId) {
+    try {
+        const res = await fetch(`/api/auth/admin/${adminId}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+        });
+
+        if (res.ok || res.status === 204) {
+            showToast('Admin user removed successfully!', 'success');
+
+            const row = document.getElementById(`admin-row-${adminId}`);
+            const wasActive = row ? !!row.querySelector('.bg-success-subtle') : true;
+            if (row) row.remove();
+
+            bumpStat('stat-total-admins', -1);
+            bumpStat(wasActive ? 'stat-active-admins' : 'stat-inactive-admins', -1);
+
+            const tbody = document.getElementById('admins-table-body');
+            if (tbody && !tbody.querySelector('tr')) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox fs-2 mb-2 d-block text-secondary"></i>
+                            <span class="fw-medium">No system administrators registered yet.</span>
+                        </td>
+                    </tr>`;
+            }
+        } else {
+            let errMsg = 'Failed to remove admin user.';
+            try {
+                const data = await res.json();
+                errMsg = typeof data === 'object'
+                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                    : String(data);
+            } catch (e) {}
+            showToast(errMsg, 'danger');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'danger');
+    }
 }
 </script>
 {% endblock %}

@@ -251,7 +251,7 @@
                     <div class="card border-0 bg-warning bg-opacity-10 h-100">
                         <div class="card-body text-center">
                             <div class="text-muted small">Pending</div>
-                            <div class="fs-2 fw-bold text-warning">{{ pending_count }}</div>
+                            <div class="fs-2 fw-bold text-warning" id="stat-pending-count">{{ pending_count }}</div>
                         </div>
                     </div>
                 </div>
@@ -259,7 +259,7 @@
                     <div class="card border-0 bg-success bg-opacity-10 h-100">
                         <div class="card-body text-center">
                             <div class="text-muted small">Completed</div>
-                            <div class="fs-2 fw-bold text-success">{{ completed_count }}</div>
+                            <div class="fs-2 fw-bold text-success" id="stat-completed-count">{{ completed_count }}</div>
                         </div>
                     </div>
                 </div>
@@ -416,7 +416,7 @@
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="recent-requests-body">
                             {% for req in my_requests %}
                             <tr id="home-request-row-{{ req.id }}">
                                 <td>{{ req.id }}</td>
@@ -1280,6 +1280,92 @@ function savePendingClaimToken(token) {
     }
 }
 
+// ── Live DOM helpers (no reload) ────────────────────────────────────────────
+
+function bumpStat(elId, delta) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const current = parseInt(el.textContent) || 0;
+    el.textContent = Math.max(0, current + delta);
+}
+
+const HOME_STATUS_BADGE_CLASS = {
+    completed: 'bg-success',
+    pending: 'bg-warning text-dark',
+    in_progress: 'bg-info',
+    cancelled: 'bg-danger',
+    assigned: 'bg-primary',
+};
+const HOME_STATUS_LABELS = {
+    completed: 'Completed',
+    pending: 'Pending',
+    in_progress: 'In Progress',
+    cancelled: 'Cancelled',
+    assigned: 'Assigned',
+};
+
+// Recent Requests table को row भित्र status badge + action button
+// reload नगरी update गर्ने (cancel, ra WebSocket status-update दुबैले प्रयोग गर्छन्)
+function applyHomeRequestRowUpdate(requestId, newStatus) {
+    const row = document.getElementById(`home-request-row-${requestId}`);
+    if (!row) return;
+
+    const statusCell = row.children[2]; // Status is 3rd <td>, index 2
+    if (statusCell) {
+        const badge = statusCell.querySelector('.badge');
+        if (badge) {
+            badge.className = `badge ${HOME_STATUS_BADGE_CLASS[newStatus] || 'bg-secondary'}`;
+            badge.textContent = HOME_STATUS_LABELS[newStatus] || newStatus;
+        }
+    }
+
+    const actionCell = row.children[6]; // Actions is 7th <td>, index 6
+    if (actionCell) {
+        if (newStatus === 'pending') {
+            actionCell.innerHTML = `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${requestId})">Cancel</button>`;
+        } else if (newStatus === 'completed' || newStatus === 'cancelled' || newStatus === 'in_progress') {
+            actionCell.innerHTML = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${requestId})" title="Move to Recycle Bin"><i class="bi bi-recycle"></i> Move to Bin</button>`;
+        } else {
+            actionCell.innerHTML = '—';
+        }
+    }
+}
+
+// नयाँ request submit भएपछि Recent Requests table मा थप्ने
+function insertHomeRequestRow(req) {
+    const tbody = document.getElementById('recent-requests-body');
+    if (!tbody) return;
+
+    const emptyRow = tbody.querySelector('tr td[colspan]');
+    if (emptyRow) emptyRow.closest('tr').remove();
+
+    const statusClass = HOME_STATUS_BADGE_CLASS[req.status] || 'bg-primary';
+    const statusLabel = HOME_STATUS_LABELS[req.status] || req.status;
+    const driverName = req.driver && req.driver.user ? req.driver.user.username : '—';
+    const photoCell = req.photo
+        ? `<a href="${req.photo}" target="_blank"><img src="${req.photo}" alt="photo" style="height:36px;width:36px;object-fit:cover;border-radius:4px;"></a>`
+        : '<span class="text-muted small">—</span>';
+    const dateStr = req.scheduled_date
+        ? new Date(req.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        : '—';
+    const actionHtml = req.status === 'pending'
+        ? `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${req.id})">Cancel</button>`
+        : '—';
+
+    const rowHtml = `
+        <tr id="home-request-row-${req.id}">
+            <td>${req.id}</td>
+            <td>${req.waste_type_display || req.waste_type}</td>
+            <td><span class="badge ${statusClass}">${statusLabel}</span></td>
+            <td class="small">${driverName}</td>
+            <td>${photoCell}</td>
+            <td class="small text-muted">${dateStr}</td>
+            <td>${actionHtml}</td>
+        </tr>
+    `;
+    tbody.insertAdjacentHTML('afterbegin', rowHtml);
+}
+
 // ── Submit Request ───────────────────────────────────────────────────────────
 async function submitRequest() {
     const address  = document.getElementById('pickup-address').value.trim();
@@ -1370,7 +1456,13 @@ async function submitRequest() {
             firstPhotoGPS = null;
             locationLockedByPhoto = false;
             renderPhotoThumbnails();
-            setTimeout(() => location.reload(), 1200);
+
+            // Reload नगरी: नयाँ request Recent Requests table मा थप्ने,
+            // pending count तुरुन्तै अपडेट गर्ने
+            if (data && data.id) {
+                insertHomeRequestRow(data);
+                bumpStat('stat-pending-count', 1);
+            }
         } else {
             const errMsg = typeof data === 'object'
                 ? Object.entries(data).map(([k,v]) => `${k}: ${v}`).join(', ')
@@ -1393,7 +1485,8 @@ async function cancelRequest(requestId) {
     const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
     if (data && data.id) {
         showToast('Request cancelled.', 'success');
-        setTimeout(() => location.reload(), 1000);
+        applyHomeRequestRowUpdate(requestId, 'cancelled');
+        bumpStat('stat-pending-count', -1);
     } else {
         showToast('Failed to cancel request.', 'danger');
     }
@@ -1416,6 +1509,9 @@ async function deleteRequest(requestId) {
             showToast('Request moved to Recycle Bin.', 'success');
             const row = document.getElementById(`home-request-row-${requestId}`);
             if (row) row.remove();
+
+            // Recycle Bin badge (sidebar) reload नगरी sync गर्ने — base.html मा defined
+            if (typeof refreshRecycleBinBadge === 'function') refreshRecycleBinBadge();
         } else {
             let errMsg = 'Failed to move request to Recycle Bin.';
             try {
@@ -1541,7 +1637,7 @@ try {
         const data = JSON.parse(e.data);
         if (data.type === 'request_update') {
             showToast(`Request #${data.request_id} updated to: ${data.status}`, 'info');
-            setTimeout(() => location.reload(), 1500);
+            applyHomeRequestRowUpdate(data.request_id, data.status);
         }
     };
 } catch (e) {}

@@ -211,7 +211,7 @@
                     <div class="card border-0 bg-success bg-opacity-10 h-100">
                         <div class="card-body text-center">
                             <div class="text-muted small">Completed Today</div>
-                            <div class="fs-2 fw-bold text-success">{{ completed_today }}</div>
+                            <div class="fs-2 fw-bold text-success" id="stat-completed-today">{{ completed_today }}</div>
                         </div>
                     </div>
                 </div>
@@ -219,7 +219,7 @@
                     <div class="card border-0 bg-info bg-opacity-10 h-100">
                         <div class="card-body text-center">
                             <div class="text-muted small">Total Trips</div>
-                            <div class="fs-2 fw-bold text-info">{{ driver.total_trips }}</div>
+                            <div class="fs-2 fw-bold text-info" id="stat-total-trips">{{ driver.total_trips }}</div>
                         </div>
                     </div>
                 </div>
@@ -230,12 +230,12 @@
                                 This Month
                                 <span class="text-muted" style="font-size:0.7rem;">({{ current_month_label }})</span>
                             </div>
-                            <div class="fs-2 fw-bold text-warning">{{ completed_this_month }}</div>
+                            <div class="fs-2 fw-bold text-warning" id="stat-completed-month">{{ completed_this_month }}</div>
                         </div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <div class="card border-0 {% if driver.is_available %}bg-success{% else %}bg-secondary{% endif %} bg-opacity-10 h-100">
+                    <div class="card border-0 {% if driver.is_available %}bg-success{% else %}bg-secondary{% endif %} bg-opacity-10 h-100" id="availability-stat-card">
                         <div class="card-body text-center">
                             <div class="text-muted small">Status</div>
                             <div class="fw-bold {% if driver.is_available %}text-success{% else %}text-secondary{% endif %}" id="availability-label">
@@ -323,9 +323,9 @@
                         <thead class="table-light">
                             <tr><th>#</th><th>User</th><th>Address</th><th>Type</th><th>Status</th><th>Date</th><th>Action</th></tr>
                         </thead>
-                        <tbody>
+                        <tbody id="assigned-requests-body">
                             {% for req in assigned_requests %}
-                            <tr>
+                            <tr id="assigned-row-{{ req.id }}">
                                 <td>{{ req.id }}</td>
                                 <td>{{ req.user.username }}</td>
                                 <td class="small">{{ req.pickup_address|truncatechars:30 }}</td>
@@ -373,7 +373,7 @@
                                 <th>Completed On</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="completed-history-body">
                             {% for req in completed_history %}
                             <tr>
                                 <td class="fw-bold text-secondary">#{{ req.id }}</td>
@@ -446,6 +446,86 @@ async function updateLocation() {
     }
 }
 
+// ── Live DOM helpers (no reload) ─────────────────────────────────────────
+
+function bumpStat(elId, delta) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const current = parseInt(el.textContent) || 0;
+    el.textContent = current + delta;
+}
+
+// Assigned table row status/action cell update — "Start" clicked (assigned -> in_progress)
+function applyAssignedRowUpdate(requestId, newStatus) {
+    const row = document.getElementById(`assigned-row-${requestId}`);
+    if (!row) return;
+
+    const statusCell = row.children[4]; // Status is 5th <td>, index 4
+    if (statusCell) {
+        const badge = statusCell.querySelector('.badge');
+        if (badge) {
+            badge.className = `badge ${newStatus === 'in_progress' ? 'bg-info' : 'bg-primary'}`;
+            badge.textContent = newStatus === 'in_progress' ? 'In Progress' : newStatus;
+        }
+    }
+
+    const actionCell = row.children[6]; // Action is 7th <td>, index 6
+    if (actionCell && newStatus === 'in_progress') {
+        actionCell.innerHTML = `
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-success" onclick="updateStatus(${requestId}, 'completed')">Done</button>
+            </div>`;
+    }
+}
+
+// Job completed — row assigned table बाट हटाउने (completed row त्यहाँ देखिनु हुँदैन)
+function removeAssignedRow(requestId) {
+    const row = document.getElementById(`assigned-row-${requestId}`);
+    if (row) row.remove();
+
+    const tbody = document.getElementById('assigned-requests-body');
+    if (tbody && !tbody.querySelector('tr')) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No assigned requests.</td></tr>';
+    }
+}
+
+// Job completed — Completed Pickup History table मा नयाँ row माथि थप्ने
+function prependCompletedHistoryRow(req) {
+    const tbody = document.getElementById('completed-history-body');
+    if (!tbody) return;
+
+    const emptyRow = tbody.querySelector('tr td[colspan]');
+    if (emptyRow) emptyRow.closest('tr').remove();
+
+    const photoCell = req.photo
+        ? `<a href="${req.photo}" target="_blank"><img src="${req.photo}" alt="photo" class="history-photo-thumb"></a>`
+        : '<span class="text-muted small">—</span>';
+
+    const citizen = req.user
+        ? (req.user.username || (typeof req.user === 'string' ? req.user : '—'))
+        : '<i class="bi bi-person-x"></i> Guest';
+
+    const completedAt = req.completed_at
+        ? new Date(req.completed_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : '—';
+
+    const address = (req.pickup_address || '').length > 50
+        ? req.pickup_address.slice(0, 50) + '…'
+        : (req.pickup_address || '');
+
+    const rowHtml = `
+        <tr>
+            <td class="fw-bold text-secondary">#${req.id}</td>
+            <td>${photoCell}</td>
+            <td class="small" style="max-width: 260px;">${address}</td>
+            <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">${req.waste_type_display || req.waste_type || ''}</span></td>
+            <td class="small">${citizen}</td>
+            <td class="small text-muted">${completedAt}</td>
+        </tr>
+    `;
+    tbody.insertAdjacentHTML('afterbegin', rowHtml);
+}
+
 // ── Update Request Status ────────────────────────────────────────────────
 // "Completed" mark गर्नु अघि GPS चाहिन्छ — HARD BLOCK. GPS नपाए backend सम्म
 // request नै पुग्दैन। GPS पाए, backend मा पुगेपछि pickup location सँग
@@ -490,7 +570,17 @@ async function updateStatus(requestId, newStatus) {
 
         if (res.ok && data.id) {
             showToast(`Status updated to ${newStatus}`, 'success');
-            setTimeout(() => location.reload(), 800);
+
+            if (newStatus === 'completed') {
+                removeAssignedRow(requestId);
+                prependCompletedHistoryRow(data);
+                bumpStat('stat-completed-today', 1);
+                bumpStat('stat-total-trips', 1);
+                bumpStat('stat-completed-month', 1);
+                if (typeof loadMapData === 'function') loadMapData();
+            } else {
+                applyAssignedRowUpdate(requestId, newStatus);
+            }
         } else {
             showToast(data.error || 'Update failed.', 'danger');
         }
@@ -506,7 +596,21 @@ async function toggleAvailability() {
     const data = await API.patch(`/api/drivers/${driverId}/toggle_availability/`, {});
     if (data && data.id) {
         showToast(`Changed to ${data.is_available ? 'Available' : 'Busy'}`, 'success');
-        setTimeout(() => location.reload(), 800);
+
+        const label = document.getElementById('availability-label');
+        const btn = document.getElementById('toggle-availability-btn');
+        const statCard = document.getElementById('availability-stat-card');
+
+        if (label) {
+            label.textContent = data.is_available ? 'Available' : 'Busy';
+            label.className = `fw-bold ${data.is_available ? 'text-success' : 'text-secondary'}`;
+        }
+        if (btn) {
+            btn.className = `btn btn-sm ${data.is_available ? 'btn-outline-secondary' : 'btn-outline-success'} mt-1`;
+        }
+        if (statCard) {
+            statCard.className = `card border-0 ${data.is_available ? 'bg-success' : 'bg-secondary'} bg-opacity-10 h-100`;
+        }
     } else {
         showToast('Failed to update availability.', 'danger');
     }

@@ -426,10 +426,13 @@ async function deleteSchedule(scheduleId) {
         if (res.ok || res.status === 204) {
             showToast('Operational route sequence entry successfully dropped.', 'success');
             const row = document.getElementById(`schedule-row-${scheduleId}`);
-            if (row) {
-                row.remove();
-            } else {
-                setTimeout(() => location.reload(), 800);
+            if (row) row.remove();
+
+            // Sabai row hatisake pachi "khali table" message देखाउने — reload
+            // नगरी नै, natra fallback reload ekdum rare edge-case ma matra chahिन्छ
+            const tbody = document.getElementById('schedules-table-body');
+            if (tbody && !tbody.querySelector('tr')) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-1"></i> No system-wide scheduling matrices map inside active storage logs.</td></tr>';
             }
         } else {
             let errMsg = 'Failed to drop scheduling database record node.';
@@ -447,12 +450,18 @@ async function deleteSchedule(scheduleId) {
 }
 
 async function addSchedule() {
+    const zoneInput = document.getElementById('add-zone');
+    const daySelect = document.getElementById('add-day');
+    const freqSelect = document.getElementById('add-frequency');
+    const driverSelect = document.getElementById('add-driver');
+    const vehicleSelect = document.getElementById('add-vehicle');
+
     const payload = {
-        zone_name: document.getElementById('add-zone').value,
-        day_of_week: parseInt(document.getElementById('add-day').value),
-        frequency: document.getElementById('add-frequency').value,
-        driver: document.getElementById('add-driver').value || null,
-        vehicle: document.getElementById('add-vehicle').value || null,
+        zone_name: zoneInput.value,
+        day_of_week: parseInt(daySelect.value),
+        frequency: freqSelect.value,
+        driver: driverSelect.value || null,
+        vehicle: vehicleSelect.value || null,
         is_active: true,
         start_time: "00:00",
     };
@@ -465,13 +474,83 @@ async function addSchedule() {
     const data = await API.post('/api/schedules/', payload);
     if (data && data.id) {
         showToast('Naya pipeline schedule successfully created!', 'success');
-        const modalEl = document.getElementById('addScheduleModal');
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        modal.hide();
-        setTimeout(() => location.reload(), 800);
+        bootstrap.Modal.getInstance(document.getElementById('addScheduleModal')).hide();
+
+        // Naya row lai DOM ma directly insert garne — reload nagari nai
+        insertScheduleRow(data, {
+            zoneName: payload.zone_name,
+            daySelect, freqSelect, driverSelect, vehicleSelect,
+        });
     } else {
         showToast('Network fault or schema reject during insertion.', 'danger');
     }
+}
+
+// ── Naya schedule row lai reload nagari table ma insert garne ──────────────
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DAY_BADGE_CLASS = [
+    'bg-secondary bg-opacity-10 text-dark',
+    'bg-secondary bg-opacity-10 text-dark',
+    'bg-secondary bg-opacity-10 text-dark',
+    'bg-secondary bg-opacity-10 text-dark',
+    'bg-secondary bg-opacity-10 text-dark',
+    'bg-success bg-opacity-10 text-success',
+    'bg-danger bg-opacity-10 text-danger',
+];
+
+function insertScheduleRow(scheduleData, ctx) {
+    const day = scheduleData.day_of_week;
+    const dayHtml = (day !== null && day !== undefined && DAY_NAMES[day])
+        ? `<span class="badge ${DAY_BADGE_CLASS[day]}">${DAY_NAMES[day]}</span>`
+        : '<span class="text-muted small italic">—</span>';
+
+    const freqLabel = ctx.freqSelect.options[ctx.freqSelect.selectedIndex].text;
+
+    const driverHtml = ctx.driverSelect.value
+        ? `<span class="text-dark"><i class="bi bi-person text-secondary me-1"></i>${ctx.driverSelect.options[ctx.driverSelect.selectedIndex].text.split('[')[0].trim()}</span>`
+        : '<span class="text-muted small italic">No Operator Bound</span>';
+
+    const vehicleHtml = ctx.vehicleSelect.value
+        ? `<code class="text-info font-monospace" style="font-size: 0.85rem;">${ctx.vehicleSelect.options[ctx.vehicleSelect.selectedIndex].text.split('—')[0].trim()}</code>`
+        : '<span class="text-muted small italic">—</span>';
+
+    const rowHtml = `
+        <tr id="schedule-row-${scheduleData.id}">
+            <td class="fw-bold text-secondary">#${scheduleData.id}</td>
+            <td class="fw-bold text-dark">${ctx.zoneName}</td>
+            <td class="fw-medium text-dark">${dayHtml}</td>
+            <td><span class="badge bg-primary bg-opacity-10 text-primary px-2.5 py-1">${freqLabel}</span></td>
+            <td class="fw-semibold">${driverHtml}</td>
+            <td>${vehicleHtml}</td>
+            <td>
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                        id="schedule-active-${scheduleData.id}" checked
+                        onchange="toggleActive(${scheduleData.id}, this.checked)">
+                </div>
+            </td>
+            <td class="text-end pe-4">
+                <button class="btn btn-sm btn-outline-danger px-3 py-1" style="font-size: 0.8rem;" onclick="deleteSchedule(${scheduleData.id})">
+                    <i class="bi bi-trash me-1"></i>Purge
+                </button>
+            </td>
+        </tr>`;
+
+    const tbody = document.getElementById('schedules-table-body');
+
+    // "No scheduling matrices..." wala empty row bhaye hataउने
+    const emptyRow = tbody.querySelector('td[colspan]');
+    if (emptyRow) emptyRow.closest('tr').remove();
+
+    tbody.insertAdjacentHTML('afterbegin', rowHtml);
+
+    // Form reset — modal khuleko bela user le pheri fresh state dekhos
+    ctx.zoneName = '';
+    document.getElementById('add-zone').value = '';
+    document.getElementById('add-day').selectedIndex = 0;
+    document.getElementById('add-frequency').selectedIndex = 0;
+    document.getElementById('add-driver').value = '';
+    document.getElementById('add-vehicle').value = '';
 }
 </script>
 {% endblock %}

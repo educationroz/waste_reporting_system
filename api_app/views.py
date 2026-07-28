@@ -182,7 +182,21 @@ def _notify_all_users(title, message, notification_type='info'):
             message=message,
             notification_type=notification_type,
         )
-
+def _notify_admins(title, message, notification_type='info'):
+    """
+    Notify every admin account (DB row + live WS push each). Used for
+    events admins need to react to immediately — e.g. a new complaint
+    being filed — so the admin sidebar's complaints badge can update
+    live via WebSocket instead of only refreshing on next page load.
+    """
+    User = get_user_model()
+    for admin_user in User.objects.filter(is_active=True, role='admin'):
+        _create_notification(
+            user=admin_user,
+            title=title,
+            message=message,
+            notification_type=notification_type,
+        )
 
 def _get_backup_files():
     files = []
@@ -1265,8 +1279,12 @@ class NotificationViewSet(viewsets.ModelViewSet):
             'related_request__driver__user',
             'related_request__driver__vehicle',
         )
-        if user.role == 'admin':
-            return qs
+        # Admin ko lagi pani afnै account ko notification matra —
+        # 'return qs' le sabai user ko personal notification samet
+        # admin ko feed ma dekhauँdaithyo (privacy leak + confusing UI).
+        # Checkpoint added/updated/removed jasto admin-wide broadcast
+        # _notify_all_users() le admin lai afnै copy pahilehi diisakeko
+        # huncha, tesैle yo filter le tiनীहरूलाई hataउँdaina.
         return qs.filter(user=user)
 
     @action(detail=False, methods=['patch'])
@@ -1357,6 +1375,13 @@ class ComplaintViewSet(viewsets.ModelViewSet):
         _log_admin_action(
             self.request, 'create', 'Complaint', complaint,
             f'{self.request.user.username} filed complaint #{complaint.id} ({complaint.get_complaint_type_display()})'
+        )
+        # NAYA: admin lai live notify garne — yehi bina admin ko complaints
+        # badge kahilyai reload nagari update hudaina thiyo
+        _notify_admins(
+            title='New Complaint Filed',
+            message=f'{self.request.user.username} filed a complaint: "{complaint.subject}".',
+            notification_type='warning',
         )
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])

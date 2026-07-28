@@ -221,48 +221,58 @@
 
 {% block extra_js %}
 <script>
-async function cancelRequest(requestId) {
-    if (!confirm('Cancel this request?')) return;
-    const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
-    if (data && data.id) {
-        showToast('Request cancelled.', 'success');
-        setTimeout(() => location.reload(), 1000);
-    } else {
-        showToast('Failed to cancel request.', 'danger');
+(function() {
+    function showEmptyStateIfNeeded() {
+        const tbody = document.querySelector('table tbody');
+        if (!tbody) return;
+        if (!tbody.querySelector('tr[id^="request-row-"]')) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">You haven't submitted any requests yet.</td></tr>`;
+        }
     }
-}
 
-// DELETE request ley usually 204 No Content (khali body) return garcha,
-// tesैle yaha API.delete() (jun always res.json() call garcha) prayog nagari
-// direct fetch() bata handle gareko — 204 ma .json() call garda crash huncha.
-async function deleteRequest(requestId) {
-    if (!confirm('Permanently delete this request? This cannot be undone.')) return;
-
-    try {
-        const res = await fetch(`/api/waste-requests/${requestId}/`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${getToken()}`,
-            },
-        });
-
-        if (res.ok) {
-            showToast('Request deleted.', 'success');
+    window.cancelRequest = async function(requestId) {
+        if (!confirm('Cancel this request?')) return;
+        const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
+        if (data && data.id) {
+            showToast('Request cancelled and moved to Recycle Bin.', 'success');
             const row = document.getElementById(`request-row-${requestId}`);
             if (row) row.remove();
+            showEmptyStateIfNeeded();
         } else {
-            let errMsg = 'Failed to delete request.';
-            try {
-                const data = await res.json();
-                errMsg = typeof data === 'object'
-                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
-                    : String(data);
-            } catch (e) { /* body khali huna sakcha, ignore */ }
-            showToast(errMsg, 'danger');
+            showToast('Failed to cancel request.', 'danger');
         }
-    } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
-    }
-}
+    };
+
+    window.deleteRequest = async function(requestId) {
+        if (!confirm('Permanently delete this request? This cannot be undone.')) return;
+
+        try {
+            const res = await fetch(`/api/waste-requests/${requestId}/`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                },
+            });
+
+            if (res.ok) {
+                showToast('Request deleted.', 'success');
+                const row = document.getElementById(`request-row-${requestId}`);
+                if (row) row.remove();
+                showEmptyStateIfNeeded();
+            } else {
+                let errMsg = 'Failed to delete request.';
+                try {
+                    const data = await res.json();
+                    errMsg = typeof data === 'object'
+                        ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                        : String(data);
+                } catch (e) { /* body khali huna sakcha, ignore */ }
+                showToast(errMsg, 'danger');
+            }
+        } catch (e) {
+            showToast('Network error: ' + e.message, 'danger');
+        }
+    };
+})();
 </script>
 {% endblock %}

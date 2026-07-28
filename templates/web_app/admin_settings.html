@@ -1135,7 +1135,7 @@ window.addEventListener('DOMContentLoaded', () => {
     loadBackupFiles();
 });
 
-// ── Add Setting Node Async Trigger ───────────────────────────────────────────
+// ── Add Setting Node Async Trigger — reload nagari modal band + form reset ──
 async function addSetting() {
     const key = document.getElementById('setting_key').value.trim();
     const value = document.getElementById('setting_value').value.trim();
@@ -1160,7 +1160,7 @@ async function addSetting() {
         if (res.ok) {
             showToast('Setting added successfully!', 'success');
             bootstrap.Modal.getInstance(document.getElementById('addSettingModal')).hide();
-            setTimeout(() => location.reload(), 1000);
+            document.getElementById('addSettingForm').reset();
         } else {
             const err = await res.json();
             showToast('Error: ' + JSON.stringify(err), 'danger');

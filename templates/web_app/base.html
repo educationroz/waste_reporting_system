@@ -9,9 +9,22 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="{% static 'web_app/css/main.css' %}" rel="stylesheet">
+
+    <!-- ── htmx + head-support extension ────────────────────────────────
+         hx-boost use garda body matra swap huncha by default — head
+         (jaha extra_css ko <style> block basxa) swap hudaina. Yo
+         head-support extension le naya page ko <head> content (naya
+         <style> tags samet) auto-merge garidincha, tesले page-specific
+         CSS pani reload nagari sahi apply huncha. -->
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/ext/head-support.js"></script>
+
     <script>
         (function () {
             document.documentElement.style.visibility = "hidden";
+            window.setTimeout(function () {
+            document.documentElement.style.visibility = "visible";
+        }, 2000);
         })();
     </script>
     <style>
@@ -32,18 +45,15 @@
   /* ३. भाषा छान्ने बक्सलाई स्क्रिनको बिचमा प्रोफेसनल देखाउने स्टाइल */
   #custom-lang-switcher {
       position: fixed;
-      top: 85px; /* नेभिगेसन बार भन्दा ठीक मुनि */
+      top: 85px;
       left: 50%;
       transform: translateX(-50%) translateY(-8px);
-      z-index: 1040; /* Navbar भन्दा माथि बस्न */
+      z-index: 1040;
       background: white;
       padding: 12px 24px;
       border-radius: 30px;
       box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-      border: 2px solid #049b09; /* Safha Sahar को थिम हरियो रंग */
-      /* display:none प्रयोग नगर्ने — Google Translate को dropdown
-         hidden container भित्र सही तरिकाले render हुँदैन, त्यसैले
-         visibility/opacity ले लुकाउने, तर element भने layout मा राख्ने */
+      border: 2px solid #049b09;
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
@@ -57,7 +67,6 @@
       transform: translateX(-50%) translateY(0);
   }
 
-  /* ४. गुगलको आफ्नो लोगो लुकाउने */
   .goog-logo-link {
       display: none !important;
   }
@@ -67,7 +76,6 @@
       font-size: 0px !important;
   }
 
-  /* ५. ड्रपडाउन (Select Box) लाई सफा बनाउने */
   .goog-te-gadget .goog-te-combo {
       color: #333 !important;
       font-size: 15px !important;
@@ -79,15 +87,28 @@
       outline: none;
   }
 
-  /* ६. Translate box भित्रको Close (X) बटनलाई राम्ररी राख्ने */
   #custom-lang-switcher .btn-close {
       font-size: 0.65rem;
       margin: 0;
   }
+
+  /* htmx page-transition ma flash/flicker nadekhos vaneर halka fade */
+  .htmx-swapping #page-content {
+      opacity: 0.4;
+      transition: opacity 0.15s ease-out;
+  }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<!-- ── HTMX BOOST — <body> मा राखियो ──────────────────────────────────
+     Pahile yo <main> ma matra thiyo, tesले garda navbar (माथिको <nav>,
+     jun <main> bahira cha) bhitraka link haru boost hudainthe — Dashboard/
+     Requests/Drivers/... navbar link click garda ajhai full page reload
+     hunthyo. Ahile <body> ma rakhepachi, hx-boost/hx-target/hx-select
+     tallo sabai child element (navbar + sidebar + content) le automatically
+     inherit garchan, tesले duवैतिर बाटैको link boosted (AJAX-style,
+     reload-free) huन्छ। -->
+<body hx-ext="head-support" hx-boost="true" hx-target="#page-content" hx-select="#page-content" hx-swap="innerHTML show:window:top">
 
 <nav class="navbar navbar-expand-lg navbar-light shadow-sm sticky-top" style="z-index: 1030;">
     <div class="container-fluid">
@@ -131,15 +152,15 @@
                     </a>
                 </li>
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" hx-boost="false" data-bs-toggle="dropdown">
                         <i class="bi bi-person-circle me-1"></i>{{ user.username }}
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><span class="dropdown-item-text text-muted small">{{ user.role|capfirst }}</span></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#" onclick="toggleLangSwitcher(); return false;"><i class="bi bi-translate me-2"></i>Translate</a></li>
+                        <li><a class="dropdown-item" href="#" hx-boost="false" onclick="toggleLangSwitcher(); return false;"><i class="bi bi-translate me-2"></i>Translate</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#" onclick="logout(); return false;"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                        <li><a class="dropdown-item" href="#" hx-boost="false" onclick="logout(); return false;"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
                     </ul>
                 </li>
             </ul>
@@ -158,7 +179,25 @@
     </div>
 </nav>
 
-<main class="{% if user.is_authenticated %}container-fluid py-4{% endif %}" style="padding-top: 1rem;">
+<!-- ── HTMX BOOST TARGET ────────────────────────────────────────────────
+     hx-boost/hx-target/hx-select ahile <body> bata inherit huँदैछ, tesले
+     yo <main id="page-content"> lai extra attribute rakhi rakhnu pardaina —
+     tara id="page-content" chai yehi rahanuparcha kina bhane hx-target/
+     hx-select le yehi id khojcha swap garna.
+
+     FIX: extra_js block lai yo <main> BHITRA sariyo (</main> bhanda
+     agadi). Pahile yo <main> bahira thiyo — hx-select="#page-content"
+     ले response bata #page-content matra निकाल्छ, tesले #page-content
+     BAHIRA bhaएko extra_js (map init, loadCheckpoints, loadDrivers,
+     complaints fetch, login/register form JS, aadि sabai page-specific
+     script) htmx boosted navigation ma KAHILE PANI chaldaina thiyo —
+     tesैle route-planning ko map, home ko map, complaints list, login/
+     register ko form-submit sabai khali/nachalne dekhinthyo jaba samma
+     hard refresh nagariyos. Ahile #page-content bhitra bhaएkole, hareक
+     boosted navigation ma tyo page ko afnै extra_js pheri fresh execute
+     huन्छ, ra map/data/form sabai reload nagari nai sahi kaam garcha. -->
+<main id="page-content"
+      class="{% if user.is_authenticated %}container-fluid py-4{% endif %}" style="padding-top: 1rem;">
     {% if messages %}
         <div class="container">
             {% for msg in messages %}
@@ -173,15 +212,13 @@
     <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index:2100"></div>
 
     {% block content %}{% endblock %}
+
+    {% block extra_js %}{% endblock %}
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{% static 'web_app/js/main.js' %}"></script>
-<!-- भाषा अनुवादक: यो block बाहिर राखिएको — कुनै पनि child page ले
-     {% templatetag openblock %} block extra_js {% templatetag closeblock %}
-     override गरे पनि यो सधैं लोड हुन्छ, हराउँदैन -->
 
-<!-- १. भाषा छान्ने बक्सको HTML (Navbar को मुनि र Main भन्दा माथि आफैं बस्छ) -->
 <div id="custom-lang-switcher">
     <button type="button" class="btn-close position-absolute top-0 end-0"
             style="margin: 10px; z-index: 1041;"
@@ -190,10 +227,7 @@
     <div id="google_translate_element"></div>
 </div>
 
-<!-- २. गुगल ट्रान्सलेटर, टगल र अटो-गायब पार्ने स्क्रिप्ट -->
 <script type="text/javascript">
-// Django बाट login स्थिति JS मा ल्याउने — logged-in user लाई auto-popup
-// कहिल्यै नदेखाउने हो (उनीहरूसँग नाम dropdown बाट access छँदैछ)
 var isUserLoggedIn = {% if user.is_authenticated %}true{% else %}false{% endif %};
 
 function googleTranslateElementInit() {
@@ -209,16 +243,10 @@ function googleTranslateElementInit() {
     }, 1000);
 }
 
-// Dropdown/navbar बाट Translate क्लिक गर्दा वा लुकाउँदा प्रयोग हुने function
 function toggleLangSwitcher() {
     document.getElementById('custom-lang-switcher').classList.toggle('show');
 }
 
-// गुगलको माथिल्लो banner frame लाई जबरजस्ती लुकाउने
-// महत्वपूर्ण: पहिलेको बग — .style.display = 'none' ले काम गरेन किनभने
-// गुगलको आफ्नै script ले आफ्नो inline style मा !important प्रयोग गर्छ,
-// र दुबै inline भएमा !important भएकोले नै जित्छ, जहिले लगाइए पनि फरक पर्दैन।
-// त्यसैले हामीले पनि setProperty(..., 'important') प्रयोग गर्नैपर्छ।
 function forceHideGoogleBanner() {
     var selectors = [
         'iframe.goog-te-banner-frame',
@@ -233,7 +261,6 @@ function forceHideGoogleBanner() {
             el.style.setProperty('height', '0px', 'important');
         });
     });
-    // गुगलले content लाई तल धकेल्न body/html मा जोड्ने top offset पनि हटाउने
     if (document.body) {
         document.body.style.setProperty('top', '0px', 'important');
     }
@@ -243,64 +270,40 @@ function forceHideGoogleBanner() {
 document.addEventListener("DOMContentLoaded", function() {
     const saved = localStorage.getItem("googtrans");
 
-if (saved) {
-
-    const wait = setInterval(function () {
-
-        const combo = document.querySelector(".goog-te-combo");
-
-        if (combo) {
-
-            clearInterval(wait);
-
-            combo.value = saved.split("/")[2];
-
-            combo.dispatchEvent(new Event("change"));
-        }
-
-    },100);
-
-}
+    if (saved) {
+        const wait = setInterval(function () {
+            const combo = document.querySelector(".goog-te-combo");
+            if (combo) {
+                clearInterval(wait);
+                combo.value = saved.split("/")[2];
+                combo.dispatchEvent(new Event("change"));
+            }
+        },100);
+    }
   
     if (!isUserLoggedIn && !localStorage.getItem("safhasahar_popup_shown_once")) {
         document.getElementById("custom-lang-switcher").classList.add('show');
         localStorage.setItem("safhasahar_popup_shown_once", "true");
     }
 
-    // सुरुमा तुरुन्तै एक पटक, अनि हरेक १५०ms मा दोहोर्‍याएर banner लुकाउने
     forceHideGoogleBanner();
     setInterval(forceHideGoogleBanner, 150);
 
-    // DOM मा नयाँ नोड थपिँदा तुरुन्तै पत्ता लगाएर लुकाउने (सबैभन्दा भरपर्दो तरिका)
     var bannerObserver = new MutationObserver(forceHideGoogleBanner);
     bannerObserver.observe(document.body, { childList: true, subtree: false });
 
-    // गुगलको ड्रपडाउन लोड हुन केही मिलिसेकेन्ड लाग्ने हुनाले चेक गर्ने
     var attempts = 0;
     var checkDropdown = setInterval(function() {
         var selectElem = document.querySelector('.goog-te-combo');
         attempts++;
         if (selectElem) {
             clearInterval(checkDropdown);
-            
-            // जब प्रयोगकर्ताले कुनै भाषा (नेपाली/English) रोज्छ, बाकस तुरुन्तै लुकाउने
-            // (auto-popup को flag अब popup खुलेकै बेला सेट भइसक्छ, यहाँ थप गर्नु पर्दैन)
            selectElem.addEventListener('change', function () {
-
-                localStorage.setItem(
-                    "googtrans",
-                    "/en/" + selectElem.value
-                );
-
-                document.cookie =
-                    "googtrans=/en/" + selectElem.value + ";path=/";
-
-                document.getElementById("custom-lang-switcher")
-                    .classList.remove("show");
+                localStorage.setItem("googtrans", "/en/" + selectElem.value);
+                document.cookie = "googtrans=/en/" + selectElem.value + ";path=/";
+                document.getElementById("custom-lang-switcher").classList.remove("show");
             });
         } else if (attempts > 100) {
-            // १० सेकेन्डसम्म कुर्दा पनि widget लोड भएन भने — network/adblocker ले
-            // translate.google.com लाई ब्लक गरेको हुन सक्छ
             clearInterval(checkDropdown);
             console.warn("Google Translate widget failed to load — check network access to translate.google.com or disable ad blockers.");
         }
@@ -308,8 +311,6 @@ if (saved) {
 });
 </script>
 <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
-
-{% block extra_js %}{% endblock %}
 
 <script>
 function showToast(message, type = 'success') {
@@ -408,41 +409,10 @@ function showToast(message, type = 'success') {
         window.location.href = '/logout/';
     }
 
-
-    try {
-        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-        const token = localStorage.getItem('access_token');
-        const wsURL = token
-            ? `${protocol}${location.host}/ws/notifications/?token=${encodeURIComponent(token)}`
-            : `${protocol}${location.host}/ws/notifications/`;
-        const notifSocket = new WebSocket(wsURL);
-        window._notifSocket = notifSocket;
-        notifSocket.onmessage = (e) => {
-            const data = JSON.parse(e.data);
-            if (data.type === 'notification') {
-                // Auto-popup toast हटाइयो — notification bell/badge मा मात्र देखिने, screen मा auto pop-up हुँदैन
-                const badge = document.getElementById('notif-badge');
-                badge.classList.remove('d-none');
-                badge.textContent = (parseInt(badge.textContent || '0') + 1).toString();
-
-                // If this notification is about a checkpoint, and the current
-                // page has defined a refresh function for its map, call it —
-                // this is what makes checkpoints appear live on every open
-                // map (admin, driver, user) without a manual page reload.
-                if (data.title && data.title.toLowerCase().includes('checkpoint')) {
-                    if (typeof window.refreshCheckpoints === 'function') {
-                        window.refreshCheckpoints();
-                    }
-                }
-            }
-        };
-        notifSocket.onerror = () => {};
-    } catch(e) {}
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const token = localStorage.getItem('access_token');
-        if (!token) return;
-
+    function refreshNotifBadge() {
+        const token = getToken();
+        const badge = document.getElementById('notif-badge');
+        if (!token || !badge) return;
         fetch('/api/notifications/unread/', {
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -451,107 +421,160 @@ function showToast(message, type = 'success') {
         })
         .then(res => res.ok ? res.json() : null)
         .then(data => {
-            if (data) {
-                const badge = document.getElementById('notif-badge');
-                let count = 0;
+            if (!data) return;
+            let count = 0;
 
-                if (Array.isArray(data)) {
-                    count = data.filter(n => n.is_read === false).length;
-                } 
-                else if (data.unread_count !== undefined) {
-                    count = parseInt(data.unread_count);
-                } else if (data.count !== undefined) {
-                    count = parseInt(data.count);
-                }
+            if (Array.isArray(data)) {
+                count = data.filter(n => n.is_read === false).length;
+            }
+            else if (data.unread_count !== undefined) {
+                count = parseInt(data.unread_count);
+            } else if (data.count !== undefined) {
+                count = parseInt(data.count);
+            }
 
-                if (count > 0) {
-                    badge.classList.remove('d-none');
-                    badge.textContent = count;
-                } else {
-                    badge.classList.add('d-none');
-                    badge.textContent = '';
-                }
+            if (count > 0) {
+                badge.classList.remove('d-none');
+                badge.textContent = count;
+            } else {
+                badge.classList.add('d-none');
+                badge.textContent = '';
             }
         })
         .catch(() => {});
+    }
 
-        // ── Recycle Bin count badge — sidebar "Recycle Bin" link mathi ──
-        // Yo badge sabai page ma dekhinxa (home, my requests, recycle bin) —
-        // jaba jaba sidebar ma id="recycle-bin-badge" wala element bhetincha,
-        // notif-badge jastैi count fetch garera populate garcha.
+    function refreshRecycleBinBadge() {
+        const token = getToken();
         const binBadge = document.getElementById('recycle-bin-badge');
-        if (binBadge) {
-            fetch('/api/waste-requests/recycle_bin/', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(res => res.ok ? res.json() : null)
-            .then(data => {
-                if (data) {
-                    let count = 0;
-                    if (Array.isArray(data)) {
-                        count = data.length;
-                    } else if (data.count !== undefined) {
-                        count = parseInt(data.count);
-                    } else if (data.results !== undefined) {
-                        count = data.results.length;
-                    }
+        if (!token || !binBadge) return;
+        fetch('/api/waste-requests/recycle_bin/', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+            if (!data) return;
+            let count = 0;
+            if (Array.isArray(data)) {
+                count = data.length;
+            } else if (data.count !== undefined) {
+                count = parseInt(data.count);
+            } else if (data.results !== undefined) {
+                count = data.results.length;
+            }
 
-                    if (count > 0) {
-                        binBadge.classList.remove('d-none');
-                        binBadge.textContent = count;
-                    } else {
-                        binBadge.classList.add('d-none');
-                        binBadge.textContent = '';
-                    }
-                }
-            })
-            .catch(() => {});
-        }
+            if (count > 0) {
+                binBadge.classList.remove('d-none');
+                binBadge.textContent = count;
+            } else {
+                binBadge.classList.add('d-none');
+                binBadge.textContent = '';
+            }
+        })
+        .catch(() => {});
+    }
 
-        // ── Pending Complaints count badge — admin sidebar "Complaints" link mathi ──
-        // Yo badge admin haruko sidebar ma dekhinxa — jaba jaba sidebar ma
-        // id="complaints-badge" wala element bhetincha, pending complaints
-        // count fetch garera populate garcha.
+    function refreshComplaintsBadge() {
+        const token = getToken();
         const complaintsBadge = document.getElementById('complaints-badge');
-        if (complaintsBadge) {
-            fetch('/api/complaints/?status=pending', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(res => res.ok ? res.json() : null)
-            .then(data => {
-                if (data) {
-                    let count = 0;
-                    if (Array.isArray(data)) {
-                        count = data.length;
-                    } else if (data.count !== undefined) {
-                        count = parseInt(data.count);
-                    } else if (data.results !== undefined) {
-                        count = data.results.length;
+        if (!token || !complaintsBadge) return;
+        fetch('/api/complaints/?status=pending', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+            if (!data) return;
+            let count = 0;
+            if (Array.isArray(data)) {
+                count = data.length;
+            } else if (data.count !== undefined) {
+                count = parseInt(data.count);
+            } else if (data.results !== undefined) {
+                count = data.results.length;
+            }
+
+            if (count > 0) {
+                complaintsBadge.classList.remove('d-none');
+                complaintsBadge.textContent = count;
+            } else {
+                complaintsBadge.classList.add('d-none');
+                complaintsBadge.textContent = '';
+            }
+        })
+        .catch(() => {});
+    }
+
+    // ── Websocket connect ─────────────────────────────────────────────────
+    // Yo <script> block <body> ko tallo tira cha, #page-content bhitra
+    // haina, tesले htmx boost navigation ma yo pheri run hudaina —
+    // socket eutai plain page-load ma matra khulcha, jun thikai ho.
+    function connectNotifSocket() {
+        try {
+            const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+            const token = localStorage.getItem('access_token');
+            const wsURL = token
+                ? `${protocol}${location.host}/ws/notifications/?token=${encodeURIComponent(token)}`
+                : `${protocol}${location.host}/ws/notifications/`;
+            const notifSocket = new WebSocket(wsURL);
+            window._notifSocket = notifSocket;
+            notifSocket.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if (data.type === 'notification') {
+                    refreshNotifBadge();
+                    refreshComplaintsBadge();
+                    refreshRecycleBinBadge();
+
+                    if (typeof window.onLiveNotification === 'function') {
+                        window.onLiveNotification(data);
                     }
 
-                    if (count > 0) {
-                        complaintsBadge.classList.remove('d-none');
-                        complaintsBadge.textContent = count;
-                    } else {
-                        complaintsBadge.classList.add('d-none');
-                        complaintsBadge.textContent = '';
+                    if (data.title && data.title.toLowerCase().includes('checkpoint')) {
+                        if (typeof window.refreshCheckpoints === 'function') {
+                            window.refreshCheckpoints();
+                        }
                     }
                 }
-            })
-            .catch(() => {});
-        }
+            };
+            notifSocket.onerror = () => {};
+        } catch(e) {}
+    }
+    connectNotifSocket();
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+
+        refreshNotifBadge();
+        refreshRecycleBinBadge();
+        refreshComplaintsBadge();
+
+        setInterval(() => {
+            refreshRecycleBinBadge();
+            refreshComplaintsBadge();
+        }, 20000);
     });
 
-    // Global helper: fetch admin-created checkpoints and render them on any
-    // Leaflet map present on the page. Exposed as `window.refreshCheckpoints`
-    // so other pages (and the WebSocket notification handler) can call it.
-    window.refreshCheckpoints = async function() {
+    // ── htmx navigation पछि पनि badge haru refresh गर्ने ────────────────
+    // #page-content swap huँda navbar/sidebar bahira bhaएको badge (jasto
+    // notif-badge, complaints-badge, recycle-bin-badge) haru DOM बाटैं
+    // hatdainan (kina bhane tie navbar/sidebar bhitra basхan, jun
+    // htmx boundary bahira/within survive garcha) — tara naya page ma
+    // fresh data देखाउन yeस event ma refresh call गर्नु उपयुक्त हुन्छ।
+    document.body.addEventListener('htmx:afterSwap', function() {
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+        refreshNotifBadge();
+        refreshRecycleBinBadge();
+        refreshComplaintsBadge();
+    });
+
+    window.refreshCheckpoints = window.refreshCheckpoints || async function() {
         try {
             const res = await fetch('/api/checkpoints/');
             if (!res.ok) return;
@@ -559,7 +582,6 @@ function showToast(message, type = 'success') {
             const list = Array.isArray(data) ? data : (data.results || []);
             const checkpoints = list.filter(ch => ch.is_active);
 
-            // Prefer common map globals used across templates (map, driverMap)
             const targetMap = window.map || window.driverMap || window.checkpointMap || null;
             if (!targetMap || typeof L === 'undefined') return;
 
@@ -588,9 +610,28 @@ function showToast(message, type = 'success') {
         }
     };
 
-    // Close WebSocket on page unload
-+    window.addEventListener('beforeunload', function() {
+    window.addEventListener('beforeunload', function() {
         if (window._notifSocket) window._notifSocket.close();
+    });
+
+    // ── htmx page-navigation UX feedback + error fallback ──────────────────
+    document.body.addEventListener('htmx:beforeRequest', function(evt) {
+        document.documentElement.style.cursor = 'progress';
+    });
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        document.documentElement.style.cursor = 'default';
+    });
+
+    // Kunai reason le boosted request fail bhaye (network error, 500, etc)
+    // — fallback normal full-page reload garne, natra user lai blank/silent
+    // failure dekhinchha
+    document.body.addEventListener('htmx:sendError', function(evt) {
+        window.location.reload();
+    });
+    document.body.addEventListener('htmx:responseError', function(evt) {
+        if (evt.detail.xhr && evt.detail.xhr.status >= 500) {
+            window.location.reload();
+        }
     });
 </script>
 {% endif %}

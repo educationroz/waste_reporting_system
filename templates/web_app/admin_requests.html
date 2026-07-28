@@ -367,9 +367,9 @@
                                     <th> Action Control </th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="requests-table-body">
                                 {% for req in requests %}
-                                <tr>
+                                <tr id="request-row-{{ req.id }}" data-request-id="{{ req.id }}">
                                     <td class="fw-bold text-secondary">#{{ req.id }}</td>
                                     {% if req.user %}
                                     <td class="fw-semibold text-dark">{{ req.user.username }}</td>
@@ -410,7 +410,7 @@
                                     {# ===== END WASTE PHOTO CELL ===== #}
 
                                     {# ===== AI SEVERITY CELL — ML gatekeeper model prediction ===== #}
-                                                                        
+
                                     <td>
                                         {% if req.severity %}
                                             <div class="d-flex align-items-center gap-1">
@@ -434,7 +434,7 @@
                                             <span class="text-muted small"><i class="bi bi-dash-circle me-1"></i>Not Scanned</span>
                                         {% endif %}
                                     </td>
-                    
+
                                     {# ===== END AI SEVERITY CELL ===== #}
 
                                     <td>
@@ -501,8 +501,8 @@
                                     </td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="10" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>
-                                
+                                <tr><td colspan="11" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>
+
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -563,6 +563,23 @@
 <script>
 const assignModal = new bootstrap.Modal(document.getElementById('assignModal'));
 
+// ── Status badge color-class map — reload नगरी badge रंग बदल्नको लागि ──
+const STATUS_BADGE_CLASS = {
+    completed: 'bg-success bg-opacity-10 text-success',
+    pending: 'bg-warning bg-opacity-10 text-warning-emphasis',
+    in_progress: 'bg-info bg-opacity-10 text-info',
+    cancelled: 'bg-danger bg-opacity-10 text-danger',
+    assigned: 'bg-primary bg-opacity-10 text-primary',
+};
+
+const STATUS_LABELS = {
+    completed: 'Completed',
+    pending: 'Pending',
+    in_progress: 'In Progress',
+    cancelled: 'Cancelled',
+    assigned: 'Assigned',
+};
+
 function openAssignModal(requestId) {
     document.getElementById('modal-request-id').value = requestId;
     assignModal.show();
@@ -570,12 +587,21 @@ function openAssignModal(requestId) {
 
 async function assignDriver() {
     const requestId = document.getElementById('modal-request-id').value;
-    const driverId = document.getElementById('modal-driver-select').value;
+    const driverSelect = document.getElementById('modal-driver-select');
+    const driverId = driverSelect.value;
+    // Dropdown option text jasto: "username — [PLATE]" — driver ko username matra chahiyeko
+    const driverName = driverSelect.options[driverSelect.selectedIndex].text.split('—')[0].trim();
+
     const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
     if (data && data.id) {
         showToast('Driver assigned successfully to the route sequence!', 'success');
         assignModal.hide();
-        setTimeout(() => location.reload(), 800);
+        applyRequestRowUpdate(requestId, {
+            statusKey: 'assigned',
+            driverHtml: `<div class="text-dark"><i class="bi bi-person me-1 text-success"></i>${driverName}</div>`,
+            actionHtml: '',
+            showDelete: true,
+        });
     } else {
         showToast('Failed to patch driver assignment parameter.', 'danger');
     }
@@ -586,7 +612,12 @@ async function cancelRequest(requestId) {
     const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
     if (data && data.id) {
         showToast('Operational collection request has been cancelled.', 'success');
-        setTimeout(() => location.reload(), 800);
+        applyRequestRowUpdate(requestId, {
+            statusKey: 'cancelled',
+            driverHtml: null, // driver cell jasтैको chha teसैं rahos
+            actionHtml: '<span class="text-muted small italic px-2">Lifecycle Locked</span>',
+            showDelete: true,
+        });
     } else {
         showToast('Failed to drop request pipeline node state.', 'danger');
     }
@@ -596,14 +627,52 @@ async function deleteRequest(requestId) {
     if (!confirm("Are you sure you want to delete this request?")) return;
 
     try {
-        const response = await API.delete(`/api/waste-requests/${requestId}/`);
-
+        await API.delete(`/api/waste-requests/${requestId}/`);
         showToast("Request deleted successfully.", "success");
-        setTimeout(() => location.reload(), 800);
+        const row = document.getElementById(`request-row-${requestId}`);
+        if (row) row.remove();
 
+        const tbody = document.getElementById('requests-table-body');
+        if (tbody && !tbody.querySelector('tr')) {
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>';
+        }
     } catch (err) {
         console.error(err);
         showToast("Delete failed.", "danger");
+    }
+}
+
+// ── Reload नगरी: status badge, driver cell, action cell, delete button live update ──
+function applyRequestRowUpdate(requestId, { statusKey, driverHtml, actionHtml, showDelete }) {
+    const row = document.getElementById(`request-row-${requestId}`);
+    if (!row) return; // row bhetिएन भने silently skip
+
+    // Status Sign cell (7th <td>, index 6) — timestamp/mismatch line नछोई badge matra replace
+    const statusCell = row.children[6];
+    if (statusCell) {
+        const badge = statusCell.querySelector('.badge');
+        if (badge) {
+            badge.className = `badge px-3 rounded-pill ${STATUS_BADGE_CLASS[statusKey] || 'bg-secondary bg-opacity-10 text-secondary'}`;
+            badge.textContent = STATUS_LABELS[statusKey] || statusKey;
+        }
+    }
+
+    // Assigned Logistics Crew cell (9th <td>, index 8)
+    if (driverHtml !== null) {
+        const driverCell = row.children[8];
+        if (driverCell) driverCell.innerHTML = driverHtml;
+    }
+
+    // Pipeline Action Dispatch cell (10th <td>, index 9)
+    const actionCell = row.children[9];
+    if (actionCell) actionCell.innerHTML = `<div class="d-inline-flex gap-2">${actionHtml}</div>`;
+
+    // Action Control / Delete cell (11th <td>, index 10)
+    if (showDelete) {
+        const controlCell = row.children[10];
+        if (controlCell) {
+            controlCell.innerHTML = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${requestId})"><i class="bi bi-trash3"></i> Delete</button>`;
+        }
     }
 }
 

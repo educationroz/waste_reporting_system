@@ -394,6 +394,7 @@
                                                     <div class="col-md-6">
                                                         <h6 class="fw-bold text-secondary small text-uppercase mb-2">Driving License Document</h6>
 
+                                                        <div id="license-doc-area-{{ driver.id }}">
                                                         {% if driver.license_document %}
                                                         <div class="mb-2">
                                                             <a href="{{ driver.license_document.url }}" target="_blank" class="btn btn-sm btn-outline-success w-100 mb-2">
@@ -407,8 +408,9 @@
                                                             <span class="small">No license document uploaded yet.</span>
                                                         </div>
                                                         {% endif %}
+                                                        </div>
 
-                                                        <label class="form-label small fw-semibold text-secondary mt-2">
+                                                        <label class="form-label small fw-semibold text-secondary mt-2" id="license-upload-label-{{ driver.id }}">
                                                             {% if driver.license_document %}Replace document{% else %}Upload license document{% endif %}
                                                             <span class="text-muted fw-normal">(PDF only, max 5MB)</span>
                                                         </label>
@@ -535,294 +537,549 @@
         </div>
     </div>
 </div>
+
+<!-- Vehicle data passed to JS so a newly-added driver's "Assign Vehicle"
+     modal can be built client-side without an extra API round trip. -->
+{{ vehicles_for_js|json_script:"vehicles-data" }}
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
+(function() {
+    // Parsed once — list of {id, plate_number, type, capacity_kg, status_display}
+    let VEHICLES_FOR_JS = [];
+    try {
+        const vehiclesDataEl = document.getElementById('vehicles-data');
+        if (vehiclesDataEl) {
+            VEHICLES_FOR_JS = JSON.parse(vehiclesDataEl.textContent) || [];
+        }
+    } catch (e) {
+        console.warn('Could not parse vehicles-data', e);
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
             }
         }
-    }
-    return cookieValue;
-}
-
-async function addDriver() {
-    const username = document.getElementById('driver_username').value.trim();
-    const email = document.getElementById('driver_email').value.trim();
-    const phone = document.getElementById('driver_phone').value.trim();
-    const address = document.getElementById('driver_address').value.trim();
-    const password = document.getElementById('driver_password').value;
-    const password2 = document.getElementById('driver_password2').value;
-
-    if (!username || !email || !password || !password2) {
-        showToast('Please fill in username, email, and both password fields.', 'warning');
-        return;
+        return cookieValue;
     }
 
-    if (password !== password2) {
-        showToast('Passwords do not match.', 'warning');
-        return;
-    }
+    async function getValidAccessToken() {
+        let access = localStorage.getItem('access_token');
+        const refresh = localStorage.getItem('refresh_token');
+        if (!access) return null;
 
-    try {
-        const res = await fetch('/auth/register/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-                username,
-                email,
-                password,
-                password2,
-                role: 'driver',
-                phone,
-                address,
-            }),
+        const probe = await fetch('/api/notifications/unread/', {
+            headers: { 'Authorization': `Bearer ${access}` }
         });
 
-        const data = await res.json();
-        if (!res.ok) {
-            throw new Error(data?.message || data?.detail || JSON.stringify(data));
+        if (probe.status !== 401) {
+            return access;
         }
 
-        showToast('Driver created successfully!', 'success');
-        bootstrap.Modal.getInstance(document.getElementById('addDriverModal')).hide();
-        setTimeout(() => location.reload(), 900);
-    } catch (e) {
-        showToast('Failed to create driver: ' + e.message, 'danger');
-    }
-}
+        if (!refresh) return null;
 
-async function toggleAvailability(driverId, currentlyAvailable) {
-    const data = await API.patch(`/api/drivers/${driverId}/`, { is_available: !currentlyAvailable });
-    if (data && data.id) {
-        showToast('Availability successfully updated!', 'success');
-        setTimeout(() => location.reload(), 800);
-    } else {
-        showToast('Update failed inside DB cluster.', 'danger');
-    }
-}
-
-async function assignVehicle(driverId) {
-    const vehicleSelect = document.getElementById(`assign-vehicle-select-${driverId}`);
-    const vehicleId = vehicleSelect.value;
-    const data = await API.patch(`/api/drivers/${driverId}/`, { vehicle: vehicleId || null });
-    if (data && data.id) {
-        showToast('Vehicle asset allocation verified!', 'success');
-        const modalEl = document.getElementById(`assignVehicleModal${driverId}`);
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        if(modal) modal.hide();
-        setTimeout(() => location.reload(), 800);
-    } else {
-        showToast('Failed to write asset mapping parameters.', 'danger');
-    }
-}
-
-async function removeDriver(driverId) {
-    if (!confirm('Are you sure you want to remove this driver from the system?')) return;
-
-    try {
-        const res = await fetch(`/api/drivers/${driverId}/`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-            },
+        const refreshRes = await fetch('/auth/token/refresh/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh }),
         });
 
-        if (res.ok || res.status === 204) {
-            showToast('Driver removed successfully.', 'success');
-            const row = document.getElementById(`driver-row-${driverId}`);
-            if (row) row.remove();
+        if (refreshRes.ok) {
+            const data = await refreshRes.json();
+            localStorage.setItem('access_token', data.access);
+            return data.access;
+        }
+
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        return null;
+    }
+
+    function buildVehicleOptionsHtml(selectedVehicleId) {
+        let html = '<option value="">None (De-allocate System Asset)</option>';
+        VEHICLES_FOR_JS.forEach(v => {
+            const selected = (v.id == selectedVehicleId) ? 'selected' : '';
+            html += `<option value="${v.id}" ${selected}>${v.plate_number} — ${v.type} (${v.capacity_kg}kg, ${v.status_display})</option>`;
+        });
+        return html;
+    }
+
+    function buildDriverRowHtml(driver) {
+        const fullName = driver.full_name || driver.username;
+        const email = driver.email || '';
+        const licenseNumber = driver.license_number || '—';
+        const vehicleCell = driver.vehicle
+            ? `<div class="fw-semibold text-dark"><i class="bi bi-truck me-1 text-success"></i>${driver.vehicle.plate_number}</div>
+               <div class="small text-muted" style="font-size: 0.8rem;">${driver.vehicle.type} (${driver.vehicle.capacity_kg}kg)</div>`
+            : `<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>No Asset Linked</span>`;
+        const statusBadgeClass = driver.is_available ? 'bg-success bg-opacity-10 text-success' : 'bg-secondary bg-opacity-10 text-secondary';
+        const statusLabel = driver.is_available ? 'Available' : 'Busy';
+        const toggleBtnLabel = driver.is_available
+            ? '<i class="bi bi-dash-circle me-1"></i>Set Busy'
+            : '<i class="bi bi-check-circle me-1"></i>Set Available';
+        const avatarLetter = (driver.username || '?').charAt(0).toUpperCase();
+
+        const rowHtml = `
+            <tr id="driver-row-${driver.id}">
+                <td class="fw-bold text-secondary">#${driver.id}</td>
+                <td>
+                    <div class="fw-semibold text-dark">${fullName}</div>
+                    <div class="small text-muted" style="font-size: 0.8rem;">${email}</div>
+                </td>
+                <td class="font-monospace text-secondary fw-semibold">${licenseNumber}</td>
+                <td>${vehicleCell}</td>
+                <td>
+                    <span class="badge ${statusBadgeClass} px-3 rounded-pill">${statusLabel}</span>
+                </td>
+                <td class="fw-semibold font-monospace">${driver.total_trips || 0}</td>
+                <td class="text-end pe-4">
+                    <div class="d-inline-flex gap-2">
+                        <button class="btn btn-sm btn-outline-dark py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#profileModal${driver.id}">
+                            <i class="bi bi-person-vcard me-1"></i>View Profile
+                        </button>
+                        <button class="btn btn-sm btn-outline-${driver.is_available ? 'secondary' : 'success'} py-1 px-3" style="font-size: 0.82rem;"
+                            onclick="toggleAvailability(${driver.id}, ${driver.is_available ? 'true' : 'false'})">
+                            ${toggleBtnLabel}
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#assignVehicleModal${driver.id}">
+                            <i class="bi bi-link-45deg me-1"></i>Assign Vehicle
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="removeDriver(${driver.id})">
+                            <i class="bi bi-trash me-1"></i>Remove
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        const profileModalHtml = `
+            <div class="modal fade" id="profileModal${driver.id}" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content border-0 shadow">
+                        <div class="modal-header bg-dark text-white border-bottom-0">
+                            <h5 class="modal-title fw-bold"><i class="bi bi-person-vcard me-2"></i>Driver Profile</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <div class="d-flex align-items-center gap-3 mb-4">
+                                <div class="profile-avatar-circle">${avatarLetter}</div>
+                                <div>
+                                    <div class="fs-5 fw-bold text-dark">${fullName}</div>
+                                    <div class="text-muted small">Driver #${driver.id}</div>
+                                </div>
+                                <span class="badge ${statusBadgeClass} px-3 rounded-pill ms-auto">${statusLabel}</span>
+                            </div>
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <h6 class="fw-bold text-secondary small text-uppercase mb-2">Contact &amp; Identity</h6>
+                                    <div class="profile-detail-row">
+                                        <span class="profile-detail-label">Username</span>
+                                        <span class="profile-detail-value">${driver.username}</span>
+                                    </div>
+                                    <div class="profile-detail-row">
+                                        <span class="profile-detail-label">Email</span>
+                                        <span class="profile-detail-value">${email || '—'}</span>
+                                    </div>
+                                    <div class="profile-detail-row">
+                                        <span class="profile-detail-label">Phone</span>
+                                        <span class="profile-detail-value">${driver.phone || '—'}</span>
+                                    </div>
+                                    <div class="profile-detail-row">
+                                        <span class="profile-detail-label">Address</span>
+                                        <span class="profile-detail-value">${driver.address || '—'}</span>
+                                    </div>
+                                    <h6 class="fw-bold text-secondary small text-uppercase mb-2 mt-4">Assignment &amp; Performance</h6>
+                                    <div class="profile-detail-row">
+                                        <span class="profile-detail-label">License Number</span>
+                                        <span class="profile-detail-value font-monospace">${licenseNumber}</span>
+                                    </div>
+                                    <div class="profile-detail-row">
+                                        <span class="profile-detail-label">Assigned Vehicle</span>
+                                        <span class="profile-detail-value">${driver.vehicle ? driver.vehicle.plate_number : 'Not assigned'}</span>
+                                    </div>
+                                    <div class="profile-detail-row">
+                                        <span class="profile-detail-label">Total Trips</span>
+                                        <span class="profile-detail-value">${driver.total_trips || 0}</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="fw-bold text-secondary small text-uppercase mb-2">Driving License Document</h6>
+                                    <div id="license-doc-area-${driver.id}">
+                                        <div class="text-center text-muted py-4 bg-light rounded-3 mb-3">
+                                            <i class="bi bi-file-earmark-x fs-2 d-block mb-1"></i>
+                                            <span class="small">No license document uploaded yet.</span>
+                                        </div>
+                                    </div>
+                                    <label class="form-label small fw-semibold text-secondary mt-2" id="license-upload-label-${driver.id}">
+                                        Upload license document
+                                        <span class="text-muted fw-normal">(PDF only, max 5MB)</span>
+                                    </label>
+                                    <div class="license-upload-zone" onclick="document.getElementById('license-file-${driver.id}').click()">
+                                        <i class="bi bi-cloud-arrow-up fs-4 text-muted d-block mb-1"></i>
+                                        <span class="small text-muted" id="license-file-label-${driver.id}">Click to choose a PDF file</span>
+                                    </div>
+                                    <input type="file" id="license-file-${driver.id}" class="d-none" accept="application/pdf"
+                                        onchange="handleLicenseFileSelect(${driver.id}, this)">
+                                    <button type="button" class="btn btn-success w-100 mt-2" id="license-upload-btn-${driver.id}" onclick="uploadLicense(${driver.id})" disabled>
+                                        <i class="bi bi-upload me-1"></i>Upload Document
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light border-top-0">
+                            <button class="btn btn-light border px-4" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const assignModalHtml = `
+            <div class="modal fade" id="assignVehicleModal${driver.id}" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title fw-bold"><i class="bi bi-truck me-2"></i>Link Fleet Asset</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <input type="hidden" id="assign-vehicle-driver-id" value="${driver.id}">
+                            <div class="mb-2">
+                                <label class="form-label fw-semibold text-secondary">Select Vehicle for ${driver.username}</label>
+                                <select class="form-select form-select-lg" style="font-size: 0.95rem;" id="assign-vehicle-select-${driver.id}">
+                                    ${buildVehicleOptionsHtml(driver.vehicle ? driver.vehicle.id : null)}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light">
+                            <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+                            <button class="btn btn-success px-4" onclick="assignVehicle(${driver.id})">Update Allocation</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        return { rowHtml, profileModalHtml, assignModalHtml };
+    }
+
+    // ── HTML बाट onclick="..." ले call हुने function haru — window. दिनुपर्छ ──
+
+    window.addDriver = async function() {
+        const username = document.getElementById('driver_username').value.trim();
+        const email = document.getElementById('driver_email').value.trim();
+        const phone = document.getElementById('driver_phone').value.trim();
+        const address = document.getElementById('driver_address').value.trim();
+        const password = document.getElementById('driver_password').value;
+        const password2 = document.getElementById('driver_password2').value;
+
+        if (!username || !email || !password || !password2) {
+            showToast('Please fill in username, email, and both password fields.', 'warning');
+            return;
+        }
+
+        if (password !== password2) {
+            showToast('Passwords do not match.', 'warning');
+            return;
+        }
+
+        try {
+            const res = await fetch('/auth/register/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    username,
+                    email,
+                    password,
+                    password2,
+                    role: 'driver',
+                    phone,
+                    address,
+                }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data?.message || data?.detail || JSON.stringify(data));
+            }
+
+            showToast('Driver created successfully!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('addDriverModal')).hide();
+            document.getElementById('addDriverForm').reset();
+
+            const token = await getValidAccessToken();
+            if (token) {
+                const searchRes = await fetch(`/api/drivers/?search=${encodeURIComponent(username)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                });
+                if (searchRes.ok) {
+                    const searchData = await searchRes.json();
+                    const list = Array.isArray(searchData) ? searchData : (searchData.results || []);
+                    const newDriver = list.find(d => d.username === username) || list[0];
+
+                    if (newDriver) {
+                        const { rowHtml, profileModalHtml, assignModalHtml } = buildDriverRowHtml(newDriver);
+                        const tbody = document.getElementById('drivers-table-body');
+
+                        const emptyRow = tbody.querySelector('tr td[colspan]');
+                        if (emptyRow) emptyRow.closest('tr').remove();
+
+                        tbody.insertAdjacentHTML('afterbegin', rowHtml);
+                        document.body.insertAdjacentHTML('beforeend', profileModalHtml);
+                        document.body.insertAdjacentHTML('beforeend', assignModalHtml);
+                        return;
+                    }
+                }
+            }
+
+            setTimeout(() => location.reload(), 900);
+        } catch (e) {
+            showToast('Failed to create driver: ' + e.message, 'danger');
+        }
+    };
+
+    window.toggleAvailability = async function(driverId, currentlyAvailable) {
+        const data = await API.patch(`/api/drivers/${driverId}/`, { is_available: !currentlyAvailable });
+        if (data && data.id) {
+            showToast('Availability successfully updated!', 'success');
+            updateDriverRowAvailability(driverId, data.is_available);
         } else {
-            let errMsg = 'Failed to remove driver.';
-            try {
-                const data = await res.json();
-                errMsg = typeof data === 'object'
+            showToast('Update failed inside DB cluster.', 'danger');
+        }
+    };
+
+    function updateDriverRowAvailability(driverId, isAvailable) {
+        const row = document.getElementById(`driver-row-${driverId}`);
+        if (!row) return;
+
+        const statusBadge = row.querySelector('td:nth-child(5) .badge');
+        if (statusBadge) {
+            statusBadge.className = `badge ${isAvailable ? 'bg-success bg-opacity-10 text-success' : 'bg-secondary bg-opacity-10 text-secondary'} px-3 rounded-pill`;
+            statusBadge.textContent = isAvailable ? 'Available' : 'Busy';
+        }
+
+        const toggleBtn = row.querySelector('button[onclick^="toggleAvailability"]');
+        if (toggleBtn) {
+            toggleBtn.className = `btn btn-sm btn-outline-${isAvailable ? 'secondary' : 'success'} py-1 px-3`;
+            toggleBtn.setAttribute('onclick', `toggleAvailability(${driverId}, ${isAvailable})`);
+            toggleBtn.innerHTML = isAvailable
+                ? '<i class="bi bi-dash-circle me-1"></i>Set Busy'
+                : '<i class="bi bi-check-circle me-1"></i>Set Available';
+        }
+    }
+
+    window.assignVehicle = async function(driverId) {
+        const vehicleSelect = document.getElementById(`assign-vehicle-select-${driverId}`);
+        const vehicleId = vehicleSelect.value;
+        const data = await API.patch(`/api/drivers/${driverId}/`, { vehicle: vehicleId || null });
+        if (data && data.id) {
+            showToast('Vehicle asset allocation verified!', 'success');
+            const modalEl = document.getElementById(`assignVehicleModal${driverId}`);
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+            updateDriverRowVehicle(driverId, vehicleSelect);
+        } else {
+            showToast('Failed to write asset mapping parameters.', 'danger');
+        }
+    };
+
+    function updateDriverRowVehicle(driverId, vehicleSelect) {
+        const row = document.getElementById(`driver-row-${driverId}`);
+        if (!row) return;
+        const vehicleCell = row.querySelector('td:nth-child(4)');
+        if (!vehicleCell) return;
+
+        if (!vehicleSelect.value) {
+            vehicleCell.innerHTML = '<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>No Asset Linked</span>';
+            return;
+        }
+
+        const selectedText = vehicleSelect.options[vehicleSelect.selectedIndex].text;
+        const [platePart, restPart] = selectedText.split('—').map(s => s.trim());
+
+        vehicleCell.innerHTML = `
+            <div class="fw-semibold text-dark"><i class="bi bi-truck me-1 text-success"></i>${platePart}</div>
+            <div class="small text-muted" style="font-size: 0.8rem;">${restPart || ''}</div>
+        `;
+    }
+
+    window.removeDriver = async function(driverId) {
+        if (!confirm('Are you sure you want to remove this driver from the system?')) return;
+
+        const token = await getValidAccessToken();
+        if (!token) {
+            showToast('Your session has expired. Please log in again.', 'danger');
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/drivers/${driverId}/`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (res.ok || res.status === 204) {
+                showToast('Driver removed successfully.', 'success');
+                const row = document.getElementById(`driver-row-${driverId}`);
+                if (row) row.remove();
+
+                const profileModal = document.getElementById(`profileModal${driverId}`);
+                if (profileModal) profileModal.remove();
+                const assignModal = document.getElementById(`assignVehicleModal${driverId}`);
+                if (assignModal) assignModal.remove();
+
+                const tbody = document.getElementById('drivers-table-body');
+                if (tbody && !tbody.querySelector('tr')) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-5">No drivers registered in this sector cluster yet. Create a user with role \'driver\' first.</td></tr>';
+                }
+            } else {
+                let errMsg = 'Failed to remove driver.';
+                try {
+                    const data = await res.json();
+                    errMsg = typeof data === 'object'
+                        ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                        : String(data);
+                } catch (e) {}
+                showToast(errMsg, 'danger');
+            }
+        } catch (e) {
+            showToast('Network error: ' + e.message, 'danger');
+        }
+    };
+
+    const pendingLicenseFiles = {};
+
+    window.handleLicenseFileSelect = function(driverId, input) {
+        const file = input.files[0];
+        const label = document.getElementById(`license-file-label-${driverId}`);
+        const uploadBtn = document.getElementById(`license-upload-btn-${driverId}`);
+
+        if (!file) {
+            pendingLicenseFiles[driverId] = null;
+            uploadBtn.disabled = true;
+            return;
+        }
+
+        if (file.type !== 'application/pdf') {
+            showToast('Only PDF files are accepted for the license document.', 'warning');
+            input.value = '';
+            pendingLicenseFiles[driverId] = null;
+            uploadBtn.disabled = true;
+            return;
+        }
+
+        const MAX_SIZE = 5 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+            showToast(`File too large (${(file.size / (1024*1024)).toFixed(2)}MB). Max is 5MB.`, 'warning');
+            input.value = '';
+            pendingLicenseFiles[driverId] = null;
+            uploadBtn.disabled = true;
+            return;
+        }
+
+        pendingLicenseFiles[driverId] = file;
+        label.textContent = file.name;
+        uploadBtn.disabled = false;
+    };
+
+    window.uploadLicense = async function(driverId) {
+        const file = pendingLicenseFiles[driverId];
+        if (!file) {
+            showToast('Please choose a PDF file first.', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById(`license-upload-btn-${driverId}`);
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Uploading...';
+
+        const token = await getValidAccessToken();
+        if (!token) {
+            showToast('Your session has expired. Please log in again.', 'danger');
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('license_document', file);
+
+        try {
+            const res = await fetch(`/api/drivers/${driverId}/`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: formData,
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.id) {
+                showToast('License document uploaded successfully!', 'success');
+                updateLicenseDocSection(driverId, data.license_document);
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                pendingLicenseFiles[driverId] = null;
+                document.getElementById(`license-file-label-${driverId}`).textContent = 'Click to choose a PDF file';
+                document.getElementById(`license-file-${driverId}`).value = '';
+                btn.disabled = true;
+            } else {
+                const errMsg = typeof data === 'object'
                     ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
                     : String(data);
-            } catch (e) {}
-            showToast(errMsg, 'danger');
-        }
-    } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
-    }
-}
-
-// ── Driver License Upload (View Profile modal) ───────────────────────────────
-// Keeps the selected File object per driver id, since a plain <input type=file>
-// value can't be read back out later without re-selecting it.
-const pendingLicenseFiles = {};
-
-function handleLicenseFileSelect(driverId, input) {
-    const file = input.files[0];
-    const label = document.getElementById(`license-file-label-${driverId}`);
-    const uploadBtn = document.getElementById(`license-upload-btn-${driverId}`);
-
-    if (!file) {
-        pendingLicenseFiles[driverId] = null;
-        uploadBtn.disabled = true;
-        return;
-    }
-
-    if (file.type !== 'application/pdf') {
-        showToast('Only PDF files are accepted for the license document.', 'warning');
-        input.value = '';
-        pendingLicenseFiles[driverId] = null;
-        uploadBtn.disabled = true;
-        return;
-    }
-
-    const MAX_SIZE = 5 * 1024 * 1024; // 5MB, matches backend validate_license_document
-    if (file.size > MAX_SIZE) {
-        showToast(`File too large (${(file.size / (1024*1024)).toFixed(2)}MB). Max is 5MB.`, 'warning');
-        input.value = '';
-        pendingLicenseFiles[driverId] = null;
-        uploadBtn.disabled = true;
-        return;
-    }
-
-    pendingLicenseFiles[driverId] = file;
-    label.textContent = file.name;
-    uploadBtn.disabled = false;
-}
-
-// ── Token refresh helper (mirrors home.html's getOptionalToken) ──────────────
-async function getValidAccessToken() {
-    let access = localStorage.getItem('access_token');
-    const refresh = localStorage.getItem('refresh_token');
-    if (!access) return null;
-
-    // Probe with a cheap authenticated endpoint to check if the token's still good
-    const probe = await fetch('/api/notifications/unread/', {
-        headers: { 'Authorization': `Bearer ${access}` }
-    });
-
-    if (probe.status !== 401) {
-        return access; // still valid
-    }
-
-    if (!refresh) return null;
-
-    const refreshRes = await fetch('/auth/token/refresh/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh }),
-    });
-
-    if (refreshRes.ok) {
-        const data = await refreshRes.json();
-        localStorage.setItem('access_token', data.access);
-        return data.access;
-    }
-
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    return null;
-}
-
-async function uploadLicense(driverId) {
-    const file = pendingLicenseFiles[driverId];
-    if (!file) {
-        showToast('Please choose a PDF file first.', 'warning');
-        return;
-    }
-
-    const btn = document.getElementById(`license-upload-btn-${driverId}`);
-    const originalHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Uploading...';
-
-    const token = await getValidAccessToken();
-    if (!token) {
-        showToast('Your session has expired. Please log in again.', 'danger');
-        btn.disabled = false;
-        btn.innerHTML = originalHtml;
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('license_document', file);
-
-    try {
-        // Raw fetch (not API.patch) because API.patch always JSON.stringifies
-        // its payload and sets Content-Type: application/json — that can't
-        // carry a file. The browser sets the correct multipart Content-Type
-        // (with boundary) automatically when the body is a FormData object,
-        // so we deliberately don't set Content-Type here ourselves.
-        const res = await fetch(`/api/drivers/${driverId}/`, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-            },
-            body: formData,
-        });
-
-        const data = await res.json();
-
-        if (res.ok && data.id) {
-            showToast('License document uploaded successfully!', 'success');
-            setTimeout(() => location.reload(), 900);
-        } else {
-            const errMsg = typeof data === 'object'
-                ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
-                : String(data);
-            showToast('Upload failed: ' + errMsg, 'danger');
+                showToast('Upload failed: ' + errMsg, 'danger');
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        } catch (e) {
+            showToast('Network error: ' + e.message, 'danger');
             btn.disabled = false;
             btn.innerHTML = originalHtml;
         }
-    } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
-        btn.disabled = false;
-        btn.innerHTML = originalHtml;
-    }
-    
-async function removeDriver(driverId) {
-    if (!confirm('Are you sure you want to remove this driver from the system?')) return;
+    };
 
-    const token = await getValidAccessToken();
-    if (!token) {
-        showToast('Your session has expired. Please log in again.', 'danger');
-        return;
-    }
+    function updateLicenseDocSection(driverId, documentUrl) {
+        const area = document.getElementById(`license-doc-area-${driverId}`);
+        const label = document.getElementById(`license-upload-label-${driverId}`);
+        if (!area || !documentUrl) return;
 
-    try {
-        const res = await fetch(`/api/drivers/${driverId}/`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-            },
-        });
+        area.innerHTML = `
+            <div class="mb-2">
+                <a href="${documentUrl}" target="_blank" class="btn btn-sm btn-outline-success w-100 mb-2">
+                    <i class="bi bi-file-earmark-pdf me-1"></i>Open Full PDF in New Tab
+                </a>
+                <embed src="${documentUrl}" type="application/pdf" class="license-pdf-frame">
+            </div>
+        `;
 
-        if (res.ok || res.status === 204) {
-            showToast('Driver removed successfully.', 'success');
-            const row = document.getElementById(`driver-row-${driverId}`);
-            if (row) row.remove();
-        } else {
-            let errMsg = 'Failed to remove driver.';
-            try {
-                const data = await res.json();
-                errMsg = typeof data === 'object'
-                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
-                    : String(data);
-            } catch (e) {}
-            showToast(errMsg, 'danger');
+        if (label) {
+            label.innerHTML = 'Replace document <span class="text-muted fw-normal">(PDF only, max 5MB)</span>';
         }
-    } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
     }
-}
-}
 
+    document.addEventListener('hide.bs.modal', function (e) {
+        if (document.activeElement) {
+            document.activeElement.blur();
+        }
+    }, true);
+})();
 </script>
 {% endblock %}

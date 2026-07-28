@@ -425,7 +425,8 @@
 {% block extra_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
-    // ── State ────────────────────────────────────────────────────────────────
+(function() {
+    // ── State ────────────────────────────────────────────────────────────
     let map = null;
     let currentRoute = null;
     let currentRouteId = null;
@@ -436,12 +437,10 @@
     let driverMarkersLayer = null;
     let driverMarkers = new Map();
 
-    // ── Get token (still used for the raw WebSocket connection below) ───────
     function getToken() {
         return localStorage.getItem('access_token');
     }
 
-    // ── Map ──────────────────────────────────────────────────────────────────
     function initMap() {
         map = L.map('route-map').setView([28.2096, 83.9856], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -453,12 +452,6 @@
         driverMarkersLayer = L.layerGroup().addTo(map);
     }
 
-    // ── Checkpoints (admin-managed drop-off points) ──────────────────────────
-    // Same defensive handling as home.html/driver_dashboard.html: the API
-    // may return a bare array or a paginated {results: [...]} shape, and the
-    // "active" flag might be a boolean is_active or a string status field —
-    // check both instead of assuming one, so a field-name mismatch doesn't
-    // silently hide every checkpoint on this map too.
     function extractCheckpointList(data) {
         if (Array.isArray(data)) return data;
         if (data && Array.isArray(data.results)) return data.results;
@@ -557,7 +550,6 @@
         }
     }
 
-    // ── Load drivers ─────────────────────────────────────────────────────────
     async function loadDrivers() {
         const data = await API.get('/api/drivers/');
         if (!data) {
@@ -575,8 +567,7 @@
         });
     }
 
-    // ── Load waste requests ──────────────────────────────────────────────────
-    async function loadWasteRequests() {
+    window.loadWasteRequests = async function() {
         const data = await API.get('/api/waste-requests/');
         if (!data) {
             showToast('Failed to load requests. Are you logged in?', 'danger');
@@ -602,10 +593,9 @@
             document.getElementById('requestsList').innerHTML = html;
         }
         new bootstrap.Modal(document.getElementById('requestsModal')).show();
-    }
+    };
 
-    // ── Confirm request selection ────────────────────────────────────────────
-    function confirmSelection() {
+    window.confirmSelection = function() {
         selectedRequests = Array.from(
             document.querySelectorAll('#requestsList input:checked')
         ).map(el => parseInt(el.value));
@@ -616,12 +606,9 @@
             showToast(`${selectedRequests.length} request(s) selected.`, 'success');
         }
         bootstrap.Modal.getInstance(document.getElementById('requestsModal')).hide();
-    }
+    };
 
-    // ── Generate optimal route ───────────────────────────────────────────────
-    // pass includeAllPending=true to auto-sweep every unassigned pending
-    // request into the route, instead of using manually checked ones
-    async function generateRoute(includeAllPending = false) {
+    window.generateRoute = async function(includeAllPending = false) {
         const driverId = document.getElementById('driverSelect').value;
         const plannedDate = document.getElementById('plannedDate').value;
 
@@ -657,18 +644,12 @@
 
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-magic"></i> Generate Optimal Route';
-    }
+    };
 
-    // ── Display route on map ─────────────────────────────────────────────────
-    // Now async: fetches real road-following geometry from OSRM instead of
-    // drawing a straight line between waypoints. Falls back to a straight
-    // dashed line if the routing service is unreachable or finds no path.
     async function displayRoute(routeData) {
-        // Clear previous markers
         routeMarkers.forEach(m => map.removeLayer(m));
         routeMarkers = [];
 
-        // Clear previous polyline
         if (routePolyline) {
             map.removeLayer(routePolyline);
             routePolyline = null;
@@ -677,7 +658,6 @@
         const waypoints = routeData.waypoints;
         const start = routeData.start_location;
 
-        // Start marker
         const startMarker = L.circleMarker([start.latitude, start.longitude], {
             radius: 10,
             fillColor: '#007bff',
@@ -688,7 +668,6 @@
         }).addTo(map).bindPopup('<strong>Driver Start Location</strong>');
         routeMarkers.push(startMarker);
 
-        // Waypoint markers
         waypoints.forEach((wp, idx) => {
             const marker = L.marker([wp.latitude, wp.longitude])
                 .addTo(map)
@@ -700,15 +679,11 @@
             routeMarkers.push(marker);
         });
 
-        // Ordered point list: depot start -> each waypoint, in route order
         const orderedPoints = [
             { lat: start.latitude, lon: start.longitude },
             ...waypoints.map(wp => ({ lat: wp.latitude, lon: wp.longitude })),
         ];
 
-        // Try to fetch actual road-following geometry from OSRM's public
-        // demo server. Falls back to a straight-line path if unreachable
-        // or if no drivable route exists between the points.
         let roadCoords = null;
         try {
             const coordStr = orderedPoints.map(p => `${p.lon},${p.lat}`).join(';');
@@ -717,7 +692,6 @@
             if (res.ok) {
                 const data = await res.json();
                 if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                    // GeoJSON coords are [lon, lat] — Leaflet wants [lat, lon]
                     roadCoords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
                 }
             }
@@ -731,21 +705,18 @@
             color: '#28a745',
             weight: 4,
             opacity: 0.85,
-            ...(roadCoords ? {} : { dashArray: '8, 4' }), // dashed only for straight-line fallback
+            ...(roadCoords ? {} : { dashArray: '8, 4' }),
         }).addTo(map);
 
-        // Fit map to route
         const group = new L.featureGroup(routeMarkers);
         map.fitBounds(group.getBounds().pad(0.15));
 
-        // Update summary
         document.getElementById('totalDistance').textContent = routeData.total_distance_km.toFixed(2);
         document.getElementById('totalStops').textContent = routeData.total_stops;
 
         displayWaypoints(waypoints);
     }
 
-    // ── Display waypoints list ───────────────────────────────────────────────
     function displayWaypoints(waypoints) {
         if (waypoints.length === 0) {
             document.getElementById('waypointList').innerHTML =
@@ -766,20 +737,17 @@
         document.getElementById('waypointList').innerHTML = html;
     }
 
-    // ── Highlight waypoint ───────────────────────────────────────────────────
-    function highlightWaypoint(idx) {
+    window.highlightWaypoint = function(idx) {
         document.querySelectorAll('.waypoint-item').forEach((el, i) => {
             el.classList.toggle('active', i === idx);
         });
-        // Pan map to that marker (+1 because index 0 is start marker)
         if (routeMarkers[idx + 1]) {
             map.panTo(routeMarkers[idx + 1].getLatLng());
             routeMarkers[idx + 1].openPopup();
         }
-    }
+    };
 
-    // ── Start route ──────────────────────────────────────────────────────────
-    async function startRoute() {
+    window.startRoute = async function() {
         if (!currentRouteId) {
             showToast('No route to start. Generate one first.', 'warning');
             return;
@@ -794,9 +762,8 @@
         } else {
             showToast('Failed to start route.', 'danger');
         }
-    }
+    };
 
-    // ── WebSocket for real-time driver location updates ──────────────────────
     function connectRouteWebSocket() {
         const token = getToken();
         if (!token) return;
@@ -846,14 +813,19 @@
         ws.onclose = () => {};
     }
 
-    // ── Init ─────────────────────────────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', () => {
-        initMap();
-        loadDrivers();
-        loadCheckpoints();
-        loadDriverMarkers();
-        document.getElementById('plannedDate').valueAsDate = new Date();
-        connectRouteWebSocket();
-    });
+    // ── Init ─────────────────────────────────────────────────────────────
+    initMap();
+    loadDrivers();
+    loadCheckpoints();
+    loadDriverMarkers();
+    document.getElementById('plannedDate').valueAsDate = new Date();
+    connectRouteWebSocket();
+
+    // base.html ko websocket handler le checkpoint update aaउँda
+    // window.refreshCheckpoints() call garcha — yehi page ko afnै sahi
+    // loadCheckpoints lai tyaha override गरियो, ताकि checkpoint change
+    // huँda यो page ले पनि reload नगरी live update होस्।
+    window.refreshCheckpoints = loadCheckpoints;
+})();
 </script>
 {% endblock %}
