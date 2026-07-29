@@ -238,20 +238,20 @@ function renderComplaints() {
     }
 
     body.innerHTML = rows.map(c => `
-        <tr id="complaint-row-${c.id}">
-            <td class="fw-bold text-secondary">#${c.id}</td>
-            <td>${c.username}</td>
-            <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">${c.complaint_type_display}</span></td>
-            <td class="small" style="max-width:260px;">${c.description}</td>
-            <td>${c.photo ? `<a href="${c.photo}" target="_blank"><img src="${c.photo}" style="height:36px;width:36px;object-fit:cover;border-radius:4px;"></a>` : '<span class="text-muted small">—</span>'}</td>
-            <td><span class="badge ${statusBadge(c.status)}">${c.status_display}</span></td>
-            <td class="small text-muted">${new Date(c.created_at).toLocaleDateString()}</td>
+        <tr id="complaint-row-${escapeHtml(c.id)}">
+            <td class="fw-bold text-secondary">#${escapeHtml(c.id)}</td>
+            <td>${escapeHtml(c.username)}</td>
+            <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">${escapeHtml(c.complaint_type_display)}</span></td>
+            <td class="small" style="max-width:260px;">${escapeHtml(c.description)}</td>
+            <td>${c.photo ? `<a href="${escapeHtml(c.photo)}" target="_blank"><img src="${escapeHtml(c.photo)}" style="height:36px;width:36px;object-fit:cover;border-radius:4px;"></a>` : '<span class="text-muted small">—</span>'}</td>
+            <td><span class="badge ${statusBadge(c.status)}">${escapeHtml(c.status_display)}</span></td>
+            <td class="small text-muted">${escapeHtml(new Date(c.created_at).toLocaleDateString())}</td>
             <td>
                 <div class="d-flex gap-1">
                     <button class="btn btn-sm btn-outline-success" onclick='openReview(${JSON.stringify(c)})'>
                         <i class="bi bi-clipboard-check"></i> Review
                     </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteComplaint(${c.id})" title="Delete complaint">
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteComplaint(${escapeHtml(c.id)})" title="Delete complaint">
                         <i class="bi bi-trash3"></i>
                     </button>
                 </div>

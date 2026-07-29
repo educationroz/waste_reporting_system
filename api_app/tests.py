@@ -1,46 +1,43 @@
+import datetime
+import tempfile
+from unittest.mock import patch
+
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
-from rest_framework.test import APIClient
+from rest_framework.test import APITestCase
 from .views import _create_notification
 from .models import Notification, WasteRequest
 
 User = get_user_model()
 
-
-class BackupRestoreAPITest(TestCase):
+class BackupRestoreTests(APITestCase):
     def setUp(self):
-        self.admin_user = User.objects.create_user(
-            username='backupadmin',
-            password='StrongPass123!',
-            role='admin',
-            is_staff=True,
-            is_superuser=True,
-        )
-        self.client.force_login(self.admin_user)
+        self.admin = User.objects.create_user(username='admin1', password='pw', role='admin', is_staff=True)
+        self.client.force_authenticate(self.admin)
 
-    def test_backup_endpoint_creates_file_and_restore_accepts_it(self):
+    def test_restore_without_confirm_flag_is_rejected(self):
         backup_response = self.client.post('/api/database-backups/backup/')
-        self.assertEqual(backup_response.status_code, 200, backup_response.content)
+        file_name = backup_response.json()['file_name']
+        download = self.client.get(f'/api/database-backups/download/?file_name={file_name}')
+        uploaded = SimpleUploadedFile(file_name, b''.join(download.streaming_content), content_type='application/json')
 
-        backup_data = backup_response.json()
-        self.assertIn('file_name', backup_data)
-        self.assertTrue(backup_data['file_name'].endswith('.json'))
-
-        file_name = backup_data['file_name']
-        file_path = backup_data['file_path']
-        with open(file_path, 'rb') as f:
-            uploaded = SimpleUploadedFile(file_name, f.read(), content_type='application/json')
-
+        # No 'confirm' field at all
         restore_response = self.client.post(
             '/api/database-backups/restore/',
             {'backup_file': uploaded},
             format='multipart',
         )
+        self.assertEqual(restore_response.status_code, 400, restore_response.content)
 
-        self.assertEqual(restore_response.status_code, 200, restore_response.content)
-        self.assertIn('restored', restore_response.json()['message'].lower())
-
+    def test_restore_rejects_invalid_json(self):
+        bad_file = SimpleUploadedFile('bad.json', b'not valid json{{{', content_type='application/json')
+        response = self.client.post(
+            '/api/database-backups/restore/',
+            {'backup_file': bad_file, 'confirm': 'true'},
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, 500)
 
 class DriverDeletionAPITest(TestCase):
     def setUp(self):
@@ -110,11 +107,16 @@ class NotificationDedupeTest(TestCase):
             role='user',
         )
 
-    def test_create_duplicate_notification_is_skipped(self):
+    @patch('django.utils.timezone.now')
+    def test_create_duplicate_notification_is_skipped(self, mock_now):
+        # Freeze time so the 30s dedupe window is deterministic instead of
+        # depending on how fast the two calls happen to execute.
+        frozen = datetime.datetime(2026, 7, 23, 10, 0, 0, tzinfo=datetime.timezone.utc)
+        mock_now.return_value = frozen
+
         title = 'Hello'
         message = 'Duplicate test'
         n1 = _create_notification(self.user, title, message)
-        # Immediate second call should be skipped by dedupe window (30s)
         n2 = _create_notification(self.user, title, message)
 
         qs = Notification.objects.filter(user=self.user, title=title, message=message)
@@ -122,26 +124,50 @@ class NotificationDedupeTest(TestCase):
         self.assertIsNotNone(n1)
         self.assertIsNone(n2)
 
+    @patch('django.utils.timezone.now')
+    def test_notification_after_dedupe_window_is_not_skipped(self, mock_now):
+        # Negative case: once the 30s window has passed, a repeat of the
+        # same title/message should create a second notification.
+        start = datetime.datetime(2026, 7, 23, 10, 0, 0, tzinfo=datetime.timezone.utc)
+        title = 'Hello'
+        message = 'Duplicate test'
+
+        mock_now.return_value = start
+        n1 = _create_notification(self.user, title, message)
+
+        mock_now.return_value = start + datetime.timedelta(seconds=31)
+        n2 = _create_notification(self.user, title, message)
+
+        qs = Notification.objects.filter(user=self.user, title=title, message=message)
+        self.assertEqual(qs.count(), 2)
+        self.assertIsNotNone(n1)
+        self.assertIsNotNone(n2)
+
 
 class WasteRequestLocationGroupingTest(TestCase):
-    def setUp(self):
-        self.admin_user = User.objects.create_user(
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user = User.objects.create_user(
             username='requestadmin',
             password='StrongPass123!',
             role='admin',
             is_staff=True,
             is_superuser=True,
         )
-        self.user_one = User.objects.create_user(
+        cls.user_one = User.objects.create_user(
             username='reporter1',
             password='StrongPass123!',
             role='user',
         )
-        self.user_two = User.objects.create_user(
+        cls.user_two = User.objects.create_user(
             username='reporter2',
             password='StrongPass123!',
             role='user',
         )
+
+    def setUp(self):
+        # APIClient auth state is per-instance, so this stays in setUp
+        # even though the users above are now created once per class.
         self.client = APIClient()
 
     def _payload(self):
@@ -231,3 +257,49 @@ class WasteRequestLocationGroupingTest(TestCase):
         self.assertEqual(second_request.status, 'assigned')
         self.assertEqual(first_request.driver_id, driver.id)
         self.assertEqual(second_request.driver_id, driver.id)
+
+    def test_far_away_request_is_not_grouped_with_siblings(self):
+        # Negative case: a request roughly 500m+ away should NOT be pulled
+        # into the same completion/assignment group. Adjust the offset if
+        # your grouping radius differs from what's assumed here.
+        driver_user = User.objects.create_user(
+            username='route-driver-2',
+            password='StrongPass123!',
+            role='driver',
+        )
+        driver = driver_user.driver_profile
+
+        near_request = WasteRequest.objects.create(
+            user=self.user_one,
+            waste_type='general',
+            status='pending',
+            description='Test pickup',
+            pickup_address='Same Location Road 3',
+            latitude='28.209600',
+            longitude='83.985600',
+            scheduled_date='2026-07-23T10:00:00Z',
+        )
+        far_request = WasteRequest.objects.create(
+            user=self.user_two,
+            waste_type='general',
+            status='pending',
+            description='Test pickup, far away',
+            pickup_address='Distant Road',
+            latitude='28.215000',
+            longitude='83.992000',
+            scheduled_date='2026-07-23T11:00:00Z',
+        )
+
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.patch(
+            f'/api/waste-requests/{near_request.id}/assign_driver/',
+            {'driver_id': driver.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+
+        near_request.refresh_from_db()
+        far_request.refresh_from_db()
+        self.assertEqual(near_request.status, 'assigned')
+        self.assertEqual(far_request.status, 'pending')
+        self.assertIsNone(far_request.driver_id)

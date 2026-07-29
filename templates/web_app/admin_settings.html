@@ -643,6 +643,10 @@ document.getElementById('checkpoint-tab').addEventListener('shown.bs.tab', funct
     loadCheckpoints();
 });
 
+document.getElementById('backup-tab').addEventListener('shown.bs.tab', function () {
+    loadBackupFiles();
+});
+
 function initDepotMap() {
     if (depotMap) return; 
 
@@ -857,12 +861,12 @@ function renderCheckpointTable(checkpoints) {
 
     tbody.innerHTML = checkpoints.map(ch => `
         <tr>
-            <td>${ch.name}</td>
-            <td>${parseFloat(ch.latitude).toFixed(6)}, ${parseFloat(ch.longitude).toFixed(6)}</td>
+            <td>${escapeHtml(ch.name)}</td>
+            <td>${escapeHtml(parseFloat(ch.latitude).toFixed(6))}, ${escapeHtml(parseFloat(ch.longitude).toFixed(6))}</td>
             <td>${ch.is_active ? 'Active' : 'Inactive'}</td>
             <td>
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="editCheckpoint(${ch.id})">Edit</button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteCheckpoint(${ch.id})">Delete</button>
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="editCheckpoint(${escapeHtml(ch.id)})">Edit</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteCheckpoint(${escapeHtml(ch.id)})">Delete</button>
             </td>
         </tr>
     `).join('');
@@ -989,13 +993,9 @@ async function loadBackupFiles() {
     if (!tableBody) return;
 
     try {
-        const res = await fetch('/api/database-backups/history/', {
-            headers: {
-                'Authorization': `Bearer ${getToken()}`,
-            },
-        });
+        const res = await authFetch('/api/database-backups/history/');
 
-        if (!res.ok) {
+        if (!res || !res.ok) {
             throw new Error('Unable to load backup history.');
         }
 
@@ -1011,13 +1011,35 @@ async function loadBackupFiles() {
                 <td>${formatBytes(backup.size_bytes)}</td>
                 <td>${new Date(backup.created_at).toLocaleString()}</td>
                 <td>
-                    <a class="btn btn-sm btn-outline-primary py-0 px-2" href="${backup.download_url}" target="_blank" rel="noopener">Download</a>
+                    <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="downloadBackup('${backup.file_name}')">Download</button>
                     <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteBackup('${backup.file_name}')">Delete</button>
                 </td>
             </tr>
         `).join('');
     } catch (e) {
         tableBody.innerHTML = '<tr><td colspan="4" class="text-danger text-center py-3">Unable to load backup history.</td></tr>';
+    }
+}
+
+async function downloadBackup(fileName) {
+    try {
+        const res = await authFetch(`/api/database-backups/download/?file_name=${encodeURIComponent(fileName)}`);
+
+        if (!res || !res.ok) {
+            throw new Error('Unable to download backup.');
+        }
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (e) {
+        showToast(e.message, 'danger');
     }
 }
 
@@ -1037,14 +1059,11 @@ async function createBackup() {
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating...';
 
     try {
-        const res = await fetch('/api/database-backups/backup/', {
+        const res = await authFetch('/api/database-backups/backup/', {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${getToken()}`,
-                'Content-Type': 'application/json',
-            },
         });
 
+        if (!res) throw new Error('Unable to create backup.');
         const data = await res.json();
         if (!res.ok) {
             throw new Error(data.error || 'Unable to create backup.');
@@ -1064,13 +1083,11 @@ async function deleteBackup(fileName) {
     if (!window.confirm(`Delete ${fileName}?`)) return;
 
     try {
-        const res = await fetch(`/api/database-backups/delete/?file_name=${encodeURIComponent(fileName)}`, {
+        const res = await authFetch(`/api/database-backups/delete/?file_name=${encodeURIComponent(fileName)}`, {
             method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${getToken()}`,
-            },
         });
 
+        if (!res) throw new Error('Unable to delete backup.');
         const data = await res.json();
         if (!res.ok) {
             throw new Error(data.error || 'Unable to delete backup.');
@@ -1086,24 +1103,32 @@ async function deleteBackup(fileName) {
 async function restoreBackup(file) {
     if (!file) return;
 
+    const confirmed = window.confirm(
+        'WARNING: This will PERMANENTLY REPLACE all current system data with the backup file. ' +
+        'This action cannot be undone. A safety backup of your current data will be created automatically.\n\n' +
+        'Are you sure you want to restore?'
+    );
+    if (!confirmed) return;
+
     const formData = new FormData();
     formData.append('backup_file', file);
+    formData.append('confirm', 'true');
 
     try {
-        const res = await fetch('/api/database-backups/restore/', {
+        showToast('Restoring backup... this may take a moment.', 'info');
+
+        const res = await authFetch('/api/database-backups/restore/', {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${getToken()}`,
-            },
             body: formData,
         });
 
+        if (!res) throw new Error('Unable to restore backup.');
         const data = await res.json();
         if (!res.ok) {
             throw new Error(data.error || 'Unable to restore backup.');
         }
 
-        showToast(data.message, 'success');
+        showToast(data.message + ' You may need to sign in again.', 'success');
         await loadBackupFiles();
     } catch (e) {
         showToast(e.message, 'danger');
@@ -1115,11 +1140,12 @@ function attachBackupHandlers() {
     const restoreBtn = document.getElementById('backup-restore-btn');
     const fileInput = document.getElementById('backup-file-input');
 
-    if (createBtn) {
+    if (createBtn && !createBtn.dataset._backupBound) {
         createBtn.addEventListener('click', createBackup);
+        createBtn.dataset._backupBound = '1';
     }
 
-    if (restoreBtn && fileInput) {
+    if (restoreBtn && fileInput && !restoreBtn.dataset._backupBound) {
         restoreBtn.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', async (event) => {
             const file = event.target.files?.[0];
@@ -1127,12 +1153,21 @@ function attachBackupHandlers() {
             await restoreBackup(file);
             event.target.value = '';
         });
+        restoreBtn.dataset._backupBound = '1';
     }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+(function bootstrapBackupUI() {
     attachBackupHandlers();
     loadBackupFiles();
+})();
+
+document.body.addEventListener('htmx:afterSwap', function (evt) {
+    const btn = document.getElementById('backup-create-btn');
+    if (btn && !btn.dataset._backupBound) {
+        attachBackupHandlers();
+        loadBackupFiles();
+    }
 });
 
 // ── Add Setting Node Async Trigger — reload nagari modal band + form reset ──

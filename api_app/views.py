@@ -299,6 +299,13 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['post'])
     def restore(self, request):
+        confirm = request.data.get('confirm') or request.POST.get('confirm')
+        if str(confirm).lower() != 'true':
+            return Response(
+                {'error': 'Restore is destructive. Confirm with confirm=true after notifying the user.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         uploaded_file = request.FILES.get('backup_file')
         if not uploaded_file:
             return Response({'error': 'backup_file is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -318,7 +325,27 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
         except Exception as exc:
             return Response({'error': f'Restore failed: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        _log_admin_action(request, 'other', 'DatabaseBackup', None, f'Restored from backup {uploaded_file.name}')
+        # `flush` deletes every row (including the currently logged-in user's),
+        # then `loaddata` reinserts everyone from the backup with fresh primary
+        # keys. request.user is still the pre-restore in-memory object, so its
+        # old pk may no longer exist — using it directly as a foreign key would
+        # crash. Re-fetch the equivalent user by username instead, and treat
+        # logging as best-effort so a logging hiccup never masks a successful
+        # restore.
+        try:
+            current_user = type(request.user).objects.filter(username=request.user.username).first()
+            if current_user:
+                AdminLog.objects.create(
+                    admin_user=current_user,
+                    action='other',
+                    content_type='DatabaseBackup',
+                    object_id=None,
+                    object_description=f'Restored from backup {uploaded_file.name}',
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+                )
+        except Exception:
+            pass
 
         return Response({
             'message': f'Backup {uploaded_file.name} restored successfully.',

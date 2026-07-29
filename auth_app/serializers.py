@@ -44,6 +44,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         extra_kwargs = {
             'email': {'required': True},
+            'role': {'read_only': True},
         }
 
     def validate_email(self, value):
@@ -65,6 +66,11 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop('password2')
         password = validated_data.pop('password')
+        # Defense-in-depth: override role to 'user' regardless of what was
+        # submitted. Even if the serializer-level read_only is bypassed
+        # (e.g. a future code change removes extra_kwargs), this server-side
+        # guarantee prevents privilege escalation via the registration API.
+        validated_data['role'] = 'user'
         user = User(**validated_data)
         user.set_password(password)
         # Account stays inactive/unverified until the emailed link is clicked.

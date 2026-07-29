@@ -647,19 +647,41 @@
 
 {% block extra_js %}
 <script>
-const assignModal = new bootstrap.Modal(document.getElementById('assignModal'));
-const quickAddModal = new bootstrap.Modal(document.getElementById('quickAddModal'));
+// FIX: previously `new bootstrap.Modal(...)` ran immediately at script
+// load time — if the Bootstrap bundle hadn't finished loading yet this
+// threw "ReferenceError: bootstrap is not defined" and broke every
+// function below it in this same script block. Getting the instance
+// lazily, only when a modal is actually about to open, removes that
+// dependency on load order entirely.
+function getAssignModal() {
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap JS failed to load — modal cannot open.');
+        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        return null;
+    }
+    return bootstrap.Modal.getOrCreateInstance(document.getElementById('assignModal'));
+}
+
+function getQuickAddModal() {
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap JS failed to load — modal cannot open.');
+        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        return null;
+    }
+    return bootstrap.Modal.getOrCreateInstance(document.getElementById('quickAddModal'));
+}
 
 function openAssignModal(requestId) {
     document.getElementById('modal-request-id').value = requestId;
-    assignModal.show();
+    const modal = getAssignModal();
+    if (modal) modal.show();
 }
 
 async function assignDriver() {
     const requestId = document.getElementById('modal-request-id').value;
     const driverId = document.getElementById('modal-driver-select').value;
 
-    if(!driverId) {
+    if (!driverId) {
         showToast('No active available driver was chosen.', 'danger');
         return;
     }
@@ -667,7 +689,8 @@ async function assignDriver() {
     const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
     if (data && data.id) {
         showToast('Driver dispatch successfully configured!', 'success');
-        assignModal.hide();
+        const modal = getAssignModal();
+        if (modal) modal.hide();
         setTimeout(() => location.reload(), 1000);
     } else {
         showToast('Failed to deploy driver node.', 'danger');

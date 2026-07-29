@@ -313,18 +313,76 @@ document.addEventListener("DOMContentLoaded", function() {
 <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
 <script>
-function showToast(message, type = 'success') {
-    const id = 'toast-' + Date.now();
-    const html = `
-        <div id="${id}" class="toast align-items-center text-bg-${type} border-0 show" role="alert">
-            <div class="d-flex">
-                <div class="toast-body">${message}</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        </div>`;
-    document.getElementById('toast-container').insertAdjacentHTML('beforeend', html);
-    setTimeout(() => document.getElementById(id)?.remove(), 4000);
-}
+// T1.3 FIX: XSS-safe showToast — uses DOM textContent for message, never innerHTML.
+// The type parameter is restricted to a safe allow-list of Bootstrap 5 background
+// classes so it can never inject arbitrary CSS/class names either.
+(function () {
+    const SAFE_TYPES = new Set([
+        'primary', 'secondary', 'success', 'danger',
+        'warning', 'info', 'light', 'dark',
+    ]);
+
+    window.showToast = function showToast(message, type) {
+        const safeType = SAFE_TYPES.has(type) ? type : 'success';
+        const safeMessage = (message == null) ? '' : String(message);
+
+        const toast = document.createElement('div');
+        toast.className = 'toast align-items-center text-bg-' + safeType + ' border-0 show';
+        toast.setAttribute('role', 'alert');
+        toast.id = 'toast-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+        const flex = document.createElement('div');
+        flex.className = 'd-flex';
+
+        const body = document.createElement('div');
+        body.className = 'toast-body';
+        body.textContent = safeMessage;  // NEVER innerHTML — textContent is always safe.
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'btn-close btn-close-white me-2 m-auto';
+        closeBtn.setAttribute('data-bs-dismiss', 'toast');
+        closeBtn.setAttribute('aria-label', 'Close');
+
+        flex.appendChild(body);
+        flex.appendChild(closeBtn);
+        toast.appendChild(flex);
+
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        container.appendChild(toast);
+
+        setTimeout(function () {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 4000);
+    };
+
+    // T1.4 FIX: Global HTML-escape helper. Use this on ANY value that came from
+    // an untrusted source (API data, user input) before concatenating it into
+    // an HTML string that will be assigned to innerHTML / insertAdjacentHTML.
+    // This is the single source of truth; never inline-escape ad-hoc.
+    window.escapeHtml = function escapeHtml(value) {
+        if (value == null) return '';
+        const s = String(value);
+        let out = '';
+        let p = 0;
+        for (let i = 0; i < s.length; i++) {
+            const c = s.charCodeAt(i);
+            // & < > " '  — the five characters that must be escaped in HTML context
+            if (c === 38 || c === 60 || c === 62 || c === 34 || c === 39) {
+                if (i > p) out += s.slice(p, i);
+                if (c === 38) out += '&amp;';
+                else if (c === 60) out += '&lt;';
+                else if (c === 62) out += '&gt;';
+                else if (c === 34) out += '&quot;';
+                else out += '&#39;';
+                p = i + 1;
+            }
+        }
+        if (p === 0) return s;
+        return out + s.slice(p);
+    };
+})();
 </script>
 {% if user.is_authenticated %}
 <script>
@@ -384,6 +442,45 @@ function showToast(message, type = 'success') {
         } catch (e) {
             return text;
         }
+    }
+
+    // Like apiFetch, but returns the raw Response instead of parsed JSON.
+    // Needed for anything that isn't a plain JSON request/response — file
+    // downloads (blob), file uploads (FormData), etc. Still auto-refreshes
+    // the access token on a 401 instead of failing outright.
+    async function authFetch(url, options = {}) {
+        let token = localStorage.getItem('access_token');
+
+        const makeRequest = (t) => {
+            const headers = Object.assign({}, options.headers || {}, {
+                'Authorization': `Bearer ${t}`,
+            });
+            return fetch(url, Object.assign({}, options, { headers }));
+        };
+
+        let res = await makeRequest(token);
+
+        if (res.status === 401) {
+            const refresh = localStorage.getItem('refresh_token');
+            if (!refresh) { logout(); return null; }
+
+            const refreshRes = await fetch('/auth/token/refresh/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh }),
+            });
+
+            if (refreshRes.ok) {
+                const refreshData = await refreshRes.json();
+                localStorage.setItem('access_token', refreshData.access);
+                res = await makeRequest(refreshData.access);
+            } else {
+                logout();
+                return null;
+            }
+        }
+
+        return res;
     }
 
     async function logout() {

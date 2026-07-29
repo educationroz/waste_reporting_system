@@ -234,3 +234,10 @@ EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@wastesystem.local')
+
+
+# Backup/restore configuration
+BACKUP_RETENTION_DAYS = 30          # local backups older than this get pruned by the scheduled command
+BACKUP_OFFSITE_ENABLED = False      # set True once S3 credentials below are configured
+BACKUP_S3_BUCKET = None             # e.g. 'my-app-db-backups'
+BACKUP_S3_ENDPOINT_URL = None       # only needed for non-AWS S3-compatible storage (Backblaze, MinIO, etc.)
