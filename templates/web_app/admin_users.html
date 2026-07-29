@@ -485,6 +485,13 @@ function getCookie(name) {
     return cookieValue;
 }
 
+// ── XSS escaping helper ────────────────────────────────────────────────────
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+}
+
 // ── Live DOM helpers (no reload) ──────────────────────────────────────────
 
 function bumpStat(elId, delta) {
@@ -508,13 +515,20 @@ function todayDateStr() {
 }
 
 function buildAdminRowHtml(admin, isActive) {
-    const name = adminFullName(admin);
+    const name = escapeHtml(adminFullName(admin));
+    const email = escapeHtml(admin.email);
+    const username = escapeHtml(admin.username);
+    const firstName = escapeHtml(admin.first_name || '');
+    const lastName = escapeHtml(admin.last_name || '');
+    const phone = escapeHtml(admin.phone || '-');
+    const adminId = admin.id;
+
     const statusBadge = isActive
         ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5"><i class="bi bi-check-circle me-1"></i>Active</span>'
         : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5"><i class="bi bi-x-circle me-1"></i>Inactive</span>';
 
     return `
-        <tr id="admin-row-${admin.id}">
+        <tr id="admin-row-${adminId}">
             <td class="ps-4">
                 <div class="d-flex align-items-center">
                     <div class="rounded-circle bg-success bg-opacity-10 me-3 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
@@ -522,17 +536,19 @@ function buildAdminRowHtml(admin, isActive) {
                     </div>
                     <div>
                         <div class="fw-bold text-dark">${name}</div>
-                        <div class="small text-muted">-</div>
+                        <div class="small text-muted">${phone}</div>
                     </div>
                 </div>
             </td>
             <td>
-                <a href="mailto:${admin.email}" class="text-decoration-none text-success fw-medium">${admin.email}</a>
+                <a href="mailto:${email}" class="text-decoration-none text-success fw-medium">${email}</a>
             </td>
             <td>
-                <span class="badge bg-success bg-opacity-10 text-success fw-semibold px-2 py-1.5">${admin.username}</span>
+                <span class="badge bg-success bg-opacity-10 text-success fw-semibold px-2 py-1.5">${username}</span>
             </td>
-            <td>${statusBadge}</td>
+            <td>
+                ${statusBadge}
+            </td>
             <td>
                 <span class="text-muted small fw-medium">${todayDateStr()}</span>
             </td>
@@ -542,18 +558,18 @@ function buildAdminRowHtml(admin, isActive) {
                         class="btn btn-outline-secondary btn-sm rounded-start"
                         data-bs-toggle="modal"
                         data-bs-target="#editAdminModal"
-                        data-admin-id="${admin.id}"
-                        data-admin-username="${admin.username}"
-                        data-admin-email="${admin.email}"
-                        data-admin-first-name="${admin.first_name || ''}"
-                        data-admin-last-name="${admin.last_name || ''}"
+                        data-admin-id="${adminId}"
+                        data-admin-username="${username}"
+                        data-admin-email="${email}"
+                        data-admin-first-name="${firstName}"
+                        data-admin-last-name="${lastName}"
                         data-admin-full-name="${name}"
                         data-admin-active="${isActive}"
                         title="Edit Administrative Access"
                     >
                         <i class="bi bi-pencil"></i>
                     </button>
-                    <button class="btn btn-outline-danger btn-sm rounded-end" onclick="if(confirm('Are you absolute sure to remove this admin?')) { removeAdmin(${admin.id}); }" title="Remove Administrative Access">
+                    <button class="btn btn-outline-danger btn-sm rounded-end" onclick="if(confirm('Are you absolute sure to remove this admin?')) { removeAdmin(${adminId}); }" title="Remove Administrative Access">
                         <i class="bi bi-trash"></i>
                     </button>
                 </div>
@@ -578,9 +594,12 @@ function updateAdminRowDom(admin, isActive) {
     const nameEl = row.children[0].querySelector('.fw-bold');
     if (nameEl) nameEl.textContent = name;
 
+    const phoneEl = row.children[0].querySelector('.small.text-muted');
+    if (phoneEl) phoneEl.textContent = admin.phone || '-';
+
     const emailLink = row.children[1].querySelector('a');
     if (emailLink) {
-        emailLink.href = `mailto:${admin.email}`;
+        emailLink.setAttribute('href', `mailto:${encodeURIComponent(admin.email)}`);
         emailLink.textContent = admin.email;
     }
 
@@ -635,9 +654,6 @@ async function addAdmin() {
 
         const data = await res.json();
 
-        // NOTE: यो backend ले kahilyai `success` key फर्काउँदैन — यो field
-        // check गर्दा पहिलेको कोड सधैँ "error" branch मा जान्थ्यो, admin
-        // बनिसके पनि। `data.id` check गर्नु नै सहि तरिका हो।
         if (res.ok && data.id) {
             showToast('Admin user created successfully!', 'success');
             bootstrap.Modal.getInstance(document.getElementById('addAdminModal')).hide();

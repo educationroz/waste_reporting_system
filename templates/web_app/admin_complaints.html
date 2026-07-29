@@ -248,7 +248,7 @@ function renderComplaints() {
             <td class="small text-muted">${escapeHtml(new Date(c.created_at).toLocaleDateString())}</td>
             <td>
                 <div class="d-flex gap-1">
-                    <button class="btn btn-sm btn-outline-success" onclick='openReview(${JSON.stringify(c)})'>
+                    <button class="btn btn-sm btn-outline-success" onclick="openReview(${escapeHtml(c.id)})">
                         <i class="bi bi-clipboard-check"></i> Review
                     </button>
                     <button class="btn btn-sm btn-outline-danger" onclick="deleteComplaint(${escapeHtml(c.id)})" title="Delete complaint">
@@ -260,7 +260,9 @@ function renderComplaints() {
     `).join('');
 }
 
-function openReview(complaint) {
+function openReview(id) {
+    const complaint = allComplaints.find(c => c.id == id);
+    if (!complaint) return;
     document.getElementById('review-complaint-id').value = complaint.id;
     document.getElementById('review-status').value = complaint.status;
     document.getElementById('review-response').value = complaint.admin_response || '';

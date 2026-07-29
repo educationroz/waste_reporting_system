@@ -1341,9 +1341,9 @@ function insertHomeRequestRow(req) {
 
     const statusClass = HOME_STATUS_BADGE_CLASS[req.status] || 'bg-primary';
     const statusLabel = HOME_STATUS_LABELS[req.status] || req.status;
-    const driverName = req.driver && req.driver.user ? req.driver.user.username : '—';
+    const driverName = escapeHtml(req.driver && req.driver.user ? req.driver.user.username : '—');
     const photoCell = req.photo
-        ? `<a href="${req.photo}" target="_blank"><img src="${req.photo}" alt="photo" style="height:36px;width:36px;object-fit:cover;border-radius:4px;"></a>`
+        ? `<a href="${escapeHtml(req.photo)}" target="_blank"><img src="${escapeHtml(req.photo)}" alt="photo" style="height:36px;width:36px;object-fit:cover;border-radius:4px;"></a>`
         : '<span class="text-muted small">—</span>';
     const dateStr = req.scheduled_date
         ? new Date(req.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -1354,12 +1354,12 @@ function insertHomeRequestRow(req) {
 
     const rowHtml = `
         <tr id="home-request-row-${req.id}">
-            <td>${req.id}</td>
-            <td>${req.waste_type_display || req.waste_type}</td>
+            <td>${escapeHtml(req.id)}</td>
+            <td>${escapeHtml(req.waste_type_display || req.waste_type)}</td>
             <td><span class="badge ${statusClass}">${statusLabel}</span></td>
             <td class="small">${driverName}</td>
             <td>${photoCell}</td>
-            <td class="small text-muted">${dateStr}</td>
+            <td class="small text-muted">${escapeHtml(dateStr)}</td>
             <td>${actionHtml}</td>
         </tr>
     `;

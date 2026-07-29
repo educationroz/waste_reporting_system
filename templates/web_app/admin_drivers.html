@@ -558,6 +558,13 @@
         console.warn('Could not parse vehicles-data', e);
     }
 
+    // ── XSS escaping helper ────────────────────────────────────────────────
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str == null ? '' : String(str);
+        return div.innerHTML;
+    }
+
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -609,25 +616,32 @@
         let html = '<option value="">None (De-allocate System Asset)</option>';
         VEHICLES_FOR_JS.forEach(v => {
             const selected = (v.id == selectedVehicleId) ? 'selected' : '';
-            html += `<option value="${v.id}" ${selected}>${v.plate_number} — ${v.type} (${v.capacity_kg}kg, ${v.status_display})</option>`;
+            const plate = escapeHtml(v.plate_number);
+            const type = escapeHtml(v.type);
+            const capacity = escapeHtml(String(v.capacity_kg));
+            const status = escapeHtml(v.status_display);
+            html += `<option value="${v.id}" ${selected}>${plate} — ${type} (${capacity}kg, ${status})</option>`;
         });
         return html;
     }
 
     function buildDriverRowHtml(driver) {
-        const fullName = driver.full_name || driver.username;
-        const email = driver.email || '';
-        const licenseNumber = driver.license_number || '—';
+        const fullName = escapeHtml(driver.full_name || driver.username);
+        const username = escapeHtml(driver.username);
+        const email = escapeHtml(driver.email || '');
+        const licenseNumber = escapeHtml(driver.license_number || '—');
+        const phone = escapeHtml(driver.phone || '—');
+        const address = escapeHtml(driver.address || '—');
         const vehicleCell = driver.vehicle
-            ? `<div class="fw-semibold text-dark"><i class="bi bi-truck me-1 text-success"></i>${driver.vehicle.plate_number}</div>
-               <div class="small text-muted" style="font-size: 0.8rem;">${driver.vehicle.type} (${driver.vehicle.capacity_kg}kg)</div>`
+            ? `<div class="fw-semibold text-dark"><i class="bi bi-truck me-1 text-success"></i>${escapeHtml(driver.vehicle.plate_number)}</div>
+               <div class="small text-muted" style="font-size: 0.8rem;">${escapeHtml(driver.vehicle.type)} (${escapeHtml(String(driver.vehicle.capacity_kg))}kg)</div>`
             : `<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>No Asset Linked</span>`;
         const statusBadgeClass = driver.is_available ? 'bg-success bg-opacity-10 text-success' : 'bg-secondary bg-opacity-10 text-secondary';
         const statusLabel = driver.is_available ? 'Available' : 'Busy';
         const toggleBtnLabel = driver.is_available
             ? '<i class="bi bi-dash-circle me-1"></i>Set Busy'
             : '<i class="bi bi-check-circle me-1"></i>Set Available';
-        const avatarLetter = (driver.username || '?').charAt(0).toUpperCase();
+        const avatarLetter = escapeHtml((driver.username || '?').charAt(0).toUpperCase());
 
         const rowHtml = `
             <tr id="driver-row-${driver.id}">
@@ -684,7 +698,7 @@
                                     <h6 class="fw-bold text-secondary small text-uppercase mb-2">Contact &amp; Identity</h6>
                                     <div class="profile-detail-row">
                                         <span class="profile-detail-label">Username</span>
-                                        <span class="profile-detail-value">${driver.username}</span>
+                                        <span class="profile-detail-value">${username}</span>
                                     </div>
                                     <div class="profile-detail-row">
                                         <span class="profile-detail-label">Email</span>
@@ -692,11 +706,11 @@
                                     </div>
                                     <div class="profile-detail-row">
                                         <span class="profile-detail-label">Phone</span>
-                                        <span class="profile-detail-value">${driver.phone || '—'}</span>
+                                        <span class="profile-detail-value">${phone}</span>
                                     </div>
                                     <div class="profile-detail-row">
                                         <span class="profile-detail-label">Address</span>
-                                        <span class="profile-detail-value">${driver.address || '—'}</span>
+                                        <span class="profile-detail-value">${address}</span>
                                     </div>
                                     <h6 class="fw-bold text-secondary small text-uppercase mb-2 mt-4">Assignment &amp; Performance</h6>
                                     <div class="profile-detail-row">
@@ -705,7 +719,7 @@
                                     </div>
                                     <div class="profile-detail-row">
                                         <span class="profile-detail-label">Assigned Vehicle</span>
-                                        <span class="profile-detail-value">${driver.vehicle ? driver.vehicle.plate_number : 'Not assigned'}</span>
+                                        <span class="profile-detail-value">${driver.vehicle ? escapeHtml(driver.vehicle.plate_number) : 'Not assigned'}</span>
                                     </div>
                                     <div class="profile-detail-row">
                                         <span class="profile-detail-label">Total Trips</span>
@@ -755,7 +769,7 @@
                         <div class="modal-body p-4">
                             <input type="hidden" id="assign-vehicle-driver-id" value="${driver.id}">
                             <div class="mb-2">
-                                <label class="form-label fw-semibold text-secondary">Select Vehicle for ${driver.username}</label>
+                                <label class="form-label fw-semibold text-secondary">Select Vehicle for ${username}</label>
                                 <select class="form-select form-select-lg" style="font-size: 0.95rem;" id="assign-vehicle-select-${driver.id}">
                                     ${buildVehicleOptionsHtml(driver.vehicle ? driver.vehicle.id : null)}
                                 </select>
@@ -908,12 +922,14 @@
             return;
         }
 
+        // .text is DOM-decoded plain text (safe to read), but it still needs
+        // escaping before being written back into innerHTML.
         const selectedText = vehicleSelect.options[vehicleSelect.selectedIndex].text;
         const [platePart, restPart] = selectedText.split('—').map(s => s.trim());
 
         vehicleCell.innerHTML = `
-            <div class="fw-semibold text-dark"><i class="bi bi-truck me-1 text-success"></i>${platePart}</div>
-            <div class="small text-muted" style="font-size: 0.8rem;">${restPart || ''}</div>
+            <div class="fw-semibold text-dark"><i class="bi bi-truck me-1 text-success"></i>${escapeHtml(platePart)}</div>
+            <div class="small text-muted" style="font-size: 0.8rem;">${escapeHtml(restPart || '')}</div>
         `;
     }
 
@@ -1061,12 +1077,14 @@
         const label = document.getElementById(`license-upload-label-${driverId}`);
         if (!area || !documentUrl) return;
 
+        const safeUrl = escapeHtml(documentUrl);
+
         area.innerHTML = `
             <div class="mb-2">
-                <a href="${documentUrl}" target="_blank" class="btn btn-sm btn-outline-success w-100 mb-2">
+                <a href="${safeUrl}" target="_blank" class="btn btn-sm btn-outline-success w-100 mb-2">
                     <i class="bi bi-file-earmark-pdf me-1"></i>Open Full PDF in New Tab
                 </a>
-                <embed src="${documentUrl}" type="application/pdf" class="license-pdf-frame">
+                <embed src="${safeUrl}" type="application/pdf" class="license-pdf-frame">
             </div>
         `;
 
