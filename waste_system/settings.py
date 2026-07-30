@@ -14,6 +14,15 @@ SECRET_KEY = config('SECRET_KEY', default='change-me-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
+# Whether registration should do a live DNS/MX lookup on the email domain.
+# Defaults to "on in production, off in development". It is exposed as its own
+# setting (rather than being derived from DEBUG inline) because Django's test
+# runner forces DEBUG=False, which previously turned the network lookup on
+# during tests and made any test using an example.com address fail.
+EMAIL_CHECK_DELIVERABILITY = config(
+    'EMAIL_CHECK_DELIVERABILITY', default=not DEBUG, cast=bool
+)
+
 # ─── Apps ─────────────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
     'jazzmin',  # Admin theme

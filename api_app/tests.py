@@ -5,7 +5,7 @@ from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase
 from .views import _create_notification
 from .models import Notification, WasteRequest
 

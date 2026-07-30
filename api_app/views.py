@@ -1,4 +1,5 @@
 import io
+import math
 from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
 from pathlib import Path
@@ -67,6 +68,70 @@ def _haversine_meters(lat1, lng1, lat2, lng2):
     dlambda = math.radians(lng2 - lng1)
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+# ── Same-location request grouping ───────────────────────────────────────────
+# Multiple people often report the SAME pile of waste from slightly different
+# spots (GPS drift alone is easily 10-20m). Those are one job for the driver,
+# so assigning or completing one request cascades to its neighbours within this
+# radius. Kept well under COMPLETION_DISTANCE_THRESHOLD_METERS so a genuinely
+# different pickup down the road is never swallowed into the group.
+SAME_LOCATION_RADIUS_METERS = 100
+
+# Only requests still waiting for work get pulled into a group; anything already
+# completed/cancelled is left exactly as it is.
+GROUPABLE_STATUSES = ('pending', 'assigned', 'in_progress')
+
+
+def _request_coords(waste_request):
+    """Best-available (lat, lng) for a request, falling back to the photo EXIF."""
+    lat = waste_request.latitude if waste_request.latitude is not None else waste_request.photo_latitude
+    lng = waste_request.longitude if waste_request.longitude is not None else waste_request.photo_longitude
+    if lat is None or lng is None:
+        return None
+    return float(lat), float(lng)
+
+
+def _same_location_siblings(waste_request):
+    """
+    Other active requests reporting the same spot as `waste_request`.
+
+    Returns a list (never a queryset) so callers can safely mutate the rows.
+    Returns [] when the request has no usable coordinates — without a location
+    we cannot prove anything is a sibling, and silently grouping by address
+    text would be far too eager.
+    """
+    origin = _request_coords(waste_request)
+    if origin is None:
+        return []
+    origin_lat, origin_lng = origin
+
+    # Cheap bounding-box prefilter so we don't haversine the whole table;
+    # ~1 degree of latitude is 111.32km, and longitude shrinks with latitude.
+    lat_delta = SAME_LOCATION_RADIUS_METERS / 111_320
+    cos_lat = math.cos(math.radians(origin_lat))
+    lng_delta = SAME_LOCATION_RADIUS_METERS / (111_320 * cos_lat) if cos_lat else 180
+
+    candidates = WasteRequest.objects.filter(
+        status__in=GROUPABLE_STATUSES,
+        is_deleted=False,
+    ).exclude(pk=waste_request.pk).filter(
+        Q(latitude__gte=origin_lat - lat_delta, latitude__lte=origin_lat + lat_delta,
+          longitude__gte=origin_lng - lng_delta, longitude__lte=origin_lng + lng_delta)
+        | Q(latitude__isnull=True, photo_latitude__gte=origin_lat - lat_delta,
+            photo_latitude__lte=origin_lat + lat_delta,
+            photo_longitude__gte=origin_lng - lng_delta,
+            photo_longitude__lte=origin_lng + lng_delta)
+    )
+
+    siblings = []
+    for candidate in candidates:
+        coords = _request_coords(candidate)
+        if coords is None:
+            continue
+        if _haversine_meters(origin_lat, origin_lng, coords[0], coords[1]) <= SAME_LOCATION_RADIUS_METERS:
+            siblings.append(candidate)
+    return siblings
 
 
 def _log_admin_action(request, action_type, content_type, obj, description=''):
@@ -810,10 +875,31 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         waste_request.status = 'assigned'
         waste_request.save(update_fields=['driver', 'status'])
 
+        # Everyone reporting this same spot is really one job, so hand the
+        # whole cluster to the same driver instead of dispatching several
+        # drivers to the same pile of waste.
+        siblings = _same_location_siblings(waste_request)
+        for sibling in siblings:
+            sibling.driver = driver
+            sibling.status = 'assigned'
+            sibling.save(update_fields=['driver', 'status'])
+
+        grouped_note = f' (+{len(siblings)} same-location request(s))' if siblings else ''
         _log_admin_action(
             request, 'assign', 'WasteRequest', waste_request,
-            f'Assigned driver {driver.user.username} to request #{waste_request.id}'
+            f'Assigned driver {driver.user.username} to request #{waste_request.id}{grouped_note}'
         )
+
+        # Notify the other reporters that their report is being handled too.
+        for sibling in siblings:
+            if sibling.user_id:
+                _create_notification(
+                    user=sibling.user,
+                    title='Driver Assigned',
+                    message=f'Driver {driver.user.username} has been assigned to your request.',
+                    notification_type='info',
+                    related_request=sibling,
+                )
 
         # Notify user (guest/anonymous requests won't have a user to notify)
         if waste_request.user_id:
@@ -904,20 +990,27 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             return Response({'error': f'Invalid status. Choose: {valid_statuses}'}, status=status.HTTP_400_BAD_REQUEST)
 
         # ── HARD BLOCK: GPS चाहिन्छ, नत्र "Completed" mark गर्न मिल्दैन ──────
+        # This applies to DRIVERS, who are meant to be standing at the pickup
+        # when they close a job — their GPS is the proof of that. Admins are
+        # doing back-office corrections from a desk (closing stale jobs,
+        # fixing a driver's mistake) and have no meaningful location to send,
+        # so requiring it from them would just block legitimate admin work.
         comp_lat = comp_lng = None
         if new_status == 'completed':
             raw_lat = request.data.get('latitude')
             raw_lng = request.data.get('longitude')
-            if raw_lat in (None, '') or raw_lng in (None, ''):
+            missing_gps = raw_lat in (None, '') or raw_lng in (None, '')
+            if missing_gps and user.role != 'admin':
                 return Response(
                     {'error': 'GPS location is required to mark this request as completed. Please enable location access and try again.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            try:
-                comp_lat = float(raw_lat)
-                comp_lng = float(raw_lng)
-            except (TypeError, ValueError):
-                return Response({'error': 'Invalid GPS coordinates.'}, status=status.HTTP_400_BAD_REQUEST)
+            if not missing_gps:
+                try:
+                    comp_lat = float(raw_lat)
+                    comp_lng = float(raw_lng)
+                except (TypeError, ValueError):
+                    return Response({'error': 'Invalid GPS coordinates.'}, status=status.HTTP_400_BAD_REQUEST)
 
         old_status = waste_request.status
 
@@ -937,7 +1030,13 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             pickup_lat = waste_request.latitude if waste_request.latitude is not None else waste_request.photo_latitude
             pickup_lng = waste_request.longitude if waste_request.longitude is not None else waste_request.photo_longitude
 
-            if pickup_lat is not None and pickup_lng is not None:
+            if comp_lat is None or comp_lng is None:
+                # Admin desk-closure: no location to compare against, so there
+                # is nothing to flag.
+                waste_request.completion_distance_meters = None
+                waste_request.completion_flagged = False
+                update_fields += ['completion_distance_meters', 'completion_flagged']
+            elif pickup_lat is not None and pickup_lng is not None:
                 dist = _haversine_meters(float(pickup_lat), float(pickup_lng), comp_lat, comp_lng)
                 waste_request.completion_distance_meters = round(dist, 1)
                 waste_request.completion_flagged = dist > COMPLETION_DISTANCE_THRESHOLD_METERS
@@ -975,6 +1074,35 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 total_trips=F('total_trips') + 1
             )
 
+        # ── Close out the rest of the cluster ────────────────────────────────
+        # The driver cleared one physical spot, so every other open report of
+        # that same spot is done too. Doing this here means the other reporters
+        # get told, instead of being left with a report that stays "pending"
+        # forever against waste that no longer exists.
+        completed_siblings = []
+        if new_status == 'completed' and old_status != 'completed':
+            for sibling in _same_location_siblings(waste_request):
+                sibling.status = 'completed'
+                sibling.completed_at = waste_request.completed_at
+                sibling.completion_latitude = comp_lat
+                sibling.completion_longitude = comp_lng
+                sibling.completion_distance_meters = None
+                sibling.completion_flagged = False
+                sibling.save(update_fields=[
+                    'status', 'completed_at', 'completion_latitude',
+                    'completion_longitude', 'completion_distance_meters',
+                    'completion_flagged',
+                ])
+                completed_siblings.append(sibling)
+
+            if completed_siblings:
+                _log_admin_action(
+                    request, 'status_change', 'WasteRequest', waste_request,
+                    f'Request #{waste_request.id} completion also closed '
+                    f'{len(completed_siblings)} same-location request(s): '
+                    f'{[s.id for s in completed_siblings]}'
+                )
+
         # Log all status changes, including self-cancels, so users' own
         # actions on their requests appear in the audit trail too.
         _log_admin_action(
@@ -982,13 +1110,26 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             f'Request #{waste_request.id} status changed to {new_status} by {user.username}'
         )
 
-        # Guest/anonymous requests won't have a user to notify
-        if waste_request.user_id:
+        # Guest/anonymous requests won't have a user to notify.
+        # On completion every reporter in the cluster hears about it — each
+        # against their OWN request, so the notification links somewhere
+        # meaningful for them rather than to a stranger's report.
+        if new_status == 'completed':
+            for closed in [waste_request] + completed_siblings:
+                if closed.user_id:
+                    _create_notification(
+                        user=closed.user,
+                        title='Report Completed',
+                        message=f'Your report #{closed.id} has been completed. Thank you!',
+                        notification_type='success',
+                        related_request=closed,
+                    )
+        elif waste_request.user_id:
             _create_notification(
                 user=waste_request.user,
                 title='Request Status Updated',
                 message=f'Your request status changed to: {new_status}.',
-                notification_type='success' if new_status == 'completed' else 'info',
+                notification_type='info',
                 related_request=waste_request,
             )
 
