@@ -285,7 +285,7 @@
                                         <button class="btn btn-outline-secondary rounded-start" data-bs-toggle="modal" data-bs-target="#editVehicleModal{{ vehicle.id }}" title="Edit Vehicle Configurations">
                                             <i class="bi bi-pencil"></i>
                                         </button>
-                                        <button class="btn btn-outline-danger rounded-end" onclick="deleteVehicle({{ vehicle.id }})" title="Delete Vehicle Info">
+                                        <button class="btn btn-outline-danger rounded-end" onclick="deleteVehicle({{ vehicle.id }}, this)" title="Delete Vehicle Info">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </div>
@@ -337,7 +337,7 @@
                                         </div>
                                         <div class="modal-footer bg-light border-top-0">
                                             <button class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                                            <button class="btn btn-success px-4" onclick="updateVehicle({{ vehicle.id }})">Save Changes</button>
+                                            <button class="btn btn-success px-4" onclick="updateVehicle({{ vehicle.id }}, this)">Save Changes</button>
                                         </div>
                                     </div>
                                 </div>
@@ -397,7 +397,7 @@
             </div>
             <div class="modal-footer bg-light border-top-0">
                 <button class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success px-4" onclick="addVehicle()">Add Vehicle</button>
+                <button class="btn btn-success px-4" onclick="addVehicle(this)">Add Vehicle</button>
             </div>
         </div>
     </div>
@@ -493,7 +493,7 @@ function checkEmptyState() {
 }
 
 // ---------- UPDATE (edit) — live cell refresh, no reload ----------
-async function updateVehicle(vehicleId) {
+async function updateVehicle(vehicleId, btn) {
     const vehicleType = resolveVehicleType('edit', vehicleId);
 
     if (!vehicleType) {
@@ -513,6 +513,7 @@ async function updateVehicle(vehicleId) {
         return;
     }
 
+    await withButtonBusy(eventButton(btn), 'Saving...', async () => {
     const data = await API.patch(`/api/vehicles/${vehicleId}/`, payload);
     if (data && data.id) {
         showToast('Vehicle updated!', 'success');
@@ -547,12 +548,14 @@ async function updateVehicle(vehicleId) {
     } else {
         showToast('Update failed.', 'danger');
     }
+    });
 }
 
 // ---------- DELETE — reliable fetch status check + instant DOM row removal ----------
-async function deleteVehicle(vehicleId) {
+async function deleteVehicle(vehicleId, btn) {
     if (!confirm('Delete this vehicle? This cannot be undone.')) return;
 
+    await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {
         const data = await API.delete(`/api/vehicles/${vehicleId}/`);
 
@@ -584,10 +587,11 @@ async function deleteVehicle(vehicleId) {
     } catch (e) {
         showToast('Network error: ' + e.message, 'danger');
     }
+    });
 }
 
 // ---------- ADD — insert new row live, no reload ----------
-async function addVehicle() {
+async function addVehicle(btn) {
     const vehicleType = resolveVehicleType('add');
 
     if (!vehicleType) {
@@ -607,6 +611,7 @@ async function addVehicle() {
         return;
     }
 
+    await withButtonBusy(eventButton(btn), 'Adding...', async () => {
     const data = await API.post('/api/vehicles/', payload);
     if (data && data.id) {
         showToast('Vehicle added!', 'success');
@@ -649,7 +654,7 @@ async function addVehicle() {
                         <button class="btn btn-outline-secondary rounded-start" disabled title="Refresh page to edit new vehicle">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn btn-outline-danger rounded-end" onclick="deleteVehicle(${data.id})" title="Delete Vehicle Info">
+                        <button class="btn btn-outline-danger rounded-end" onclick="deleteVehicle(${data.id}, this)" title="Delete Vehicle Info">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
@@ -676,6 +681,7 @@ async function addVehicle() {
     } else {
         showToast('Failed to add vehicle.', 'danger');
     }
+    });
 }
 </script>
 {% endblock %}

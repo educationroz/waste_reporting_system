@@ -445,11 +445,11 @@
                                 <td class="small text-muted">{{ req.scheduled_date|date:"d M Y" }}</td>
                                 <td>
                                     {% if req.status == 'pending' %}
-                                    <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }})">
+                                    <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }}, this)">
                                         Cancel
                                     </button>
                                     {% elif req.status == 'completed' or req.status == 'cancelled' or req.status == 'in_progress' %}
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }})" title="Move to Recycle Bin">
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }}, this)" title="Move to Recycle Bin">
                                         <i class="bi bi-recycle"></i> Move to Bin
                                     </button>
                                     {% else %}
@@ -1322,9 +1322,9 @@ function applyHomeRequestRowUpdate(requestId, newStatus) {
     const actionCell = row.children[6]; // Actions is 7th <td>, index 6
     if (actionCell) {
         if (newStatus === 'pending') {
-            actionCell.innerHTML = `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${requestId})">Cancel</button>`;
+            actionCell.innerHTML = `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${requestId}, this)">Cancel</button>`;
         } else if (newStatus === 'completed' || newStatus === 'cancelled' || newStatus === 'in_progress') {
-            actionCell.innerHTML = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${requestId})" title="Move to Recycle Bin"><i class="bi bi-recycle"></i> Move to Bin</button>`;
+            actionCell.innerHTML = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${requestId}, this)" title="Move to Recycle Bin"><i class="bi bi-recycle"></i> Move to Bin</button>`;
         } else {
             actionCell.innerHTML = '—';
         }
@@ -1349,7 +1349,7 @@ function insertHomeRequestRow(req) {
         ? new Date(req.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
         : '—';
     const actionHtml = req.status === 'pending'
-        ? `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${req.id})">Cancel</button>`
+        ? `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${req.id}, this)">Cancel</button>`
         : '—';
 
     const rowHtml = `
@@ -1479,23 +1479,26 @@ async function submitRequest() {
 }
 
 // ── Cancel Request ────────────────────────────────────────────────────────
-async function cancelRequest(requestId) {
+async function cancelRequest(requestId, btn) {
     if (!confirm('Cancel this request?')) return;
 
-    const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
-    if (data && data.id) {
-        showToast('Request cancelled.', 'success');
-        applyHomeRequestRowUpdate(requestId, 'cancelled');
-        bumpStat('stat-pending-count', -1);
-    } else {
-        showToast('Failed to cancel request.', 'danger');
-    }
+    await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
+        const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
+        if (data && data.id) {
+            showToast('Request cancelled.', 'success');
+            applyHomeRequestRowUpdate(requestId, 'cancelled');
+            bumpStat('stat-pending-count', -1);
+        } else {
+            showToast('Failed to cancel request.', 'danger');
+        }
+    });
 }
 
 // ── Move Request to Recycle Bin (soft-delete) ─────────────────────────────────
-async function deleteRequest(requestId) {
+async function deleteRequest(requestId, btn) {
     if (!confirm('Move this request to Recycle Bin? You can restore it later from there.')) return;
 
+    await withButtonBusy(eventButton(btn), 'Moving...', async () => {
     try {
         const res = await fetch(`/api/waste-requests/${requestId}/soft_delete/`, {
             method: 'PATCH',
@@ -1525,6 +1528,7 @@ async function deleteRequest(requestId) {
     } catch (e) {
         showToast('Network error: ' + e.message, 'danger');
     }
+    });
 }
 
 // ── Tooltip ──────────────────────────────────────────────────────────────────

@@ -357,6 +357,60 @@ document.addEventListener("DOMContentLoaded", function() {
         }, 4000);
     };
 
+    // Global double-submit guard for any button that fires an async CRUD call.
+    //
+    // Without this, a user who double-clicks "Create" sends the request twice
+    // before the first response lands, and the server happily creates two
+    // records. Every write action on the site funnels through here.
+    //
+    // Usage:
+    //     await withButtonBusy(btn, 'Saving...', async () => { ...fetch... });
+    //
+    // `btn` may be null (keyboard-triggered paths, buttons rendered later) —
+    // the work still runs, it just isn't visually locked.
+    //
+    // The button is restored in a `finally`, so a thrown error or an early
+    // `return` inside the callback can never leave it stuck spinning.
+    window.withButtonBusy = async function withButtonBusy(btn, busyText, work) {
+        // Re-entrancy guard. `disabled` already blocks a second mouse click,
+        // but the same handler can also be reached via Enter on a form or by
+        // another button bound to the same function.
+        if (btn && btn.dataset.busy === '1') return undefined;
+
+        let originalHtml;
+        if (btn) {
+            btn.dataset.busy = '1';
+            originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            // textContent on a fresh span keeps busyText from being parsed as
+            // HTML, matching the XSS posture of showToast above.
+            const spinner = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>';
+            btn.innerHTML = spinner + window.escapeHtml(busyText || 'Working...');
+        }
+
+        try {
+            return await work();
+        } finally {
+            if (btn) {
+                delete btn.dataset.busy;
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+    };
+
+    // Resolves the button that triggered the current inline `onclick`.
+    // Prefer passing `this` from the markup — `onclick="doThing(5, this)"` —
+    // and use this only as the fallback for handlers that cannot be edited.
+    // Must be called SYNCHRONOUSLY at the top of a handler: `window.event` is
+    // cleared once the first `await` yields control.
+    window.eventButton = function eventButton(explicit) {
+        if (explicit && explicit.tagName) return explicit;
+        const ev = window.event;
+        const target = ev && (ev.currentTarget || ev.target);
+        return (target && target.closest) ? target.closest('button, .btn') : null;
+    };
+
     // T1.4 FIX: Global HTML-escape helper. Use this on ANY value that came from
     // an untrusted source (API data, user input) before concatenating it into
     // an HTML string that will be assigned to innerHTML / insertAdjacentHTML.
