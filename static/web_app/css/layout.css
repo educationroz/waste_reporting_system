@@ -1,0 +1,286 @@
+    /* ── Layout Outer Wrapper ────────────────────────────── */
+    .layout-wrapper {
+        display: flex;
+        align-items: stretch;
+        min-height: calc(100vh - var(--navbar-height, 60px));
+        position: relative;
+        width: 100%;
+    }
+
+    /* ── Sidebar Column Container ───────────────────────────────────── */
+    .sidebar-col {
+        flex: 0 0 240px;
+        max-width: 240px;
+        position: sticky;
+        top: var(--navbar-height, 60px);
+        height: calc(100vh - var(--navbar-height, 60px));
+        transition: flex 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                    max-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1020; /* was 1040 — must stay BELOW the navbar's 1030 */
+    }
+
+    /* ── Sidebar Card Styling ─────────────────────────── */
+    .sidebar-card {
+        height: 100% !important;
+        min-height: 100% !important;
+        background-color: var(--bg-card, #ffffff) !important;
+        border-right: 1px solid var(--border-color, #e5e7eb) !important;
+        color: var(--text-primary, #1f2937) !important;
+        overflow-y: auto;
+        overflow-x: hidden;
+        width: 100%;
+        border-radius: 0 !important;
+    }
+
+    .sidebar-card .card-body {
+        display: flex;
+        flex-direction: column;
+        min-height: 100%;
+        padding: 1rem 0.5rem !important;
+    }
+
+    .sidebar-card::-webkit-scrollbar { width: 4px; }
+    .sidebar-card::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 4px;
+    }
+
+    .sidebar-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0 0.25rem 1rem 0.25rem;
+        border-bottom: 1px solid var(--border-color, #e5e7eb);
+        margin-bottom: 0.75rem;
+        width: 100%;
+    }
+
+    .sidebar-brand-logo {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        text-decoration: none;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .sidebar-logo-img {
+        width: 26px;
+        height: 26px;
+        object-fit: contain;
+        flex-shrink: 0;
+        border-radius: 4px;
+    }
+
+    .sidebar-toggle-btn {
+        border: none;
+        background: transparent;
+        color: var(--text-primary, #1f2937);
+        font-size: 1.35rem;
+        padding: 4px 8px;
+        border-radius: 6px;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        visibility: visible !important;
+        opacity: 1 !important;
+        transition: background-color 0.2s ease;
+    }
+    .sidebar-toggle-btn:hover {
+        background-color: var(--bg-hover, #f3f4f6);
+    }
+
+    .sidebar-logo-text { white-space: nowrap; }
+
+    .sidebar-card .nav-link {
+        display: flex;
+        align-items: center;
+        padding: 0.65rem 0.75rem;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        width: 100%;
+        white-space: nowrap;
+    }
+
+    .sidebar-card .nav-link i {
+        font-size: 1.15rem;
+        margin-right: 0.75rem;
+        min-width: 24px;
+        text-align: center;
+        flex-shrink: 0;
+    }
+
+    .sidebar-card .nav-link.active {
+        background-color: rgba(4, 155, 9, 0.12) !important;
+        color: #049b09 !important;
+        font-weight: 600;
+    }
+    .sidebar-card .nav-link.active i {
+        color: #049b09 !important;
+    }
+
+    .sidebar-card .nav-link:hover:not(.active) {
+        background-color: var(--bg-hover, #f3f4f6) !important;
+        color: var(--text-primary, #111827) !important;
+    }
+
+    .content-col {
+        flex: 1 1 auto;
+        min-width: 0;
+        background-color: var(--bg-body, #f9fafb);
+        padding: 1.5rem;
+    }
+
+    /* ── DESKTOP VIEW COLLAPSE BEHAVIOR ────────────────── */
+    @media (min-width: 768px) {
+        .layout-wrapper.collapsed .sidebar-col {
+            flex: 0 0 72px;
+            max-width: 72px;
+        }
+
+        .layout-wrapper.collapsed .sidebar-card .card-body {
+            padding: 1rem 0.25rem !important;
+            align-items: center;
+        }
+
+        .layout-wrapper.collapsed .sidebar-logo-text,
+        .layout-wrapper.collapsed .sidebar-link-text,
+        .layout-wrapper.collapsed .badge-text {
+            display: none !important;
+        }
+
+        .layout-wrapper.collapsed .sidebar-header {
+            flex-direction: column;
+            justify-content: center !important;
+            align-items: center;
+            gap: 8px;
+            padding: 0 0 1rem 0 !important;
+        }
+
+        .layout-wrapper.collapsed .sidebar-brand-logo {
+            justify-content: center !important;
+            width: 100%;
+        }
+
+        .layout-wrapper.collapsed .sidebar-logo-img {
+            margin: 0 auto;
+        }
+
+        .layout-wrapper.collapsed .sidebar-toggle-btn {
+            margin: 0 auto !important;
+        }
+
+        .layout-wrapper.collapsed .sidebar-card .nav-link {
+            justify-content: center !important;
+            padding: 0.6rem !important;
+            width: 42px;
+            height: 42px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .layout-wrapper.collapsed .sidebar-card .nav-link i {
+            margin-right: 0 !important;
+            font-size: 1.2rem !important;
+            min-width: auto !important;
+        }
+
+        .layout-wrapper.collapsed .sidebar-card .nav-link.active {
+            background-color: #049b09 !important;
+            border-radius: 10px;
+        }
+        .layout-wrapper.collapsed .sidebar-card .nav-link.active i {
+            color: #ffffff !important;
+        }
+    }
+
+    /* ── MOBILE VIEW COLLAPSE & EXPAND BEHAVIOR ── */
+    @media (max-width: 767.98px) {
+        .layout-wrapper:not(.mobile-open) .sidebar-col {
+            flex: 0 0 72px;
+            max-width: 72px;
+        }
+
+        .layout-wrapper:not(.mobile-open) .sidebar-card .card-body {
+            padding: 1rem 0.25rem !important;
+            align-items: center;
+        }
+
+        .layout-wrapper:not(.mobile-open) .sidebar-logo-text,
+        .layout-wrapper:not(.mobile-open) .sidebar-link-text,
+        .layout-wrapper:not(.mobile-open) .badge-text {
+            display: none !important;
+        }
+
+        .layout-wrapper:not(.mobile-open) .sidebar-header {
+            flex-direction: column;
+            gap: 8px;
+            padding: 0 0 1rem 0 !important;
+        }
+
+        .layout-wrapper:not(.mobile-open) .sidebar-brand-logo {
+            justify-content: center !important;
+            width: 100%;
+        }
+
+        .layout-wrapper:not(.mobile-open) .sidebar-card .nav-link {
+            justify-content: center !important;
+            width: 42px;
+            height: 42px;
+            padding: 0.6rem !important;
+            margin: 0 auto;
+        }
+
+        .layout-wrapper:not(.mobile-open) .sidebar-card .nav-link i {
+            margin-right: 0 !important;
+            font-size: 1.2rem !important;
+            min-width: auto !important;
+        }
+
+        /* When mobile menu opens via .mobile-open class */
+        .layout-wrapper.mobile-open .sidebar-col {
+            flex: 0 0 240px;
+            max-width: 240px;
+        }
+
+        .layout-wrapper.mobile-open .sidebar-card .card-body {
+            padding: 1rem 0.5rem !important;
+            align-items: flex-start;
+        }
+
+        .layout-wrapper.mobile-open .sidebar-logo-text,
+        .layout-wrapper.mobile-open .sidebar-link-text,
+        .layout-wrapper.mobile-open .badge-text {
+            display: inline !important;
+        }
+
+        .layout-wrapper.mobile-open .sidebar-header {
+            flex-direction: row;
+        }
+
+        .layout-wrapper.mobile-open .sidebar-card .nav-link {
+            justify-content: flex-start !important;
+            width: 100%;
+            height: auto;
+            padding: 0.65rem 0.75rem !important;
+            margin: 0;
+        }
+
+        .layout-wrapper.mobile-open .sidebar-card .nav-link i {
+            margin-right: 0.75rem !important;
+            min-width: 24px !important;
+        }
+
+        .sidebar-backdrop {
+            display: none;
+        }
+        
+        .layout-wrapper.mobile-open ~ .sidebar-backdrop {
+            display: block !important;
+        }
+    }

@@ -1,39 +1,251 @@
 /* waste_system/static/web_app/css/main.css */
 
-body {
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    background-color: #f8f9fa;
+/* ══════════════════════════════════════════════════════════════════
+   THEME VARIABLES
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+    --bg-body: #f8f9fa;
+    --bg-navbar: #fffbfb;
+    --bg-card: #ffffff;
+    --bg-input: #ffffff;
+    --bg-footer: #f8f9fa;
+    --bg-dropdown: #ffffff;
+    --bg-hover: #f1f3f5;
+
+    --text-primary: #000000;
+    --text-body: #212529;
+    --text-muted: #6c757d;
+    --text-link: #000000;
+
+    --border-color: #dee2e6;
+    --border-color-strong: #ced4da;
+
+    --shadow-color: rgba(0, 0, 0, 0.07);
+    --shadow-color-strong: rgba(0, 0, 0, 0.15);
+
+    --brand-green: #049b09;
+    --brand-green-light: #56dd59;
 }
 
-.navbar {
-    background-color: #fffbfb !important;
+[data-theme="dark"] {
+    --bg-body: #121417;
+    --bg-navbar: #1a1d21;
+    --bg-card: #1e2125;
+    --bg-input: #24282d;
+    --bg-footer: #16181b;
+    --bg-dropdown: #1e2125;
+    --bg-hover: #2a2e33;
 
+    --text-primary: #e9ecef;
+    --text-body: #e9ecef;
+    --text-muted: #adb5bd;
+    --text-link: #e9ecef;
+
+    --border-color: #343a40;
+    --border-color-strong: #495057;
+
+    --shadow-color: rgba(0, 0, 0, 0.45);
+    --shadow-color-strong: rgba(0, 0, 0, 0.6);
+
+    --brand-green: #2ecc40;
+    --brand-green-light: #6ee86e;
+}
+
+/* Transitions for Smooth Theme Toggling */
+body,
+.navbar,
+.card,
+.table,
+.form-control,
+.form-select,
+.dropdown-menu,
+.modal-content,
+.alert,
+footer,
+#custom-lang-switcher {
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* ── Custom Dark Scrollbar ───────────────────────────────────────── */
+[data-theme="dark"] ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+[data-theme="dark"] ::-webkit-scrollbar-track {
+    background: var(--bg-body);
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: var(--border-color-strong);
+    border-radius: 4px;
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* ── STICKY FOOTER FLEXBOX FIX ───────────────────────────────────── */
+html {
+    height: 100% !important;
+}
+
+body {
+    min-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: var(--bg-body);
+    color: var(--text-body);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+nav.navbar {
+    flex-shrink: 0 !important;
+}
+
+/* HTMX Swap App Area */
+.site-main, 
+#content-app {
+    flex: 1 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+}
+
+.main-body-wrapper {
+    flex: 1 0 auto !important;
+    width: 100% !important;
+}
+
+/* Sticky Footer Always Bottom */
+.site-footer {
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    margin-top: auto !important;
+}
+
+.site-footer .bg-light {
+    background-color: var(--bg-footer) !important;
+    color: var(--text-muted) !important;
+    border-top: 1px solid var(--border-color);
+}
+
+/* ── Navbar ─────────────────────────────────────────────────────── */
+.navbar {
+    background-color: var(--bg-navbar) !important;
+    border-bottom: 1px solid var(--border-color);
 }
 .navbar .nav-link {
-    color: #000000 !important;
+    color: var(--text-primary) !important;
     font-size: 0.9rem;
     transition: color 0.2s ease-in-out;
+}
+.navbar .nav-link:hover {
+    color: var(--brand-green) !important;
 }
 .navbar-brand {
     font-size: 1.3rem;
     letter-spacing: 0.5px;
+    color: var(--text-primary);
+}
+.navbar-toggler {
+    border-color: var(--border-color-strong);
+}
+.navbar-toggler-icon {
+    filter: var(--navbar-toggler-filter, none);
+}
+[data-theme="dark"] .navbar-toggler-icon {
+    filter: invert(1) grayscale(100%) brightness(200%);
 }
 
+/* ── Theme toggle button ───────────────────────────────────────── */
+.theme-toggle-btn {
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+.theme-toggle-btn:hover {
+    background: var(--bg-hover);
+    transform: rotate(15deg) scale(1.05);
+}
+.theme-toggle-btn:focus {
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
 
+/* ── Dropdown menus ─────────────────────────────────────────────── */
+.dropdown-menu {
+    background-color: var(--bg-dropdown);
+    border-color: var(--border-color);
+    box-shadow: 0 4px 12px var(--shadow-color-strong);
+}
+.dropdown-item {
+    color: var(--text-body);
+}
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background-color: var(--bg-hover);
+    color: var(--text-body);
+}
+.dropdown-item-text {
+    color: var(--text-muted) !important;
+}
+.dropdown-divider {
+    border-color: var(--border-color);
+}
+
+/* ── Cards ──────────────────────────────────────────────────────── */
 .card {
     border-radius: 12px;
-    border: none;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-card);
+    color: var(--text-body);
 }
 
 .card.shadow-sm {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.07) !important;
+    box-shadow: 0 2px 8px var(--shadow-color) !important;
 }
 
+[data-theme="dark"] .card-header,
+[data-theme="dark"] .card-header.bg-white {
+    background-color: var(--bg-card) !important;
+    color: var(--text-body) !important;
+    border-bottom: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .card-footer {
+    background-color: var(--bg-card) !important;
+    border-top: 1px solid var(--border-color);
+}
+
+/* ── Tables ─────────────────────────────────────────────────────── */
+.table {
+    color: var(--text-body);
+    border-color: var(--border-color);
+}
 .table th {
     font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #6c757d;
+    color: var(--text-muted);
+}
+.table td, .table th {
+    border-color: var(--border-color);
+}
+[data-theme="dark"] .table-hover > tbody > tr:hover > * {
+    background-color: var(--bg-hover);
+    color: var(--text-body);
+}
+[data-theme="dark"] .table > :not(caption) > * > * {
+    background-color: var(--bg-card);
+    color: var(--text-body);
+    box-shadow: none;
 }
 
 .badge {
@@ -46,19 +258,109 @@ body {
     font-size: 0.75rem;
 }
 
-/* Toast container */
+/* ── Toast container ───────────────────────────────────────────── */
 #toast-container .toast {
     min-width: 260px;
+    box-shadow: 0 4px 12px var(--shadow-color-strong);
 }
 
-/* Form controls */
+/* ── Form controls ─────────────────────────────────────────────── */
+.form-control,
+.form-select {
+    background-color: var(--bg-input);
+    color: var(--text-body);
+    border-color: var(--border-color-strong);
+}
 .form-control:focus,
 .form-select:focus {
-    border-color: #28a745;
+    background-color: var(--bg-input);
+    color: var(--text-body);
+    border-color: var(--brand-green);
     box-shadow: 0 0 0 0.2rem rgba(40,167,69,0.15);
+}
+[data-theme="dark"] .form-control::placeholder {
+    color: var(--text-muted);
+}
+.form-label {
+    color: var(--text-body);
+}
+
+/* ── Helper Text Classes ───────────────────────────────────────── */
+.text-muted {
+    color: var(--text-muted) !important;
+}
+
+/* ── Alerts & Modals ───────────────────────────────────────────── */
+[data-theme="dark"] .alert {
+    border: 1px solid var(--border-color);
+}
+[data-theme="dark"] .alert-light {
+    background-color: var(--bg-card) !important;
+    color: var(--text-body) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .modal-content {
+    background-color: var(--bg-card);
+    color: var(--text-body);
+    border-color: var(--border-color);
+    box-shadow: 0 10px 30px var(--shadow-color-strong);
+}
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer {
+    border-color: var(--border-color);
+}
+[data-theme="dark"] .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* ── Auth pages ─────────────────────────────────────────────────── */
+.auth-page-bg {
+    background-color: var(--bg-body) !important;
+}
+
+/* ── Google-translate ──────────────────────────────────────────── */
+#custom-lang-switcher {
+    background: var(--bg-card);
+    color: var(--text-body);
+    border-color: var(--brand-green);
 }
 
 /* Stat cards */
 .card .fs-2 {
     line-height: 1.1;
+}
+
+/* ── Quick-toggle button for mobile navbar icon group (matches sidebar-toggle-btn style) ── */
+.nav-quick-toggle-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-primary, #1f2937);
+    font-size: 1.35rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.nav-quick-toggle-btn:hover {
+    background-color: var(--bg-hover, #f3f4f6);
+}
+
+/* Mobile dropdown panel for the icon group when toggled open */
+@media (max-width: 767.98px) {
+    #navQuickMenu.mobile-open {
+        display: flex !important;
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 12px;
+        background: var(--bg-card, #ffffff);
+        border: 1px solid var(--border-color, #dee2e6);
+        border-radius: 12px;
+        padding: 10px 14px;
+        box-shadow: 0 8px 20px var(--shadow-color-strong, rgba(0,0,0,0.15));
+        z-index: 1035;
+        flex-direction: row;
+    }
 }

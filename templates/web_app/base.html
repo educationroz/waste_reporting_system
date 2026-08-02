@@ -5,155 +5,169 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Safha Sahar - Live Waste Reporting System</title>
+    
+    <!-- Favicon & CSS Links -->
     <link rel="icon" type="image/png" href="{% static 'web_app/image/SafhaSahar.png' %}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{% static 'web_app/css/layout.css' %}" rel="stylesheet">
     <link href="{% static 'web_app/css/main.css' %}" rel="stylesheet">
 
-    <!-- ── htmx + head-support extension ────────────────────────────────
-         hx-boost use garda body matra swap huncha by default — head
-         (jaha extra_css ko <style> block basxa) swap hudaina. Yo
-         head-support extension le naya page ko <head> content (naya
-         <style> tags samet) auto-merge garidincha, tesले page-specific
-         CSS pani reload nagari sahi apply huncha. -->
+    <!-- HTMX + Head-Support Extension -->
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/ext/head-support.js"></script>
 
+    <!-- Theme Early-Initialization -->
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('safhasahar_theme');
+                var theme = savedTheme
+                    ? savedTheme
+                    : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+
+    <!-- FOUC Prevention Hide Script -->
     <script>
         (function () {
             document.documentElement.style.visibility = "hidden";
             window.setTimeout(function () {
-            document.documentElement.style.visibility = "visible";
-        }, 2000);
+                document.documentElement.style.visibility = "visible";
+            }, 2000);
         })();
     </script>
+
     <style>
+        .goog-te-banner-frame, 
+        .goog-te-banner-frame.skiptranslate, 
+        .goog-vi-gtrans, 
+        #goog-gt-tt, 
+        .goog-te-balloon-frame {
+            display: none !important;
+        }
         
-  /* २. गुगलको माथिल्लो सेतो/निलो पट्टी (Banner Bar) पूर्ण रूपमा हटाउने */
-  .goog-te-banner-frame, 
-  .goog-te-banner-frame.skiptranslate, 
-  .goog-vi-gtrans, 
-  #goog-gt-tt, 
-  .goog-te-balloon-frame {
-      display: none !important;
-  }
-  
-  body {
-      top: 0px !important;
-  }
+        body {
+            top: 0px !important;
+        }
 
-  /* ३. भाषा छान्ने बक्सलाई स्क्रिनको बिचमा प्रोफेसनल देखाउने स्टाइल */
-  #custom-lang-switcher {
-      position: fixed;
-      top: 85px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-8px);
-      z-index: 1040;
-      background: white;
-      padding: 12px 24px;
-      border-radius: 30px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-      border: 2px solid #049b09;
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-      transition: opacity 0.2s ease, transform 0.2s ease;
-  }
+        #custom-lang-switcher {
+            position: fixed;
+            top: 85px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-8px);
+            z-index: 1040;
+            background: var(--bg-card, #ffffff);
+            padding: 12px 24px;
+            border-radius: 30px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            border: 2px solid #049b09;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
 
-  #custom-lang-switcher.show {
-      opacity: 1;
-      visibility: visible;
-      pointer-events: auto;
-      transform: translateX(-50%) translateY(0);
-  }
+        #custom-lang-switcher.show {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(0);
+        }
 
-  .goog-logo-link {
-      display: none !important;
-  }
-  
-  .goog-te-gadget {
-      color: transparent !important;
-      font-size: 0px !important;
-  }
+        .goog-logo-link {
+            display: none !important;
+        }
+        
+        .goog-te-gadget {
+            color: transparent !important;
+            font-size: 0px !important;
+        }
 
-  .goog-te-gadget .goog-te-combo {
-      color: #333 !important;
-      font-size: 15px !important;
-      font-weight: 600;
-      padding: 6px 15px;
-      border-radius: 20px;
-      border: 1px solid #ccc;
-      cursor: pointer;
-      outline: none;
-  }
+        .goog-te-gadget .goog-te-combo {
+            color: #333 !important;
+            font-size: 15px !important;
+            font-weight: 600;
+            padding: 6px 15px;
+            border-radius: 20px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            outline: none;
+        }
 
-  #custom-lang-switcher .btn-close {
-      font-size: 0.65rem;
-      margin: 0;
-  }
+        #custom-lang-switcher .btn-close {
+            font-size: 0.65rem;
+            margin: 0;
+        }
 
-  /* htmx page-transition ma flash/flicker nadekhos vaneर halka fade */
-  .htmx-swapping #page-content {
-      opacity: 0.4;
-      transition: opacity 0.15s ease-out;
-  }
+        .htmx-swapping #content-app {
+            opacity: 0.4;
+            transition: opacity 0.15s ease-out;
+        }
+
+        .theme-toggle-btn {
+            border: 1px solid var(--border-color, #dee2e6);
+            background: var(--bg-card, #ffffff);
+            color: var(--text-primary, #000000);
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+        }
+        .theme-toggle-btn:hover {
+            transform: rotate(15deg) scale(1.05);
+        }
+        .theme-toggle-btn:focus {
+            box-shadow: 0 0 0 0.2rem rgba(40,167,69,0.25);
+        }
     </style>
+
     {% block extra_css %}{% endblock %}
 </head>
-<!-- ── HTMX BOOST — <body> मा राखियो ──────────────────────────────────
-     Pahile yo <main> ma matra thiyo, tesले garda navbar (माथिको <nav>,
-     jun <main> bahira cha) bhitraka link haru boost hudainthe — Dashboard/
-     Requests/Drivers/... navbar link click garda ajhai full page reload
-     hunthyo. Ahile <body> ma rakhepachi, hx-boost/hx-target/hx-select
-     tallo sabai child element (navbar + sidebar + content) le automatically
-     inherit garchan, tesले duवैतिर बाटैको link boosted (AJAX-style,
-     reload-free) huन्छ। -->
-<body hx-ext="head-support" hx-boost="true" hx-target="#page-content" hx-select="#page-content" hx-swap="innerHTML show:window:top">
+<body hx-ext="head-support" hx-boost="true" hx-target="#content-app" hx-select="#content-app" hx-swap="outerHTML show:window:top">
 
-<nav class="navbar navbar-expand-lg navbar-light shadow-sm sticky-top" style="z-index: 1030;">
-    <div class="container-fluid">
-        <a class="navbar-brand notranslate d-flex align-items-center" href="/" translate="no">
-            <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="Logo" width="40" height="40" class="d-inline-block align-text-top me-2">
-            <span class="fw-semibold" style="color: #049b09;">Safha</span> <span class="fw-semibold" style="color: #56dd59;">Sahar</span>
+<!-- NAVBAR SECTION -->
+<nav class="navbar navbar-light shadow-sm sticky-top" style="z-index: 1030;">
+    <div class="container-fluid d-flex align-items-center flex-nowrap position-relative">
+        <a class="navbar-brand notranslate d-flex align-items-center flex-shrink-1 me-2" href="/" translate="no" style="min-width:0;">
+            <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="Logo" width="40" height="40" class="d-inline-block align-text-top me-2 flex-shrink-0">
+            <span class="fw-semibold text-truncate" style="color: #56dd59;">
+                <span class="d-none d-sm-inline">Safha Sahar</span>
+                <span class="d-inline d-sm-none">Safha</span>
+            </span>
         </a>
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                data-bs-target="#navMenu" aria-controls="navMenu"
-                aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        
-        <div class="collapse navbar-collapse" id="navMenu">
+        <!-- MOBILE: single toggle button that reveals the icon group -->
+            <button class="btn nav-quick-toggle-btn d-inline-flex d-md-none ms-auto" type="button"
+                    onclick="toggleNavQuickMenu()" aria-label="More options" title="More options">
+                <i class="bi bi-list"></i>
+            </button>
+
+        <!-- Right Side Container: icon group. Desktop = always inline. Mobile = hidden until toggled -->
+        <div id="navQuickMenu" class="d-none d-md-flex align-items-center ms-md-auto gap-2 flex-shrink-0">
+            <!-- Dark/Light Theme Toggle -->
+            <button id="theme-toggle-btn" class="btn theme-toggle-btn"
+                    type="button" onclick="toggleTheme()" aria-label="Toggle dark/light theme" title="Toggle theme">
+                <i class="bi bi-moon-stars-fill" id="theme-icon"></i>
+            </button>
+
             {% if user.is_authenticated %}
-            <ul class="navbar-nav me-auto">
-                {% if user.role == 'admin' %}
-                    <li class="nav-item"><a class="nav-link" href="{% url 'admin-dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'admin-requests' %}"><i class="bi bi-clipboard-list me-1"></i>Requests</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'admin-drivers' %}"><i class="bi bi-person-badge me-1"></i>Drivers</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'admin-vehicles' %}"><i class="bi bi-truck me-1"></i>Vehicles</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'admin-schedules' %}"><i class="bi bi-calendar-week me-1"></i>Schedules</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'route-planning' %}"><i class="bi bi-map me-1"></i>Routes</a></li>
-                {% elif user.role == 'driver' %}
-                    <li class="nav-item"><a class="nav-link" href="{% url 'driver-dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
-                {% elif user.role == 'user' %}
-                    <li class="nav-item"><a class="nav-link" href="{% url 'home' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'user-requests' %}"><i class="bi bi-clipboard me-1"></i>My Requests</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'user-recycle-bin' %}"><i class="bi bi-recycle me-1"></i>Recycle Bin</a></li>
-                {% else%}
-                    <li class="nav-item"><a class="nav-link" href="{% url 'login' %}"><i class="bi bi-speedometer2 me-1"></i>Login</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'register' %}"><i class="bi bi-person-plus me-1"></i>Register</a></li>
-                {% endif %}
-            </ul>
-            <ul class="navbar-nav">
-                <li class="nav-item">
-                    <a class="nav-link position-relative" href="{% url 'notifications' %}">
-                        <i class="bi bi-bell"></i>
-                        <span id="notif-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"></span>
-                    </a>
-                </li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" hx-boost="false" data-bs-toggle="dropdown">
-                        <i class="bi bi-person-circle me-1"></i>{{ user.username }}
+                <a class="nav-link position-relative px-1" href="{% url 'notifications' %}">
+                    <i class="bi bi-bell fs-5"></i>
+                    <span id="notif-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"></span>
+                </a>
+                <div class="dropdown">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" hx-boost="false" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle me-1"></i>
+                        <span class="d-none d-lg-inline">{{ user.username }}</span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><span class="dropdown-item-text text-muted small">{{ user.role|capfirst }}</span></li>
@@ -162,63 +176,52 @@
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="#" hx-boost="false" onclick="logout(); return false;"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
                     </ul>
-                </li>
-            </ul>
+                </div>
             {% else %}
-            <ul class="navbar-nav me-auto"></ul>
-            <ul class="navbar-nav">
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'login' %}"><i class="bi bi-box-arrow-in-right me-1"></i>Sign In</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'register' %}"><i class="bi bi-person-plus me-1"></i>Register</a>
-                </li>
-            </ul>
+                <a class="nav-link" href="{% url 'login' %}" hx-boost="false"><i class="bi bi-box-arrow-in-right me-1"></i>Sign In</a>
+                <a class="nav-link" href="{% url 'register' %}" hx-boost="false"><i class="bi bi-person-plus me-1"></i>Register</a>
             {% endif %}
         </div>
     </div>
 </nav>
+<!-- MOBILE OVERLAY BACKDROP -->
+<div id="sidebar-backdrop" class="sidebar-backdrop" onclick="toggleSidebarMenu()"></div>
 
-<!-- ── HTMX BOOST TARGET ────────────────────────────────────────────────
-     hx-boost/hx-target/hx-select ahile <body> bata inherit huँदैछ, tesले
-     yo <main id="page-content"> lai extra attribute rakhi rakhnu pardaina —
-     tara id="page-content" chai yehi rahanuparcha kina bhane hx-target/
-     hx-select le yehi id khojcha swap garna.
+<!-- MAIN CONTENT AREA (HTMX TARGET) -->
+<main id="content-app" class="site-main">
+    <div class="main-body-wrapper">
+        {% if messages %}
+            <div class="container pt-3">
+                {% for msg in messages %}
+                    <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
+                        {{ msg }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
 
-     FIX: extra_js block lai yo <main> BHITRA sariyo (</main> bhanda
-     agadi). Pahile yo <main> bahira thiyo — hx-select="#page-content"
-     ले response bata #page-content matra निकाल्छ, tesले #page-content
-     BAHIRA bhaएko extra_js (map init, loadCheckpoints, loadDrivers,
-     complaints fetch, login/register form JS, aadि sabai page-specific
-     script) htmx boosted navigation ma KAHILE PANI chaldaina thiyo —
-     tesैle route-planning ko map, home ko map, complaints list, login/
-     register ko form-submit sabai khali/nachalne dekhinthyo jaba samma
-     hard refresh nagariyos. Ahile #page-content bhitra bhaएkole, hareक
-     boosted navigation ma tyo page ko afnै extra_js pheri fresh execute
-     huन्छ, ra map/data/form sabai reload nagari nai sahi kaam garcha. -->
-<main id="page-content"
-      class="{% if user.is_authenticated %}container-fluid py-4{% endif %}" style="padding-top: 1rem;">
-    {% if messages %}
-        <div class="container">
-            {% for msg in messages %}
-                <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
-                    {{ msg }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
+        <!-- Dynamic Toast Container -->
+        <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index:2100"></div>
 
-    <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index:2100"></div>
+        {% block content %}{% endblock %}
 
-    {% block content %}{% endblock %}
-
-    {% block extra_js %}{% endblock %}
+        {% block extra_js %}{% endblock %}
+    </div>
 </main>
 
+<!-- FOOTER -->
+<footer class="site-footer">
+    <div class="text-center py-3 bg-light">
+        <small>&copy; Safha Sahar {% now "Y" %}. All rights reserved. | RA Innovations</small>
+    </div>
+</footer>
+
+<!-- JS LIBRARIES -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{% static 'web_app/js/main.js' %}"></script>
 
+<!-- LANGUAGE SWITCHER POPUP -->
 <div id="custom-lang-switcher">
     <button type="button" class="btn-close position-absolute top-0 end-0"
             style="margin: 10px; z-index: 1041;"
@@ -227,6 +230,7 @@
     <div id="google_translate_element"></div>
 </div>
 
+<!-- GOOGLE TRANSLATE & THEME LOGIC -->
 <script type="text/javascript">
 var isUserLoggedIn = {% if user.is_authenticated %}true{% else %}false{% endif %};
 
@@ -267,7 +271,23 @@ function forceHideGoogleBanner() {
     document.documentElement.style.setProperty('top', '0px', 'important');
 }
 
+function applyThemeIcon(theme) {
+    var icon = document.getElementById('theme-icon');
+    if (!icon) return;
+    icon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+}
+
+function toggleTheme() {
+    var current = document.documentElement.getAttribute('data-theme') || 'light';
+    var next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('safhasahar_theme', next); } catch (e) {}
+    applyThemeIcon(next);
+}
+
 document.addEventListener("DOMContentLoaded", function() {
+    applyThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
+
     const saved = localStorage.getItem("googtrans");
 
     if (saved) {
@@ -278,7 +298,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 combo.value = saved.split("/")[2];
                 combo.dispatchEvent(new Event("change"));
             }
-        },100);
+        }, 100);
     }
   
     if (!isUserLoggedIn && !localStorage.getItem("safhasahar_popup_shown_once")) {
@@ -298,24 +318,22 @@ document.addEventListener("DOMContentLoaded", function() {
         attempts++;
         if (selectElem) {
             clearInterval(checkDropdown);
-           selectElem.addEventListener('change', function () {
+            selectElem.addEventListener('change', function () {
                 localStorage.setItem("googtrans", "/en/" + selectElem.value);
                 document.cookie = "googtrans=/en/" + selectElem.value + ";path=/";
                 document.getElementById("custom-lang-switcher").classList.remove("show");
             });
         } else if (attempts > 100) {
             clearInterval(checkDropdown);
-            console.warn("Google Translate widget failed to load — check network access to translate.google.com or disable ad blockers.");
+            console.warn("Google Translate widget failed to load.");
         }
     }, 100); 
 });
 </script>
 <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
+<!-- TOAST & UTILITY HELPER FUNCTIONS -->
 <script>
-// T1.3 FIX: XSS-safe showToast — uses DOM textContent for message, never innerHTML.
-// The type parameter is restricted to a safe allow-list of Bootstrap 5 background
-// classes so it can never inject arbitrary CSS/class names either.
 (function () {
     const SAFE_TYPES = new Set([
         'primary', 'secondary', 'success', 'danger',
@@ -336,7 +354,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         const body = document.createElement('div');
         body.className = 'toast-body';
-        body.textContent = safeMessage;  // NEVER innerHTML — textContent is always safe.
+        body.textContent = safeMessage;
 
         const closeBtn = document.createElement('button');
         closeBtn.type = 'button';
@@ -357,10 +375,6 @@ document.addEventListener("DOMContentLoaded", function() {
         }, 4000);
     };
 
-    // T1.4 FIX: Global HTML-escape helper. Use this on ANY value that came from
-    // an untrusted source (API data, user input) before concatenating it into
-    // an HTML string that will be assigned to innerHTML / insertAdjacentHTML.
-    // This is the single source of truth; never inline-escape ad-hoc.
     window.escapeHtml = function escapeHtml(value) {
         if (value == null) return '';
         const s = String(value);
@@ -368,7 +382,6 @@ document.addEventListener("DOMContentLoaded", function() {
         let p = 0;
         for (let i = 0; i < s.length; i++) {
             const c = s.charCodeAt(i);
-            // & < > " '  — the five characters that must be escaped in HTML context
             if (c === 38 || c === 60 || c === 62 || c === 34 || c === 39) {
                 if (i > p) out += s.slice(p, i);
                 if (c === 38) out += '&amp;';
@@ -384,6 +397,8 @@ document.addEventListener("DOMContentLoaded", function() {
     };
 })();
 </script>
+
+<!-- AUTHENTICATED USER SCRIPT -->
 {% if user.is_authenticated %}
 <script>
     const API = {
@@ -433,9 +448,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         const text = await res.text();
-        if (!text) {
-            return {};
-        }
+        if (!text) return {};
 
         try {
             return JSON.parse(text);
@@ -444,10 +457,6 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    // Like apiFetch, but returns the raw Response instead of parsed JSON.
-    // Needed for anything that isn't a plain JSON request/response — file
-    // downloads (blob), file uploads (FormData), etc. Still auto-refreshes
-    // the access token on a 401 instead of failing outright.
     async function authFetch(url, options = {}) {
         let token = localStorage.getItem('access_token');
 
@@ -607,10 +616,6 @@ document.addEventListener("DOMContentLoaded", function() {
         .catch(() => {});
     }
 
-    // ── Websocket connect ─────────────────────────────────────────────────
-    // Yo <script> block <body> ko tallo tira cha, #page-content bhitra
-    // haina, tesले htmx boost navigation ma yo pheri run hudaina —
-    // socket eutai plain page-load ma matra khulcha, jun thikai ho.
     function connectNotifSocket() {
         try {
             const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -657,12 +662,6 @@ document.addEventListener("DOMContentLoaded", function() {
         }, 20000);
     });
 
-    // ── htmx navigation पछि पनि badge haru refresh गर्ने ────────────────
-    // #page-content swap huँda navbar/sidebar bahira bhaएको badge (jasto
-    // notif-badge, complaints-badge, recycle-bin-badge) haru DOM बाटैं
-    // hatdainan (kina bhane tie navbar/sidebar bhitra basхan, jun
-    // htmx boundary bahira/within survive garcha) — tara naya page ma
-    // fresh data देखाउन yeस event ma refresh call गर्नु उपयुक्त हुन्छ।
     document.body.addEventListener('htmx:afterSwap', function() {
         const token = localStorage.getItem('access_token');
         if (!token) return;
@@ -711,7 +710,6 @@ document.addEventListener("DOMContentLoaded", function() {
         if (window._notifSocket) window._notifSocket.close();
     });
 
-    // ── htmx page-navigation UX feedback + error fallback ──────────────────
     document.body.addEventListener('htmx:beforeRequest', function(evt) {
         document.documentElement.style.cursor = 'progress';
     });
@@ -719,9 +717,6 @@ document.addEventListener("DOMContentLoaded", function() {
         document.documentElement.style.cursor = 'default';
     });
 
-    // Kunai reason le boosted request fail bhaye (network error, 500, etc)
-    // — fallback normal full-page reload garne, natra user lai blank/silent
-    // failure dekhinchha
     document.body.addEventListener('htmx:sendError', function(evt) {
         window.location.reload();
     });
@@ -733,10 +728,76 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 {% endif %}
 
-<footer>
-    <div class="text-center py-3 bg-light mt-4">
-        <small>&copy;  Safha Sahar {% now "Y" %}. All rights reserved. | RA Innovations</small>
-    </div>
-</footer>
+<!-- SIDEBAR TOGGLE & RESPONSIVE LOGIC -->
+<script>
+    document.body.addEventListener('htmx:afterSettle', function () {
+        var content = document.getElementById('content-app');
+        if (!content) return;
+        content.classList.remove('htmx-swapping');
+        content.style.opacity = '';
+    });
+
+   // Dynamic Sidebar Toggle for Both Mobile & Desktop
+function toggleSidebarMenu() {
+    const wrapper = document.querySelector(".layout-wrapper");
+    if (!wrapper) return;
+
+    if (window.innerWidth < 768) {
+        wrapper.classList.toggle("mobile-open");
+    } else {
+        wrapper.classList.toggle("collapsed");
+        wrapper.classList.remove("mobile-open");
+    }
+}
+
+function toggleNavQuickMenu() {
+    const menu = document.getElementById('navQuickMenu');
+    if (!menu) return;
+    menu.classList.toggle('mobile-open');
+}
+
+// Close the quick menu if user taps outside it (mobile)
+document.addEventListener('click', function (e) {
+    const menu = document.getElementById('navQuickMenu');
+    const toggleBtn = document.querySelector('.navbar-quick-toggle');
+    if (!menu || !toggleBtn) return;
+    if (menu.classList.contains('mobile-open') &&
+        !menu.contains(e.target) &&
+        !toggleBtn.contains(e.target)) {
+        menu.classList.remove('mobile-open');
+    }
+});
+    // Keep sidebar/layout in sync with actual navbar height (handles collapse expand, translate widget, etc.)
+(function () {
+    var navbar = document.querySelector('nav.navbar');
+    if (!navbar) return;
+
+    function setNavbarHeightVar() {
+        document.documentElement.style.setProperty('--navbar-height', navbar.offsetHeight + 'px');
+    }
+
+    setNavbarHeightVar(); // set immediately, no waiting
+
+    // Keeps --navbar-height perfectly in sync with ANY change to the
+    // navbar's real size (icon font swap, translate button, resize,
+    // collapse toggle, zoom, etc.) — no more racing timeouts.
+    if (window.ResizeObserver) {
+        new ResizeObserver(setNavbarHeightVar).observe(navbar);
+    } else {
+        window.addEventListener('resize', setNavbarHeightVar);
+        setTimeout(setNavbarHeightVar, 500);
+        setTimeout(setNavbarHeightVar, 1500);
+    }
+
+    window.addEventListener('load', setNavbarHeightVar);
+
+    var navMenuEl = document.getElementById('navMenu');
+    if (navMenuEl) {
+        navMenuEl.addEventListener('shown.bs.collapse', setNavbarHeightVar);
+        navMenuEl.addEventListener('hidden.bs.collapse', setNavbarHeightVar);
+    }
+})();
+</script>
+
 </body>
 </html>

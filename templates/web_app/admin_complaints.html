@@ -3,85 +3,33 @@
 
 {% block extra_css %}
 <style>
-    .layout-wrapper { display: flex; align-items: stretch; gap: 1.5rem; min-height: calc(100vh - 56px); }
-    .sidebar-col { flex: 0 0 220px; max-width: 220px; }
-    .sidebar-card { height: 100%; position: sticky; top: 20px; z-index: 1020; }
-    .content-col { flex: 1 1 auto; min-width: 0; }
-    .nav-pills .nav-link:not(.active):hover { background-color: #f8f9fa; color: #198754 !important; }
-    .dashboard-card { border: none; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.03); background: #fff; }
-    .dashboard-card .card-header { border-bottom: 1px solid #f1f3f5; padding: 1.25rem; }
-    .table th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; color: #6c757d; padding: 1rem; }
-    .table td { padding: 1rem; font-size: 0.88rem; vertical-align: middle; }
-
-    /* Sidebar overflow fix — translated (Nepali) text le nav-link
-       lai flex item ko default min-width:auto le grow garaera
-       card bahira overflow garcha, tyo rokne */
-    .sidebar-card .nav.flex-column {
-        min-width: 0;
+    .nav-pills .nav-link:not(.active):hover { 
+        background-color: #f8f9fa; 
+        color: #198754 !important; 
     }
-
-    .sidebar-card .nav-link {
-        min-width: 0;
-        max-width: 100%;
+    .dashboard-card { 
+        border: none; 
+        border-radius: 14px; 
+        box-shadow: 0 4px 16px rgba(0,0,0,0.03); 
+        background: #fff; 
     }
-
-    .sidebar-logo-text,
-    .sidebar-link-text {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        min-width: 0;
+    .dashboard-card .card-header { 
+        border-bottom: 1px solid #f1f3f5; 
+        padding: 1.25rem; 
     }
-
-    .sidebar-logo-text {
-        display: block;
+    .table th { 
+        font-size: 0.78rem; 
+        text-transform: uppercase; 
+        letter-spacing: 0.5px; 
+        font-weight: 600; 
+        color: #6c757d; 
+        padding: 1rem; 
     }
-
-    .sidebar-link-text {
-        flex: 1 1 auto;
+    .table td { 
+        padding: 1rem; 
+        font-size: 0.88rem; 
+        vertical-align: middle; 
     }
-
-    @media (max-width: 767.98px) {
-
-    .sidebar-col{
-        flex: 0 0 70px;
-        max-width: 70px;
-        min-width: 70px;
-    }
-
-    .sidebar-logo-text,
-    .sidebar-link-text{
-        display:none;
-    }
-
-    .sidebar-card .nav-link{
-        justify-content:center;
-        padding:.75rem;
-        position: relative; /* badge lai icon ko माथि absolute position garna */
-    }
-
-    .sidebar-card .nav-link i{
-        margin:0;
-        font-size:1.2rem;
-    }
-
-    /* Mobile ma badge lai icon ko top-right corner ma sano dot jasto rakhne —
-       natra ms-auto le kaam nagareर icon sanगै thelिएर विचित्र देखिन्थ्यो */
-    .sidebar-card .nav-link .badge {
-        position: absolute;
-        top: 6px;
-        right: 10px;
-        margin: 0 !important;
-        padding: 0;
-        min-width: 16px;
-        height: 16px;
-        font-size: 0.62rem;
-        line-height: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-}
 </style>
 {% endblock %}
 
@@ -89,54 +37,12 @@
 <div class="container-fluid px-4 py-3">
     <div class="layout-wrapper">
 
+        <!-- DYNAMIC SIDEBAR INCLUDE -->
         <div class="sidebar-col">
-            <div class="card shadow-sm border-0 sidebar-card">
-                <div class="card-body p-3 d-flex flex-column">
-                    <h5 class="text-success fw-bold mb-3 px-2"><span class="sidebar-logo-text">SafhaSahar</span></h5>
-                    <div class="nav flex-column nav-pills">
-                        <a href="{% url 'admin-dashboard' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
-                            <i class="bi bi-speedometer2 me-2"></i><span class="sidebar-link-text">Dashboard</span>
-                        </a>
-                        <a href="{% url 'admin-requests' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
-                            <i class="bi bi-list-check me-2"></i><span class="sidebar-link-text">Collection Requests</span>
-                        </a>
-                        <a href="{% url 'admin-complaints' %}" class="nav-link active bg-success mb-2 d-flex align-items-center">
-                            <i class="bi bi-exclamation-circle me-2"></i>
-                            <span class="sidebar-link-text">Complaints</span>
-                            <span id="complaints-badge" class="badge rounded-pill bg-danger ms-auto d-none">0</span>
-                        </a>
-                        <a href="{% url 'admin-drivers' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
-                            <i class="bi bi-person-badge me-2"></i><span class="sidebar-link-text">Manage Drivers</span>
-                        </a>
-                        <a href="{% url 'admin-vehicles' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
-                            <i class="bi bi-truck me-2"></i><span class="sidebar-link-text">Fleet Logistics</span>
-                        </a>
-                        <a href="{% url 'admin-schedules' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
-                            <i class="bi bi-calendar-week me-2"></i><span class="sidebar-link-text">Zone Schedules</span>
-                        </a>
-                        <a href="{% url 'route-planning' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
-                            <i class="bi bi-map me-2"></i><span class="sidebar-link-text">Route Planning</span>
-                        </a>
-                        <a href="{% url 'admin-users' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
-                            <i class="bi bi-shield-check me-2"></i><span class="sidebar-link-text">Security Admins</span>
-                        </a>
-                        <a href="{% url 'admin-logs' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
-                            <i class="bi bi-file-earmark-text me-2"></i><span class="sidebar-link-text">Activity Logs</span>
-                        </a>
-                        <a href="{% url 'admin-settings' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
-                            <i class="bi bi-gear me-2"></i><span class="sidebar-link-text">Portal Settings</span>
-                        </a>
-                        <a href="{% url 'notifications' %}" class="nav-link text-dark mb-2 d-flex align-items-center">
-                            <i class="bi bi-bell me-2"></i><span class="sidebar-link-text">Notifications</span>
-                        </a>
-                        <a href="#" onclick="logout(); return false;" class="nav-link text-dark mb-2 d-flex align-items-center">
-                            <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">Logout</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
+            {% include 'partials/sidebar.html' %}
         </div>
 
+        <!-- MAIN CONTENT AREA -->
         <div class="content-col">
             <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
                 <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-megaphone text-success me-2"></i>Complaint Management</h2>
@@ -156,8 +62,14 @@
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>ID</th><th>User</th><th>Type</th><th>Description</th>
-                                <th>Photo</th><th>Status</th><th>Date</th><th>Action</th>
+                                <th>ID</th>
+                                <th>User</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                                <th>Photo</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="complaint-table-body">
@@ -170,6 +82,7 @@
     </div>
 </div>
 
+<!-- REVIEW COMPLAINT MODAL -->
 <div class="modal fade" id="reviewModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
@@ -206,9 +119,7 @@
 let allComplaints = [];
 const reviewModal = new bootstrap.Modal(document.getElementById('reviewModal'));
 
-// Modal band huनु agadि, focus lai close button bata hataune —
-// natra Bootstrap ley aria-hidden set garda, focused element nai
-// hidden huन्छ, jasले accessibility warning dincha.
+// Focus issue handling when closing Bootstrap modal
 document.getElementById('reviewModal').addEventListener('hide.bs.modal', function () {
     if (document.activeElement) {
         document.activeElement.blur();
@@ -274,9 +185,6 @@ async function submitReview() {
     const status = document.getElementById('review-status').value;
     const admin_response = document.getElementById('review-response').value;
 
-    // Update huनु agadि ko complaint ko purano status pattaउने —
-    // pending bata arू ma gaएko bhaye badge ghataune, arू bata
-    // pending ma फर्केको bhaye badge badhaune.
     const oldComplaint = allComplaints.find(c => c.id == id);
     const wasPending = oldComplaint && oldComplaint.status === 'pending';
     const isPending = status === 'pending';
@@ -298,7 +206,6 @@ async function submitReview() {
     }
 }
 
-// ── Delete Complaint ──────────────────────────────────────────────────────
 async function deleteComplaint(id) {
     if (!confirm('Delete this complaint permanently? This cannot be undone.')) return;
 
@@ -316,14 +223,12 @@ async function deleteComplaint(id) {
         if (res.ok || res.status === 204) {
             showToast('Complaint deleted.', 'success');
 
-            // list बाट हटाउने र row पनि DOM बाट सिधै हटाउने — full reload नगरी
             allComplaints = allComplaints.filter(c => c.id != id);
             if (wasPending) adjustComplaintsBadge(-1);
 
             const row = document.getElementById(`complaint-row-${id}`);
             if (row) row.remove();
 
-            // यदि सबै row हट्यो भने "No complaints found" देखाउने
             if (!allComplaints.length) {
                 renderComplaints();
             }
@@ -342,8 +247,6 @@ async function deleteComplaint(id) {
     }
 }
 
-// Sidebar ko "Complaints" badge lai reload नगरिकनै tuरुन्तै update garne —
-// delta chai +1 (pending ma फर्कदा) ya -1 (pending bata अरू ma jaँda) huन्छ.
 function adjustComplaintsBadge(delta) {
     const badge = document.getElementById('complaints-badge');
     if (!badge) return;

@@ -1,0 +1,25 @@
+{% load static %}
+
+<div class="card shadow-sm border-0 sidebar-card">
+    <div class="card-body">
+        <div class="sidebar-header">
+            <button type="button" class="sidebar-toggle-btn" onclick="toggleSidebarMenu()">
+                <i class="bi bi-list"></i>
+            </button>
+            <a href="{% url 'admin-dashboard' %}" class="sidebar-brand-logo">
+                <img src="{% static 'web_app/image/SafhaSahar.png' %}" class="sidebar-logo-img">
+                <span class="sidebar-logo-text">
+                    <span class="fw-semibold" style="color: #56dd59;">Safha</span> <span class="fw-semibold" style="color: #56dd59;">Sahar</span>
+                </span>
+            </a>
+        </div>
+
+        {% if user.role == "admin" %}
+            {% include "partials/sidebar_admin.html" %}
+        {% elif user.role == "driver" %}
+            {% include "partials/sidebar_driver.html" %}
+        {% else %}
+            {% include "partials/sidebar_user.html" %}
+        {% endif %}
+    </div>
+</div>
