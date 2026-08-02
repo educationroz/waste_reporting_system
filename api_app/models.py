@@ -344,6 +344,13 @@ class Route(models.Model):
     class Meta:
         db_table = 'routes'
         ordering = ['-planned_date']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['driver', 'planned_date', 'status'],
+                condition=models.Q(status='planned'),
+                name='unique_planned_route_per_driver_per_day',
+            ),
+        ]
         indexes = [
             models.Index(fields=['driver', 'status']),
             models.Index(fields=['vehicle', 'status']),
