@@ -550,10 +550,14 @@ document.addEventListener("DOMContentLoaded", function() {
                     credentials: 'same-origin',
                     body: JSON.stringify({ refresh }),
                 });
-            } catch (e) {}
+            } catch (e) {
+                console.error('Logout API call failed:', e);
+            }
         }
         if (window._notifSocket) {
-            try { window._notifSocket.close(); } catch (e) {}
+            try { window._notifSocket.close(); } catch (e) {
+                console.error('Failed to close notification socket:', e);
+            }
         }
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
@@ -592,7 +596,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 badge.textContent = '';
             }
         })
-        .catch(() => {});
+        .catch((e) => {
+            console.error('Failed to refresh notification badge:', e);
+        });
     }
 
     function refreshRecycleBinBadge() {
@@ -625,7 +631,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 binBadge.textContent = '';
             }
         })
-        .catch(() => {});
+        .catch((e) => {
+            console.error('Failed to refresh recycle bin badge:', e);
+        });
     }
 
     function refreshComplaintsBadge() {
@@ -658,7 +666,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 complaintsBadge.textContent = '';
             }
         })
-        .catch(() => {});
+        .catch((e) => {
+            console.error('Failed to refresh complaints badge:', e);
+        });
     }
 
     // ── Websocket connect ─────────────────────────────────────────────────
@@ -692,8 +702,12 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 }
             };
-            notifSocket.onerror = () => {};
-        } catch(e) {}
+            notifSocket.onerror = (e) => {
+                console.error('Notification WebSocket error:', e);
+            };
+        } catch(e) {
+            console.error('Failed to initialize notification WebSocket:', e);
+        }
     }
     connectNotifSocket();
 

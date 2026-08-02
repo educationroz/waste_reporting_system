@@ -337,7 +337,9 @@ async function deleteComplaint(id, btn) {
                 errMsg = typeof data === 'object'
                     ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
                     : String(data);
-            } catch (e) {}
+            } catch (e) {
+                console.error('Failed to parse error response JSON:', e);
+            }
             showToast(errMsg, 'danger');
         }
     } catch (e) {

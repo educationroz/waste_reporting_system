@@ -697,7 +697,9 @@ async function loadDepotLocation() {
             moveDepotMarker(lat, lng);
             showDepotStatus(`Depot set to ${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`);
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error('Failed to load depot location:', e);
+    }
 }
 
 async function saveDepotLocation() {

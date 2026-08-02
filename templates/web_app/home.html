@@ -1522,7 +1522,9 @@ async function deleteRequest(requestId, btn) {
                 errMsg = typeof data === 'object'
                     ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
                     : String(data);
-            } catch (e) {}
+            } catch (e) {
+                console.error('Failed to parse error response JSON:', e);
+            }
             showToast(errMsg, 'danger');
         }
     } catch (e) {
@@ -1644,7 +1646,10 @@ try {
             applyHomeRequestRowUpdate(data.request_id, data.status);
         }
     };
-} catch (e) {}
+} catch (e) {
+    console.error('Failed to initialize request WebSocket:', e);
+    showToast('Live request updates unavailable.', 'warning');
+}
 
 try {
     const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -1681,7 +1686,9 @@ try {
             }
         };
     }
-} catch (e) {}
+} catch (e) {
+    console.error('Failed to initialize driver-locations WebSocket:', e);
+}
 {% endif %}
 </script>
 {% endblock %}
