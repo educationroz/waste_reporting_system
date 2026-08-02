@@ -60,7 +60,7 @@
                     <p class="text-muted mb-0">Monitor real-time system alerts, operations, and audit triggers</p>
                 </div>
                 {% if notifications %}
-                <button class="btn btn-outline-success px-3 py-2 fw-semibold btn-sm rounded-2" onclick="markAllRead()">
+                <button class="btn btn-outline-success px-3 py-2 fw-semibold btn-sm rounded-2" onclick="markAllRead(this)">
                     <i class="bi bi-check-all me-1"></i>Mark All Read
                 </button>
                 {% endif %}
@@ -126,7 +126,12 @@
 {% block extra_js %}
 <script>
 (function() {
+    const _markingRead = new Set();
+
     window.markOneRead = async function(notifId) {
+        if (_markingRead.has(notifId)) return;
+        _markingRead.add(notifId);
+        try {
         const data = await API.patch(`/api/notifications/${notifId}/`, { is_read: true });
         if (data && data.id) {
             const el = document.getElementById(`notif-${notifId}`);
@@ -140,6 +145,9 @@
             decrementMainBadge();
         } else {
             showToast('Failed to mark as read.', 'danger');
+        }
+        } finally {
+            _markingRead.delete(notifId);
         }
     };
 
@@ -155,7 +163,8 @@
         }
     }
 
-    window.markAllRead = async function() {
+    window.markAllRead = async function(btn) {
+        await withButtonBusy(eventButton(btn), 'Marking...', async () => {
         const unreadItems = document.querySelectorAll('.notif-item.unread-style');
         const unreadTags = document.querySelectorAll('.unread-tag');
         const mainBadge = document.getElementById('notif-badge');
@@ -187,6 +196,7 @@
             console.error("Error marking notifications:", error);
             showToast('Something went wrong. Please try again.', 'danger');
         }
+        });
     };
 })();
 </script>

@@ -307,7 +307,7 @@
                                     <td class="text-end pe-4">
                                         <div class="d-inline-flex gap-2">
                                             {% if req.status == 'pending' %}
-                                            <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="cancelRequest({{ req.id }})">
+                                            <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="cancelRequest({{ req.id }}, this)">
                                                 <i class="bi bi-slash-circle me-1"></i>Cancel
                                             </button>
                                             {% else %}
@@ -319,7 +319,7 @@
                                     </td>
                                     <td>
                                         {% if req.status == 'completed' or req.status == 'cancelled' or req.status == 'assigned' or req.status == 'in_progress' %}
-                                        <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }})">
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }}, this)">
                                             <i class="bi bi-trash3"></i> Delete
                                         </button>
                                         {% else %}
@@ -360,7 +360,7 @@
             </div>
             <div class="modal-footer bg-light">
                 <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success px-4" onclick="assignDriver()">Confirm Dispatch</button>
+                <button class="btn btn-success px-4" onclick="assignDriver(this)">Confirm Dispatch</button>
             </div>
         </div>
     </div>
@@ -412,7 +412,7 @@ function openAssignModal(requestId) {
     assignModal.show();
 }
 
-async function assignDriver() {
+async function assignDriver(btn) {
     const requestId = document.getElementById('modal-request-id').value;
     const driverSelect = document.getElementById('modal-driver-select');
     const driverId = driverSelect.value;
@@ -420,6 +420,7 @@ async function assignDriver() {
     // driverName is user-controlled (a driver's username), so it must be escaped.
     const driverName = escapeHtml(driverSelect.options[driverSelect.selectedIndex].text.split('—')[0].trim());
 
+    await withButtonBusy(eventButton(btn), 'Assigning...', async () => {
     const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
     if (data && data.id) {
         showToast('Driver assigned successfully to the route sequence!', 'success');
@@ -436,10 +437,12 @@ async function assignDriver() {
     } else {
         showToast('Failed to patch driver assignment parameter.', 'danger');
     }
+    });
 }
 
-async function cancelRequest(requestId) {
+async function cancelRequest(requestId, btn) {
     if (!confirm('Are you absolutely sure you want to cancel this municipal request matrix?')) return;
+    await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
     const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
     if (data && data.id) {
         showToast('Operational collection request has been cancelled.', 'success');
@@ -452,11 +455,13 @@ async function cancelRequest(requestId) {
     } else {
         showToast('Failed to drop request pipeline node state.', 'danger');
     }
+    });
 }
 
-async function deleteRequest(requestId) {
+async function deleteRequest(requestId, btn) {
     if (!confirm("Are you sure you want to delete this request?")) return;
 
+    await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {
         await API.delete(`/api/waste-requests/${requestId}/`);
         showToast("Request deleted successfully.", "success");
@@ -471,6 +476,7 @@ async function deleteRequest(requestId) {
         console.error(err);
         showToast("Delete failed.", "danger");
     }
+    });
 }
 
 // ── Reload नगरी: status badge, driver cell, action cell, delete button live update ──
@@ -502,7 +508,7 @@ function applyRequestRowUpdate(requestId, { statusKey, driverHtml, actionHtml, s
     if (showDelete) {
         const controlCell = row.children[10];
         if (controlCell) {
-            controlCell.innerHTML = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${requestId})"><i class="bi bi-trash3"></i> Delete</button>`;
+            controlCell.innerHTML = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${requestId}, this)"><i class="bi bi-trash3"></i> Delete</button>`;
         }
     }
 }

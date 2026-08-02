@@ -48,9 +48,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         }
 
     def validate_email(self, value):
-        """Reject malformed emails and, outside DEBUG, domains with no valid MX record."""
+        """Reject malformed emails and, in production, domains with no valid MX record."""
+        check_deliverability = getattr(
+            settings, 'EMAIL_CHECK_DELIVERABILITY', not settings.DEBUG
+        )
         try:
-            emailinfo = validate_email(value, check_deliverability=not settings.DEBUG)
+            emailinfo = validate_email(value, check_deliverability=check_deliverability)
             value = emailinfo.normalized
         except EmailNotValidError as e:
             raise serializers.ValidationError(str(e))
