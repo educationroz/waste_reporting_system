@@ -132,11 +132,11 @@
                                             <input class="form-check-input" type="checkbox" role="switch"
                                                 id="schedule-active-{{ schedule.id }}"
                                                 {% if schedule.is_active %}checked{% endif %}
-                                                onchange="toggleActive({{ schedule.id }}, this.checked)">
+                                                onchange="toggleActive({{ schedule.id }}, this.checked, this)">
                                         </div>
                                     </td>
                                     <td class="text-end pe-4">
-                                        <button class="btn btn-sm btn-outline-danger px-3 py-1" style="font-size: 0.8rem;" onclick="deleteSchedule({{ schedule.id }})">
+                                        <button class="btn btn-sm btn-outline-danger px-3 py-1" style="font-size: 0.8rem;" onclick="deleteSchedule({{ schedule.id }}, this)">
                                             <i class="bi bi-trash me-1"></i>Purge
                                         </button>
                                     </td>
@@ -213,7 +213,7 @@
             </div>
             <div class="modal-footer bg-light">
                 <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success px-4" onclick="addSchedule()">Save Matrix Node</button>
+                <button class="btn btn-success px-4" onclick="addSchedule(this)">Save Matrix Node</button>
             </div>
         </div>
     </div>
@@ -229,19 +229,32 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-async function toggleActive(scheduleId, isActive) {
-    const data = await API.patch(`/api/schedules/${scheduleId}/`, { is_active: isActive });
-    if (!data || data.id === undefined) {
-        showToast('Failed to patch systemic active lifecycle flag.', 'danger');
-        document.getElementById(`schedule-active-${scheduleId}`).checked = !isActive;
-    } else {
-        showToast('Zone monitoring schedule altered successfully.', 'success');
+async function toggleActive(scheduleId, isActive, el) {
+    // Checkbox, so there is no label to swap — just lock it until the PATCH
+    // resolves. Without this a fast double-toggle fires two requests that can
+    // land out of order and leave the switch contradicting the server.
+    const toggle = el || document.getElementById(`schedule-active-${scheduleId}`);
+    if (toggle && toggle.disabled) return;
+    if (toggle) toggle.disabled = true;
+
+    try {
+        const data = await API.patch(`/api/schedules/${scheduleId}/`, { is_active: isActive });
+        if (!data || data.id === undefined) {
+            showToast('Failed to patch systemic active lifecycle flag.', 'danger');
+            const revert = document.getElementById(`schedule-active-${scheduleId}`);
+            if (revert) revert.checked = !isActive;
+        } else {
+            showToast('Zone monitoring schedule altered successfully.', 'success');
+        }
+    } finally {
+        if (toggle) toggle.disabled = false;
     }
 }
 
-async function deleteSchedule(scheduleId) {
+async function deleteSchedule(scheduleId, btn) {
     if (!confirm('Are you absolutely sure you want to drop this scheduling context from system routing?')) return;
 
+    await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {
         const res = await fetch(`/api/schedules/${scheduleId}/`, {
             method: 'DELETE',
@@ -279,9 +292,10 @@ async function deleteSchedule(scheduleId) {
     } catch (e) {
         showToast('Network error: ' + e.message, 'danger');
     }
+    });
 }
 
-async function addSchedule() {
+async function addSchedule(btn) {
     const zoneInput = document.getElementById('add-zone');
     const daySelect = document.getElementById('add-day');
     const freqSelect = document.getElementById('add-frequency');
@@ -303,6 +317,7 @@ async function addSchedule() {
         return;
     }
 
+    await withButtonBusy(eventButton(btn), 'Creating...', async () => {
     const data = await API.post('/api/schedules/', payload);
     if (data && data.id) {
         showToast('Naya pipeline schedule successfully created!', 'success');
@@ -316,6 +331,7 @@ async function addSchedule() {
     } else {
         showToast('Network fault or schema reject during insertion.', 'danger');
     }
+    });
 }
 
 // ── Naya schedule row lai reload nagari table ma insert garne ──────────────
@@ -364,11 +380,11 @@ function insertScheduleRow(scheduleData, ctx) {
                 <div class="form-check form-switch m-0">
                     <input class="form-check-input" type="checkbox" role="switch"
                         id="schedule-active-${scheduleData.id}" checked
-                        onchange="toggleActive(${scheduleData.id}, this.checked)">
+                        onchange="toggleActive(${scheduleData.id}, this.checked, this)">
                 </div>
             </td>
             <td class="text-end pe-4">
-                <button class="btn btn-sm btn-outline-danger px-3 py-1" style="font-size: 0.8rem;" onclick="deleteSchedule(${scheduleData.id})">
+                <button class="btn btn-sm btn-outline-danger px-3 py-1" style="font-size: 0.8rem;" onclick="deleteSchedule(${scheduleData.id}, this)">
                     <i class="bi bi-trash me-1"></i>Purge
                 </button>
             </td>

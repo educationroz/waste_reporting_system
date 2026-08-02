@@ -115,6 +115,18 @@ async function doRegister() {
         return;
     }
 
+    if (payload.password.length < 8) {
+        errDiv.textContent = 'Password must be at least 8 characters long.';
+        errDiv.classList.remove('d-none');
+        return;
+    }
+
+    if (payload.password !== payload.password2) {
+        errDiv.textContent = 'Passwords do not match.';
+        errDiv.classList.remove('d-none');
+        return;
+    }
+
     spinner.classList.remove('d-none');
     text.textContent = 'Creating...';
 

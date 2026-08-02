@@ -40,7 +40,7 @@
                     <p class="text-muted mb-0">Deleted requests stay here until restored or permanently removed.</p>
                 </div>
                 {% if deleted_requests %}
-                <button class="btn btn-outline-danger" onclick="emptyRecycleBin()">
+                <button class="btn btn-outline-danger" onclick="emptyRecycleBin(this)">
                     <i class="bi bi-trash3 me-1"></i>Empty Bin
                 </button>
                 {% endif %}
@@ -87,10 +87,10 @@
                                     </td>
                                     <td class="small text-muted">{{ req.deleted_at|date:"d M Y H:i" }}</td>
                                     <td class="pe-4 text-end">
-                                        <button class="btn btn-sm btn-outline-success me-1" onclick="restoreRequest({{ req.id }})">
+                                        <button class="btn btn-sm btn-outline-success me-1" onclick="restoreRequest({{ req.id }}, this)">
                                             <i class="bi bi-arrow-counterclockwise me-1"></i>Restore
                                         </button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="permanentlyDeleteRequest({{ req.id }})">
+                                        <button class="btn btn-sm btn-outline-danger" onclick="permanentlyDeleteRequest({{ req.id }}, this)">
                                             <i class="bi bi-trash3 me-1"></i>Delete Forever
                                         </button>
                                     </td>
@@ -147,12 +147,13 @@
                         Recycle Bin is empty.
                     </td>
                 </tr>`;
-            const emptyBtn = document.querySelector('button[onclick="emptyRecycleBin()"]');
+            const emptyBtn = document.querySelector('button[onclick="emptyRecycleBin(this)"]');
             if (emptyBtn) emptyBtn.remove();
         }
     }
 
-    window.restoreRequest = async function(requestId) {
+    window.restoreRequest = async function(requestId, btn) {
+        await withButtonBusy(eventButton(btn), 'Restoring...', async () => {
         try {
             const res = await fetch(`/api/waste-requests/${requestId}/restore/`, {
                 method: 'PATCH',
@@ -172,11 +173,13 @@
         } catch (e) {
             showToast('Network error: ' + e.message, 'danger');
         }
+        });
     };
 
-    window.permanentlyDeleteRequest = async function(requestId) {
+    window.permanentlyDeleteRequest = async function(requestId, btn) {
         if (!confirm('Permanently delete this request? This cannot be undone.')) return;
 
+        await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
         try {
             const res = await fetch(`/api/waste-requests/${requestId}/`, {
                 method: 'DELETE',
@@ -195,11 +198,16 @@
         } catch (e) {
             showToast('Network error: ' + e.message, 'danger');
         }
+        });
     };
 
-    window.emptyRecycleBin = async function() {
+    // The riskiest button on the page: it loops a DELETE over every row, so a
+    // double-click previously started a second pass while the first was still
+    // running — duplicate requests for rows not yet removed from the DOM.
+    window.emptyRecycleBin = async function(btn) {
         if (!confirm('Permanently delete ALL items in the Recycle Bin? This cannot be undone.')) return;
 
+        await withButtonBusy(eventButton(btn), 'Emptying...', async () => {
         const rows = Array.from(document.querySelectorAll('#recycle-bin-body tr[id^="bin-row-"]'));
         let failedCount = 0;
 
@@ -235,6 +243,7 @@
         }
 
         showEmptyStateIfNeeded();
+        });
     };
 })();
 </script>

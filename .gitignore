@@ -64,5 +64,11 @@ node_modules/
 npm-debug.log*
 
 
-# Ignore local database migration generated during setup
-api_app/migrations/0007_*.py
+# NOTE: api_app/migrations/0007_*.py used to be ignored here as a "local
+# setup" file, but it is a committed, required link in the migration chain
+# (0008 depends on it). Ignoring it meant a fresh clone could silently drop
+# it and break `migrate`. Migrations belong in version control.
+# Database backups — these contain real user emails and password hashes,
+# plus they are machine-generated. Keep them local / in off-site storage.
+backups/*.json
+backups/*.sha256
