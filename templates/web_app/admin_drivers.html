@@ -327,7 +327,7 @@
                                             <button class="btn btn-sm btn-outline-primary py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#assignVehicleModal{{ driver.id }}">
                                                 <i class="bi bi-link-45deg me-1"></i>Assign Vehicle
                                             </button>
-                                            <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="removeDriver({{ driver.id }})">
+                                            <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="removeDriver({{ driver.id }}, this)">
                                                 <i class="bi bi-trash me-1"></i>Remove
                                             </button>
                                         </div>
@@ -457,7 +457,7 @@
                                             </div>
                                             <div class="modal-footer bg-light">
                                                 <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
-                                                <button class="btn btn-success px-4" onclick="assignVehicle({{ driver.id }})">Update Allocation</button>
+                                                <button class="btn btn-success px-4" onclick="assignVehicle({{ driver.id }}, this)">Update Allocation</button>
                                             </div>
                                         </div>
                                     </div>
@@ -532,7 +532,7 @@
             </div>
             <div class="modal-footer bg-light border-top-0">
                 <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success px-4" onclick="addDriver()">Create Driver</button>
+                <button type="button" class="btn btn-success px-4" onclick="addDriver(this)">Create Driver</button>
             </div>
         </div>
     </div>
@@ -668,7 +668,7 @@
                         <button class="btn btn-sm btn-outline-primary py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#assignVehicleModal${driver.id}">
                             <i class="bi bi-link-45deg me-1"></i>Assign Vehicle
                         </button>
-                        <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="removeDriver(${driver.id})">
+                        <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="removeDriver(${driver.id}, this)">
                             <i class="bi bi-trash me-1"></i>Remove
                         </button>
                     </div>
@@ -777,7 +777,7 @@
                         </div>
                         <div class="modal-footer bg-light">
                             <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
-                            <button class="btn btn-success px-4" onclick="assignVehicle(${driver.id})">Update Allocation</button>
+                            <button class="btn btn-success px-4" onclick="assignVehicle(${driver.id}, this)">Update Allocation</button>
                         </div>
                     </div>
                 </div>
@@ -789,7 +789,7 @@
 
     // ── HTML बाट onclick="..." ले call हुने function haru — window. दिनुपर्छ ──
 
-    window.addDriver = async function() {
+    window.addDriver = async function(btn) {
         const username = document.getElementById('driver_username').value.trim();
         const email = document.getElementById('driver_email').value.trim();
         const phone = document.getElementById('driver_phone').value.trim();
@@ -807,6 +807,7 @@
             return;
         }
 
+        await withButtonBusy(eventButton(btn), 'Creating...', async () => {
         try {
             const res = await fetch('/auth/register/', {
                 method: 'POST',
@@ -864,6 +865,7 @@
         } catch (e) {
             showToast('Failed to create driver: ' + e.message, 'danger');
         }
+        });
     };
 
     window.toggleAvailability = async function(driverId, currentlyAvailable) {
@@ -896,9 +898,10 @@
         }
     }
 
-    window.assignVehicle = async function(driverId) {
+    window.assignVehicle = async function(driverId, btn) {
         const vehicleSelect = document.getElementById(`assign-vehicle-select-${driverId}`);
         const vehicleId = vehicleSelect.value;
+        await withButtonBusy(eventButton(btn), 'Updating...', async () => {
         const data = await API.patch(`/api/drivers/${driverId}/`, { vehicle: vehicleId || null });
         if (data && data.id) {
             showToast('Vehicle asset allocation verified!', 'success');
@@ -909,6 +912,7 @@
         } else {
             showToast('Failed to write asset mapping parameters.', 'danger');
         }
+        });
     };
 
     function updateDriverRowVehicle(driverId, vehicleSelect) {
@@ -933,9 +937,10 @@
         `;
     }
 
-    window.removeDriver = async function(driverId) {
+    window.removeDriver = async function(driverId, btn) {
         if (!confirm('Are you sure you want to remove this driver from the system?')) return;
 
+        await withButtonBusy(eventButton(btn), 'Removing...', async () => {
         const token = await getValidAccessToken();
         if (!token) {
             showToast('Your session has expired. Please log in again.', 'danger');
@@ -977,6 +982,7 @@
         } catch (e) {
             showToast('Network error: ' + e.message, 'danger');
         }
+        });
     };
 
     const pendingLicenseFiles = {};

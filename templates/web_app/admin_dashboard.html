@@ -479,11 +479,11 @@
                                             <td class="small text-muted">{{ req.scheduled_date|date:"d M Y" }}</td>
                                             <td>
                                                 {% if req.status == 'pending' %}
-                                                <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }})">
+                                                <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }}, this)">
                                                     Cancel
                                                 </button>
                                                 {% elif req.status == 'completed' or req.status == 'cancelled' or req.status == 'assigned' or req.status == 'in_progress' %}
-                                                <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }})">
+                                                <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }}, this)">
                                                     <i class="bi bi-trash3"></i> Delete
                                                 </button>
                                                 {% else %}
@@ -599,7 +599,7 @@
             </div>
             <div class="modal-footer bg-light">
                 <button class="btn btn-light border px-4" data-bs-dismiss="modal">Abort</button>
-                <button class="btn btn-success px-4" onclick="assignDriver()">Confirm Dispatch</button>
+                <button class="btn btn-success px-4" onclick="assignDriver(this)">Confirm Dispatch</button>
             </div>
         </div>
     </div>
@@ -677,7 +677,7 @@ function openAssignModal(requestId) {
     if (modal) modal.show();
 }
 
-async function assignDriver() {
+async function assignDriver(btn) {
     const requestId = document.getElementById('modal-request-id').value;
     const driverId = document.getElementById('modal-driver-select').value;
 
@@ -686,6 +686,7 @@ async function assignDriver() {
         return;
     }
 
+    await withButtonBusy(eventButton(btn), 'Assigning...', async () => {
     const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
     if (data && data.id) {
         showToast('Driver dispatch successfully configured!', 'success');
@@ -695,10 +696,12 @@ async function assignDriver() {
     } else {
         showToast('Failed to deploy driver node.', 'danger');
     }
+    });
 }
 
-async function cancelRequest(requestId) {
+async function cancelRequest(requestId, btn) {
     if (!confirm('Cancel this request?')) return;
+    await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
     const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
     if (data && data.id) {
         showToast('Request cancelled.', 'success');
@@ -706,11 +709,13 @@ async function cancelRequest(requestId) {
     } else {
         showToast('Failed to cancel request.', 'danger');
     }
+    });
 }
 
-async function deleteRequest(requestId) {
+async function deleteRequest(requestId, btn) {
     if (!confirm('Permanently delete this request? This cannot be undone.')) return;
 
+    await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {
         const res = await fetch(`/api/waste-requests/${requestId}/`, {
             method: 'DELETE',
@@ -735,6 +740,7 @@ async function deleteRequest(requestId) {
     } catch (e) {
         showToast('Network error: ' + e.message, 'danger');
     }
+    });
 }
 
 function applyFilters() {

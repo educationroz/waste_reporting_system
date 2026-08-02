@@ -193,11 +193,11 @@
                                     <td class="small text-muted">{{ req.scheduled_date|date:"d M Y, H:i" }}</td>
                                     <td>
                                         {% if req.status == 'pending' %}
-                                        <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }})">
+                                        <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }}, this)">
                                             Cancel
                                         </button>
                                         {% elif req.status == 'completed' or req.status == 'cancelled' %}
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteRequest({{ req.id }})">
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteRequest({{ req.id }}, this)">
                                             <i class="bi bi-trash3"></i> Delete
                                         </button>
                                         {% else %}
@@ -230,22 +230,25 @@
         }
     }
 
-    window.cancelRequest = async function(requestId) {
+    window.cancelRequest = async function(requestId, btn) {
         if (!confirm('Cancel this request?')) return;
-        const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
-        if (data && data.id) {
-            showToast('Request cancelled and moved to Recycle Bin.', 'success');
-            const row = document.getElementById(`request-row-${requestId}`);
-            if (row) row.remove();
-            showEmptyStateIfNeeded();
-        } else {
-            showToast('Failed to cancel request.', 'danger');
-        }
+        await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
+            const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
+            if (data && data.id) {
+                showToast('Request cancelled and moved to Recycle Bin.', 'success');
+                const row = document.getElementById(`request-row-${requestId}`);
+                if (row) row.remove();
+                showEmptyStateIfNeeded();
+            } else {
+                showToast('Failed to cancel request.', 'danger');
+            }
+        });
     };
 
-    window.deleteRequest = async function(requestId) {
+    window.deleteRequest = async function(requestId, btn) {
         if (!confirm('Permanently delete this request? This cannot be undone.')) return;
 
+        await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
         try {
             const res = await fetch(`/api/waste-requests/${requestId}/`, {
                 method: 'DELETE',
@@ -272,6 +275,7 @@
         } catch (e) {
             showToast('Network error: ' + e.message, 'danger');
         }
+        });
     };
 })();
 </script>
