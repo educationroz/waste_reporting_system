@@ -1263,10 +1263,11 @@ class RouteViewSet(viewsets.ModelViewSet):
             "include_all_pending": bool        # auto-select every unassigned pending request
         }
         """
+        from django.db.utils import IntegrityError
         from .route_optimizer import generate_optimal_route
 
         driver_id = request.data.get('driver_id')
-        waste_request_ids = request.data.get('waste_request_ids', [])
+        input_request_ids = request.data.get('waste_request_ids', [])
         bin_ids = request.data.get('bin_ids', [])
         planned_date = request.data.get('planned_date')
         include_all_pending = request.data.get('include_all_pending', False)
@@ -1283,76 +1284,168 @@ class RouteViewSet(viewsets.ModelViewSet):
         if request.user.role != 'admin' and driver.user != request.user:
             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Auto-select every unassigned pending request with valid coordinates,
-        # so the generated route covers all reported pickups in one sweep.
-        if include_all_pending:
-            pending_qs = WasteRequest.objects.filter(
-                status='pending',
-                driver__isnull=True,
-                is_deleted=False,
-            ).filter(
-                Q(latitude__isnull=False, longitude__isnull=False) |
-                Q(photo_latitude__isnull=False, photo_longitude__isnull=False)
-            )
-            waste_request_ids = list(pending_qs.values_list('id', flat=True))
-            if not waste_request_ids:
+        # Parse planned_date once, outside the transaction — pure parsing, no DB touch.
+        if planned_date:
+            try:
+                planned_date = datetime.strptime(planned_date, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
                 return Response(
-                    {'error': 'No pending requests with location data found.'},
+                    {'error': 'planned_date must be in YYYY-MM-DD format.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-
-        # Generate optimized route
-        route_data = generate_optimal_route(driver, waste_request_ids, bin_ids)
-
-        if 'error' in route_data:
-            return Response(route_data, status=status.HTTP_400_BAD_REQUEST)
-
-        # Create or update route
-        if planned_date:
-            planned_date = datetime.strptime(planned_date, '%Y-%m-%d').date()
         else:
             planned_date = datetime.now().date()
 
-        route, created = Route.objects.get_or_create(
-            driver=driver,
-            planned_date=planned_date,
-            status='planned',
-            defaults={
-                'vehicle': driver.vehicle,
-                'total_distance_km': route_data['total_distance_km'],
-            }
-        )
+        # ── Transaction + row locking ───────────────────────────────────────
+        # Two concurrent admins can't double-assign the same request because:
+        #   1. WasteRequest rows are SELECT … FOR UPDATE SKIP LOCKED inside
+        #      the atomic() block. The first admin to reach this point locks
+        #      the rows; the other admin's query SKIPS them (so they are
+        #      silently excluded from the race, no deadlock, no double-assign).
+        #   2. The Route table has a UniqueConstraint(driver, planned_date,
+        #      status='planned'). Even if two TXNs both pass the get() check
+        #      in the milliseconds before .create(), the second insert raises
+        #      IntegrityError → we catch, retry once, and load the row the
+        #      first TXN created.
+        #   3. Everything that mutates state (route create/update, M2M set,
+        #      bulk request update, per-user notifications) lives inside a
+        #      single transaction.atomic() block, so crash mid-way = full
+        #      rollback = no partial state.
+        MAX_CREATE_RETRIES = 2
+        route = None
+        created = False
+        route_data = None
+        locked_requests = []
+        for attempt in range(1, MAX_CREATE_RETRIES + 1):
+            try:
+                with transaction.atomic():
+                    # Step 1 — if include_all_pending, RE-QUERY the pending
+                    # IDs inside the transaction with row locks. The IDs read
+                    # earlier (before the TXN) were a stale snapshot and any
+                    # one of them could have been assigned by another admin
+                    # since we read them.
+                    if include_all_pending:
+                        locked_ids = list(
+                            WasteRequest.objects.filter(
+                                status='pending',
+                                driver__isnull=True,
+                                is_deleted=False,
+                            ).filter(
+                                Q(latitude__isnull=False, longitude__isnull=False) |
+                                Q(photo_latitude__isnull=False, photo_longitude__isnull=False)
+                            ).select_for_update(skip_locked=True)
+                             .values_list('id', flat=True)
+                        )
+                        if not locked_ids:
+                            return Response(
+                                {'error': 'No pending requests with location data found (all were already assigned by another user).'},
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
+                        input_request_ids = locked_ids
 
-        if not created:
-            route.total_distance_km = route_data['total_distance_km']
-            route.save(update_fields=['total_distance_km'])
+                    # Step 2 — lock only the requests that are still
+                    # assignable (pending + no driver + not deleted). Any
+                    # rows already locked by another concurrent admin are
+                    # SKIP LOCKED'd out of the final set — no deadlock.
+                    locked_requests = list(
+                        WasteRequest.objects.filter(
+                            id__in=input_request_ids,
+                            status='pending',
+                            driver__isnull=True,
+                            is_deleted=False,
+                        ).select_for_update(skip_locked=True)
+                        .select_related('user')
+                    )
+                    waste_request_ids = [wr.id for wr in locked_requests]
+                    if not waste_request_ids:
+                        return Response(
+                            {'error': 'All selected requests were already assigned, deleted, or are locked by another user.'},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
 
-        # Add waste requests and bins to route
-        if waste_request_ids:
-            route.waste_requests.set(waste_request_ids)
-        if bin_ids:
-            route.bins.set(bin_ids)
+                    # Step 3 — generate optimal geometry on the actually-
+                    # locked subset (not the original input_ids list, which
+                    # might have contained already-locked rows skipped above).
+                    route_data = generate_optimal_route(driver, waste_request_ids, bin_ids)
+                    if 'error' in route_data:
+                        return Response(route_data, status=status.HTTP_400_BAD_REQUEST)
 
-        # Auto-assign the driver to each request on the route, so pickup
-        # status/driver reflects the plan and each user gets notified.
-        if waste_request_ids:
-            WasteRequest.objects.filter(id__in=waste_request_ids, status='pending').update(
-                driver=driver, status='assigned'
-            )
-            for wr in WasteRequest.objects.filter(id__in=waste_request_ids):
-                if wr.user_id:
-                    _create_notification(
-                        user=wr.user,
-                        title='Driver Assigned',
-                        message=f'Driver {driver.user.username} has been assigned to your request and is on route #{route.id}.',
-                        notification_type='info',
-                        related_request=wr,
+                    # Step 4 — create-or-update the route. Because of the
+                    # UniqueConstraint(driver, planned_date, status='planned')
+                    # on the Route model, two concurrent admins can't both
+                    # insert a duplicate planned route; IntegrityError triggers
+                    # the retry loop (outer try/except).
+                    try:
+                        route = Route.objects.select_for_update().get(
+                            driver=driver,
+                            planned_date=planned_date,
+                            status='planned',
+                        )
+                        created = False
+                        route.vehicle = driver.vehicle
+                        route.total_distance_km = route_data['total_distance_km']
+                        route.save(update_fields=['vehicle', 'total_distance_km'])
+                    except Route.DoesNotExist:
+                        route = Route.objects.create(
+                            driver=driver,
+                            planned_date=planned_date,
+                            status='planned',
+                            vehicle=driver.vehicle,
+                            total_distance_km=route_data['total_distance_km'],
+                        )
+                        created = True
+
+                    # Step 5 — M2M assignments (must be inside TXN because
+                    # the join table rows must commit alongside the request
+                    # status update below)
+                    route.waste_requests.set(waste_request_ids)
+                    if bin_ids:
+                        route.bins.set(bin_ids)
+
+                    # Step 6 — bulk-update driver assignment on the locked
+                    # request rows. Rows are already row-locked from step 2,
+                    # so this .update() cannot be interleaved with another
+                    # admin's UPDATE on the same IDs.
+                    WasteRequest.objects.filter(id__in=waste_request_ids).update(
+                        driver=driver, status='assigned',
                     )
 
-        # Notify the driver once about the whole route (not per-request —
-        # that would spam them with one toast per stop). This is the main
-        # ESSENTIAL notification for a driver: a new route has been
-        # planned for them and they should check the dashboard/map.
+                    # Step 7 — per-user notifications (writes to DB via
+                    # _create_notification, kept inside the TXN so they
+                    # roll back if anything later throws). locked_requests
+                    # already .select_related('user') so this loop is N+1-free.
+                    for wr in locked_requests:
+                        if wr.user_id:
+                            _create_notification(
+                                user=wr.user,
+                                title='Driver Assigned',
+                                message=f'Driver {driver.user.username} has been assigned to your request and is on route #{route.id}.',
+                                notification_type='info',
+                                related_request=wr,
+                            )
+
+                # End of atomic() block — TXN committed here, rows unlocked
+                break
+
+            except IntegrityError:
+                # UniqueConstraint collision on Route(driver, planned_date,
+                # status='planned'). Another concurrent admin just created
+                # the exact route row we wanted. Retry the TXN once so we
+                # load that row via .get() instead of trying to insert again.
+                if attempt >= MAX_CREATE_RETRIES:
+                    return Response(
+                        {'error': 'A route for this driver and date was just created by another user. Please reload and try again.'},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                continue
+
+        # ── Post-commit side effects (must NOT be inside atomic()) ──────────
+        # These actions call channels WS senders (network) and/or must not
+        # be rolled back once the TXN has committed. If we put them inside
+        # atomic(), the DB rollback would still leave stale WS messages in
+        # flight to the browser.
+
+        # Notify the driver once about the whole route (not per-request).
         _notify_driver(
             driver,
             title='New Route Generated',
@@ -1366,7 +1459,7 @@ class RouteViewSet(viewsets.ModelViewSet):
             f'Generated optimal route for driver {driver.user.username} ({route_data["total_stops"]} stops)'
         )
 
-        # Broadcast route update via WebSocket
+        # Broadcast route geometry via WebSocket to driver-facing map pages.
         if CHANNEL_LAYER is not None:
             async_to_sync(CHANNEL_LAYER.group_send)(
                 'driver_locations',
