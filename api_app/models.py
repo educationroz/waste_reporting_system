@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
-
+from .validators import validate_image_file, validate_pdf_file
 
 class Vehicle(models.Model):
     STATUS_CHOICES = [
@@ -79,7 +79,7 @@ class Driver(models.Model):
         upload_to='driver_licenses/',
         blank=True,
         null=True,
-        validators=[FileExtensionValidator(allowed_extensions=['pdf'])],
+        validators=[FileExtensionValidator(allowed_extensions=['pdf']), validate_pdf_file],
         help_text='Driving license document (PDF only, max 5MB)'
     )
 
@@ -206,12 +206,18 @@ class WasteRequest(models.Model):
         'Checkpoint', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='waste_requests'
     )
+    # FIX: this previously had WasteRequestPhoto's upload_to path
+    # ('waste_photos/extra/') pasted in, and was missing blank=True/null=True
+    # — that made every WasteRequest require a photo at the DB level (guest
+    # reports with no photo would fail to save) and filed primary photos
+    # into the "extra" subfolder instead of their own.
     photo = models.ImageField(
         upload_to='waste_photos/',
         blank=True,
         null=True,
         validators=[
-            FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp'])
+            FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp']),
+            validate_image_file,
         ],
         help_text='Accepted formats: JPG, JPEG, PNG, GIF, WebP (Max 5MB)'
     )
@@ -296,7 +302,8 @@ class WasteRequestPhoto(models.Model):
     photo = models.ImageField(
         upload_to='waste_photos/extra/',
         validators=[
-            FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp'])
+            FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp']),
+            validate_image_file,
         ],
     )
     latitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True,
@@ -507,7 +514,8 @@ class SystemSettings(models.Model):
 
     def __str__(self):
         return f"{self.key}: {self.value}"
-    
+
+
 class Complaint(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -532,7 +540,8 @@ class Complaint(models.Model):
         blank=True,
         null=True,
         validators=[
-            FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp'])
+            FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp']),
+            validate_image_file,
         ],
         help_text='Accepted formats: JPG, JPEG, PNG, GIF, WebP (Max 5MB)'
     )

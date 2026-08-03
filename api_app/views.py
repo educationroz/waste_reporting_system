@@ -3,7 +3,8 @@ import math
 from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
 from pathlib import Path
-
+from .backup_utils import BACKUP_DIR as BACKUP_DIR_FOR_UPLOADS
+from .backup_utils import verify_backup_file
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
@@ -38,6 +39,15 @@ from .serializers import (
     WasteRequestSerializer,
     ComplaintSerializer,
 )
+from .backup_utils import (
+    BackupError,
+    BACKUP_DIR as BACKUP_DIR_FOR_UPLOADS,
+    create_backup,
+    list_backups,
+    resolve_backup_path,
+    restore_backup,
+)
+
 
 try:
     CHANNEL_LAYER = get_channel_layer()
@@ -49,10 +59,8 @@ User = get_user_model()
 import logging
 logger = logging.getLogger('notif_debug')
 logging.basicConfig(level=logging.INFO)
-
-BACKUP_DIR = Path(settings.BASE_DIR) / 'backups'
-BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-
+backup_logger = logging.getLogger('backup')  # same logger name as backup_utils.py, so backup-related
+                                              # log lines from both files end up under one logger/handler
 # ── Completion GPS verification ──────────────────────────────────────────────
 # Driver ले "Completed" mark गर्ने बेला उनको GPS pickup location भन्दा यो
 # थ्रेसहोल्ड (मिटरमा) भन्दा टाढा भए suspicious मानिन्छ — admin लाई flag देखाइन्छ।
@@ -263,40 +271,6 @@ def _notify_admins(title, message, notification_type='info'):
             notification_type=notification_type,
         )
 
-def _get_backup_files():
-    files = []
-    for backup_path in sorted(BACKUP_DIR.glob('*.json'), key=lambda item: item.stat().st_mtime, reverse=True):
-        # FIX: `from datetime import datetime` above binds `datetime` to the
-        # *class*, not the module — so `datetime.timezone` doesn't exist on
-        # it (that only lives on the datetime *module*). Using the
-        # `dt_timezone` alias imported at the top avoids the collision with
-        # `django.utils.timezone` (imported as `timezone`) while still
-        # getting the real UTC tzinfo object.
-        created_ts = datetime.fromtimestamp(backup_path.stat().st_mtime, tz=dt_timezone.utc)
-        files.append({
-            'file_name': backup_path.name,
-            'size_bytes': backup_path.stat().st_size,
-            'created_at': created_ts.isoformat(),
-            'download_url': f'/api/database-backups/download/?file_name={backup_path.name}',
-        })
-    return files
-
-
-def _resolve_backup_path(file_name):
-    if not file_name:
-        raise ValueError('file_name is required.')
-
-    candidate = (BACKUP_DIR / file_name).resolve()
-    backup_root = BACKUP_DIR.resolve()
-    if candidate.parent != backup_root:
-        raise ValueError('Invalid backup file location.')
-
-    if not candidate.exists():
-        raise FileNotFoundError(f'Backup file {file_name} was not found.')
-
-    return candidate
-
-
 class DatabaseBackupViewSet(viewsets.GenericViewSet):
     """Create, list, download, restore, and delete JSON database backups."""
     permission_classes = [IsAuthenticated, IsAdminUser]
@@ -304,43 +278,35 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['get'])
     def history(self, request):
-        return Response(_get_backup_files())
+        return Response(list_backups())
 
     @action(detail=False, methods=['post'])
     def backup(self, request):
-        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
-        file_name = f'backup_{timestamp}.json'
-        file_path = BACKUP_DIR / file_name
-
-        buffer = io.StringIO()
         try:
-            call_command(
-                'dumpdata',
-                stdout=buffer,
-                indent=2,
-                natural_foreign=True,
-                natural_primary=True,
-                verbosity=0,
+            result = create_backup()
+        except BackupError as exc:
+            # create_backup() wraps the real exception in its BackupError
+            # message (e.g. "Backup failed: <raw exc>") — that detail is
+            # only useful to us, not the client.
+            backup_logger.exception('Database backup creation failed: %s', exc)
+            return Response(
+                {'error': 'Backup failed. Please check server logs or try again.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-            file_path.write_text(buffer.getvalue(), encoding='utf-8')
-        except Exception as exc:
-            return Response({'error': f'Backup failed: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        _log_admin_action(request, 'other', 'DatabaseBackup', None, f'Created backup {file_name}')
-
-        return Response({
-            'file_name': file_name,
-            'file_path': str(file_path),
-            'size_bytes': file_path.stat().st_size,
-            'created_at': timezone.now().isoformat(),
-        })
+        _log_admin_action(request, 'other', 'DatabaseBackup', None, f"Created backup {result['file_name']}")
+        return Response(result)
 
     @action(detail=False, methods=['get'])
     def download(self, request):
         file_name = request.query_params.get('file_name')
         try:
-            backup_path = _resolve_backup_path(file_name)
-        except (ValueError, FileNotFoundError) as exc:
+            backup_path = resolve_backup_path(file_name)
+        except BackupError as exc:
+            # resolve_backup_path's BackupError messages are already
+            # curated/safe ("not found" / "invalid location") — no raw
+            # exception internals to strip here.
+            backup_logger.warning('Backup download rejected: %s', exc)
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return FileResponse(
@@ -354,11 +320,13 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
     def delete(self, request):
         file_name = request.query_params.get('file_name')
         try:
-            backup_path = _resolve_backup_path(file_name)
-        except (ValueError, FileNotFoundError) as exc:
+            backup_path = resolve_backup_path(file_name)
+        except BackupError as exc:
+            backup_logger.warning('Backup delete rejected: %s', exc)
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         backup_path.unlink(missing_ok=True)
+        (backup_path.parent / f'{backup_path.name}.sha256').unlink(missing_ok=True)
         _log_admin_action(request, 'delete', 'DatabaseBackup', None, f'Deleted backup {file_name}')
         return Response({'message': f'Backup {file_name} deleted successfully.'})
 
@@ -378,23 +346,66 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
         if not uploaded_file.name.endswith('.json'):
             return Response({'error': 'Only .json backup files are supported.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        backup_path = BACKUP_DIR / uploaded_file.name
-        with backup_path.open('wb') as backup_file:
-            for chunk in uploaded_file.chunks():
-                backup_file.write(chunk)
+        # Write to BACKUP_DIR first so restore_backup() can operate on a
+        # real Path. Nothing here has been verified yet.
+        backup_path = BACKUP_DIR_FOR_UPLOADS / uploaded_file.name
+        try:
+            with backup_path.open('wb') as backup_file:
+                for chunk in uploaded_file.chunks():
+                    backup_file.write(chunk)
+        except OSError as exc:
+            backup_logger.exception('Failed writing uploaded backup file: %s', exc)
+            return Response(
+                {'error': 'Could not save the uploaded file. Please try again.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         try:
-            with transaction.atomic():
-                call_command('flush', interactive=False, verbosity=0)
-                call_command('loaddata', str(backup_path), verbosity=0)
-        except Exception as exc:
-            return Response({'error': f'Restore failed: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # restore_backup() calls verify_backup_file() as its very first
+            # step — flush/loaddata never runs against an unverified file.
+            # It also auto-snapshots current state first and attempts
+            # auto-recovery if loaddata fails partway through.
+            result = restore_backup(backup_path)
+        except BackupError as exc:
+            msg = str(exc)
+            backup_logger.exception('Restore failed for %r requested by %s: %s',
+                                     uploaded_file.name, request.user.username, msg)
+
+            # Pre-flush validation failures (bad JSON / not a fixture / empty
+            # file) are safe, curated messages — nothing was touched, so it's
+            # fine and helpful to show them directly.
+            if 'AUTOMATIC RECOVERY FAILED' in msg:
+                # Worst case: flush ran, loaddata failed, AND recovery of the
+                # pre-restore snapshot also failed. This is the one case
+                # where raw exception text must never reach the client, but
+                # the admin genuinely needs to know the DB may be empty.
+                return Response(
+                    {'error': 'Restore failed and automatic recovery of your previous data also '
+                              'failed. The database may be in an inconsistent state — contact a '
+                              'system administrator immediately. A safety backup was taken before '
+                              'this restore and is available in the backups directory; check server '
+                              'logs for its exact filename.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            if 'automatically recovered' in msg:
+                return Response(
+                    {'error': 'Restore failed, but your previous data was automatically recovered — '
+                              'no data was lost. Please verify the backup file and try again.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if msg.startswith('Could not create safety backup'):
+                return Response(
+                    {'error': 'Could not safely start the restore (a pre-restore snapshot could not '
+                              'be created), so nothing was changed. Please try again.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            # Pre-flush validation failure — safe to show verbatim.
+            return Response({'error': msg}, status=status.HTTP_400_BAD_REQUEST)
 
         # `flush` deletes every row (including the currently logged-in user's),
         # then `loaddata` reinserts everyone from the backup with fresh primary
         # keys. request.user is still the pre-restore in-memory object, so its
-        # old pk may no longer exist — using it directly as a foreign key would
-        # crash. Re-fetch the equivalent user by username instead, and treat
+        # old pk may no longer exist — re-fetch by username instead, and treat
         # logging as best-effort so a logging hiccup never masks a successful
         # restore.
         try:
@@ -405,18 +416,20 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
                     action='other',
                     content_type='DatabaseBackup',
                     object_id=None,
-                    object_description=f'Restored from backup {uploaded_file.name}',
+                    object_description=f"Restored from backup {result['restored_file']} "
+                                        f"({result['record_count']} records; safety copy: {result['safety_backup']})",
                     ip_address=request.META.get('REMOTE_ADDR'),
                     user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
                 )
-        except Exception:
-            pass
+        except Exception as log_exc:
+            backup_logger.warning('Post-restore admin-log write failed: %s', log_exc)
 
         return Response({
-            'message': f'Backup {uploaded_file.name} restored successfully.',
-            'restored_file': uploaded_file.name,
+            'message': f"Backup {result['restored_file']} restored successfully.",
+            'restored_file': result['restored_file'],
+            'record_count': result['record_count'],
+            'safety_backup': result['safety_backup'],
         })
-
 
 class VehicleViewSet(viewsets.ModelViewSet):
     """CRUD for vehicles. Admins manage, all authenticated users read."""

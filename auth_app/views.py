@@ -7,9 +7,10 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, ScopedRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login, logout as django_logout
@@ -25,6 +26,17 @@ from django.contrib.auth import authenticate
 from .tokens import email_verification_token
 
 User = get_user_model()
+
+
+# ─── Scope-default throttling helpers ────────────────────────────────────────
+# Mixins so AllowAny views get throttled by anon IP, and authenticated views
+# by user PK. Each subclass just sets `throttle_scope = '…'` to pick the rate
+# defined in settings.REST_FRAMEWORK.DEFAULT_THROTTLE_RATES.
+class AnonScopedThrottleMixin:
+    throttle_classes = [AnonRateThrottle, ScopedRateThrottle]
+
+class AuthScopedThrottleMixin:
+    throttle_classes = [UserRateThrottle, ScopedRateThrottle]
 
 
 def send_verification_email(user, request):
@@ -71,8 +83,9 @@ def send_password_reset_email(user, request):
     )
 
 
-class SessionLoginView(APIView):
+class SessionLoginView(AnonScopedThrottleMixin, APIView):
     permission_classes = [AllowAny]
+    throttle_scope = 'session_login'
 
     def post(self, request):
         username = request.data.get('username')
@@ -85,17 +98,19 @@ class SessionLoginView(APIView):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
-class CustomTokenObtainPairView(TokenObtainPairView):
+class CustomTokenObtainPairView(AnonScopedThrottleMixin, TokenObtainPairView):
     """Login — returns access + refresh tokens plus user info."""
     serializer_class = CustomTokenObtainPairSerializer
     permission_classes = [AllowAny]
+    throttle_scope = 'login'
 
 
-class RegisterView(generics.CreateAPIView):
+class RegisterView(AnonScopedThrottleMixin, generics.CreateAPIView):
     """Register a new user. No auth required. Sends an email verification link."""
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    throttle_scope = 'register'
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -113,9 +128,10 @@ class RegisterView(generics.CreateAPIView):
         )
 
 
-class VerifyEmailView(APIView):
+class VerifyEmailView(AnonScopedThrottleMixin, APIView):
     """Confirms a user's email from the link sent at registration."""
     permission_classes = [AllowAny]
+    throttle_scope = 'verify_email'
 
     def get(self, request, uidb64, token):
         try:
@@ -133,9 +149,10 @@ class VerifyEmailView(APIView):
         return Response({'error': 'This verification link is invalid or has expired.'}, status=400)
 
 
-class ResendVerificationEmailView(APIView):
+class ResendVerificationEmailView(AnonScopedThrottleMixin, APIView):
     """Re-sends the verification email for an unverified account."""
     permission_classes = [AllowAny]
+    throttle_scope = 'resend_verification'
 
     def post(self, request):
         email = request.data.get('email')
@@ -152,9 +169,10 @@ class ResendVerificationEmailView(APIView):
         return Response({'message': 'If that account exists and is unverified, an email has been sent.'})
 
 
-class PasswordResetRequestView(APIView):
+class PasswordResetRequestView(AnonScopedThrottleMixin, APIView):
     """Step 1 of forgot-password: submit an email, get a reset link emailed."""
     permission_classes = [AllowAny]
+    throttle_scope = 'password_reset_request'
 
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
@@ -177,9 +195,10 @@ class PasswordResetRequestView(APIView):
         return generic_response
 
 
-class PasswordResetConfirmView(APIView):
+class PasswordResetConfirmView(AnonScopedThrottleMixin, APIView):
     """Step 2 of forgot-password: submit uid/token from the email plus a new password."""
     permission_classes = [AllowAny]
+    throttle_scope = 'password_reset_confirm'
 
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
@@ -203,9 +222,10 @@ class PasswordResetConfirmView(APIView):
         return Response({'message': 'Password has been reset successfully. You can now log in.'})
 
 
-class LogoutView(APIView):
+class LogoutView(AnonScopedThrottleMixin, APIView):
     """Logs out JWT/session users. Blacklists refresh token when provided."""
     permission_classes = [AllowAny]
+    throttle_scope = 'logout'
 
     def post(self, request):
         refresh_token = request.data.get('refresh')
@@ -220,18 +240,18 @@ class LogoutView(APIView):
         return Response({'message': 'Logged out successfully.'}, status=status.HTTP_200_OK)
 
 
-class ProfileView(generics.RetrieveUpdateAPIView):
+class ProfileView(AuthScopedThrottleMixin, generics.RetrieveUpdateAPIView):
     """Get or update current user's profile."""
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+    # Uses DEFAULT_THROTTLE_RATES['user'] from settings.
+    # No need for a tighter scope — profile writes are infrequent and owned.
 
-    def get_object(self):
-        return self.request.user
 
-
-class ChangePasswordView(APIView):
+class ChangePasswordView(AuthScopedThrottleMixin, APIView):
     """Change password. Requires current password for verification."""
     permission_classes = [IsAuthenticated]
+    throttle_scope = 'change_password'
 
     def post(self, request):
         serializer = ChangePasswordSerializer(
@@ -245,7 +265,16 @@ class ChangePasswordView(APIView):
         )
 
 
-class UserListView(generics.ListAPIView):
+class CustomTokenRefreshView(AnonScopedThrottleMixin, TokenRefreshView):
+    """JWT refresh endpoint — returns a new access token (and rotated refresh).
+
+    Keyed by anon IP because at the time refresh_token is submitted, the caller
+    has NO valid Authorization access token yet.
+    """
+    throttle_scope = 'token_refresh'
+
+
+class UserListView(AuthScopedThrottleMixin, generics.ListAPIView):
     """Admin-only: list all users."""
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
