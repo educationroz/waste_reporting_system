@@ -79,6 +79,14 @@ WSGI_APPLICATION = 'waste_system.wsgi.application'
 ASGI_APPLICATION = 'waste_system.asgi.application'
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+if not DEBUG:
+    SECURE_HSTS_SECONDS = 31536000  # 1 year, per HSTS preload requirements
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 # ─── Database ─────────────────────────────────────────────────────────────────
 # Use SQLite for development, PostgreSQL for production
 DB_ENGINE = config('DB_ENGINE', default='sqlite3')  # 'postgresql' or 'sqlite3'
@@ -150,6 +158,35 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    # ─── Rate limiting (throttling) ────────────────────────────────────────
+    # AnonRateThrottle keys off the client IP (no login needed).
+    # UserRateThrottle keys off the authenticated user PK.
+    # ScopedRateThrottle is opt-in per-view: set throttle_scope on a view.
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        # Generic global caps — apply to *every* DRF view by default unless
+        # the view overrides throttle_classes or throttle_scope.
+        'anon': '20/min',
+        'user': '200/min',
+        # Heavier per-endpoint scopes. Apply these to sensitive endpoints by
+        # setting `throttle_scope = '<name>'` on the view class.
+        # ─ Authentication / brute‑force targets ─────────────────────
+        'login':                    '5/min',      # 5 wrong passwords/min → locked out temporarily (per IP)
+        'session_login':            '5/min',      # Django session-login form
+        'register':                 '6/hour',     # 6 new accounts/hr/IP — spam mitigation
+        # ─ Email‑sending endpoints (avoid bombing users' inboxes) ───
+        'resend_verification':      '3/hour',     # 3 re-verify email attempts/hr
+        'password_reset_request':   '3/hour',     # 3 forgot-password emails/hr/IP
+        'password_reset_confirm':   '10/min',     # Reset-password form submit (cheap but don't spam)
+        # ─ Other auth endpoints ─────────────────────────────────────
+        'logout':                   '20/min',
+        'token_refresh':            '30/min',
+        'change_password':          '10/min',
+        'verify_email':             '30/min',     # Clicking the email verify link (GET)
+    },
 }
 # ─── JWT ─────────────────────────────────────────────────────────────────────
 SIMPLE_JWT = {

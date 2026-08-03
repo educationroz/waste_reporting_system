@@ -4,7 +4,7 @@
 {% block title %}Register — Waste Collection{% endblock %}
 
 {% block content %}
-<div class="min-vh-100 d-flex align-items-center justify-content-center auth-page-bg py-4">
+<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light py-4">
     <div class="card shadow-sm" style="width:440px">
         <div class="card-body p-4">
             <div class="text-center mb-4">
@@ -115,25 +115,16 @@ async function doRegister() {
         return;
     }
 
-    if (payload.password.length < 8) {
-        errDiv.textContent = 'Password must be at least 8 characters long.';
-        errDiv.classList.remove('d-none');
-        return;
-    }
-
-    if (payload.password !== payload.password2) {
-        errDiv.textContent = 'Passwords do not match.';
-        errDiv.classList.remove('d-none');
-        return;
-    }
-
     spinner.classList.remove('d-none');
     text.textContent = 'Creating...';
 
     try {
         const res = await fetch('/auth/register/', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
             body: JSON.stringify(payload),
         });
         const data = await res.json();

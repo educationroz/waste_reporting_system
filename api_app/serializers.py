@@ -5,6 +5,8 @@ from .models import (
     AdminLog, Bin, Checkpoint, Driver, Notification, Route, Schedule,
     SystemSettings, Vehicle, VehicleType, WasteRequest, WasteRequestPhoto, Complaint,
 )
+from .validators import validate_image_file, validate_pdf_file, sanitize_image
+
 User = get_user_model()
 
 
@@ -46,11 +48,14 @@ class DriverSerializer(serializers.ModelSerializer):
         read_only_fields = ('total_trips', 'created_at')
 
     def validate_license_document(self, file):
-        MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
-        if file and file.size > MAX_FILE_SIZE:
-            raise serializers.ValidationError(
-                f"File too large. Maximum size is 5MB, but got {file.size / (1024*1024):.2f}MB"
-            )
+        """
+        Real content validation, not just a size check: sniffs the actual
+        MIME type from the file's bytes (python-magic) and confirms the
+        %PDF- magic number, so a renamed .exe/.html can't pass itself off
+        as a PDF just by having a .pdf extension.
+        """
+        if file:
+            validate_pdf_file(file)  # raises serializers.ValidationError-compatible
         return file
 
 
@@ -129,28 +134,37 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         return route.get_status_display() if route else None
 
     def validate_photo(self, file):
-        """Validate photo file size (max 5MB) AND run it through the ML gatekeeper."""
-        MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
-        if file and file.size > MAX_FILE_SIZE:
+        """
+        Full defence-in-depth pipeline for the uploaded photo:
+          1. validate_image_file — size cap + real MIME sniff (python-magic)
+             + Pillow structural verification. Rejects a renamed non-image
+             outright, before it ever touches the ML model or disk.
+          2. sanitize_image — fully decodes and re-encodes the image from
+             scratch, stripping any bytes appended after the real image
+             data (the classic "valid JPEG + payload glued on" polyglot
+             trick). The ML model and the eventual saved file both use
+             this clean copy, never the original upload.
+          3. Run the ML gatekeeper on the sanitized copy.
+        """
+        if not file:
+            return file
+
+        validate_image_file(file)  # raises on spoofed/corrupt/oversized files
+        clean_file = sanitize_image(file)
+
+        from ml_models.waste_classifier.inference import predict_waste
+        result = predict_waste(clean_file)
+        clean_file.seek(0)  # PIL/model read the file — reset pointer before Django saves it
+
+        if not result['is_waste']:
             raise serializers.ValidationError(
-                f"File too large. Maximum size is 5MB, but got {file.size / (1024*1024):.2f}MB"
+                "This doesn't look like waste. Please upload a valid waste photo."
             )
 
-        if file:
-            from ml_models.waste_classifier.inference import predict_waste
-            result = predict_waste(file)
-            file.seek(0)  # PIL le padhepachi pointer reset — natra Django save fail huन्छ
+        # Stash the ML result so validate() can attach it to validated_data below
+        self._ml_result = result
 
-            if not result['is_waste']:
-                raise serializers.ValidationError(
-                    f"This doesn't look like waste "
-                    f"Please upload a valid waste photo."
-                )
-
-            # Stash the ML result so validate() can attach it to validated_data below
-            self._ml_result = result
-
-        return file
+        return clean_file
 
     def validate(self, data):
         """Validate latitude/longitude are within valid ranges, and attach ML result."""
@@ -286,6 +300,7 @@ class SystemSettingsSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('updated_at',)
 
+
 class ComplaintSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
@@ -305,9 +320,9 @@ class ComplaintSerializer(serializers.ModelSerializer):
         }
 
     def validate_photo(self, file):
-        MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
-        if file and file.size > MAX_FILE_SIZE:
-            raise serializers.ValidationError(
-                f"File too large. Maximum size is 5MB, but got {file.size / (1024*1024):.2f}MB"
-            )
-        return file
+        """Same defence-in-depth pipeline as WasteRequestSerializer.validate_photo,
+        minus the ML gatekeeper step (complaints don't get auto-classified)."""
+        if not file:
+            return file
+        validate_image_file(file)
+        return sanitize_image(file)
