@@ -63,6 +63,48 @@
         font-size: 0.85rem;
         margin-bottom: 0;
     }
+
+    /* ==========================================
+       QUICK FILTER PILLS — one-click action-type
+       filtering instead of a dropdown + page reload
+       ========================================== */
+    .action-pill {
+        border: 1px solid #dee2e6;
+        background: #fff;
+        color: #495057;
+        border-radius: 20px;
+        padding: 0.4rem 0.95rem;
+        font-size: 0.82rem;
+        font-weight: 500;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .action-pill:hover {
+        border-color: #198754;
+        color: #198754;
+        background: rgba(25, 135, 84, 0.06);
+    }
+
+    .action-pill.active {
+        background: #198754;
+        border-color: #198754;
+        color: #fff;
+        box-shadow: 0 2px 6px rgba(25, 135, 84, 0.25);
+    }
+
+    .action-pill .badge-count {
+        font-size: 0.68rem;
+        opacity: 0.75;
+    }
+
+    #operator-input-wrap .btn-clear-operator {
+        display: none;
+    }
+
+    #operator-input-wrap.has-value .btn-clear-operator {
+        display: inline-flex;
+    }
 </style>
 {% endblock %}
 
@@ -100,27 +142,54 @@
 
             <!-- Query Filter Terminal Card -->
             <div class="card dashboard-card mb-4">
-                <div class="card-header bg-white">
+                <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-funnel me-2 text-success"></i>Query Filter Terminal</h6>
+                    {% if current_action or current_operator %}
+                    <a href="{% url 'admin-logs' %}" class="small text-danger text-decoration-none fw-semibold">
+                        <i class="bi bi-x-circle me-1"></i>Clear all filters
+                    </a>
+                    {% endif %}
                 </div>
                 <div class="card-body">
                     <form method="get" class="row g-3" id="log-filter-form">
-                        <div class="col-lg-5 col-md-6">
-                            <label class="form-label small fw-semibold text-secondary">Filter by Action type</label>
-                            <select name="action" class="form-select" onchange="document.getElementById('log-filter-form').submit()">
-                                <option value="">All Actions Categories</option>
+                        <!-- Quick one-click action-type pills — no dropdown, no extra click to open it -->
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary d-block mb-2">Quick Filter by Action</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button"
+                                        class="btn action-pill {% if not current_action %}active{% endif %}"
+                                        data-value="">
+                                    <i class="bi bi-grid-3x3-gap-fill me-1"></i>All Actions
+                                </button>
                                 {% for val, label in action_choices %}
-                                <option value="{{ val }}" {% if val == current_action %}selected{% endif %}>{{ label }}</option>
+                                <button type="button"
+                                        class="btn action-pill {% if val == current_action %}active{% endif %}"
+                                        data-value="{{ val }}">
+                                    {{ label }}
+                                </button>
                                 {% endfor %}
-                            </select>
+                            </div>
+                            <input type="hidden" name="action" id="action-input" value="{{ current_action|default:'' }}">
                         </div>
-                        <div class="col-lg-7 col-md-6">
+
+                        <!-- Operator search: debounced auto-search + clear (×) + Enter/Search button still work -->
+                        <div class="col-12">
                             <label class="form-label small fw-semibold text-secondary">Search by Security Operator</label>
-                            <div class="input-group">
-                                <input type="search" name="operator" class="form-control"
-                                       placeholder="Type admin, driver, or user name"
-                                       value="{{ current_operator|default:'' }}">
-                                <button class="btn btn-success px-4" type="submit">Search</button>
+                            <div class="input-group" id="operator-input-wrap">
+                                <span class="input-group-text bg-white border-end-0">
+                                    <i class="bi bi-search text-muted"></i>
+                                </span>
+                                <input type="search" name="operator" id="operator-input"
+                                       class="form-control border-start-0 ps-0"
+                                       placeholder="Type admin, driver, or user name — results update as you type"
+                                       value="{{ current_operator|default:'' }}"
+                                       autocomplete="off">
+                                <button type="button" class="btn btn-outline-secondary btn-clear-operator" title="Clear search">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                                <button class="btn btn-success px-4" type="submit">
+                                    <i class="bi bi-search me-1"></i>Search
+                                </button>
                             </div>
                         </div>
                     </form>
@@ -320,4 +389,48 @@
         </div> <!-- /content-col -->
     </div> <!-- /layout-wrapper -->
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const form = document.getElementById('log-filter-form');
+    const actionInput = document.getElementById('action-input');
+    const operatorInput = document.getElementById('operator-input');
+    const operatorWrap = document.getElementById('operator-input-wrap');
+    const clearOperatorBtn = operatorWrap.querySelector('.btn-clear-operator');
+
+    // Quick filter pills — one click sets the hidden action field and
+    // submits immediately, no dropdown to open first.
+    document.querySelectorAll('.action-pill').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            actionInput.value = btn.dataset.value;
+            form.submit();
+        });
+    });
+
+    // Show/hide the clear (×) button based on whether there's text.
+    function syncClearButton() {
+        operatorWrap.classList.toggle('has-value', operatorInput.value.trim().length > 0);
+    }
+    syncClearButton();
+    operatorInput.addEventListener('input', syncClearButton);
+
+    clearOperatorBtn.addEventListener('click', function () {
+        operatorInput.value = '';
+        form.submit();
+    });
+
+    // Debounced auto-search: typing pauses for a moment and the results
+    // refresh on their own — the Search button and Enter key still work
+    // immediately for anyone who prefers that.
+    let debounceTimer;
+    operatorInput.addEventListener('input', function () {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+            form.submit();
+        }, 600);
+    });
+})();
+</script>
 {% endblock %}

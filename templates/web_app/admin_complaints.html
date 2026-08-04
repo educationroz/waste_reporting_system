@@ -116,201 +116,209 @@
 
 {% block extra_js %}
 <script>
-let allComplaints = [];
-const reviewModalEl = document.getElementById('reviewModal');
+(function () {
+    let allComplaints = [];
+    const reviewModalEl = document.getElementById('reviewModal');
 
-function getReviewModal() {
-    if (typeof bootstrap === 'undefined') {
-        console.error('Bootstrap JS failed to load — modal cannot open.');
-        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
-        return null;
-    }
-    return bootstrap.Modal.getOrCreateInstance(reviewModalEl);
-}
-
-// Focus issue handling when closing Bootstrap modal
-if (reviewModalEl && !reviewModalEl.dataset._bound) {
-    reviewModalEl.addEventListener('hide.bs.modal', function () {
-        if (document.activeElement) {
-            document.activeElement.blur();
+    function getReviewModal() {
+        if (typeof bootstrap === 'undefined') {
+            console.error('Bootstrap JS failed to load — modal cannot open.');
+            showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+            return null;
         }
-    });
-    reviewModalEl.dataset._bound = '1';
-}
-
-const statusBadge = s => ({
-    pending: 'bg-warning text-dark',
-    under_review: 'bg-info',
-    completed: 'bg-success'
-}[s] || 'bg-secondary');
-
-async function loadComplaints() {
-    const body = document.getElementById('complaint-table-body');
-
-    try {
-        const data = await API.get('/api/complaints/');
-        if (!data) {
-            throw new Error('Unable to load complaints.');
-        }
-
-        allComplaints = (data && data.results) ? data.results : (data || []);
-        renderComplaints();
-    } catch (e) {
-        console.error('Failed to load complaints:', e);
-        allComplaints = [];
-        if (body) {
-            body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Unable to load complaints right now.</td></tr>';
-        }
-        showToast('Unable to load complaints right now.', 'warning');
-    }
-}
-
-function renderComplaints() {
-    const filter = document.getElementById('status-filter').value;
-    const rows = allComplaints.filter(c => !filter || c.status === filter);
-    const body = document.getElementById('complaint-table-body');
-
-    if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No complaints found.</td></tr>';
-        return;
+        return bootstrap.Modal.getOrCreateInstance(reviewModalEl);
     }
 
-    body.innerHTML = rows.map(c => `
-        <tr id="complaint-row-${escapeHtml(c.id)}">
-            <td class="fw-bold text-secondary">#${escapeHtml(c.id)}</td>
-            <td>${escapeHtml(c.username)}</td>
-            <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">${escapeHtml(c.complaint_type_display)}</span></td>
-            <td class="small" style="max-width:260px;">${escapeHtml(c.description)}</td>
-            <td>${c.photo ? `<a href="${escapeHtml(c.photo)}" target="_blank"><img src="${escapeHtml(c.photo)}" style="height:36px;width:36px;object-fit:cover;border-radius:4px;"></a>` : '<span class="text-muted small">—</span>'}</td>
-            <td><span class="badge ${statusBadge(c.status)}">${escapeHtml(c.status_display)}</span></td>
-            <td class="small text-muted">${escapeHtml(new Date(c.created_at).toLocaleDateString())}</td>
-            <td>
-                <div class="d-flex gap-1">
-                    <button class="btn btn-sm btn-outline-success" onclick="openReview(${escapeHtml(c.id)})">
-                        <i class="bi bi-clipboard-check"></i> Review
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteComplaint(${escapeHtml(c.id)}, this)" title="Delete complaint">
-                        <i class="bi bi-trash3"></i>
-                    </button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
-}
-
-function openReview(id) {
-    const complaint = allComplaints.find(c => c.id == id);
-    if (!complaint) return;
-    document.getElementById('review-complaint-id').value = complaint.id;
-    document.getElementById('review-status').value = complaint.status;
-    document.getElementById('review-response').value = complaint.admin_response || '';
-    const modal = getReviewModal();
-    if (modal) modal.show();
-}
-
-async function submitReview(btn) {
-    const id = document.getElementById('review-complaint-id').value;
-    const status = document.getElementById('review-status').value;
-    const admin_response = document.getElementById('review-response').value;
-
-    const oldComplaint = allComplaints.find(c => c.id == id);
-    const wasPending = oldComplaint && oldComplaint.status === 'pending';
-    const isPending = status === 'pending';
-
-    await withButtonBusy(eventButton(btn), 'Saving...', async () => {
-    const data = await API.patch(`/api/complaints/${id}/update_status/`, { status, admin_response });
-    if (data && data.id) {
-        showToast('Complaint updated.', 'success');
-        const modal = getReviewModal();
-        if (modal) modal.hide();
-
-        if (wasPending && !isPending) {
-            adjustComplaintsBadge(-1);
-        } else if (!wasPending && isPending) {
-            adjustComplaintsBadge(1);
-        }
-
-        loadComplaints();
-    } else {
-        showToast('Failed to update complaint.', 'danger');
-    }
-    });
-}
-
-
-
-
-// ── Delete Complaint ──────────────────────────────────────────────────────
-async function deleteComplaint(id, btn) {
-
-    if (!confirm('Delete this complaint permanently? This cannot be undone.')) return;
-
-    const complaint = allComplaints.find(c => c.id == id);
-    const wasPending = complaint && complaint.status === 'pending';
-
-    await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
-    try {
-        const res = await fetch(`/api/complaints/${id}/`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-            },
+    // Focus issue handling when closing Bootstrap modal
+    if (reviewModalEl && !reviewModalEl.dataset._bound) {
+        reviewModalEl.addEventListener('hide.bs.modal', function () {
+            if (document.activeElement) {
+                document.activeElement.blur();
+            }
         });
+        reviewModalEl.dataset._bound = '1';
+    }
 
-        if (res.ok || res.status === 204) {
-            showToast('Complaint deleted.', 'success');
+    const statusBadge = s => ({
+        pending: 'bg-warning text-dark',
+        under_review: 'bg-info',
+        completed: 'bg-success'
+    }[s] || 'bg-secondary');
 
-            allComplaints = allComplaints.filter(c => c.id != id);
-            if (wasPending) adjustComplaintsBadge(-1);
+    async function loadComplaints() {
+        const body = document.getElementById('complaint-table-body');
 
-            const row = document.getElementById(`complaint-row-${id}`);
-            if (row) row.remove();
-
-            if (!allComplaints.length) {
-                renderComplaints();
+        try {
+            const data = await API.get('/api/complaints/');
+            if (!data) {
+                throw new Error('Unable to load complaints.');
             }
-        } else {
-            let errMsg = 'Failed to delete complaint.';
-            try {
-                const data = await res.json();
-                errMsg = typeof data === 'object'
-                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
-                    : String(data);
-            } catch (e) {
-                console.error('Failed to parse error response JSON:', e);
+
+            allComplaints = (data && data.results) ? data.results : (data || []);
+            renderComplaints();
+        } catch (e) {
+            console.error('Failed to load complaints:', e);
+            allComplaints = [];
+            if (body) {
+                body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Unable to load complaints right now.</td></tr>';
             }
-            showToast(errMsg, 'danger');
+            showToast('Unable to load complaints right now.', 'warning');
         }
-    } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
     }
-    });
-}
 
-function adjustComplaintsBadge(delta) {
-    const badge = document.getElementById('complaints-badge');
-    if (!badge) return;
-    const current = parseInt(badge.textContent || '0', 10) || 0;
-    const updated = Math.max(0, current + delta);
+    function renderComplaints() {
+        const filter = document.getElementById('status-filter').value;
+        const rows = allComplaints.filter(c => !filter || c.status === filter);
+        const body = document.getElementById('complaint-table-body');
 
-    if (updated > 0) {
-        badge.classList.remove('d-none');
-        badge.textContent = updated;
-    } else {
-        badge.classList.add('d-none');
-        badge.textContent = '';
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No complaints found.</td></tr>';
+            return;
+        }
+
+        body.innerHTML = rows.map(c => `
+            <tr id="complaint-row-${escapeHtml(c.id)}">
+                <td class="fw-bold text-secondary">#${escapeHtml(c.id)}</td>
+                <td>${escapeHtml(c.username)}</td>
+                <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">${escapeHtml(c.complaint_type_display)}</span></td>
+                <td class="small" style="max-width:260px;">${escapeHtml(c.description)}</td>
+                <td>${c.photo ? `<a href="${escapeHtml(c.photo)}" target="_blank"><img src="${escapeHtml(c.photo)}" style="height:36px;width:36px;object-fit:cover;border-radius:4px;"></a>` : '<span class="text-muted small">—</span>'}</td>
+                <td><span class="badge ${statusBadge(c.status)}">${escapeHtml(c.status_display)}</span></td>
+                <td class="small text-muted">${escapeHtml(new Date(c.created_at).toLocaleDateString())}</td>
+                <td>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-success" onclick="openReview(${escapeHtml(c.id)})">
+                            <i class="bi bi-clipboard-check"></i> Review
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteComplaint(${escapeHtml(c.id)}, this)" title="Delete complaint">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
     }
-}
 
-function bootstrapComplaintsPage() {
-    const body = document.getElementById('complaint-table-body');
-    if (!body) return;
-    if (body.dataset._loaded) return;
-    body.dataset._loaded = '1';
-    loadComplaints();
-}
+    function openReview(id) {
+        const complaint = allComplaints.find(c => c.id == id);
+        if (!complaint) return;
+        document.getElementById('review-complaint-id').value = complaint.id;
+        document.getElementById('review-status').value = complaint.status;
+        document.getElementById('review-response').value = complaint.admin_response || '';
+        const modal = getReviewModal();
+        if (modal) modal.show();
+    }
 
-document.addEventListener('DOMContentLoaded', bootstrapComplaintsPage);
-document.body.addEventListener('htmx:afterSwap', bootstrapComplaintsPage);
+    async function submitReview(btn) {
+        const id = document.getElementById('review-complaint-id').value;
+        const status = document.getElementById('review-status').value;
+        const admin_response = document.getElementById('review-response').value;
+
+        const oldComplaint = allComplaints.find(c => c.id == id);
+        const wasPending = oldComplaint && oldComplaint.status === 'pending';
+        const isPending = status === 'pending';
+
+        await withButtonBusy(eventButton(btn), 'Saving...', async () => {
+        const data = await API.patch(`/api/complaints/${id}/update_status/`, { status, admin_response });
+        if (data && data.id) {
+            showToast('Complaint updated.', 'success');
+            const modal = getReviewModal();
+            if (modal) modal.hide();
+
+            if (wasPending && !isPending) {
+                adjustComplaintsBadge(-1);
+            } else if (!wasPending && isPending) {
+                adjustComplaintsBadge(1);
+            }
+
+            loadComplaints();
+        } else {
+            showToast('Failed to update complaint.', 'danger');
+        }
+        });
+    }
+
+    // ── Delete Complaint ──────────────────────────────────────────────────────
+    async function deleteComplaint(id, btn) {
+
+        if (!confirm('Delete this complaint permanently? This cannot be undone.')) return;
+
+        const complaint = allComplaints.find(c => c.id == id);
+        const wasPending = complaint && complaint.status === 'pending';
+
+        await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
+        try {
+            const res = await fetch(`/api/complaints/${id}/`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                },
+            });
+
+            if (res.ok || res.status === 204) {
+                showToast('Complaint deleted.', 'success');
+
+                allComplaints = allComplaints.filter(c => c.id != id);
+                if (wasPending) adjustComplaintsBadge(-1);
+
+                const row = document.getElementById(`complaint-row-${id}`);
+                if (row) row.remove();
+
+                if (!allComplaints.length) {
+                    renderComplaints();
+                }
+            } else {
+                let errMsg = 'Failed to delete complaint.';
+                try {
+                    const data = await res.json();
+                    errMsg = typeof data === 'object'
+                        ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                        : String(data);
+                } catch (e) {
+                    console.error('Failed to parse error response JSON:', e);
+                }
+                showToast(errMsg, 'danger');
+            }
+        } catch (e) {
+            showToast('Network error: ' + e.message, 'danger');
+        }
+        });
+    }
+
+    function adjustComplaintsBadge(delta) {
+        const badge = document.getElementById('complaints-badge');
+        if (!badge) return;
+        const current = parseInt(badge.textContent || '0', 10) || 0;
+        const updated = Math.max(0, current + delta);
+
+        if (updated > 0) {
+            badge.classList.remove('d-none');
+            badge.textContent = updated;
+        } else {
+            badge.classList.add('d-none');
+            badge.textContent = '';
+        }
+    }
+
+    function bootstrapComplaintsPage() {
+        const body = document.getElementById('complaint-table-body');
+        if (!body) return;
+        if (body.dataset._loaded) return;
+        body.dataset._loaded = '1';
+        loadComplaints();
+    }
+
+    // ── Expose functions referenced by inline onclick="" attributes in the
+    // HTML above. Inline handlers resolve names against `window`, so anything
+    // called that way must be attached explicitly — everything else in this
+    // IIFE stays private and won't leak into global scope on repeat htmx swaps.
+    window.renderComplaints = renderComplaints;
+    window.openReview = openReview;
+    window.submitReview = submitReview;
+    window.deleteComplaint = deleteComplaint;
+
+    document.addEventListener('DOMContentLoaded', bootstrapComplaintsPage);
+    document.body.addEventListener('htmx:afterSwap', bootstrapComplaintsPage);
+})();
 </script>
 {% endblock %}

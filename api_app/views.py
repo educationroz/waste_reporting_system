@@ -343,12 +343,17 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
         if not uploaded_file:
             return Response({'error': 'backup_file is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not uploaded_file.name.endswith('.json'):
+        uploaded_name = Path(uploaded_file.name).name
+        if not uploaded_name.endswith('.json'):
             return Response({'error': 'Only .json backup files are supported.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Write to BACKUP_DIR first so restore_backup() can operate on a
-        # real Path. Nothing here has been verified yet.
-        backup_path = BACKUP_DIR_FOR_UPLOADS / uploaded_file.name
+        # Normalize to a basename first, then enforce the final path stays
+        # inside BACKUP_DIR. This blocks multipart filenames that try to
+        # smuggle path separators or traversal segments.
+        backup_path = (BACKUP_DIR_FOR_UPLOADS / uploaded_name).resolve()
+        if backup_path.parent != BACKUP_DIR_FOR_UPLOADS.resolve():
+            return Response({'error': 'Invalid backup file location.'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             with backup_path.open('wb') as backup_file:
                 for chunk in uploaded_file.chunks():
