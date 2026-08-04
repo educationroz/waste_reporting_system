@@ -540,6 +540,40 @@ if (!document.body.dataset._leafletCleanupBound) {
     document.body.dataset._leafletCleanupBound = '1';
 }
 
+function ensureLeafletLoaded(onReady) {
+    if (typeof L !== 'undefined') {
+        onReady();
+        return;
+    }
+
+    if (window._leafletLoadPromise) {
+        window._leafletLoadPromise.then(onReady).catch(() => {});
+        return;
+    }
+
+    window._leafletLoadPromise = new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-leaflet-loader="home"]');
+        if (existing) {
+            existing.addEventListener('load', resolve, { once: true });
+            existing.addEventListener('error', reject, { once: true });
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.async = true;
+        script.dataset.leafletLoader = 'home';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+
+    window._leafletLoadPromise.then(onReady).catch((error) => {
+        console.error('Leaflet failed to load for home map:', error);
+        showToast('Map failed to load. Please refresh the page.', 'danger');
+    });
+}
+
 // Live camera modal state
 let cameraStream = null;
 let cameraTarget = null;      // 'garbage' or 'complaint'
@@ -572,6 +606,11 @@ function updateLocationLockUI() {
 }
 
 function initMap(lat, lng) {
+    if (typeof L === 'undefined') {
+        ensureLeafletLoaded(() => initMap(lat, lng));
+        return;
+    }
+
     if (map) {
         marker.setLatLng([lat, lng]);
         map.setView([lat, lng], 16);
@@ -1562,9 +1601,14 @@ try {
     let requestReconnectTimer = null;
     let requestReconnectWarned = false;
 
-    function connectRequestWebSocket() {
-        const wsURL = token
-            ? `${protocol}${location.host}/ws/requests/?token=${encodeURIComponent(token)}`
+    async function connectRequestWebSocket() {
+        const wsToken = await (window.getFreshAccessTokenForSockets ? window.getFreshAccessTokenForSockets() : Promise.resolve(token));
+        if (!wsToken) {
+            if (localStorage.getItem('refresh_token')) logout();
+            return;
+        }
+        const wsURL = wsToken
+            ? `${protocol}${location.host}/ws/requests/?token=${encodeURIComponent(wsToken)}`
             : `${protocol}${location.host}/ws/requests/`;
         const ws = new WebSocket(wsURL);
         requestWS = ws;
@@ -1612,9 +1656,13 @@ try {
     let driverReconnectTimer = null;
     let driverReconnectWarned = false;
 
-    function connectDriverLocationWebSocket() {
-        if (!token) return;
-        const ws = new WebSocket(`${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`);
+    async function connectDriverLocationWebSocket() {
+        const wsToken = await (window.getFreshAccessTokenForSockets ? window.getFreshAccessTokenForSockets() : Promise.resolve(token));
+        if (!wsToken) {
+            if (localStorage.getItem('refresh_token')) logout();
+            return;
+        }
+        const ws = new WebSocket(`${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(wsToken)}`);
         driverWS = ws;
 
         function scheduleDriverReconnect() {

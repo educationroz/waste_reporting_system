@@ -278,11 +278,69 @@
         document.body.dataset._leafletCleanupBound = '1';
     }
 
+    function ensureLeafletLoaded(onReady) {
+        if (typeof L !== 'undefined') {
+            onReady();
+            return;
+        }
+
+        if (window._routeLeafletLoadPromise) {
+            window._routeLeafletLoadPromise.then(onReady).catch(() => {});
+            return;
+        }
+
+        window._routeLeafletLoadPromise = new Promise((resolve, reject) => {
+            const existing = document.querySelector('script[data-leaflet-loader="route-planning"]');
+            if (existing) {
+                existing.addEventListener('load', resolve, { once: true });
+                existing.addEventListener('error', reject, { once: true });
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+            script.async = true;
+            script.dataset.leafletLoader = 'route-planning';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+
+        window._routeLeafletLoadPromise.then(onReady).catch((error) => {
+            console.error('Leaflet failed to load for route planning:', error);
+            showToast('Map failed to load. Please refresh the page.', 'danger');
+        });
+    }
+
     function getToken() {
         return localStorage.getItem('access_token');
     }
 
+    function getApiClient() {
+        if (window.API) return window.API;
+
+        return {
+            get: (url) => authFetch(url, { method: 'GET' }),
+            post: (url, data) => authFetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            }),
+            patch: (url, data) => authFetch(url, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            }),
+            delete: (url) => authFetch(url, { method: 'DELETE' }),
+        };
+    }
+
     function initMap() {
+        if (typeof L === 'undefined') {
+            ensureLeafletLoaded(initMap);
+            return;
+        }
+
         map = L.map('route-map').setView([28.2096, 83.9856], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
@@ -382,7 +440,7 @@
 
     async function loadDriverMarkers() {
         try {
-            const data = await API.get('/api/drivers/');
+            const data = await getApiClient().get('/api/drivers/');
             if (!data) return;
             const drivers = Array.isArray(data) ? data : (data.results || []);
             renderDriverMarkers(drivers);
@@ -392,7 +450,7 @@
     }
 
     async function loadDrivers() {
-        const data = await API.get('/api/drivers/');
+        const data = await getApiClient().get('/api/drivers/');
         if (!data) {
             console.error('Failed to load drivers');
             return;
@@ -409,7 +467,7 @@
     }
 
     window.loadWasteRequests = async function() {
-        const data = await API.get('/api/waste-requests/');
+        const data = await getApiClient().get('/api/waste-requests/');
         if (!data) {
             showToast('Failed to load requests. Are you logged in?', 'danger');
             return;
@@ -466,7 +524,7 @@
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Generating...';
 
-        const data = await API.post('/api/routes/generate_optimal/', {
+        const data = await getApiClient().post('/api/routes/generate_optimal/', {
             driver_id: parseInt(driverId),
             waste_request_ids: includeAllPending ? [] : selectedRequests,
             planned_date: plannedDate,
@@ -593,7 +651,7 @@
             showToast('No route to start. Generate one first.', 'warning');
             return;
         }
-        const data = await API.patch(`/api/routes/${currentRouteId}/start_route/`, {});
+        const data = await getApiClient().patch(`/api/routes/${currentRouteId}/start_route/`, {});
         if (data && data.id) {
             const statusEl = document.getElementById('routeStatus');
             statusEl.textContent = 'Active';
@@ -605,9 +663,12 @@
         }
     };
 
-    function connectRouteWebSocket() {
-        const token = getToken();
-        if (!token) return;
+    async function connectRouteWebSocket() {
+        const token = await (window.getFreshAccessTokenForSockets ? window.getFreshAccessTokenForSockets() : Promise.resolve(getToken()));
+        if (!token) {
+            if (localStorage.getItem('refresh_token')) logout();
+            return;
+        }
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
         if (window._routeReconnectTimer) {
             clearTimeout(window._routeReconnectTimer);
@@ -687,7 +748,7 @@
     }
 
     // ── Init ─────────────────────────────────────────────────────────────
-    initMap();
+    ensureLeafletLoaded(initMap);
     loadDrivers();
     loadCheckpoints();
     loadDriverMarkers();
