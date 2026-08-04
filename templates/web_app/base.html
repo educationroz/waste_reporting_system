@@ -470,6 +470,44 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function getToken() { return localStorage.getItem('access_token'); }
 
+    function isJwtExpired(token, skewSeconds = 30) {
+        if (!token) return true;
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+            if (!payload.exp) return true;
+            return (payload.exp * 1000) <= (Date.now() + skewSeconds * 1000);
+        } catch (e) {
+            return true;
+        }
+    }
+
+    async function getFreshAccessTokenForSockets() {
+        const access = localStorage.getItem('access_token');
+        if (!access) return null;
+        if (!isJwtExpired(access)) return access;
+
+        const refresh = localStorage.getItem('refresh_token');
+        if (!refresh) return null;
+
+        try {
+            const refreshRes = await fetch('/auth/token/refresh/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh }),
+            });
+
+            if (!refreshRes.ok) return null;
+
+            const refreshData = await refreshRes.json();
+            if (!refreshData || !refreshData.access) return null;
+            localStorage.setItem('access_token', refreshData.access);
+            return refreshData.access;
+        } catch (e) {
+            console.error('Failed to refresh access token for WebSocket reconnect:', e);
+            return null;
+        }
+    }
+
     async function apiFetch(method, url, data = null) {
         let token = localStorage.getItem('access_token');
 
@@ -686,10 +724,14 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    function connectNotifSocket() {
+    async function connectNotifSocket() {
         try {
             const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-            const token = localStorage.getItem('access_token');
+            const token = await getFreshAccessTokenForSockets();
+            if (!token) {
+                if (localStorage.getItem('refresh_token')) logout();
+                return;
+            }
             const wsURL = token
                 ? `${protocol}${location.host}/ws/notifications/?token=${encodeURIComponent(token)}`
                 : `${protocol}${location.host}/ws/notifications/`;

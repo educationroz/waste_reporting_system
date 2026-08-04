@@ -145,9 +145,24 @@ const statusBadge = s => ({
 }[s] || 'bg-secondary');
 
 async function loadComplaints() {
-    const data = await API.get('/api/complaints/');
-    allComplaints = (data && data.results) ? data.results : (data || []);
-    renderComplaints();
+    const body = document.getElementById('complaint-table-body');
+
+    try {
+        const data = await API.get('/api/complaints/');
+        if (!data) {
+            throw new Error('Unable to load complaints.');
+        }
+
+        allComplaints = (data && data.results) ? data.results : (data || []);
+        renderComplaints();
+    } catch (e) {
+        console.error('Failed to load complaints:', e);
+        allComplaints = [];
+        if (body) {
+            body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Unable to load complaints right now.</td></tr>';
+        }
+        showToast('Unable to load complaints right now.', 'warning');
+    }
 }
 
 function renderComplaints() {
@@ -287,6 +302,15 @@ function adjustComplaintsBadge(delta) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', loadComplaints);
+function bootstrapComplaintsPage() {
+    const body = document.getElementById('complaint-table-body');
+    if (!body) return;
+    if (body.dataset._loaded) return;
+    body.dataset._loaded = '1';
+    loadComplaints();
+}
+
+document.addEventListener('DOMContentLoaded', bootstrapComplaintsPage);
+document.body.addEventListener('htmx:afterSwap', bootstrapComplaintsPage);
 </script>
 {% endblock %}

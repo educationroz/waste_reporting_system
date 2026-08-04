@@ -308,13 +308,20 @@ window._locationReconnectAttempt = 0;
 window._locationReconnectWarned = false;
 window._locationReconnectTimer = null;
 
-function connectLocationWebSocket() {
+async function connectLocationWebSocket() {
     if (window._locationReconnectTimer) {
         clearTimeout(window._locationReconnectTimer);
         window._locationReconnectTimer = null;
     }
 
-    const ws = new WebSocket(locationWSURL);
+    const token = await (window.getFreshAccessTokenForSockets ? window.getFreshAccessTokenForSockets() : Promise.resolve(localStorage.getItem('access_token')));
+    if (!token) {
+        if (localStorage.getItem('refresh_token')) logout();
+        return;
+    }
+
+    const wsURL = `${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`;
+    const ws = new WebSocket(wsURL);
     locationWS = ws;
     window.locationWS = ws;
 
@@ -653,7 +660,46 @@ if (!document.body.dataset._leafletCleanupBound) {
     document.body.dataset._leafletCleanupBound = '1';
 }
 
+function ensureLeafletLoaded(onReady) {
+    if (typeof L !== 'undefined') {
+        onReady();
+        return;
+    }
+
+    if (window._driverLeafletLoadPromise) {
+        window._driverLeafletLoadPromise.then(onReady).catch(() => {});
+        return;
+    }
+
+    window._driverLeafletLoadPromise = new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-leaflet-loader="driver-dashboard"]');
+        if (existing) {
+            existing.addEventListener('load', resolve, { once: true });
+            existing.addEventListener('error', reject, { once: true });
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.async = true;
+        script.dataset.leafletLoader = 'driver-dashboard';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+
+    window._driverLeafletLoadPromise.then(onReady).catch((error) => {
+        console.error('Leaflet failed to load for driver dashboard:', error);
+        showToast('Map failed to load. Please refresh the page.', 'danger');
+    });
+}
+
 function initDriverMap() {
+    if (typeof L === 'undefined') {
+        ensureLeafletLoaded(initDriverMap);
+        return;
+    }
+
     driverMap = L.map('driver-map', { scrollWheelZoom: true }).setView(DEFAULT_CENTER, 13);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

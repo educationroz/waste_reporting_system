@@ -472,6 +472,40 @@ if (!document.body.dataset._leafletCleanupBound) {
     document.body.dataset._leafletCleanupBound = '1';
 }
 
+function ensureLeafletLoaded(onReady) {
+    if (typeof L !== 'undefined') {
+        onReady();
+        return;
+    }
+
+    if (window._settingsLeafletLoadPromise) {
+        window._settingsLeafletLoadPromise.then(onReady).catch(() => {});
+        return;
+    }
+
+    window._settingsLeafletLoadPromise = new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-leaflet-loader="admin-settings"]');
+        if (existing) {
+            existing.addEventListener('load', resolve, { once: true });
+            existing.addEventListener('error', reject, { once: true });
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.async = true;
+        script.dataset.leafletLoader = 'admin-settings';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+
+    window._settingsLeafletLoadPromise.then(onReady).catch((error) => {
+        console.error('Leaflet failed to load for admin settings:', error);
+        showToast('Map failed to load. Please refresh the page.', 'danger');
+    });
+}
+
 const depotTab = document.getElementById('depot-tab');
 if (depotTab && !depotTab.dataset._bound) {
     depotTab.addEventListener('shown.bs.tab', function () {
@@ -499,6 +533,11 @@ if (backupTab && !backupTab.dataset._bound) {
 }
 
 function initDepotMap() {
+    if (typeof L === 'undefined') {
+        ensureLeafletLoaded(initDepotMap);
+        return;
+    }
+
     if (depotMap) return; 
 
     depotMap = L.map('depot-map').setView([DEFAULT_LAT, DEFAULT_LNG], 14);
@@ -633,6 +672,11 @@ function showDepotStatus(text) {
 }
 
 function initCheckpointMap() {
+    if (typeof L === 'undefined') {
+        ensureLeafletLoaded(initCheckpointMap);
+        return;
+    }
+
     if (checkpointMap) return;
 
     checkpointMap = L.map('checkpoint-map').setView([DEFAULT_LAT, DEFAULT_LNG], 14);
