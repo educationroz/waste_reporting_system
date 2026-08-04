@@ -695,6 +695,32 @@ document.addEventListener("DOMContentLoaded", function() {
                 : `${protocol}${location.host}/ws/notifications/`;
             const notifSocket = new WebSocket(wsURL);
             window._notifSocket = notifSocket;
+            window._notifReconnectAttempt = 0;
+            if (window._notifReconnectTimer) {
+                clearTimeout(window._notifReconnectTimer);
+                window._notifReconnectTimer = null;
+            }
+            window._notifReconnectWarned = false;
+
+            function scheduleNotifReconnect() {
+                if (window._notifReconnectTimer) return;
+                const delay = Math.min(30000, 1000 * Math.pow(2, window._notifReconnectAttempt || 0));
+                window._notifReconnectAttempt = (window._notifReconnectAttempt || 0) + 1;
+                window._notifReconnectTimer = setTimeout(() => {
+                    window._notifReconnectTimer = null;
+                    connectNotifSocket();
+                }, delay);
+            }
+
+            function notifyNotifSocketIssue(label, event) {
+                console.warn(label, event);
+                if (!window._notifReconnectWarned) {
+                    showToast('Connection lost — live updates paused', 'warning');
+                    window._notifReconnectWarned = true;
+                }
+                scheduleNotifReconnect();
+            }
+
             notifSocket.onmessage = (e) => {
                 const data = JSON.parse(e.data);
                 if (data.type === 'notification') {
@@ -713,9 +739,8 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 }
             };
-            notifSocket.onerror = (e) => {
-                console.error('Notification WebSocket error:', e);
-            };
+            notifSocket.onerror = (e) => notifyNotifSocketIssue('Notification WebSocket error:', e);
+            notifSocket.onclose = (e) => notifyNotifSocketIssue('Notification WebSocket closed:', e);
         } catch(e) {
             console.error('Failed to initialize notification WebSocket:', e);
         }

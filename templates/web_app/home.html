@@ -525,6 +525,21 @@ let locationLockedByPhoto = false;
 // यो थ्रेसहोल्ड भन्दा टाढाको फोटो भए "फरक ठाउँ" मानेर reject गर्ने
 const SAME_LOCATION_THRESHOLD_METERS = 150;
 
+if (!document.body.dataset._leafletCleanupBound) {
+    document.body.addEventListener('htmx:beforeSwap', () => {
+        if (map) {
+            map.remove();
+            map = null;
+        }
+        marker = null;
+        checkpointMarkersLayer = null;
+        driverMarkersLayer = null;
+        driverMarkers.clear();
+        checkpointData = [];
+    });
+    document.body.dataset._leafletCleanupBound = '1';
+}
+
 // Live camera modal state
 let cameraStream = null;
 let cameraTarget = null;      // 'garbage' or 'complaint'
@@ -828,7 +843,15 @@ async function loadDriverMarkers() {
 
 // ── Live Camera Modal (getUserMedia) ─────────────────────────────────────────
 const cameraModalEl = document.getElementById('cameraModal');
-const cameraModal = new bootstrap.Modal(cameraModalEl);
+
+function getCameraModal() {
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap JS failed to load — modal cannot open.');
+        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        return null;
+    }
+    return bootstrap.Modal.getOrCreateInstance(cameraModalEl);
+}
 
 async function openCamera(target) {
     cameraTarget = target; // 'garbage' or 'complaint'
@@ -851,7 +874,8 @@ async function openCamera(target) {
         document.getElementById('camera-done-btn').textContent = 'Cancel';
     }
 
-    cameraModal.show();
+    const modal = getCameraModal();
+    if (modal) modal.show();
     await startCameraStream();
 
     // Camera खुलेकै बेला background मा GPS पनि फेच गरिराख्ने
@@ -904,7 +928,8 @@ function stopCameraStream() {
 
 function closeCamera() {
     stopCameraStream();
-    cameraModal.hide();
+    const modal = getCameraModal();
+    if (modal) modal.hide();
 }
 
 async function switchCamera() {
@@ -949,7 +974,10 @@ function useCapturedComplaintPhoto(file) {
     handleComplaintPhotoUpload(input);
 }
 
-cameraModalEl.addEventListener('hidden.bs.modal', stopCameraStream);
+if (cameraModalEl && !cameraModalEl.dataset._bound) {
+    cameraModalEl.addEventListener('hidden.bs.modal', stopCameraStream);
+    cameraModalEl.dataset._bound = '1';
+}
 
 // ── Multi-Photo Handling (gallery multi-select + live camera captures) ──────
 
@@ -1437,11 +1465,13 @@ document.addEventListener('DOMContentLoaded', function() {
 let complaintPhotoFile = null;
 
 document.querySelectorAll('.complaint-type-option').forEach(el => {
+    if (el.dataset._bound) return;
     el.addEventListener('click', () => {
         document.querySelectorAll('.complaint-type-option').forEach(o => o.classList.remove('active'));
         el.classList.add('active');
         document.getElementById('complaint-type').value = el.dataset.value;
     });
+    el.dataset._bound = '1';
 });
 
 function handleComplaintPhotoUpload(input) {
@@ -1527,28 +1557,86 @@ async function submitComplaint() {
 try {
     const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
     const token = localStorage.getItem('access_token');
-    const wsURL = token
-        ? `${protocol}${location.host}/ws/requests/?token=${encodeURIComponent(token)}`
-        : `${protocol}${location.host}/ws/requests/`;
-    const ws = new WebSocket(wsURL);
-    ws.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        if (data.type === 'request_update') {
-            showToast(`Request #${data.request_id} updated to: ${data.status}`, 'info');
-            applyHomeRequestRowUpdate(data.request_id, data.status);
-        }
-    };
-} catch (e) {
-    console.error('Failed to initialize request WebSocket:', e);
-    showToast('Live request updates unavailable.', 'warning');
-}
+    let requestWS = null;
+    let requestReconnectAttempt = 0;
+    let requestReconnectTimer = null;
+    let requestReconnectWarned = false;
 
-try {
-    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-    const token = localStorage.getItem('access_token');
-    if (token) {
-        const driverWS = new WebSocket(`${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`);
-        driverWS.onmessage = (e) => {
+    function connectRequestWebSocket() {
+        const wsURL = token
+            ? `${protocol}${location.host}/ws/requests/?token=${encodeURIComponent(token)}`
+            : `${protocol}${location.host}/ws/requests/`;
+        const ws = new WebSocket(wsURL);
+        requestWS = ws;
+
+        function scheduleRequestReconnect() {
+            if (requestReconnectTimer) return;
+            const delay = Math.min(30000, 1000 * Math.pow(2, requestReconnectAttempt));
+            requestReconnectAttempt += 1;
+            requestReconnectTimer = setTimeout(() => {
+                requestReconnectTimer = null;
+                connectRequestWebSocket();
+            }, delay);
+        }
+
+        function notifyRequestSocketIssue(label, event) {
+            console.warn(label, event);
+            if (!requestReconnectWarned) {
+                showToast('Connection lost — live updates paused', 'warning');
+                requestReconnectWarned = true;
+            }
+            scheduleRequestReconnect();
+        }
+
+        ws.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'request_update') {
+                showToast(`Request #${data.request_id} updated to: ${data.status}`, 'info');
+                applyHomeRequestRowUpdate(data.request_id, data.status);
+            }
+        };
+        ws.onopen = () => {
+            requestReconnectAttempt = 0;
+            requestReconnectWarned = false;
+            if (requestReconnectTimer) {
+                clearTimeout(requestReconnectTimer);
+                requestReconnectTimer = null;
+            }
+        };
+        ws.onerror = (e) => notifyRequestSocketIssue('Request WebSocket error:', e);
+        ws.onclose = (e) => notifyRequestSocketIssue('Request WebSocket closed:', e);
+    }
+
+    let driverWS = null;
+    let driverReconnectAttempt = 0;
+    let driverReconnectTimer = null;
+    let driverReconnectWarned = false;
+
+    function connectDriverLocationWebSocket() {
+        if (!token) return;
+        const ws = new WebSocket(`${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`);
+        driverWS = ws;
+
+        function scheduleDriverReconnect() {
+            if (driverReconnectTimer) return;
+            const delay = Math.min(30000, 1000 * Math.pow(2, driverReconnectAttempt));
+            driverReconnectAttempt += 1;
+            driverReconnectTimer = setTimeout(() => {
+                driverReconnectTimer = null;
+                connectDriverLocationWebSocket();
+            }, delay);
+        }
+
+        function notifyDriverSocketIssue(label, event) {
+            console.warn(label, event);
+            if (!driverReconnectWarned) {
+                showToast('Connection lost — live updates paused', 'warning');
+                driverReconnectWarned = true;
+            }
+            scheduleDriverReconnect();
+        }
+
+        ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (data.type !== 'driver_location') return;
 
@@ -1577,9 +1665,25 @@ try {
                 driverMarkers.set(driverId, driverMarker);
             }
         };
+        ws.onopen = () => {
+            driverReconnectAttempt = 0;
+            driverReconnectWarned = false;
+            if (driverReconnectTimer) {
+                clearTimeout(driverReconnectTimer);
+                driverReconnectTimer = null;
+            }
+        };
+        ws.onerror = (e) => notifyDriverSocketIssue('Driver location WebSocket error:', e);
+        ws.onclose = (e) => notifyDriverSocketIssue('Driver location WebSocket closed:', e);
     }
+
+    connectRequestWebSocket();
+    connectDriverLocationWebSocket();
+    window._homeRequestWS = () => requestWS;
+    window._homeDriverWS = () => driverWS;
 } catch (e) {
-    console.error('Failed to initialize driver-locations WebSocket:', e);
+    console.error('Failed to initialize home WebSockets:', e);
+    showToast('Live updates unavailable.', 'warning');
 }
 {% endif %}
 </script>

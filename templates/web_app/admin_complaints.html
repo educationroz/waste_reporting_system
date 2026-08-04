@@ -117,14 +117,26 @@
 {% block extra_js %}
 <script>
 let allComplaints = [];
-const reviewModal = new bootstrap.Modal(document.getElementById('reviewModal'));
+const reviewModalEl = document.getElementById('reviewModal');
+
+function getReviewModal() {
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap JS failed to load — modal cannot open.');
+        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        return null;
+    }
+    return bootstrap.Modal.getOrCreateInstance(reviewModalEl);
+}
 
 // Focus issue handling when closing Bootstrap modal
-document.getElementById('reviewModal').addEventListener('hide.bs.modal', function () {
-    if (document.activeElement) {
-        document.activeElement.blur();
-    }
-});
+if (reviewModalEl && !reviewModalEl.dataset._bound) {
+    reviewModalEl.addEventListener('hide.bs.modal', function () {
+        if (document.activeElement) {
+            document.activeElement.blur();
+        }
+    });
+    reviewModalEl.dataset._bound = '1';
+}
 
 const statusBadge = s => ({
     pending: 'bg-warning text-dark',
@@ -177,7 +189,8 @@ function openReview(id) {
     document.getElementById('review-complaint-id').value = complaint.id;
     document.getElementById('review-status').value = complaint.status;
     document.getElementById('review-response').value = complaint.admin_response || '';
-    reviewModal.show();
+    const modal = getReviewModal();
+    if (modal) modal.show();
 }
 
 async function submitReview(btn) {
@@ -193,7 +206,8 @@ async function submitReview(btn) {
     const data = await API.patch(`/api/complaints/${id}/update_status/`, { status, admin_response });
     if (data && data.id) {
         showToast('Complaint updated.', 'success');
-        reviewModal.hide();
+        const modal = getReviewModal();
+        if (modal) modal.hide();
 
         if (wasPending && !isPending) {
             adjustComplaintsBadge(-1);

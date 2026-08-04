@@ -303,7 +303,86 @@ const token = localStorage.getItem('access_token');
 const locationWSURL = token
     ? `${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`
     : `${protocol}${location.host}/ws/driver-locations/`;
-const locationWS = new WebSocket(locationWSURL);
+let locationWS = null;
+window._locationReconnectAttempt = 0;
+window._locationReconnectWarned = false;
+window._locationReconnectTimer = null;
+
+function connectLocationWebSocket() {
+    if (window._locationReconnectTimer) {
+        clearTimeout(window._locationReconnectTimer);
+        window._locationReconnectTimer = null;
+    }
+
+    const ws = new WebSocket(locationWSURL);
+    locationWS = ws;
+    window.locationWS = ws;
+
+    function scheduleLocationReconnect() {
+        if (window._locationReconnectTimer) return;
+        const delay = Math.min(30000, 1000 * Math.pow(2, window._locationReconnectAttempt || 0));
+        window._locationReconnectAttempt = (window._locationReconnectAttempt || 0) + 1;
+        window._locationReconnectTimer = setTimeout(() => {
+            window._locationReconnectTimer = null;
+            connectLocationWebSocket();
+        }, delay);
+    }
+
+    function notifyLocationSocketIssue(label, event) {
+        console.warn(label, event);
+        if (!window._locationReconnectWarned) {
+            showToast('Connection lost — live updates paused', 'warning');
+            window._locationReconnectWarned = true;
+        }
+        scheduleLocationReconnect();
+    }
+
+    ws.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'route_update' && data.driver_id === {{ driver.id|default:'null' }}) {
+                showToast(`New route generated: ${data.total_stops} stops, ${data.total_distance} km`, 'info');
+                loadMapData();
+            }
+            if (data.type === 'driver_location') {
+                const driverId = data.driver_id;
+                const lat = parseFloat(data.latitude);
+                const lng = parseFloat(data.longitude);
+                if (isNaN(lat) || isNaN(lng) || !driverId) return;
+
+                const name = data.driver_name || `Driver #${driverId}`;
+                const popupHtml = `<strong>🚛 ${name}</strong><br>Live driver location`;
+                const icon = L.divIcon({
+                    className: 'driver-marker-icon',
+                    html: '<span style="font-size:1.4rem; line-height:1;">🚛</span>',
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                });
+
+                let driverMarker = driverMarkers.get(driverId);
+                if (driverMarker) {
+                    driverMarker.setLatLng([lat, lng]);
+                    driverMarker.setPopupContent(popupHtml);
+                } else if (driverMarkersLayer) {
+                    driverMarker = L.marker([lat, lng], { icon })
+                        .addTo(driverMarkersLayer)
+                        .bindPopup(popupHtml);
+                    driverMarkers.set(driverId, driverMarker);
+                }
+            }
+        } catch (err) {
+            console.warn('Driver location WebSocket message parse failed:', err);
+        }
+    };
+    ws.onopen = () => {
+        window._locationReconnectAttempt = 0;
+        window._locationReconnectWarned = false;
+    };
+    ws.onerror = (e) => notifyLocationSocketIssue('Driver location WebSocket error:', e);
+    ws.onclose = (e) => notifyLocationSocketIssue('Driver location WebSocket closed:', e);
+}
+
+connectLocationWebSocket();
 
 function useGPS() {
     if (!navigator.geolocation) { showToast('GPS not supported.', 'warning'); return; }
@@ -320,6 +399,11 @@ async function updateLocation() {
     const lat = document.getElementById('lat').value;
     const lng = document.getElementById('lng').value;
     if (!lat || !lng) { showToast('Enter coordinates.', 'warning'); return; }
+
+    if (!locationWS || locationWS.readyState !== WebSocket.OPEN) {
+        showToast('Connection lost — live updates paused', 'warning');
+        return;
+    }
 
     locationWS.send(JSON.stringify({ latitude: lat, longitude: lng }));
 
@@ -554,6 +638,21 @@ let requestMarkersLayer = null;
 let checkpointsLayer = null;
 let hasFittedBounds = false; // only auto-fit the view once, on first load
 
+if (!document.body.dataset._leafletCleanupBound) {
+    document.body.addEventListener('htmx:beforeSwap', () => {
+        if (driverMap) {
+            driverMap.remove();
+            driverMap = null;
+        }
+        driverMarker = null;
+        routeLine = null;
+        requestMarkersLayer = null;
+        checkpointsLayer = null;
+        hasFittedBounds = false;
+    });
+    document.body.dataset._leafletCleanupBound = '1';
+}
+
 function initDriverMap() {
     driverMap = L.map('driver-map', { scrollWheelZoom: true }).setView(DEFAULT_CENTER, 13);
 
@@ -744,20 +843,16 @@ async function loadMapData() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', initDriverMap);
+const driverMapEl = document.getElementById('driver-map');
+if (driverMapEl && !driverMapEl.dataset._bound) {
+    driverMapEl.dataset._bound = '1';
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDriverMap);
+    } else {
+        initDriverMap();
+    }
+}
 {% endif %}
 
-locationWS.onmessage = (event) => {
-    try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'route_update' && data.driver_id === {{ driver.id|default:'null' }}) {
-            showToast(`New route generated: ${data.total_stops} stops, ${data.total_distance} km`, 'info');
-            loadMapData();
-        }
-    } catch (e) {
-        // non-JSON or unrelated message, ignore
-    }
-};
-locationWS.onerror = () => {};
 </script>
 {% endblock %}
