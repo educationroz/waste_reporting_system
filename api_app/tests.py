@@ -37,7 +37,7 @@ class BackupRestoreTests(APITestCase):
             {'backup_file': bad_file, 'confirm': 'true'},
             format='multipart',
         )
-        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 400, response.content)
 
 class DriverDeletionAPITest(TestCase):
     def setUp(self):
