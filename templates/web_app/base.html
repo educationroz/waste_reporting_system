@@ -618,76 +618,73 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function refreshNotifBadge() {
-        const token = getToken();
-        const badge = document.getElementById('notif-badge');
-        if (!token || !badge) return;
-        fetch('/api/notifications/unread/', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-            if (!data) return;
-            let count = 0;
+    const badge = document.getElementById('notif-badge');
+    if (!getToken() || !badge) return;
+    API.get('/api/notifications/unread/').then(data => {
+        if (!data) return; // apiFetch already handled 401/refresh/logout
+        let count = 0;
+        if (Array.isArray(data)) {
+            count = data.filter(n => n.is_read === false).length;
+        } else if (data.unread_count !== undefined) {
+            count = parseInt(data.unread_count);
+        } else if (data.count !== undefined) {
+            count = parseInt(data.count);
+        }
+        if (count > 0) {
+            badge.classList.remove('d-none');
+            badge.textContent = count;
+        } else {
+            badge.classList.add('d-none');
+            badge.textContent = '';
+        }
+    }).catch((e) => console.error('Failed to refresh notification badge:', e));
+}
 
-            if (Array.isArray(data)) {
-                count = data.filter(n => n.is_read === false).length;
-            }
-            else if (data.unread_count !== undefined) {
-                count = parseInt(data.unread_count);
-            } else if (data.count !== undefined) {
-                count = parseInt(data.count);
-            }
+function refreshRecycleBinBadge() {
+    const binBadge = document.getElementById('recycle-bin-badge');
+    if (!getToken() || !binBadge) return;
+    API.get('/api/waste-requests/recycle_bin/').then(data => {
+        if (!data) return;
+        let count = 0;
+        if (Array.isArray(data)) {
+            count = data.length;
+        } else if (data.count !== undefined) {
+            count = parseInt(data.count);
+        } else if (data.results !== undefined) {
+            count = data.results.length;
+        }
+        if (count > 0) {
+            binBadge.classList.remove('d-none');
+            binBadge.textContent = count;
+        } else {
+            binBadge.classList.add('d-none');
+            binBadge.textContent = '';
+        }
+    }).catch((e) => console.error('Failed to refresh recycle bin badge:', e));
+}
 
-            if (count > 0) {
-                badge.classList.remove('d-none');
-                badge.textContent = count;
-            } else {
-                badge.classList.add('d-none');
-                badge.textContent = '';
-            }
-        })
-        .catch((e) => {
-            console.error('Failed to refresh notification badge:', e);
-        });
-    }
-
-    function refreshRecycleBinBadge() {
-        const token = getToken();
-        const binBadge = document.getElementById('recycle-bin-badge');
-        if (!token || !binBadge) return;
-        fetch('/api/waste-requests/recycle_bin/', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-            if (!data) return;
-            let count = 0;
-            if (Array.isArray(data)) {
-                count = data.length;
-            } else if (data.count !== undefined) {
-                count = parseInt(data.count);
-            } else if (data.results !== undefined) {
-                count = data.results.length;
-            }
-
-            if (count > 0) {
-                binBadge.classList.remove('d-none');
-                binBadge.textContent = count;
-            } else {
-                binBadge.classList.add('d-none');
-                binBadge.textContent = '';
-            }
-        })
-        .catch((e) => {
-            console.error('Failed to refresh recycle bin badge:', e);
-        });
-    }
+function refreshComplaintsBadge() {
+    const complaintsBadge = document.getElementById('complaints-badge');
+    if (!getToken() || !complaintsBadge) return;
+    API.get('/api/complaints/?status=pending').then(data => {
+        if (!data) return;
+        let count = 0;
+        if (Array.isArray(data)) {
+            count = data.length;
+        } else if (data.count !== undefined) {
+            count = parseInt(data.count);
+        } else if (data.results !== undefined) {
+            count = data.results.length;
+        }
+        if (count > 0) {
+            complaintsBadge.classList.remove('d-none');
+            complaintsBadge.textContent = count;
+        } else {
+            complaintsBadge.classList.add('d-none');
+            complaintsBadge.textContent = '';
+        }
+    }).catch((e) => console.error('Failed to refresh complaints badge:', e));
+}
 
     function refreshComplaintsBadge() {
         const token = getToken();
