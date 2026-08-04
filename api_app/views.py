@@ -1,10 +1,11 @@
-import io
+import os
 import math
 from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
 from pathlib import Path
+import tempfile
 from .backup_utils import BACKUP_DIR as BACKUP_DIR_FOR_UPLOADS
-from .backup_utils import verify_backup_file
+from .backup_utils import BackupError, verify_backup_file
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
@@ -347,23 +348,28 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
         if not uploaded_name.endswith('.json'):
             return Response({'error': 'Only .json backup files are supported.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Normalize to a basename first, then enforce the final path stays
-        # inside BACKUP_DIR. This blocks multipart filenames that try to
-        # smuggle path separators or traversal segments.
-        backup_path = (BACKUP_DIR_FOR_UPLOADS / uploaded_name).resolve()
-        if backup_path.parent != BACKUP_DIR_FOR_UPLOADS.resolve():
-            return Response({'error': 'Invalid backup file location.'}, status=status.HTTP_400_BAD_REQUEST)
+        with tempfile.TemporaryDirectory(prefix='restore_upload_') as tmp_dir:
+            safe_name = os.path.basename(uploaded_file.name) or 'upload.json'
+            staged_path = Path(tmp_dir) / safe_name
 
-        try:
-            with backup_path.open('wb') as backup_file:
+            with staged_path.open('wb') as staged_file:
                 for chunk in uploaded_file.chunks():
-                    backup_file.write(chunk)
-        except OSError as exc:
-            backup_logger.exception('Failed writing uploaded backup file: %s', exc)
-            return Response(
-                {'error': 'Could not save the uploaded file. Please try again.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+                    staged_file.write(chunk)
+
+            try:
+                verify_backup_file(staged_path)
+            except BackupError as exc:
+                return Response(
+                    {'error': f'Invalid backup file: {exc}'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            try:
+                with transaction.atomic():
+                    call_command('flush', interactive=False, verbosity=0)
+                    call_command('loaddata', str(staged_path), verbosity=0)
+            except Exception as exc:
+                return Response({'error': f'Restore failed: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         try:
             # restore_backup() calls verify_backup_file() as its very first

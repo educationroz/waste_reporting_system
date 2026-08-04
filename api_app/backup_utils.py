@@ -124,12 +124,9 @@ def verify_backup_file(file_path: Path):
     if len(data) == 0:
         raise BackupError('Backup file is empty — refusing to restore from it.')
 
-    for i, record in enumerate(data[:50]):  # spot-check first 50, cheap and catches most corruption
-        if not isinstance(record, dict) or not all(k in record for k in ('model', 'pk', 'fields')):
-            raise BackupError(f'Record {i} is missing model/pk/fields — not a valid fixture entry.')
-
-    return len(data)
-
+    for i, record in enumerate(data[:50]):
+        if not isinstance(record, dict) or not all(k in record for k in ('model', 'fields')):
+            raise BackupError(f'Record {i} is missing model/fields — not a valid fixture entry.')
 
 def restore_backup(file_path: Path):
     """
