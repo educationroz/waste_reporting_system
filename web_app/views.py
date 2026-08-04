@@ -241,7 +241,6 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
             'driver__user', 'vehicle'
         )
         ctx['drivers'] = Driver.objects.select_related('user', 'vehicle').all()
-        ctx['admin_role'] = self.request.user.role.title()
         ctx['now'] = timezone.now()
         
         # System alerts
@@ -538,7 +537,6 @@ class AdminUsersManagementView(LoginRequiredMixin, ListView):
         ctx['active_admins'] = User.objects.filter(role='admin', is_active=True).count()
         ctx['inactive_admins'] = User.objects.filter(role='admin', is_active=False).count()
         ctx['all_users'] = User.objects.all().count()
-        ctx['all_roles'] = dict(User.ROLE_CHOICES)
         return ctx
 
 

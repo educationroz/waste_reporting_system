@@ -455,19 +455,48 @@ let editingCheckpointId = null;
 const DEFAULT_LAT = 28.2096;
 const DEFAULT_LNG = 83.9856;
 
-document.getElementById('depot-tab').addEventListener('shown.bs.tab', function () {
-    initDepotMap();
-    loadDepotLocation();
-});
+if (!document.body.dataset._leafletCleanupBound) {
+    document.body.addEventListener('htmx:beforeSwap', () => {
+        if (depotMap) {
+            depotMap.remove();
+            depotMap = null;
+        }
+        if (checkpointMap) {
+            checkpointMap.remove();
+            checkpointMap = null;
+        }
+        depotMarker = null;
+        checkpointMarker = null;
+        editingCheckpointId = null;
+    });
+    document.body.dataset._leafletCleanupBound = '1';
+}
 
-document.getElementById('checkpoint-tab').addEventListener('shown.bs.tab', function () {
-    initCheckpointMap();
-    loadCheckpoints();
-});
+const depotTab = document.getElementById('depot-tab');
+if (depotTab && !depotTab.dataset._bound) {
+    depotTab.addEventListener('shown.bs.tab', function () {
+        initDepotMap();
+        loadDepotLocation();
+    });
+    depotTab.dataset._bound = '1';
+}
 
-document.getElementById('backup-tab').addEventListener('shown.bs.tab', function () {
-    loadBackupFiles();
-});
+const checkpointTab = document.getElementById('checkpoint-tab');
+if (checkpointTab && !checkpointTab.dataset._bound) {
+    checkpointTab.addEventListener('shown.bs.tab', function () {
+        initCheckpointMap();
+        loadCheckpoints();
+    });
+    checkpointTab.dataset._bound = '1';
+}
+
+const backupTab = document.getElementById('backup-tab');
+if (backupTab && !backupTab.dataset._bound) {
+    backupTab.addEventListener('shown.bs.tab', function () {
+        loadBackupFiles();
+    });
+    backupTab.dataset._bound = '1';
+}
 
 function initDepotMap() {
     if (depotMap) return; 
@@ -964,12 +993,12 @@ function attachBackupHandlers() {
     const restoreBtn = document.getElementById('backup-restore-btn');
     const fileInput = document.getElementById('backup-file-input');
 
-    if (createBtn && !createBtn.dataset._backupBound) {
+    if (createBtn && !createBtn.dataset._bound) {
         createBtn.addEventListener('click', createBackup);
-        createBtn.dataset._backupBound = '1';
+        createBtn.dataset._bound = '1';
     }
 
-    if (restoreBtn && fileInput && !restoreBtn.dataset._backupBound) {
+    if (restoreBtn && fileInput && !restoreBtn.dataset._bound) {
         restoreBtn.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', async (event) => {
             const file = event.target.files?.[0];
@@ -977,7 +1006,7 @@ function attachBackupHandlers() {
             await restoreBackup(file);
             event.target.value = '';
         });
-        restoreBtn.dataset._backupBound = '1';
+        restoreBtn.dataset._bound = '1';
     }
 }
 

@@ -388,7 +388,16 @@
 
 {% block extra_js %}
 <script>
-const assignModal = new bootstrap.Modal(document.getElementById('assignModal'));
+const assignModalEl = document.getElementById('assignModal');
+
+function getAssignModal() {
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap JS failed to load — modal cannot open.');
+        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        return null;
+    }
+    return bootstrap.Modal.getOrCreateInstance(assignModalEl);
+}
 
 // ── Status badge color-class map — reload नगरी badge रंग बदल्नको लागि ──
 const STATUS_BADGE_CLASS = {
@@ -409,7 +418,8 @@ const STATUS_LABELS = {
 
 function openAssignModal(requestId) {
     document.getElementById('modal-request-id').value = requestId;
-    assignModal.show();
+    const modal = getAssignModal();
+    if (modal) modal.show();
 }
 
 async function assignDriver(btn) {
@@ -424,7 +434,8 @@ async function assignDriver(btn) {
     const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
     if (data && data.id) {
         showToast('Driver assigned successfully to the route sequence!', 'success');
-        assignModal.hide();
+        const modal = getAssignModal();
+        if (modal) modal.hide();
         applyRequestRowUpdate(requestId, {
             statusKey: 'assigned',
             // Only driverName (untrusted) is escaped above — the surrounding
@@ -514,7 +525,16 @@ function applyRequestRowUpdate(requestId, { statusKey, driverHtml, actionHtml, s
 }
 
 /* ===== PHOTO GALLERY LOGIC ===== */
-const photoGalleryModal = new bootstrap.Modal(document.getElementById('photoGalleryModal'));
+const photoGalleryModalEl = document.getElementById('photoGalleryModal');
+
+function getPhotoGalleryModal() {
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap JS failed to load — modal cannot open.');
+        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        return null;
+    }
+    return bootstrap.Modal.getOrCreateInstance(photoGalleryModalEl);
+}
 
 function openPhotoGallery(requestId) {
     const dataDiv = document.getElementById(`photo-data-${requestId}`);
@@ -544,7 +564,8 @@ function openPhotoGallery(requestId) {
         });
     }
 
-    photoGalleryModal.show();
+    const modal = getPhotoGalleryModal();
+    if (modal) modal.show();
 }
 </script>
 {% endblock %}

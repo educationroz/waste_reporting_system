@@ -262,6 +262,22 @@
     let driverMarkersLayer = null;
     let driverMarkers = new Map();
 
+    if (!document.body.dataset._leafletCleanupBound) {
+        document.body.addEventListener('htmx:beforeSwap', () => {
+            if (map) {
+                map.remove();
+                map = null;
+            }
+            routeMarkers = [];
+            routePolyline = null;
+            selectedRequests = [];
+            checkpointMarkersLayer = null;
+            driverMarkersLayer = null;
+            driverMarkers.clear();
+        });
+        document.body.dataset._leafletCleanupBound = '1';
+    }
+
     function getToken() {
         return localStorage.getItem('access_token');
     }
@@ -593,9 +609,37 @@
         const token = getToken();
         if (!token) return;
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        if (window._routeReconnectTimer) {
+            clearTimeout(window._routeReconnectTimer);
+            window._routeReconnectTimer = null;
+        }
+        window._routeReconnectAttempt = 0;
+        window._routeReconnectWarned = false;
+
         const ws = new WebSocket(
             `${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`
         );
+        window._routeWebSocket = ws;
+
+        function scheduleRouteReconnect() {
+            if (window._routeReconnectTimer) return;
+            const delay = Math.min(30000, 1000 * Math.pow(2, window._routeReconnectAttempt || 0));
+            window._routeReconnectAttempt = (window._routeReconnectAttempt || 0) + 1;
+            window._routeReconnectTimer = setTimeout(() => {
+                window._routeReconnectTimer = null;
+                connectRouteWebSocket();
+            }, delay);
+        }
+
+        function notifyRouteSocketIssue(label, event) {
+            console.warn(label, event);
+            if (!window._routeReconnectWarned) {
+                showToast('Connection lost — live updates paused', 'warning');
+                window._routeReconnectWarned = true;
+            }
+            scheduleRouteReconnect();
+        }
+
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (data.type === 'route_update') {
@@ -634,8 +678,12 @@
                 }
             }
         };
-        ws.onerror = () => {};
-        ws.onclose = () => {};
+        ws.onopen = () => {
+            window._routeReconnectAttempt = 0;
+            window._routeReconnectWarned = false;
+        };
+        ws.onerror = (e) => notifyRouteSocketIssue('Route WebSocket error:', e);
+        ws.onclose = (e) => notifyRouteSocketIssue('Route WebSocket closed:', e);
     }
 
     // ── Init ─────────────────────────────────────────────────────────────
