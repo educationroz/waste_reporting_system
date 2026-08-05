@@ -446,6 +446,7 @@
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+(function() {
 // ── Depot Map Logic ──────────────────────────────────────────────────────────
 let depotMap = null;
 let depotMarker = null;
@@ -1101,5 +1102,20 @@ async function addSetting() {
         showToast('Network error: ' + e.message, 'danger');
     }
 }
+
+// ── Inline onclick= handlers ma bata call hune functions,
+//    window scope ma expose garne (IIFE bhitra local bhaye pani) ──
+window.saveDepotLocation = saveDepotLocation;
+window.useMyGPS = useMyGPS;
+window.initCheckpointMap = initCheckpointMap;
+window.resetCheckpointForm = resetCheckpointForm;
+window.saveCheckpoint = saveCheckpoint;
+window.editCheckpoint = editCheckpoint;
+window.deleteCheckpoint = deleteCheckpoint;
+window.useCheckpointGPS = useCheckpointGPS;
+window.downloadBackup = downloadBackup;
+window.deleteBackup = deleteBackup;
+window.addSetting = addSetting;
+})();
 </script>
 {% endblock %}

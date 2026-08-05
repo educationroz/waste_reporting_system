@@ -502,6 +502,7 @@
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+(function() {
 // ── State ────────────────────────────────────────────────────────────────────
 let map = null;
 let marker = null;
@@ -779,7 +780,7 @@ async function loadCheckpoints() {
     }
 }
 
-function onCheckpointSelect(value) {
+window.onCheckpointSelect = function(value) {
     if (!value) {
         return;
     }
@@ -803,7 +804,7 @@ function onCheckpointSelect(value) {
             updateCoords(lat, lng);
         }
     }
-}
+};
 
 function renderCheckpointMarkers(checkpoints) {
     if (!checkpointMarkersLayer) return;
@@ -892,7 +893,7 @@ function getCameraModal() {
     return bootstrap.Modal.getOrCreateInstance(cameraModalEl);
 }
 
-async function openCamera(target) {
+window.openCamera = async function(target) {
     cameraTarget = target; // 'garbage' or 'complaint'
     cameraFacingMode = 'environment';
     liveCameraGPS = null;
@@ -930,7 +931,7 @@ async function openCamera(target) {
             { enableHighAccuracy: true, timeout: 8000 }
         );
     }
-}
+};
 
 async function startCameraStream() {
     stopCameraStream();
@@ -965,18 +966,18 @@ function stopCameraStream() {
     }
 }
 
-function closeCamera() {
+window.closeCamera = function() {
     stopCameraStream();
     const modal = getCameraModal();
     if (modal) modal.hide();
-}
+};
 
-async function switchCamera() {
+window.switchCamera = async function() {
     cameraFacingMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
     await startCameraStream();
-}
+};
 
-function capturePhoto() {
+window.capturePhoto = function() {
     const video = document.getElementById('camera-video');
     const canvas = document.getElementById('camera-canvas');
 
@@ -1003,7 +1004,7 @@ function capturePhoto() {
             closeCamera(); // complaint मा एउटा फोटो पर्याप्त, तुरुन्तै बन्द
         }
     }, 'image/jpeg', 0.9);
-}
+};
 
 function useCapturedComplaintPhoto(file) {
     const dt = new DataTransfer();
@@ -1021,7 +1022,7 @@ if (cameraModalEl && !cameraModalEl.dataset._bound) {
 // ── Multi-Photo Handling (gallery multi-select + live camera captures) ──────
 
 // Gallery बाट एकसाथ धेरै फोटो select गर्दा
-async function handlePhotoUpload(input) {
+window.handlePhotoUpload = async function(input) {
     const files = Array.from(input.files || []);
     if (!files.length) return;
 
@@ -1029,7 +1030,7 @@ async function handlePhotoUpload(input) {
         await addGarbagePhotoWithExif(file);
     }
     input.value = ''; // reset ताकि उही फोटो फेरि select गर्दा पनि change event चल्छ
-}
+};
 
 // Live camera बाट खिचेको फोटो — EXIF हुँदैन, geolocation प्रयोग गर्ने।
 // पहिलो फोटो भए reference बनाउने, पछिका फोटो भए same-location check गर्ने।
@@ -1158,7 +1159,7 @@ function renderPhotoThumbnails() {
 
 // एउटा फोटो हटाउने — पहिलो फोटो (index 0) हटायो भने reference र location-lock
 // दुबै त्यसअनुसार पुनः-मूल्याङ्कन गर्ने।
-function removeGarbagePhoto(index) {
+window.removeGarbagePhoto = function(index) {
     photoFiles.splice(index, 1);
 
     if (index === 0) {
@@ -1182,7 +1183,7 @@ function removeGarbagePhoto(index) {
     }
 
     renderPhotoThumbnails();
-}
+};
 
 // ── Token helper ─────────────────────────────────────────────────────────────
 async function getOptionalToken() {
@@ -1326,7 +1327,7 @@ function insertHomeRequestRow(req) {
 }
 
 // ── Submit Request ───────────────────────────────────────────────────────────
-async function submitRequest() {
+window.submitRequest = async function() {
     const address  = document.getElementById('pickup-address').value.trim();
     const date     = document.getElementById('scheduled-date').value;
     const lat      = document.getElementById('req-lat').value;
@@ -1435,10 +1436,10 @@ async function submitRequest() {
         text.innerHTML = '<i class="bi bi-send me-2"></i>Submit Request';
         spinner.classList.add('d-none');
     }
-}
+};
 
 // ── Cancel Request ────────────────────────────────────────────────────────
-async function cancelRequest(requestId, btn) {
+window.cancelRequest = async function(requestId, btn) {
     if (!confirm('Cancel this request?')) return;
 
     await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
@@ -1451,10 +1452,10 @@ async function cancelRequest(requestId, btn) {
             showToast('Failed to cancel request.', 'danger');
         }
     });
-}
+};
 
 // ── Move Request to Recycle Bin (soft-delete) ─────────────────────────────────
-async function deleteRequest(requestId, btn) {
+window.deleteRequest = async function(requestId, btn) {
     if (!confirm('Move this request to Recycle Bin? You can restore it later from there.')) return;
 
     await withButtonBusy(eventButton(btn), 'Moving...', async () => {
@@ -1490,7 +1491,7 @@ async function deleteRequest(requestId, btn) {
         showToast('Network error: ' + e.message, 'danger');
     }
     });
-}
+};
 
 // ── Tooltip ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
@@ -1513,7 +1514,7 @@ document.querySelectorAll('.complaint-type-option').forEach(el => {
     el.dataset._bound = '1';
 });
 
-function handleComplaintPhotoUpload(input) {
+window.handleComplaintPhotoUpload = function(input) {
     const file = input.files[0];
     if (!file) return;
     complaintPhotoFile = file;
@@ -1522,13 +1523,13 @@ function handleComplaintPhotoUpload(input) {
     const preview = document.getElementById('complaint-photo-preview');
     preview.src = URL.createObjectURL(file);
     previewSection.classList.remove('d-none');
-}
+};
 
-function removeComplaintPhoto() {
+window.removeComplaintPhoto = function() {
     complaintPhotoFile = null;
     document.getElementById('complaint-photo').value = '';
     document.getElementById('complaint-photo-preview-section').classList.add('d-none');
-}
+};
 
 function resetComplaintForm() {
     document.getElementById('complaint-description').value = '';
@@ -1538,7 +1539,7 @@ function resetComplaintForm() {
     document.getElementById('complaint-type').value = 'missed_pickup';
 }
 
-async function submitComplaint() {
+window.submitComplaint = async function() {
     const description = document.getElementById('complaint-description').value.trim();
     const complaintType = document.getElementById('complaint-type').value;
     const btn = document.getElementById('complaint-submit-btn');
@@ -1589,7 +1590,7 @@ async function submitComplaint() {
         text.innerHTML = '<i class="bi bi-send me-1"></i>Submit Complaint';
         spinner.classList.add('d-none');
     }
-}
+};
 
 // ── WebSocket Real-time Status Updates ───────────────────────────────────────
 {% if user.is_authenticated %}
@@ -1734,5 +1735,7 @@ try {
     showToast('Live updates unavailable.', 'warning');
 }
 {% endif %}
+
+})();
 </script>
 {% endblock %}

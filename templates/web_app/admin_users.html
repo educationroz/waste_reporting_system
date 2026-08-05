@@ -244,6 +244,7 @@
 
 {% block extra_js %}
 <script>
+(function() {
 const editAdminModal = document.getElementById('editAdminModal');
 if (editAdminModal) {
     editAdminModal.addEventListener('show.bs.modal', function (event) {
@@ -426,7 +427,7 @@ function updateAdminRowDom(admin, isActive) {
 
 // ── Add / Update / Remove — reload nagari live DOM update ─────────────────
 
-async function addAdmin(btn) {
+window.addAdmin = async function(btn) {
     const username = document.getElementById('username').value.trim();
     const email = document.getElementById('email').value.trim();
     const full_name = document.getElementById('full_name').value.trim();
@@ -477,9 +478,9 @@ async function addAdmin(btn) {
         showToast('Error creating admin user: ' + e.message, 'danger');
     }
     });
-}
+};
 
-async function updateAdmin(btn) {
+window.updateAdmin = async function(btn) {
     const adminId = document.getElementById('edit_admin_id').value;
     const username = document.getElementById('edit_username').value.trim();
     const email = document.getElementById('edit_email').value.trim();
@@ -536,9 +537,9 @@ async function updateAdmin(btn) {
         showToast('Error updating admin user: ' + e.message, 'danger');
     }
     });
-}
+};
 
-async function removeAdmin(adminId, btn) {
+window.removeAdmin = async function(adminId, btn) {
     await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {
         const res = await fetch(`/api/auth/admin/${adminId}/delete/`, {
@@ -584,6 +585,7 @@ async function removeAdmin(adminId, btn) {
         showToast('Network error: ' + e.message, 'danger');
     }
     });
-}
+};
+})();
 </script>
 {% endblock %}

@@ -291,6 +291,7 @@
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+(function() {
 // ── XSS escaping helper ────────────────────────────────────────────────────
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -391,7 +392,7 @@ async function connectLocationWebSocket() {
 
 connectLocationWebSocket();
 
-function useGPS() {
+window.useGPS = function() {
     if (!navigator.geolocation) { showToast('GPS not supported.', 'warning'); return; }
     navigator.geolocation.getCurrentPosition(
         pos => {
@@ -400,9 +401,9 @@ function useGPS() {
         },
         () => showToast('Could not get GPS location.', 'danger')
     );
-}
+};
 
-async function updateLocation() {
+window.updateLocation = async function() {
     const lat = document.getElementById('lat').value;
     const lng = document.getElementById('lng').value;
     if (!lat || !lng) { showToast('Enter coordinates.', 'warning'); return; }
@@ -424,7 +425,7 @@ async function updateLocation() {
     if (typeof updateDriverMarker === 'function') {
         updateDriverMarker(parseFloat(lat), parseFloat(lng));
     }
-}
+};
 
 // ── Live DOM helpers (no reload) ─────────────────────────────────────────
 
@@ -516,7 +517,7 @@ function prependCompletedHistoryRow(req) {
 // "Completed" mark गर्नु अघि GPS चाहिन्छ — HARD BLOCK. GPS नपाए backend सम्म
 // request नै पुग्दैन। GPS पाए, backend मा पुगेपछि pickup location सँग
 // compare भएर completion_flagged set हुन्छ (admin ले हेर्न पाउँछ)।
-async function updateStatus(requestId, newStatus, btn) {
+window.updateStatus = async function(requestId, newStatus, btn) {
     const busyLabel = newStatus === 'completed' ? 'Completing...' : 'Starting...';
     await withButtonBusy(eventButton(btn), busyLabel, async () => {
     let payload = { status: newStatus };
@@ -576,9 +577,9 @@ async function updateStatus(requestId, newStatus, btn) {
         showToast('Network error: ' + e.message, 'danger');
     }
     });
-}
+};
 
-async function toggleAvailability() {
+window.toggleAvailability = async function() {
     const driverId = {{ driver.id|default:'null' }};
     if (!driverId) return;
 
@@ -603,7 +604,7 @@ async function toggleAvailability() {
     } else {
         showToast('Failed to update availability.', 'danger');
     }
-}
+};
 
 /* ==========================================================
    ROUTE & REPORTS MAP
@@ -775,13 +776,13 @@ async function drawRoadFollowingLine(stopCoords) {
 
 let lastBoundsPoints = [];
 
-function centerMap() {
+window.centerMap = function() {
     if (!driverMap || lastBoundsPoints.length === 0) return;
     const allPoints = driverMarker ? lastBoundsPoints.concat([driverMarker.getLatLng()]) : lastBoundsPoints;
     driverMap.fitBounds(allPoints, { padding: [30, 30], maxZoom: 15 });
-}
+};
 
-async function loadMapData() {
+window.loadMapData = async function() {
     if (!driverMap) return;
 
     const [requestsData, routesData, checkpointsData] = await Promise.all([
@@ -887,7 +888,7 @@ async function loadMapData() {
             hasFittedBounds = true;
         }
     }
-}
+};
 
 const driverMapEl = document.getElementById('driver-map');
 if (driverMapEl && !driverMapEl.dataset._bound) {
@@ -900,5 +901,6 @@ if (driverMapEl && !driverMapEl.dataset._bound) {
 }
 {% endif %}
 
+})();
 </script>
 {% endblock %}

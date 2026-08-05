@@ -234,6 +234,7 @@
 
 {% block extra_js %}
 <script>
+(function() {
 // ---------- XSS escaping helper ----------
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -268,7 +269,7 @@ const STATUS_BADGE_CLASSES = {
 // ---------- Custom vehicle type toggle ----------
 // `context` is 'add' or 'edit'; `vehicleId` only applies to 'edit' (each
 // edit modal has its own select + text input, scoped by vehicle id).
-function toggleCustomType(context, vehicleId) {
+window.toggleCustomType = function(context, vehicleId) {
     const selectId = context === 'add' ? 'add-type' : `edit-type-${vehicleId}`;
     const customInputId = context === 'add' ? 'add-type-custom' : `edit-type-custom-${vehicleId}`;
 
@@ -282,7 +283,7 @@ function toggleCustomType(context, vehicleId) {
         customInput.classList.add('d-none');
         customInput.value = '';
     }
-}
+};
 
 // Resolves the actual vehicle_type string to submit: if "+ Add New Type..."
 // is selected, use the typed custom value instead of the sentinel.
@@ -321,7 +322,7 @@ function checkEmptyState() {
 }
 
 // ---------- UPDATE (edit) — live cell refresh, no reload ----------
-async function updateVehicle(vehicleId, btn) {
+window.updateVehicle = async function(vehicleId, btn) {
     const vehicleType = resolveVehicleType('edit', vehicleId);
 
     if (!vehicleType) {
@@ -377,10 +378,10 @@ async function updateVehicle(vehicleId, btn) {
         showToast('Update failed.', 'danger');
     }
     });
-}
+};
 
 // ---------- DELETE — reliable fetch status check + instant DOM row removal ----------
-async function deleteVehicle(vehicleId, btn) {
+window.deleteVehicle = async function(vehicleId, btn) {
     if (!confirm('Delete this vehicle? This cannot be undone.')) return;
 
     await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
@@ -416,10 +417,10 @@ async function deleteVehicle(vehicleId, btn) {
         showToast('Network error: ' + e.message, 'danger');
     }
     });
-}
+};
 
 // ---------- ADD — insert new row live, no reload ----------
-async function addVehicle(btn) {
+window.addVehicle = async function(btn) {
     const vehicleType = resolveVehicleType('add');
 
     if (!vehicleType) {
@@ -510,6 +511,7 @@ async function addVehicle(btn) {
         showToast('Failed to add vehicle.', 'danger');
     }
     });
-}
+};
+})();
 </script>
 {% endblock %}
