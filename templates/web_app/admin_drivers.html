@@ -953,14 +953,11 @@
         }
     }
 
-    if (!document.body.dataset._bound) {
-        document.addEventListener('hide.bs.modal', function (e) {
-            if (document.activeElement) {
-                document.activeElement.blur();
-            }
-        }, true);
-        document.body.dataset._bound = '1';
-    }
+    document.addEventListener('hide.bs.modal', function (e) {
+        if (document.activeElement) {
+            document.activeElement.blur();
+        }
+    }, true);
 })();
 </script>
 {% endblock %}
