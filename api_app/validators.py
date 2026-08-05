@@ -1,12 +1,25 @@
 import io
 import magic
 from PIL import Image, UnidentifiedImageError
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.template.defaultfilters import filesizeformat
 
-MAX_IMAGE_SIZE = 5 * 1024 * 1024   # 5 MB
-MAX_PDF_SIZE = 5 * 1024 * 1024     # 5 MB
+# Single source of truth for the per-photo size cap — settings.py sets
+# MAX_PHOTO_SIZE and also derives DATA_UPLOAD_MAX_MEMORY_SIZE /
+# FILE_UPLOAD_MAX_MEMORY_SIZE from it, so the request-body cap and the
+# per-file cap can no longer drift apart the way they did before (5MB
+# per-photo vs. a 5MB whole-request cap meant 2+ photos were always
+# rejected before this validator ever ran).
+MAX_IMAGE_SIZE = getattr(settings, 'MAX_PHOTO_SIZE', 3 * 1024 * 1024)
+MAX_PDF_SIZE = 5 * 1024 * 1024     # 5 MB — unrelated to photo uploads, left as-is
+
+# Resize/re-encode target for compress_image(). 1600px longest side is
+# plenty for map markers, list thumbnails, and full-detail view — well
+# above what any of those UI surfaces actually render at.
+MAX_IMAGE_DIMENSION = 1600
+COMPRESS_JPEG_QUALITY = 82
 
 # Real MIME (sniffed from bytes) -> the Pillow format string(s) it must match.
 ALLOWED_IMAGE_MIME_TO_PIL_FORMAT = {
@@ -120,3 +133,54 @@ def sanitize_image(uploaded_file, quality=88):
 
     original_name = getattr(uploaded_file, 'name', 'upload')
     return ContentFile(buffer.read(), name=original_name)
+
+
+def compress_image(uploaded_file, max_dimension=MAX_IMAGE_DIMENSION, quality=COMPRESS_JPEG_QUALITY):
+    """
+    Resize (if needed) and re-encode an image for storage, so a raw 3-5MB
+    phone JPEG isn't saved and then served at full size to every map
+    marker and list thumbnail.
+
+    Call this AFTER sanitize_image() — the input here should already be a
+    clean, re-encoded copy, so this only needs to handle resizing/
+    re-compression, not defending against malformed input.
+
+    Images with an alpha channel (RGBA/LA/P) are kept as PNG to preserve
+    transparency; everything else is re-encoded as JPEG for predictable,
+    smaller file sizes.
+
+    Note: like sanitize_image(), re-encoding here does not preserve EXIF
+    (including GPS tags). That's fine for this project specifically —
+    the frontend already extracts photo GPS client-side before upload and
+    sends it separately as photo_latitude/photo_longitude (or the
+    per-extra-photo equivalents), so nothing downstream reads EXIF GPS
+    off the stored file.
+    """
+    uploaded_file.seek(0)
+    img = Image.open(uploaded_file)
+    img.load()
+
+    is_alpha = img.mode in ('RGBA', 'LA', 'P')
+    out_format = 'PNG' if is_alpha else 'JPEG'
+
+    if out_format == 'JPEG' and img.mode != 'RGB':
+        img = img.convert('RGB')
+
+    width, height = img.size
+    if max(width, height) > max_dimension:
+        scale = max_dimension / float(max(width, height))
+        new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
+        img = img.resize(new_size, Image.LANCZOS)
+
+    buffer = io.BytesIO()
+    save_kwargs = {'format': out_format, 'optimize': True}
+    if out_format == 'JPEG':
+        save_kwargs['quality'] = quality
+    img.save(buffer, **save_kwargs)
+    buffer.seek(0)
+
+    original_name = getattr(uploaded_file, 'name', 'upload')
+    base_name = original_name.rsplit('.', 1)[0] if '.' in original_name else original_name
+    ext = 'jpg' if out_format == 'JPEG' else 'png'
+
+    return ContentFile(buffer.read(), name=f'{base_name}.{ext}')

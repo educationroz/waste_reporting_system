@@ -1,11 +1,10 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers # type: ignore
-
+from .validators import validate_image_file, validate_pdf_file, sanitize_image, compress_image
 from .models import (
     AdminLog, Bin, Checkpoint, Driver, Notification, Route, Schedule,
     SystemSettings, Vehicle, VehicleType, WasteRequest, WasteRequestPhoto, Complaint,
 )
-from .validators import validate_image_file, validate_pdf_file, sanitize_image
 
 User = get_user_model()
 
@@ -142,9 +141,11 @@ class WasteRequestSerializer(serializers.ModelSerializer):
           2. sanitize_image — fully decodes and re-encodes the image from
              scratch, stripping any bytes appended after the real image
              data (the classic "valid JPEG + payload glued on" polyglot
-             trick). The ML model and the eventual saved file both use
-             this clean copy, never the original upload.
+             trick). The ML model reads this clean copy, never the
+             original upload.
           3. Run the ML gatekeeper on the sanitized copy.
+          4. compress_image — resize/re-encode for storage, AFTER the ML
+             check has passed, so the classifier always sees full quality.
         """
         if not file:
             return file
@@ -154,7 +155,7 @@ class WasteRequestSerializer(serializers.ModelSerializer):
 
         from ml_models.waste_classifier.inference import predict_waste
         result = predict_waste(clean_file)
-        clean_file.seek(0)  # PIL/model read the file — reset pointer before Django saves it
+        clean_file.seek(0)  # PIL/model read the file — reset pointer before compressing
 
         if not result['is_waste']:
             raise serializers.ValidationError(
@@ -164,7 +165,9 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         # Stash the ML result so validate() can attach it to validated_data below
         self._ml_result = result
 
-        return clean_file
+        clean_file.seek(0)
+        compressed_file = compress_image(clean_file)  # shrink for storage, ML already ran
+        return compressed_file
 
     def validate(self, data):
         """Validate latitude/longitude are within valid ranges, and attach ML result."""
@@ -320,9 +323,15 @@ class ComplaintSerializer(serializers.ModelSerializer):
         }
 
     def validate_photo(self, file):
-        """Same defence-in-depth pipeline as WasteRequestSerializer.validate_photo,
-        minus the ML gatekeeper step (complaints don't get auto-classified)."""
+        """
+        Same defence-in-depth pipeline as WasteRequestSerializer.validate_photo,
+        minus the ML gatekeeper step (complaints don't get auto-classified).
+        Still compressed before storage for the same reason — complaint
+        photos come from the same phone cameras and hit the same map/list
+        display surfaces as waste-request photos.
+        """
         if not file:
             return file
         validate_image_file(file)
-        return sanitize_image(file)
+        clean_file = sanitize_image(file)
+        return compress_image(clean_file)

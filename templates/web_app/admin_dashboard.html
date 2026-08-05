@@ -82,7 +82,7 @@
                     <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-grid-1x2-fill text-success me-2"></i>Admin Management Console</h2>
                     <p class="text-muted mb-0">
                         Active Session: <span class="fw-semibold text-dark">{{ request.user.username }}</span>
-                        <span class="badge bg-success bg-opacity-10 text-success ms-2 text-uppercase font-monospace" style="font-size: 0.75rem;">{{ request.user.role|title }}</span>
+                        <span class="badge bg-success bg-opacity-10 text-success ms-2 text-uppercase font-monospace" style="font-size: 0.75rem;">{{ admin_role }}</span>
                     </p>
                 </div>
                 <div class="text-md-end bg-white p-2 px-3 border rounded-3 shadow-xs">

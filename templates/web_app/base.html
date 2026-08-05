@@ -618,86 +618,32 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function refreshNotifBadge() {
-    const badge = document.getElementById('notif-badge');
-    if (!getToken() || !badge) return;
-    API.get('/api/notifications/unread/').then(data => {
-        if (!data) return; // apiFetch already handled 401/refresh/logout
-        let count = 0;
-        if (Array.isArray(data)) {
-            count = data.filter(n => n.is_read === false).length;
-        } else if (data.unread_count !== undefined) {
-            count = parseInt(data.unread_count);
-        } else if (data.count !== undefined) {
-            count = parseInt(data.count);
-        }
-        if (count > 0) {
-            badge.classList.remove('d-none');
-            badge.textContent = count;
-        } else {
-            badge.classList.add('d-none');
-            badge.textContent = '';
-        }
-    }).catch((e) => console.error('Failed to refresh notification badge:', e));
-}
-
-function refreshRecycleBinBadge() {
-    const binBadge = document.getElementById('recycle-bin-badge');
-    if (!getToken() || !binBadge) return;
-    API.get('/api/waste-requests/recycle_bin/').then(data => {
-        if (!data) return;
-        let count = 0;
-        if (Array.isArray(data)) {
-            count = data.length;
-        } else if (data.count !== undefined) {
-            count = parseInt(data.count);
-        } else if (data.results !== undefined) {
-            count = data.results.length;
-        }
-        if (count > 0) {
-            binBadge.classList.remove('d-none');
-            binBadge.textContent = count;
-        } else {
-            binBadge.classList.add('d-none');
-            binBadge.textContent = '';
-        }
-    }).catch((e) => console.error('Failed to refresh recycle bin badge:', e));
-}
-
-function refreshComplaintsBadge() {
-    const complaintsBadge = document.getElementById('complaints-badge');
-    if (!getToken() || !complaintsBadge) return;
-    API.get('/api/complaints/?status=pending').then(data => {
-        if (!data) return;
-        let count = 0;
-        if (Array.isArray(data)) {
-            count = data.length;
-        } else if (data.count !== undefined) {
-            count = parseInt(data.count);
-        } else if (data.results !== undefined) {
-            count = data.results.length;
-        }
-        if (count > 0) {
-            complaintsBadge.classList.remove('d-none');
-            complaintsBadge.textContent = count;
-        } else {
-            complaintsBadge.classList.add('d-none');
-            complaintsBadge.textContent = '';
-        }
-    }).catch((e) => console.error('Failed to refresh complaints badge:', e));
-}
-
-    function refreshComplaintsBadge() {
-        const token = getToken();
-        const complaintsBadge = document.getElementById('complaints-badge');
-        if (!token || !complaintsBadge) return;
-        fetch('/api/complaints/?status=pending', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
+        const badge = document.getElementById('notif-badge');
+        if (!getToken() || !badge) return;
+        API.get('/api/notifications/unread/').then(data => {
+            if (!data) return; // apiFetch already handled 401/refresh/logout
+            let count = 0;
+            if (Array.isArray(data)) {
+                count = data.filter(n => n.is_read === false).length;
+            } else if (data.unread_count !== undefined) {
+                count = parseInt(data.unread_count);
+            } else if (data.count !== undefined) {
+                count = parseInt(data.count);
             }
-        })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
+            if (count > 0) {
+                badge.classList.remove('d-none');
+                badge.textContent = count;
+            } else {
+                badge.classList.add('d-none');
+                badge.textContent = '';
+            }
+        }).catch((e) => console.error('Failed to refresh notification badge:', e));
+    }
+
+    function refreshRecycleBinBadge() {
+        const binBadge = document.getElementById('recycle-bin-badge');
+        if (!getToken() || !binBadge) return;
+        API.get('/api/waste-requests/recycle_bin/').then(data => {
             if (!data) return;
             let count = 0;
             if (Array.isArray(data)) {
@@ -707,7 +653,37 @@ function refreshComplaintsBadge() {
             } else if (data.results !== undefined) {
                 count = data.results.length;
             }
+            if (count > 0) {
+                binBadge.classList.remove('d-none');
+                binBadge.textContent = count;
+            } else {
+                binBadge.classList.add('d-none');
+                binBadge.textContent = '';
+            }
+        }).catch((e) => console.error('Failed to refresh recycle bin badge:', e));
+    }
 
+    // NOTE: previously this function was defined twice in this file. The
+    // duplicate (a plain `fetch()` call with no 401/refresh handling)
+    // silently overrode this one and was the active implementation — any
+    // request that hit an expired access token failed closed with no error,
+    // which is why the badge would sometimes stop updating. Removed the
+    // duplicate; this is the only definition now, and it goes through
+    // API.get so an expired token gets refreshed and retried like every
+    // other badge call.
+    function refreshComplaintsBadge() {
+        const complaintsBadge = document.getElementById('complaints-badge');
+        if (!getToken() || !complaintsBadge) return;
+        API.get('/api/complaints/?status=pending').then(data => {
+            if (!data) return;
+            let count = 0;
+            if (Array.isArray(data)) {
+                count = data.length;
+            } else if (data.count !== undefined) {
+                count = parseInt(data.count);
+            } else if (data.results !== undefined) {
+                count = data.results.length;
+            }
             if (count > 0) {
                 complaintsBadge.classList.remove('d-none');
                 complaintsBadge.textContent = count;
@@ -715,10 +691,7 @@ function refreshComplaintsBadge() {
                 complaintsBadge.classList.add('d-none');
                 complaintsBadge.textContent = '';
             }
-        })
-        .catch((e) => {
-            console.error('Failed to refresh complaints badge:', e);
-        });
+        }).catch((e) => console.error('Failed to refresh complaints badge:', e));
     }
 
     async function connectNotifSocket() {
