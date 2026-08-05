@@ -21,6 +21,7 @@ from rest_framework.decorators import action # type: ignore
 from rest_framework.permissions import AllowAny, IsAuthenticated # type: ignore
 from rest_framework.response import Response # type: ignore
 from rest_framework.views import APIView
+
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser # type: ignore
 from .models import (
     AdminLog, Bin, Checkpoint, Complaint, Driver, Notification, Route, Schedule,
@@ -349,10 +350,26 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
         if not uploaded_name.endswith('.json'):
             return Response({'error': 'Only .json backup files are supported.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        with tempfile.TemporaryDirectory(prefix='restore_upload_') as tmp_dir:
-            safe_name = os.path.basename(uploaded_file.name) or 'upload.json'
-            staged_path = Path(tmp_dir) / safe_name
-
+        # BUG FIX (T3.1): this used to stage the file, run its OWN manual
+        # flush()+loaddata() right here with no safety net, THEN call
+        # restore_backup(backup_path) below — except `backup_path` was never
+        # defined anywhere in this method (only `staged_path` was), so any
+        # real restore attempt crashed with NameError right after the manual
+        # flush had already wiped the DB. On top of the crash, running
+        # flush/loaddata twice (once unsafely here, once safely inside
+        # restore_backup) made no sense — restore_backup() already does
+        # verify -> safety-snapshot -> flush -> loaddata -> auto-recovery
+        # on its own, so that's the ONLY place this should happen.
+        #
+        # Fix: stage + verify the upload here (cheap, safe to do outside the
+        # destructive path), then hand the staged path to restore_backup()
+        # and let IT own flush/loaddata + the safety net. The temp dir is
+        # kept alive (via tempfile.mkdtemp, cleaned up in `finally`) instead
+        # of `with ... as tmp_dir:` because restore_backup() needs the file
+        # to still exist on disk after we've validated it.
+        tmp_dir = tempfile.mkdtemp(prefix='restore_upload_')
+        try:
+            staged_path = Path(tmp_dir) / (uploaded_name or 'upload.json')
             with staged_path.open('wb') as staged_file:
                 for chunk in uploaded_file.chunks():
                     staged_file.write(chunk)
@@ -366,53 +383,53 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
                 )
 
             try:
-                with transaction.atomic():
-                    call_command('flush', interactive=False, verbosity=0)
-                    call_command('loaddata', str(staged_path), verbosity=0)
-            except Exception as exc:
-                return Response({'error': f'Restore failed: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                # restore_backup() calls verify_backup_file() again as its
+                # very first step — flush/loaddata never runs against an
+                # unverified file. It also auto-snapshots current state
+                # first and attempts auto-recovery if loaddata fails partway
+                # through.
+                result = restore_backup(staged_path)
+            except BackupError as exc:
+                msg = str(exc)
+                backup_logger.exception(
+                    'Restore failed for %r requested by %s: %s',
+                    uploaded_file.name, request.user.username, msg,
+                )
 
-        try:
-            # restore_backup() calls verify_backup_file() as its very first
-            # step — flush/loaddata never runs against an unverified file.
-            # It also auto-snapshots current state first and attempts
-            # auto-recovery if loaddata fails partway through.
-            result = restore_backup(backup_path)
-        except BackupError as exc:
-            msg = str(exc)
-            backup_logger.exception('Restore failed for %r requested by %s: %s',
-                                     uploaded_file.name, request.user.username, msg)
-
-            # Pre-flush validation failures (bad JSON / not a fixture / empty
-            # file) are safe, curated messages — nothing was touched, so it's
-            # fine and helpful to show them directly.
-            if 'AUTOMATIC RECOVERY FAILED' in msg:
-                # Worst case: flush ran, loaddata failed, AND recovery of the
-                # pre-restore snapshot also failed. This is the one case
-                # where raw exception text must never reach the client, but
-                # the admin genuinely needs to know the DB may be empty.
-                return Response(
-                    {'error': 'Restore failed and automatic recovery of your previous data also '
-                              'failed. The database may be in an inconsistent state — contact a '
-                              'system administrator immediately. A safety backup was taken before '
-                              'this restore and is available in the backups directory; check server '
-                              'logs for its exact filename.'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-            if 'automatically recovered' in msg:
-                return Response(
-                    {'error': 'Restore failed, but your previous data was automatically recovered — '
-                              'no data was lost. Please verify the backup file and try again.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if msg.startswith('Could not create safety backup'):
-                return Response(
-                    {'error': 'Could not safely start the restore (a pre-restore snapshot could not '
-                              'be created), so nothing was changed. Please try again.'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-            # Pre-flush validation failure — safe to show verbatim.
-            return Response({'error': msg}, status=status.HTTP_400_BAD_REQUEST)
+                # Pre-flush validation failures (bad JSON / not a fixture /
+                # empty file) are safe, curated messages — nothing was
+                # touched, so it's fine and helpful to show them directly.
+                if 'AUTOMATIC RECOVERY FAILED' in msg:
+                    # Worst case: flush ran, loaddata failed, AND recovery of
+                    # the pre-restore snapshot also failed. This is the one
+                    # case where raw exception text must never reach the
+                    # client, but the admin genuinely needs to know the DB
+                    # may be empty.
+                    return Response(
+                        {'error': 'Restore failed and automatic recovery of your previous data also '
+                                  'failed. The database may be in an inconsistent state — contact a '
+                                  'system administrator immediately. A safety backup was taken before '
+                                  'this restore and is available in the backups directory; check server '
+                                  'logs for its exact filename.'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+                if 'automatically recovered' in msg:
+                    return Response(
+                        {'error': 'Restore failed, but your previous data was automatically recovered — '
+                                  'no data was lost. Please verify the backup file and try again.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if msg.startswith('Could not create safety backup'):
+                    return Response(
+                        {'error': 'Could not safely start the restore (a pre-restore snapshot could not '
+                                  'be created), so nothing was changed. Please try again.'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+                # Pre-flush validation failure — safe to show verbatim.
+                return Response({'error': msg}, status=status.HTTP_400_BAD_REQUEST)
+        finally:
+            import shutil
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
         # `flush` deletes every row (including the currently logged-in user's),
         # then `loaddata` reinserts everyone from the backup with fresh primary

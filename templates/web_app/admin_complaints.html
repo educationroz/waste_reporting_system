@@ -118,25 +118,35 @@
 <script>
 (function () {
     let allComplaints = [];
-    const reviewModalEl = document.getElementById('reviewModal');
 
+    // T2.3 FIX: this whole page (including #reviewModal) lives inside
+    // #content-app, which htmx REPLACES on every boosted navigation
+    // (hx-swap="outerHTML"). The old code grabbed reviewModalEl ONCE at
+    // script-parse time and bound hide.bs.modal to it once — after the
+    // first swap that node is detached from the DOM and the "new" modal
+    // on the page was never bound. Now we re-query + re-bind (guarded by
+    // dataset._bound so we don't double-bind) every time the modal is
+    // actually opened, so it always targets the live node.
     function getReviewModal() {
+        const el = document.getElementById('reviewModal');
+        if (!el) return null;
+
         if (typeof bootstrap === 'undefined') {
             console.error('Bootstrap JS failed to load — modal cannot open.');
             showToast('A page resource failed to load. Please refresh and try again.', 'danger');
             return null;
         }
-        return bootstrap.Modal.getOrCreateInstance(reviewModalEl);
-    }
 
-    // Focus issue handling when closing Bootstrap modal
-    if (reviewModalEl && !reviewModalEl.dataset._bound) {
-        reviewModalEl.addEventListener('hide.bs.modal', function () {
-            if (document.activeElement) {
-                document.activeElement.blur();
-            }
-        });
-        reviewModalEl.dataset._bound = '1';
+        if (!el.dataset._bound) {
+            el.addEventListener('hide.bs.modal', function () {
+                if (document.activeElement) {
+                    document.activeElement.blur();
+                }
+            });
+            el.dataset._bound = '1';
+        }
+
+        return bootstrap.Modal.getOrCreateInstance(el);
     }
 
     const statusBadge = s => ({
@@ -167,9 +177,11 @@
     }
 
     function renderComplaints() {
-        const filter = document.getElementById('status-filter').value;
+        const filterEl = document.getElementById('status-filter');
+        const filter = filterEl ? filterEl.value : '';
         const rows = allComplaints.filter(c => !filter || c.status === filter);
         const body = document.getElementById('complaint-table-body');
+        if (!body) return;
 
         if (!rows.length) {
             body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No complaints found.</td></tr>';
@@ -285,8 +297,12 @@
         });
     }
 
+    // T2.4 FIX: syncs the collapsed-sidebar dot too, same as base.html's
+    // refreshComplaintsBadge — otherwise the dot only ever reflected the
+    // count from the last full poll, not an instant local update.
     function adjustComplaintsBadge(delta) {
         const badge = document.getElementById('complaints-badge');
+        const dot = document.getElementById('complaints-badge-dot');
         if (!badge) return;
         const current = parseInt(badge.textContent || '0', 10) || 0;
         const updated = Math.max(0, current + delta);
@@ -294,9 +310,11 @@
         if (updated > 0) {
             badge.classList.remove('d-none');
             badge.textContent = updated;
+            if (dot) dot.classList.add('show');
         } else {
             badge.classList.add('d-none');
             badge.textContent = '';
+            if (dot) dot.classList.remove('show');
         }
     }
 
@@ -308,17 +326,22 @@
         loadComplaints();
     }
 
-    // ── Expose functions referenced by inline onclick="" attributes in the
-    // HTML above. Inline handlers resolve names against `window`, so anything
-    // called that way must be attached explicitly — everything else in this
-    // IIFE stays private and won't leak into global scope on repeat htmx swaps.
     window.renderComplaints = renderComplaints;
     window.openReview = openReview;
     window.submitReview = submitReview;
     window.deleteComplaint = deleteComplaint;
 
     document.addEventListener('DOMContentLoaded', bootstrapComplaintsPage);
-    document.body.addEventListener('htmx:afterSwap', bootstrapComplaintsPage);
+
+    // T2.5 FIX: this whole <script> block re-executes on every htmx swap
+    // (it's part of #content-app), so `document.body.addEventListener(...)`
+    // was previously called again on every visit to this page — body is
+    // never itself swapped, so listeners piled up (2nd visit = 2 loads,
+    // 3rd = 3 loads, etc). Guard on body so it's bound exactly once.
+    if (!document.body.dataset._complaintsSwapBound) {
+        document.body.addEventListener('htmx:afterSwap', bootstrapComplaintsPage);
+        document.body.dataset._complaintsSwapBound = '1';
+    }
 
     // On a hard refresh / direct load of this URL, this script executes
     // mid-parse, BEFORE the later <script> tags in base.html that define
