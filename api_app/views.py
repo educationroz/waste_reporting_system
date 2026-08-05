@@ -40,6 +40,7 @@ from .serializers import (
     WasteRequestSerializer,
     ComplaintSerializer,
 )
+from .validators import validate_image_file, sanitize_image, compress_image
 from .backup_utils import (
     BackupError,
     BACKUP_DIR as BACKUP_DIR_FOR_UPLOADS,
@@ -852,6 +853,25 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             qs = qs.filter(status=status_filter)
         return qs.order_by('-created_at')
 
+    def create(self, request, *args, **kwargs):
+        """
+        FIX: previously the 'extra_photos' loop in perform_create() had no
+        cap at all — a request could attach any number of extra photos,
+        each one an unvalidated, uncompressed file write. Reject an
+        excessive count here, BEFORE serializer.save() runs, so a bad
+        request doesn't create a WasteRequest row (and run ML inference
+        on the primary photo) only to be rejected afterwards anyway.
+        """
+        extra_files = request.FILES.getlist('extra_photos')
+        max_extra = getattr(settings, 'MAX_EXTRA_PHOTOS', 5)
+        if len(extra_files) > max_extra:
+            return Response(
+                {'error': f'Too many photos. Maximum {max_extra} additional photos '
+                          f'allowed (plus the 1 primary photo).'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         waste_request = serializer.save(user=user)
@@ -861,6 +881,16 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         # GPS chai frontend le 'extra_photos_latitude' / 'extra_photos_longitude'
         # array haru pathayo bhane (same index alignment), tyo pani save garne —
         # natra photo_latitude/longitude sabै NULL nai rahanchha.
+        #
+        # FIX: previously these went straight into WasteRequestPhoto.objects.create()
+        # completely unvalidated — no size cap, no MIME sniff, no polyglot
+        # stripping, no compression. Only the PRIMARY photo went through the
+        # serializer's validate_photo() pipeline. Now every extra photo runs
+        # through the same validate_image_file -> sanitize_image ->
+        # compress_image pipeline before being saved. A single bad extra
+        # photo is skipped rather than failing the whole request, since the
+        # WasteRequest row (and primary photo) have already been validated
+        # and committed by this point.
         extra_files = self.request.FILES.getlist('extra_photos')
         extra_lats = self.request.POST.getlist('extra_photos_latitude')
         extra_lngs = self.request.POST.getlist('extra_photos_longitude')
@@ -868,15 +898,27 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         for idx, photo_file in enumerate(extra_files):
             lat = extra_lats[idx] if idx < len(extra_lats) and extra_lats[idx] else None
             lng = extra_lngs[idx] if idx < len(extra_lngs) and extra_lngs[idx] else None
+
+            try:
+                validate_image_file(photo_file)
+                clean_file = sanitize_image(photo_file)
+                clean_file = compress_image(clean_file)
+            except Exception:
+                logger.warning(
+                    f'[EXTRA PHOTO SKIP] request={waste_request.id} idx={idx} '
+                    f'rejected during validation/sanitize/compress — skipping this photo only.'
+                )
+                continue
+
             WasteRequestPhoto.objects.create(
                 request=waste_request,
-                photo=photo_file,
+                photo=clean_file,
                 latitude=lat,
                 longitude=lng,
             )
 
         if user:
-            total_photos = len(extra_files) + (1 if waste_request.photo else 0)
+            total_photos = WasteRequestPhoto.objects.filter(request=waste_request).count() + (1 if waste_request.photo else 0)
             photo_note = f' with {total_photos} photo(s)' if total_photos else ''
             _log_admin_action(
                 self.request, 'create', 'WasteRequest', waste_request,
@@ -984,7 +1026,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def update_status(self, request, pk=None):
         """
-        PATCH /api/waste-requests/{id}/update_status/ — driver/admin updates request status.
+        PATCH /api/waste-requests/{id}/update_status/ — driver/admin updates status.
         Apawad (exception): request ko malik (owner) le aफnै 'pending' request lai
         'cancelled' ma matra move garna paaucha — home.html/user_requests.html ko
         "Cancel" button le yehi endpoint use garcha, tesैle purano role-check le
