@@ -83,9 +83,10 @@
 </style>
 
 <script>
+(function() {
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-async function doRegister() {
+window.doRegister = async function() {
     const errDiv = document.getElementById('error-alert');
     const sucDiv = document.getElementById('success-alert');
     const spinner = document.getElementById('reg-spinner');
@@ -152,7 +153,7 @@ async function doRegister() {
             text.textContent = 'Create Account';
         }
     }
-}
+};
 
 function getCookie(name) {
     let cookieValue = null;
@@ -197,6 +198,7 @@ function handlePasswordInput() {
         icon.style.display = 'none';
     }
 }
+window.handlePasswordInput = handlePasswordInput;
 
 function togglePassword() {
     const pwdInput = document.getElementById('password');
@@ -211,6 +213,7 @@ function togglePassword() {
         icon.classList.add('bi-eye');
     }
 }
+window.togglePassword = togglePassword;
 
 // दोस्रो (Confirm) Password फिल्डको लागि Eye Icon कन्ट्रोल
 function handlePassword2Input() {
@@ -222,6 +225,7 @@ function handlePassword2Input() {
         icon.style.display = 'none';
     }
 }
+window.handlePassword2Input = handlePassword2Input;
 
 function togglePassword2() {
     const pwdInput = document.getElementById('password2');
@@ -236,5 +240,7 @@ function togglePassword2() {
         icon.classList.add('bi-eye');
     }
 }
+window.togglePassword2 = togglePassword2;
+})();
 </script>
 {% endblock %}

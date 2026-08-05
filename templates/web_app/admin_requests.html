@@ -388,6 +388,7 @@
 
 {% block extra_js %}
 <script>
+(function() {
 const assignModalEl = document.getElementById('assignModal');
 
 function getAssignModal() {
@@ -416,13 +417,13 @@ const STATUS_LABELS = {
     assigned: 'Assigned',
 };
 
-function openAssignModal(requestId) {
+window.openAssignModal = function(requestId) {
     document.getElementById('modal-request-id').value = requestId;
     const modal = getAssignModal();
     if (modal) modal.show();
-}
+};
 
-async function assignDriver(btn) {
+window.assignDriver = async function(btn) {
     const requestId = document.getElementById('modal-request-id').value;
     const driverSelect = document.getElementById('modal-driver-select');
     const driverId = driverSelect.value;
@@ -449,9 +450,9 @@ async function assignDriver(btn) {
         showToast('Failed to patch driver assignment parameter.', 'danger');
     }
     });
-}
+};
 
-async function cancelRequest(requestId, btn) {
+window.cancelRequest = async function(requestId, btn) {
     if (!confirm('Are you absolutely sure you want to cancel this municipal request matrix?')) return;
     await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
     const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
@@ -467,9 +468,9 @@ async function cancelRequest(requestId, btn) {
         showToast('Failed to drop request pipeline node state.', 'danger');
     }
     });
-}
+};
 
-async function deleteRequest(requestId, btn) {
+window.deleteRequest = async function(requestId, btn) {
     if (!confirm("Are you sure you want to delete this request?")) return;
 
     await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
@@ -488,7 +489,7 @@ async function deleteRequest(requestId, btn) {
         showToast("Delete failed.", "danger");
     }
     });
-}
+};
 
 // ── Reload नगरी: status badge, driver cell, action cell, delete button live update ──
 function applyRequestRowUpdate(requestId, { statusKey, driverHtml, actionHtml, showDelete }) {
@@ -536,7 +537,7 @@ function getPhotoGalleryModal() {
     return bootstrap.Modal.getOrCreateInstance(photoGalleryModalEl);
 }
 
-function openPhotoGallery(requestId) {
+window.openPhotoGallery = function(requestId) {
     const dataDiv = document.getElementById(`photo-data-${requestId}`);
     if (!dataDiv) return;
 
@@ -566,6 +567,7 @@ function openPhotoGallery(requestId) {
 
     const modal = getPhotoGalleryModal();
     if (modal) modal.show();
-}
+};
+})();
 </script>
 {% endblock %}
