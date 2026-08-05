@@ -100,6 +100,14 @@ if DB_ENGINE == 'postgresql':
             'PASSWORD': config('DB_PASSWORD', default=''),
             'HOST': config('DB_HOST', default='localhost'),
             'PORT': config('DB_PORT', default='5432'),
+            # Reuse TCP connections across requests instead of opening a new
+            # one every request — a real cost once you're on Postgres over a
+            # network connection rather than local SQLite. 600s (10 min) is
+            # a safe default; if this ever sits behind pgbouncer in
+            # transaction-pooling mode, set this to 0 instead (pgbouncer
+            # manages pooling itself at that point).
+            'CONN_MAX_AGE': config('CONN_MAX_AGE', default=600, cast=int),
+            'CONN_HEALTH_CHECKS': True,  # validate a pooled connection before reuse
         }
     }
 else:  # SQLite (default for development)
@@ -255,9 +263,24 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # ─── File Upload Security ─────────────────────────────────────────────────────
-# Maximum size for file uploads (5MB)
-DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
+# Per-photo cap — validators.py's MAX_IMAGE_SIZE reads this value directly
+# (with a 3MB fallback if this setting is ever missing), so there is exactly
+# ONE number controlling "how big can one photo be", not two that can drift
+# out of sync.
+MAX_PHOTO_SIZE = 3 * 1024 * 1024          # 3MB per individual photo
+
+# Hard server-side cap on how many 'extra_photos' a single WasteRequest can
+# attach — views.py's WasteRequestViewSet.create() rejects anything over
+# this BEFORE the request is processed or any ML inference runs.
+MAX_EXTRA_PHOTOS = 5
+
+# Reconciled against MAX_PHOTO_SIZE above: previously this was 5MB total
+# while each photo was independently allowed up to 5MB, so 2+ photos in one
+# request were always rejected by Django before any validator ever ran.
+# 20MB gives headroom for 1 primary + MAX_EXTRA_PHOTOS additional photos at
+# MAX_PHOTO_SIZE each, plus the rest of the multipart form fields.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024   # 20MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
 FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

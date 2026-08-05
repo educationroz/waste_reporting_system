@@ -319,6 +319,23 @@
 
     document.addEventListener('DOMContentLoaded', bootstrapComplaintsPage);
     document.body.addEventListener('htmx:afterSwap', bootstrapComplaintsPage);
+
+    // On a hard refresh / direct load of this URL, this script executes
+    // mid-parse, BEFORE the later <script> tags in base.html that define
+    // `API` and `showToast` have run — calling bootstrapComplaintsPage()
+    // immediately in that case throws ReferenceError. document.readyState
+    // is still 'loading' at that point, so we skip the immediate call and
+    // let the DOMContentLoaded listener above fire once the whole document,
+    // including those later scripts, has finished.
+    //
+    // On an htmx swap (navigating here from another admin page), the initial
+    // document load is long done — DOMContentLoaded already fired and won't
+    // fire again — so readyState is 'complete', API/showToast already exist,
+    // and it's safe to call bootstrapComplaintsPage() right here to load
+    // the table for this swap.
+    if (document.readyState !== 'loading') {
+        bootstrapComplaintsPage();
+    }
 })();
 </script>
 {% endblock %}
