@@ -646,10 +646,26 @@ let requestMarkersLayer = null;
 let checkpointsLayer = null;
 let hasFittedBounds = false; // only auto-fit the view once, on first load
 let lastBoundsPoints = [];
+let mapRefreshIntervalId = null; // FIX: track the interval so it can actually be cleared
 
 if (!document.body.dataset._leafletCleanupBound) {
     document.body.addEventListener('htmx:beforeSwap', () => {
+        // FIX: previously the 30s setInterval kept running forever after an
+        // htmx page swap, because nothing ever called clearInterval() on it.
+        // The stale interval kept calling loadMapData() against DOM elements
+        // (#map-route-info, #map-empty-note) that no longer existed on the
+        // new page, causing "Cannot set properties of null" crashes.
+        if (mapRefreshIntervalId) {
+            clearInterval(mapRefreshIntervalId);
+            mapRefreshIntervalId = null;
+        }
         if (driverMap) {
+            // FIX: if fitBounds' zoom/pan animation is still mid-flight when
+            // htmx swaps the page, its transitionend handler can fire after
+            // this map (and its renderer) is torn down — that's what caused
+            // the uncaught Bounds.js crash right after sidebar navigation.
+            // stop() cancels any in-progress animation immediately.
+            try { driverMap.stop(); } catch (e) {}
             driverMap.remove();
             driverMap = null;
         }
@@ -716,8 +732,42 @@ function initDriverMap() {
         updateDriverMarker(INITIAL_DRIVER_LAT, INITIAL_DRIVER_LNG);
     }
 
-    loadMapData();
-    setInterval(loadMapData, 30000); // fallback auto-refresh every 30s
+    // FIX: force the renderer through an _update() cycle before we ever
+    // touch it — invalidateSize() + setView() (same zoom/center) makes
+    // Leaflet recompute and populate renderer._bounds.min/max, which is
+    // what whenRendererReady() now actually checks for below.
+    driverMap.whenReady(() => {
+        driverMap.invalidateSize();
+        driverMap.setView(driverMap.getCenter(), driverMap.getZoom(), { animate: false });
+
+        whenRendererReady(() => {
+            loadMapData();
+            mapRefreshIntervalId = setInterval(loadMapData, 30000);
+        });
+    });
+}
+
+// FIX: instead of guessing with a fixed number of animation frames, this
+// polls Leaflet's actual internal readiness signal (_renderer._bounds)
+// before doing anything that touches SVG paths (adding CircleMarkers,
+// calling fitBounds). This is what finally makes the "reading 'x'" issue
+// go away instead of just catching it after the fact — we simply never
+// call into Leaflet's path/bounds code before it's genuinely ready.
+function whenRendererReady(callback, attempt) {
+    attempt = attempt || 0;
+    const renderer = driverMap && driverMap._renderer;
+    // FIX: renderer._bounds is truthy the instant the renderer object is
+    // created (it's an empty Bounds() by default), so the old check
+    // (`renderer && renderer._bounds`) passed before .min/.max were ever
+    // populated — the first marker added (e.g. request #52) then crashed
+    // inside Bounds.intersects() reading undefined.min.x. Now we wait for
+    // .min AND .max to actually exist (populated by a real _update() cycle).
+    const ready = renderer && renderer._bounds && renderer._bounds.min && renderer._bounds.max;
+    if (ready || attempt > 20) {
+        callback();
+        return;
+    }
+    requestAnimationFrame(() => whenRendererReady(callback, attempt + 1));
 }
 
 function updateDriverMarker(lat, lng) {
@@ -745,7 +795,19 @@ function pickCoords(req) {
     const lng = Number(req.longitude ?? req.photo_longitude);
 
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        console.error("Invalid request:", req);
+        console.error("Invalid request (non-numeric coords):", req.id);
+        return null;
+    }
+
+    // Reject null-island / obviously bogus coords
+    if (lat === 0 && lng === 0) {
+        console.error("Invalid request (0,0 coords):", req.id);
+        return null;
+    }
+
+    // Sanity range check (Nepal-ish box, adjust if needed)
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        console.error("Invalid request (out of range coords):", req.id);
         return null;
     }
 
@@ -772,12 +834,16 @@ async function drawRoadFollowingLine(stopCoords) {
 
     const lineCoords = roadCoords || orderedPoints;
 
-    routeLine = L.polyline(lineCoords, {
-        color: '#198754',
-        weight: 4,
-        opacity: 0.85,
-        ...(roadCoords ? {} : { dashArray: '8,8' }),
-    }).addTo(driverMap);
+    try {
+        routeLine = L.polyline(lineCoords, {
+            color: '#198754',
+            weight: 4,
+            opacity: 0.85,
+            ...(roadCoords ? {} : { dashArray: '8,8' }),
+        }).addTo(driverMap);
+    } catch (err) {
+        console.warn('Failed to draw route line:', err);
+    }
 }
 
 window.centerMap = function() {
@@ -799,21 +865,38 @@ window.centerMap = function() {
     );
 
     if (validPoints.length > 0) {
-        driverMap.fitBounds(validPoints, {
-            padding: [30, 30],
-            maxZoom: 15
+        whenRendererReady(() => {
+            try {
+                driverMap.invalidateSize();
+                driverMap.fitBounds(validPoints, {
+                    padding: [30, 30],
+                    maxZoom: 15,
+                    animate: false
+                });
+            } catch (err) {
+                console.warn('centerMap fitBounds failed:', err, validPoints);
+            }
         });
     }
 };
 
 window.loadMapData = async function() {
-    if (!driverMap) return;
+    // FIX: bail out if the map or its layers no longer exist — covers the
+    // case where this call was already in flight (awaiting the API calls
+    // below) when htmx swapped the page out from under it.
+    if (!driverMap || !requestMarkersLayer || !checkpointsLayer) return;
 
     const [requestsData, routesData, checkpointsData] = await Promise.all([
         API.get('/api/waste-requests/'),
         API.get('/api/routes/'),
         API.get('/api/checkpoints/'),
     ]);
+
+    // FIX: re-check after the await — if htmx swapped the page while these
+    // three API calls were in flight, driverMap/its layers may have been
+    // torn down in the meantime. Bail out quietly instead of touching
+    // removed Leaflet objects or a detached DOM.
+    if (!driverMap || !requestMarkersLayer || !checkpointsLayer) return;
 
     const allRequests = extractList(requestsData);
     const routes = extractList(routesData);
@@ -841,20 +924,34 @@ window.loadMapData = async function() {
         boundsPoints.push(coords);
 
         const color = STATUS_COLORS[req.status] || '#6c757d';
-        const marker = L.circleMarker(coords, {
-            radius: 8,
-            color: color,
-            fillColor: color,
-            fillOpacity: 0.85,
-            weight: 2,
+
+        // FIX: switched from L.circleMarker (SVG Path renderer) to
+        // L.marker + L.divIcon (plain HTML/CSS dot). circleMarker crashed
+        // because Leaflet's SVG renderer has a well-known internal race
+        // condition around _pxBounds readiness that no amount of "wait for
+        // renderer" polling fully closes. divIcon markers are plain HTML
+        // elements positioned with CSS transforms — they never touch the
+        // SVG Path/Bounds code at all, so this class of crash is impossible.
+        const dotIcon = L.divIcon({
+            className: '',
+            html: `<div style="width:16px;height:16px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div>`,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8],
         });
+
+        const marker = L.marker(coords, { icon: dotIcon });
 
         marker.bindPopup(`
             <strong>#${req.id} — ${escapeHtml(req.status_display || req.status)}</strong><br>
             ${req.pickup_address ? escapeHtml(req.pickup_address) : 'No address given'}<br>
             <span class="text-muted">${escapeHtml(req.waste_type_display || req.waste_type || '')}</span>
         `);
-        marker.addTo(requestMarkersLayer);
+
+        try {
+            marker.addTo(requestMarkersLayer);
+        } catch (err) {
+            console.warn('Failed to add marker for request', req.id, err);
+        }
     });
 
     checkpoints.forEach(cp => {
@@ -877,7 +974,12 @@ window.loadMapData = async function() {
             ${cp.description ? escapeHtml(cp.description) : 'Designated checkpoint'}
             ${cp.status ? `<br><span class="text-muted">${escapeHtml(cp.status)}</span>` : ''}
         `);
-        marker.addTo(checkpointsLayer);
+
+        try {
+            marker.addTo(checkpointsLayer);
+        } catch (err) {
+            console.warn('Failed to add checkpoint marker', cp.id, err);
+        }
     });
 
     const myRoutes = routes.filter(r => r.status === 'active')
@@ -885,6 +987,12 @@ window.loadMapData = async function() {
         .sort((a, b) => (b.id || 0) - (a.id || 0));
     const currentRoute = myRoutes[0];
 
+    // FIX: guard against these elements being gone — if the interval fires
+    // after the page has already been swapped out by htmx (a stale timer
+    // that slipped through before cleanup, or any other detached-DOM edge
+    // case), getElementById returns null and setting .textContent on it
+    // used to throw an uncaught "Cannot set properties of null" that killed
+    // the rest of this function.
     const infoEl = document.getElementById('map-route-info');
     if (currentRoute) {
         const stopCoords = (currentRoute.waste_request_ids || [])
@@ -895,20 +1003,35 @@ window.loadMapData = async function() {
             await drawRoadFollowingLine(stopCoords);
         }
 
-        infoEl.textContent = `Route #${currentRoute.id} (${currentRoute.status_display || currentRoute.status}) — ${currentRoute.total_distance_km ? currentRoute.total_distance_km + ' km' : ''}`;
-    } else {
+        if (infoEl) {
+            infoEl.textContent = `Route #${currentRoute.id} (${currentRoute.status_display || currentRoute.status}) — ${currentRoute.total_distance_km ? currentRoute.total_distance_km + ' km' : ''}`;
+        }
+    } else if (infoEl) {
         infoEl.textContent = 'No active route assigned yet';
     }
 
     const emptyNote = document.getElementById('map-empty-note');
     lastBoundsPoints = boundsPoints;
     if (boundsPoints.length === 0) {
-        emptyNote.classList.remove('d-none');
+        if (emptyNote) emptyNote.classList.remove('d-none');
     } else {
-        emptyNote.classList.add('d-none');
+        if (emptyNote) emptyNote.classList.add('d-none');
         if (!hasFittedBounds) {
             const allPoints = driverMarker ? boundsPoints.concat([driverMarker.getLatLng()]) : boundsPoints;
-            driverMap.fitBounds(allPoints, { padding: [30, 30], maxZoom: 15 });
+            const validPoints = allPoints.filter(p =>
+                Array.isArray(p) ? (Number.isFinite(p[0]) && Number.isFinite(p[1]))
+                : (p && Number.isFinite(p.lat) && Number.isFinite(p.lng))
+            );
+            if (validPoints.length > 0) {
+                whenRendererReady(() => {
+                    try {
+                        driverMap.invalidateSize();
+                        driverMap.fitBounds(validPoints, { padding: [30, 30], maxZoom: 15, animate: false });
+                    } catch (err) {
+                        console.warn('fitBounds crashed, skipping:', err, validPoints);
+                    }
+                });
+            }
             hasFittedBounds = true;
         }
     }

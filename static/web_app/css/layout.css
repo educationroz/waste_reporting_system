@@ -1,4 +1,4 @@
-    /* ── Layout Outer Wrapper ────────────────────────────── */
+/* ── Layout Outer Wrapper ────────────────────────────── */
     .layout-wrapper {
         display: flex;
         align-items: stretch;
@@ -94,6 +94,14 @@
 
     .sidebar-logo-text { white-space: nowrap; }
 
+    /* FIX: nav-link had no explicit color in its default (non-active,
+       non-hover) state, so it fell back to Bootstrap's built-in link
+       color (a hardcoded blue) instead of following the theme. This
+       happened to look okay in light mode by coincidence, but in dark
+       mode the text stayed that same hardcoded blue instead of switching
+       to the light theme text color — causing the illegible/mismatched
+       sidebar text. Added color: var(--text-primary) here so it now
+       follows the theme in both modes. */
     .sidebar-card .nav-link {
         display: flex;
         align-items: center;
@@ -105,14 +113,20 @@
         text-decoration: none;
         width: 100%;
         white-space: nowrap;
+        color: var(--text-primary, #1f2937) !important;
     }
 
+    /* FIX: icons inside nav-link inherited the same hardcoded Bootstrap
+       blue for the same reason — now uses the muted theme variable so
+       icons stay visually secondary to the text in both light and dark
+       mode, and switch correctly with theme toggle. */
     .sidebar-card .nav-link i {
         font-size: 1.15rem;
         margin-right: 0.75rem;
         min-width: 24px;
         text-align: center;
         flex-shrink: 0;
+        color: var(--text-muted, #6c757d);
     }
 
     .sidebar-card .nav-link.active {
