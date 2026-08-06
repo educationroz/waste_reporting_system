@@ -113,6 +113,7 @@
         text-decoration: none;
         width: 100%;
         white-space: nowrap;
+        color: var(--text-primary, #1f2937) !important;
     }
 
     /* FIX: icons inside nav-link inherited the same hardcoded Bootstrap
