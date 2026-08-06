@@ -297,4 +297,17 @@
         .layout-wrapper.mobile-open ~ .sidebar-backdrop {
             display: block !important;
         }
+
+        /* Content area was using the same 1.5rem padding as desktop,
+           eating too much of the small screen's width/height. Tighter
+           padding on mobile only — desktop (>=768px) is untouched. */
+        .content-col {
+            padding: 1rem 0.75rem;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .content-col {
+            padding: 0.85rem 0.6rem;
+        }
     }
