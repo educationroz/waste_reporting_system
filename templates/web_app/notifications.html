@@ -12,9 +12,8 @@
     .notif-card {
         border: none;
         border-radius: 14px;
-        box-shadow: 0 4px 16px var(--shadow-color);
-        background: var(--bg-card);
-        color: var(--text-body);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+        background: #ffffff;
         overflow: hidden;
     }
 
@@ -22,115 +21,26 @@
         padding: 1.25rem 1.5rem;
         border-left: 4px solid transparent;
         transition: all 0.2s ease;
-        background: var(--bg-card);
-        color: var(--text-body);
     }
 
     .notif-item.unread-style {
-        background-color: rgba(25, 135, 84, 0.08) !important;
+        background-color: #f4faf6 !important;
         border-left-color: #198754;
         cursor: pointer;
     }
 
     .notif-item.unread-style:hover {
-        background-color: rgba(25, 135, 84, 0.14) !important;
+        background-color: #e9f7ef !important;
     }
 
     .page-link {
         color: #198754;
-        background-color: var(--bg-card);
-        border-color: var(--border-color);
     }
     .page-item.active .page-link {
         background-color: #198754;
         border-color: #198754;
-        color: #fff;
-    }
-    .page-item.disabled .page-link {
-        background-color: var(--bg-card);
-        color: var(--text-muted);
     }
 </style>
-{% endblock %}
-
-{% block content %}
-<div class="container-fluid px-4 py-3">
-    <div class="layout-wrapper">
-
-        <!-- DYNAMIC SIDEBAR INCLUDE -->
-        <div class="sidebar-col">
-            {% include 'partials/sidebar.html' %}
-        </div>
-
-        <!-- ── मुख्य सामाग्री (Main Content Area) ── -->
-        <div class="content-col">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h2 class="mb-1 fw-bold"><i class="bi bi-bell text-success me-2"></i>System Notifications</h2>
-                    <p class="text-muted mb-0">Monitor real-time system alerts, operations, and audit triggers</p>
-                </div>
-                {% if notifications %}
-                <button class="btn btn-outline-success px-3 py-2 fw-semibold btn-sm rounded-2" onclick="markAllRead(this)">
-                    <i class="bi bi-check-all me-1"></i>Mark All Read
-                </button>
-                {% endif %}
-            </div>
-
-            <div class="card notif-card">
-                <div class="list-group list-group-flush" id="notif-list">
-                    {% for notif in notifications %}
-                    <div class="list-group-item notif-item {% if not notif.is_read %}unread-style{% endif %}"
-                        id="notif-{{ notif.id }}"
-                        {% if not notif.is_read %}onclick="markOneRead({{ notif.id }})" title="Click to mark as read"{% endif %}>
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <span class="badge rounded-pill px-2 py-1 me-2
-                                    {% if notif.notification_type == 'success' %}bg-success-subtle text-success border border-success-subtle
-                                    {% elif notif.notification_type == 'warning' %}bg-warning-subtle text-warning border border-warning-subtle
-                                    {% elif notif.notification_type == 'alert' %}bg-danger-subtle text-danger border border-danger-subtle
-                                    {% else %}bg-info-subtle text-info border border-info-subtle{% endif %}">
-                                    {{ notif.get_notification_type_display }}
-                                </span>
-                                <strong class="fs-6">{{ notif.title }}</strong>
-                                {% if not notif.is_read %}
-                                <span class="badge bg-primary ms-1 unread-tag">New</span>
-                                {% endif %}
-                            </div>
-                            <small class="text-muted fw-medium">{{ notif.created_at|timesince }} ago</small>
-                        </div>
-                        <p class="mb-0 mt-2 text-secondary" style="font-size: 0.9rem;">{{ notif.message }}</p>
-
-                        {% if notif.related_request %}
-                        <div class="mt-2">
-                            <span class="badge bg-surface-alt text-secondary border rounded-1">Request #{{ notif.related_request.id }}</span>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% empty %}
-                    <div class="text-center py-5 text-muted">
-                        <i class="bi bi-bell-slash fs-1 d-block mb-2 text-secondary"></i>
-                        <span class="fw-medium">No system notifications found at this time.</span>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            {% if is_paginated %}
-            <nav class="mt-4">
-                <ul class="pagination justify-content-center m-0">
-                    {% if page_obj.has_previous %}
-                    <li class="page-item"><a class="page-link shadow-none" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
-                    {% endif %}
-                    <li class="page-item disabled"><span class="page-link fw-medium">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
-                    {% if page_obj.has_next %}
-                    <li class="page-item"><a class="page-link shadow-none" href="?page={{ page_obj.next_page_number }}">Next</a></li>
-                    {% endif %}
-                </ul>
-            </nav>
-            {% endif %}
-        </div> <!-- /मुख्य सामाग्री -->
-    </div> <!-- /layout-wrapper -->
-</div>
 {% endblock %}
 
 {% block content %}

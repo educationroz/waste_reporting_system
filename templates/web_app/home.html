@@ -715,7 +715,7 @@ async function reverseGeocode(lat, lng) {
     }
 }
 
-window.addEventListener('load', () => {
+function initHomeMap() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             pos => initMap(pos.coords.latitude, pos.coords.longitude),
@@ -726,7 +726,9 @@ window.addEventListener('load', () => {
         initMap(DEFAULT_LAT, DEFAULT_LNG);
     }
     loadCheckpoints();
-});
+}
+
+initHomeMap();
 
 // DRF list endpoints may or may not be paginated depending on project
 // settings — handle both a bare array and a {results: [...]} shape instead

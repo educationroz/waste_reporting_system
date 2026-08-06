@@ -259,6 +259,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (function() {
+    // Guard against this script block running twice on the same page
+    // (e.g. htmx re-swapping content that includes this same script tag).
+    if (window._routePlanningInitialized) {
+        return;
+    }
+    window._routePlanningInitialized = true;
+
     // ── State ────────────────────────────────────────────────────────────
     let map = null;
     let currentRoute = null;
@@ -282,6 +289,7 @@
             checkpointMarkersLayer = null;
             driverMarkersLayer = null;
             driverMarkers.clear();
+            window._routePlanningInitialized = false;
         });
         document.body.dataset._leafletCleanupBound = '1';
     }
@@ -324,22 +332,35 @@
         return localStorage.getItem('access_token');
     }
 
+    async function authedFetch(url, options = {}) {
+        const token = getToken();
+        const headers = { ...(options.headers || {}) };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(url, { ...options, headers });
+        if (!res.ok) return null;
+        try {
+            return await res.json();
+        } catch (e) {
+            return null;
+        }
+    }
+
     function getApiClient() {
         if (window.API) return window.API;
 
         return {
-            get: (url) => authFetch(url, { method: 'GET' }),
-            post: (url, data) => authFetch(url, {
+            get: (url) => authedFetch(url, { method: 'GET' }),
+            post: (url, data) => authedFetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             }),
-            patch: (url, data) => authFetch(url, {
+            patch: (url, data) => authedFetch(url, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             }),
-            delete: (url) => authFetch(url, { method: 'DELETE' }),
+            delete: (url) => authedFetch(url, { method: 'DELETE' }),
         };
     }
 
@@ -348,6 +369,9 @@
             ensureLeafletLoaded(initMap);
             return;
         }
+
+        const mapEl = document.getElementById('route-map');
+        if (!mapEl) return; // page swapped away before Leaflet finished loading
 
         map = L.map('route-map').setView([28.2096, 83.9856], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -465,6 +489,7 @@
         }
         const drivers = Array.isArray(data) ? data : (data.results || []);
         const select = document.getElementById('driverSelect');
+        if (!select) return;
         select.innerHTML = '<option value="">Select a driver...</option>';
         drivers.forEach(d => {
             const option = document.createElement('option');
@@ -554,6 +579,8 @@
     };
 
     async function displayRoute(routeData) {
+        if (!map) return;
+
         routeMarkers.forEach(m => map.removeLayer(m));
         routeMarkers = [];
 
@@ -760,7 +787,8 @@
     loadDrivers();
     loadCheckpoints();
     loadDriverMarkers();
-    document.getElementById('plannedDate').valueAsDate = new Date();
+    const dateInput = document.getElementById('plannedDate');
+    if (dateInput) dateInput.valueAsDate = new Date();
     connectRouteWebSocket();
 
     // base.html ko websocket handler le checkpoint update aaउँda
