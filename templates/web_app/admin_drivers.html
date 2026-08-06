@@ -10,13 +10,16 @@
     .dashboard-card {
         border: none;
         border-radius: 14px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
-        background: #ffffff;
+        box-shadow: 0 4px 16px var(--shadow-color);
+        background: var(--bg-card);
+        color: var(--text-body);
     }
 
     .dashboard-card .card-header {
-        border-bottom: 1px solid #f1f3f5;
+        border-bottom: 1px solid var(--border-color);
         padding: 1.25rem;
+        background: var(--bg-card);
+        color: var(--text-body);
     }
 
     .table-responsive {
@@ -28,7 +31,7 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
         font-weight: 600;
-        color: #6c757d;
+        color: var(--text-muted);
         padding: 1rem;
     }
 
@@ -44,7 +47,7 @@
         width: 64px;
         height: 64px;
         border-radius: 50%;
-        background: #e8f5ec;
+        background: rgba(25, 135, 84, 0.12);
         color: #198754;
         display: flex;
         align-items: center;
@@ -58,7 +61,7 @@
         display: flex;
         justify-content: space-between;
         padding: 0.55rem 0;
-        border-bottom: 1px solid #f1f3f5;
+        border-bottom: 1px solid var(--border-color);
         font-size: 0.88rem;
     }
 
@@ -67,12 +70,12 @@
     }
 
     .profile-detail-label {
-        color: #6c757d;
+        color: var(--text-muted);
         font-weight: 500;
     }
 
     .profile-detail-value {
-        color: #212529;
+        color: var(--text-body);
         font-weight: 600;
         text-align: right;
     }
@@ -80,23 +83,23 @@
     .license-pdf-frame {
         width: 100%;
         height: 340px;
-        border: 1px solid #dee2e6;
+        border: 1px solid var(--border-color-strong);
         border-radius: 8px;
     }
 
     .license-upload-zone {
-        border: 2px dashed #dee2e6;
+        border: 2px dashed var(--border-color-strong);
         border-radius: 10px;
         padding: 1rem;
         text-align: center;
-        background: #fafafa;
+        background: var(--bg-surface-alt);
         cursor: pointer;
         transition: all 0.15s ease;
     }
 
     .license-upload-zone:hover {
         border-color: #198754;
-        background: #f1f8f5;
+        background: rgba(25, 135, 84, 0.06);
     }
 </style>
 {% endblock %}
@@ -116,7 +119,7 @@
             <!-- Header Strip Matrix -->
             <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-person-badge text-success me-2"></i>Drivers Management</h2>
+                    <h2 class="mb-1 fw-bold"><i class="bi bi-person-badge text-success me-2"></i>Drivers Management</h2>
                     <p class="text-muted mb-0">Monitor active field staff registry, verify logistics permits, and allocate municipal vehicle fleets.</p>
                 </div>
                 <button type="button" class="btn btn-success fw-semibold px-4" data-bs-toggle="modal" data-bs-target="#addDriverModal">
@@ -126,8 +129,8 @@
 
             <!-- Drivers Primary Records Card -->
             <div class="card dashboard-card">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-layers-half me-2 text-success"></i>Verified Active Roster</h6>
+                <div class="card-header py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>Verified Active Roster</h6>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -148,13 +151,13 @@
                                 <tr id="driver-row-{{ driver.id }}">
                                     <td class="fw-bold text-secondary">#{{ driver.id }}</td>
                                     <td>
-                                        <div class="fw-semibold text-dark">{{ driver.user.get_full_name|default:driver.user.username }}</div>
+                                        <div class="fw-semibold">{{ driver.user.get_full_name|default:driver.user.username }}</div>
                                         <div class="small text-muted" style="font-size: 0.8rem;">{{ driver.user.email }}</div>
                                     </td>
                                     <td class="font-monospace text-secondary fw-semibold">{{ driver.license_number|default:"—" }}</td>
                                     <td>
                                         {% if driver.vehicle %}
-                                            <div class="fw-semibold text-dark"><i class="bi bi-truck me-1 text-success"></i>{{ driver.vehicle.plate_number }}</div>
+                                            <div class="fw-semibold"><i class="bi bi-truck me-1 text-success"></i>{{ driver.vehicle.plate_number }}</div>
                                             <div class="small text-muted" style="font-size: 0.8rem;">{{ driver.vehicle.type }} ({{ driver.vehicle.capacity_kg }}kg)</div>
                                         {% else %}
                                             <span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>No Asset Linked</span>
@@ -168,7 +171,7 @@
                                     <td class="fw-semibold font-monospace">{{ driver.total_trips }}</td>
                                     <td class="text-end pe-4">
                                         <div class="d-inline-flex gap-2">
-                                            <button class="btn btn-sm btn-outline-dark py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#profileModal{{ driver.id }}">
+                                            <button class="btn btn-sm btn-outline-secondary py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#profileModal{{ driver.id }}">
                                                 <i class="bi bi-person-vcard me-1"></i>View Profile
                                             </button>
                                             <button class="btn btn-sm btn-outline-{% if driver.is_available %}secondary{% else %}success{% endif %} py-1 px-3" style="font-size: 0.82rem;"
@@ -200,7 +203,7 @@
                                                         {{ driver.user.username|slice:":1"|upper }}
                                                     </div>
                                                     <div>
-                                                        <div class="fs-5 fw-bold text-dark">{{ driver.user.get_full_name|default:driver.user.username }}</div>
+                                                        <div class="fs-5 fw-bold">{{ driver.user.get_full_name|default:driver.user.username }}</div>
                                                         <div class="text-muted small">Driver #{{ driver.id }} &middot; Registered {{ driver.created_at|date:"d M Y" }}</div>
                                                     </div>
                                                     <span class="badge {% if driver.is_available %}bg-success bg-opacity-10 text-success{% else %}bg-secondary bg-opacity-10 text-secondary{% endif %} px-3 rounded-pill ms-auto">
@@ -255,7 +258,7 @@
                                                             <embed src="{{ driver.license_document.url }}" type="application/pdf" class="license-pdf-frame">
                                                         </div>
                                                         {% else %}
-                                                        <div class="text-center text-muted py-4 bg-light rounded-3 mb-3">
+                                                        <div class="text-center text-muted py-4 rounded-3 mb-3" style="background: var(--bg-surface-alt);">
                                                             <i class="bi bi-file-earmark-x fs-2 d-block mb-1"></i>
                                                             <span class="small">No license document uploaded yet.</span>
                                                         </div>
@@ -278,8 +281,8 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div class="modal-footer bg-light border-top-0">
-                                                <button class="btn btn-light border px-4" data-bs-dismiss="modal">Close</button>
+                                            <div class="modal-footer bg-surface-alt border-top-0">
+                                                <button class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
                                             </div>
                                         </div>
                                     </div>
@@ -307,8 +310,8 @@
                                                     </select>
                                                 </div>
                                             </div>
-                                            <div class="modal-footer bg-light">
-                                                <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+                                            <div class="modal-footer bg-surface-alt">
+                                                <button class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
                                                 <button class="btn btn-success px-4" onclick="assignVehicle({{ driver.id }}, this)">Update Allocation</button>
                                             </div>
                                         </div>
@@ -332,10 +335,10 @@
                 </div>
                 <div class="card-body">
                     <p class="small text-secondary mb-3">The following accounts are tagged with a <code>driver</code> permission token, but structural identity rows are missing inside the primary driver tables. Grant them metadata vectors or fleet licenses immediately to resolve routing pipeline integrity warnings:</p>
-                    <div class="bg-light p-3 rounded-3 border-start border-warning border-3">
+                    <div class="p-3 rounded-3 border-start border-warning border-3" style="background: var(--bg-surface-alt);">
                         <ul class="mb-0 gap-1 d-flex flex-column" style="font-size: 0.88rem;">
                             {% for u in users_no_driver %}
-                            <li><span class="fw-bold text-dark">{{ u.username }}</span> — <span class="text-secondary font-monospace">{{ u.email }}</span></li>
+                            <li><span class="fw-bold">{{ u.username }}</span> — <span class="text-secondary font-monospace">{{ u.email }}</span></li>
                             {% endfor %}
                         </ul>
                     </div>
@@ -382,7 +385,7 @@
                     </div>
                 </form>
             </div>
-            <div class="modal-footer bg-light border-top-0">
+            <div class="modal-footer bg-surface-alt border-top-0">
                 <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-success px-4" onclick="addDriver(this)">Create Driver</button>
             </div>

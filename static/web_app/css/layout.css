@@ -105,6 +105,7 @@
         text-decoration: none;
         width: 100%;
         white-space: nowrap;
+        color: var(--text-body, #212529); /* <-- add this */
     }
 
     .sidebar-card .nav-link i {
@@ -113,6 +114,7 @@
         min-width: 24px;
         text-align: center;
         flex-shrink: 0;
+        color: var(--text-muted, #6c757d);
     }
 
     .sidebar-card .nav-link.active {

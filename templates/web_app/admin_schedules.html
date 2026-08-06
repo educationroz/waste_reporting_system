@@ -10,13 +10,16 @@
     .dashboard-card {
         border: none;
         border-radius: 14px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
-        background: #ffffff;
+        box-shadow: 0 4px 16px var(--shadow-color);
+        background: var(--bg-card);
+        color: var(--text-body);
     }
 
     .dashboard-card .card-header {
-        border-bottom: 1px solid #f1f3f5;
+        border-bottom: 1px solid var(--border-color);
         padding: 1.25rem;
+        background: var(--bg-card);
+        color: var(--text-body);
     }
 
     .table-responsive {
@@ -28,7 +31,7 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
         font-weight: 600;
-        color: #6c757d;
+        color: var(--text-muted);
         padding: 1rem;
     }
 
@@ -57,7 +60,7 @@
 
             <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-calendar-week text-success me-2"></i>Schedules Management</h2>
+                    <h2 class="mb-1 fw-bold"><i class="bi bi-calendar-week text-success me-2"></i>Schedules Management</h2>
                     <p class="text-muted mb-0">Configure municipal boundary collection maps, recurrence intervals, and operational fleet constraints.</p>
                 </div>
                 <div>
@@ -68,8 +71,8 @@
             </div>
 
             <div class="card dashboard-card">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-calendar2-range me-2 text-success"></i>Configured Operational Route Intervals</h6>
+                <div class="card-header py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-calendar2-range me-2 text-success"></i>Configured Operational Route Intervals</h6>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -90,15 +93,15 @@
                                 {% for schedule in schedules %}
                                 <tr id="schedule-row-{{ schedule.id }}">
                                     <td class="fw-bold text-secondary">#{{ schedule.id }}</td>
-                                    <td class="fw-bold text-dark">{{ schedule.zone_name }}</td>
-                                    <td class="fw-medium text-dark">
+                                    <td class="fw-bold">{{ schedule.zone_name }}</td>
+                                    <td class="fw-medium">
                                         {% if schedule.day_of_week is not None %}
                                             {% with day=schedule.day_of_week %}
-                                                {% if day == 0 %}<span class="badge bg-secondary bg-opacity-10 text-dark">Monday</span>
-                                                {% elif day == 1 %}<span class="badge bg-secondary bg-opacity-10 text-dark">Tuesday</span>
-                                                {% elif day == 2 %}<span class="badge bg-secondary bg-opacity-10 text-dark">Wednesday</span>
-                                                {% elif day == 3 %}<span class="badge bg-secondary bg-opacity-10 text-dark">Thursday</span>
-                                                {% elif day == 4 %}<span class="badge bg-secondary bg-opacity-10 text-dark">Friday</span>
+                                                {% if day == 0 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Monday</span>
+                                                {% elif day == 1 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Tuesday</span>
+                                                {% elif day == 2 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Wednesday</span>
+                                                {% elif day == 3 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Thursday</span>
+                                                {% elif day == 4 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Friday</span>
                                                 {% elif day == 5 %}<span class="badge bg-success bg-opacity-10 text-success">Saturday</span>
                                                 {% elif day == 6 %}<span class="badge bg-danger bg-opacity-10 text-danger">Sunday</span>
                                                 {% else %}Unknown
@@ -115,7 +118,7 @@
                                     </td>
                                     <td class="fw-semibold">
                                         {% if schedule.driver %}
-                                            <span class="text-dark"><i class="bi bi-person text-secondary me-1"></i>{{ schedule.driver.user.username }}</span>
+                                            <span><i class="bi bi-person text-secondary me-1"></i>{{ schedule.driver.user.username }}</span>
                                         {% else %}
                                             <span class="text-muted small italic">No Operator Bound</span>
                                         {% endif %}
@@ -211,8 +214,8 @@
                     </select>
                 </div>
             </div>
-            <div class="modal-footer bg-light">
-                <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+            <div class="modal-footer bg-surface-alt">
+                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">Cancel</button>
                 <button class="btn btn-success px-4" onclick="addSchedule(this)">Save Matrix Node</button>
             </div>
         </div>
