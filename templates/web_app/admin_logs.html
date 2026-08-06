@@ -11,7 +11,7 @@
         border: none;
         border-radius: 12px;
         transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+        box-shadow: 0 2px 6px var(--shadow-color);
     }
 
     .metric-card:hover {
@@ -22,13 +22,16 @@
     .dashboard-card {
         border: none;
         border-radius: 14px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
-        background: #ffffff;
+        box-shadow: 0 4px 16px var(--shadow-color);
+        background: var(--bg-card);
+        color: var(--text-body);
     }
 
     .dashboard-card .card-header {
-        border-bottom: 1px solid #f1f3f5;
+        border-bottom: 1px solid var(--border-color);
         padding: 1.25rem;
+        background: var(--bg-card);
+        color: var(--text-body);
     }
 
     .table-responsive {
@@ -40,7 +43,7 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
         font-weight: 600;
-        color: #6c757d;
+        color: var(--text-muted);
         padding: 1rem;
     }
 
@@ -54,7 +57,7 @@
     }
 
     .log-row:hover {
-        background-color: #f8f9fa;
+        background-color: var(--bg-hover);
     }
 
     pre {
@@ -64,14 +67,27 @@
         margin-bottom: 0;
     }
 
+    /* Search box icon prefix — was bg-white, now follows theme */
+    .input-group-text {
+        background: var(--bg-input) !important;
+        color: var(--text-muted) !important;
+        border-color: var(--border-color-strong) !important;
+    }
+
+    /* Modal detail boxes — were bg-light */
+    .detail-box {
+        background: var(--bg-surface-alt);
+        border: 1px solid var(--border-color) !important;
+    }
+
     /* ==========================================
        QUICK FILTER PILLS — one-click action-type
        filtering instead of a dropdown + page reload
        ========================================== */
     .action-pill {
-        border: 1px solid #dee2e6;
-        background: #fff;
-        color: #495057;
+        border: 1px solid var(--border-color-strong);
+        background: var(--bg-card);
+        color: var(--text-body);
         border-radius: 20px;
         padding: 0.4rem 0.95rem;
         font-size: 0.82rem;
@@ -123,7 +139,7 @@
             <!-- Header Strip Matrix -->
             <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-file-text text-info me-2"></i>Admin Activity Logs</h2>
+                    <h2 class="mb-1 fw-bold"><i class="bi bi-file-text text-info me-2"></i>Admin Activity Logs</h2>
                     <p class="text-muted mb-0">System audit trail records tracking operations, record lifecycles, and configuration mappings.</p>
                 </div>
             </div>
@@ -142,8 +158,8 @@
 
             <!-- Query Filter Terminal Card -->
             <div class="card dashboard-card mb-4">
-                <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-funnel me-2 text-success"></i>Query Filter Terminal</h6>
+                <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-funnel me-2 text-success"></i>Query Filter Terminal</h6>
                     {% if current_action or current_operator %}
                     <a href="{% url 'admin-logs' %}" class="small text-danger text-decoration-none fw-semibold">
                         <i class="bi bi-x-circle me-1"></i>Clear all filters
@@ -176,7 +192,7 @@
                         <div class="col-12">
                             <label class="form-label small fw-semibold text-secondary">Search by Security Operator</label>
                             <div class="input-group" id="operator-input-wrap">
-                                <span class="input-group-text bg-white border-end-0">
+                                <span class="input-group-text border-end-0">
                                     <i class="bi bi-search text-muted"></i>
                                 </span>
                                 <input type="search" name="operator" id="operator-input"
@@ -198,8 +214,8 @@
 
             <!-- System Logs Table Card Container -->
             <div class="card dashboard-card">
-                <div class="card-header bg-white">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-layers-half me-2 text-success"></i>Real-time Audit Streams</h6>
+                <div class="card-header">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>Real-time Audit Streams</h6>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -247,7 +263,7 @@
                                     </td>
                                     <td><code class="text-secondary small">{{ log.content_type }}</code></td>
                                     <td>
-                                        <span class="text-dark fw-medium">{{ log.object_description|truncatewords:5 }}</span>
+                                        <span class="fw-medium">{{ log.object_description|truncatewords:5 }}</span>
                                     </td>
                                     <td>
                                         {% if log.ip_address %}
@@ -276,55 +292,55 @@
                                             <div class="modal-body p-4">
                                                 <div class="row g-3">
                                                     <div class="col-md-6">
-                                                        <div class="border rounded-3 p-3 h-100 bg-light">
+                                                        <div class="detail-box border rounded-3 p-3 h-100">
                                                             <div class="small text-muted text-uppercase fw-semibold mb-1">Timestamp</div>
                                                             <div class="fw-semibold">{{ log.created_at|date:"d M Y H:i" }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
-                                                        <div class="border rounded-3 p-3 h-100 bg-light">
+                                                        <div class="detail-box border rounded-3 p-3 h-100">
                                                             <div class="small text-muted text-uppercase fw-semibold mb-1">Operator</div>
                                                             <div class="fw-semibold">{% if log.admin_user %}{{ log.admin_user.username }}{% else %}SYSTEM CRON{% endif %}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
-                                                        <div class="border rounded-3 p-3 h-100 bg-light">
+                                                        <div class="detail-box border rounded-3 p-3 h-100">
                                                             <div class="small text-muted text-uppercase fw-semibold mb-1">Action</div>
                                                             <div class="fw-semibold">{{ log.get_action_display }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
-                                                        <div class="border rounded-3 p-3 h-100 bg-light">
+                                                        <div class="detail-box border rounded-3 p-3 h-100">
                                                             <div class="small text-muted text-uppercase fw-semibold mb-1">Content Type</div>
                                                             <div class="fw-semibold">{{ log.content_type }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-12">
-                                                        <div class="border rounded-3 p-3 bg-light">
+                                                        <div class="detail-box border rounded-3 p-3">
                                                             <div class="small text-muted text-uppercase fw-semibold mb-1">Description</div>
                                                             <div class="fw-semibold">{{ log.object_description|default:"No description available." }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
-                                                        <div class="border rounded-3 p-3 h-100 bg-light">
+                                                        <div class="detail-box border rounded-3 p-3 h-100">
                                                             <div class="small text-muted text-uppercase fw-semibold mb-1">Object ID</div>
                                                             <div class="fw-semibold">{{ log.object_id|default:"—" }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
-                                                        <div class="border rounded-3 p-3 h-100 bg-light">
+                                                        <div class="detail-box border rounded-3 p-3 h-100">
                                                             <div class="small text-muted text-uppercase fw-semibold mb-1">IP Address</div>
                                                             <div class="fw-semibold">{{ log.ip_address|default:"—" }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-12">
-                                                        <div class="border rounded-3 p-3 bg-light">
+                                                        <div class="detail-box border rounded-3 p-3">
                                                             <div class="small text-muted text-uppercase fw-semibold mb-2">User Agent</div>
                                                             <div class="small text-break">{{ log.user_agent|default:"—" }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-12">
-                                                        <div class="border rounded-3 p-3 bg-light">
+                                                        <div class="detail-box border rounded-3 p-3">
                                                             <div class="small text-muted text-uppercase fw-semibold mb-2">Change Payload</div>
                                                             {% if log.changes %}
                                                                 <pre class="mb-0"><code>{{ log.changes }}</code></pre>

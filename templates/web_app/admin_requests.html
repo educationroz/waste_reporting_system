@@ -10,13 +10,16 @@
     .dashboard-card {
         border: none;
         border-radius: 14px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
-        background: #ffffff;
+        box-shadow: 0 4px 16px var(--shadow-color);
+        background: var(--bg-card);
+        color: var(--text-body);
     }
 
     .dashboard-card .card-header {
-        border-bottom: 1px solid #f1f3f5;
+        border-bottom: 1px solid var(--border-color);
         padding: 1.25rem;
+        background: var(--bg-card);
+        color: var(--text-body);
     }
 
     .table-responsive {
@@ -28,13 +31,20 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
         font-weight: 600;
-        color: #6c757d;
+        color: var(--text-muted);
         padding: 1rem;
     }
 
     .table td {
         padding: 1rem;
         font-size: 0.88rem;
+    }
+
+    /* Search box icon prefix — was bg-white, now follows theme */
+    .input-group-text {
+        background: var(--bg-input) !important;
+        color: var(--text-muted) !important;
+        border-color: var(--border-color-strong) !important;
     }
 
     /* ==========================================
@@ -51,7 +61,7 @@
 
     .photo-thumb-wrapper:hover img {
         transform: scale(1.06);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 10px var(--shadow-color-strong);
     }
 
     .photo-extra-badge {
@@ -66,7 +76,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        border: 2px solid #fff;
+        border: 2px solid var(--bg-card);
     }
 
     #gallery-photo-container img {
@@ -113,7 +123,7 @@
 
             <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-clipboard-list text-success me-2"></i>Requests Management</h2>
+                    <h2 class="mb-1 fw-bold"><i class="bi bi-clipboard-list text-success me-2"></i>Requests Management</h2>
                     <p class="text-muted mb-0">Evaluate citizen pick-up requests, filter pipeline segments, and dispatch operational field units.</p>
                 </div>
             </div>
@@ -125,7 +135,7 @@
                         <div class="col-lg-6 col-md-12">
                             <label class="form-label small fw-semibold text-secondary mb-1">Search Requests</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-white border-end-0 text-muted">
+                                <span class="input-group-text border-end-0">
                                     <i class="bi bi-search"></i>
                                 </span>
                                 <input type="text" name="search" class="form-control border-start-0 ps-0"
@@ -173,8 +183,8 @@
             </div>
 
             <div class="card dashboard-card">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-layers-half me-2 text-success"></i>Dispatched Manifest & Pipeline Streams</h6>
+                <div class="card-header py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>Dispatched Manifest & Pipeline Streams</h6>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -199,9 +209,9 @@
                                 <tr id="request-row-{{ req.id }}" data-request-id="{{ req.id }}">
                                     <td class="fw-bold text-secondary">#{{ req.id }}</td>
                                     {% if req.user %}
-                                    <td class="fw-semibold text-dark">{{ req.user.username }}</td>
+                                    <td class="fw-semibold">{{ req.user.username }}</td>
                                     {% else %}
-                                    <td class="fw-semibold text-dark"><i class="bi bi-person-x me-1"></i> Guest</td>
+                                    <td class="fw-semibold"><i class="bi bi-person-x me-1"></i> Guest</td>
                                     {% endif %}
                                     <td>
                                         <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-10 px-2.5 py-1">
@@ -265,7 +275,7 @@
                                     {# ===== END AI SEVERITY CELL ===== #}
 
                                     <td>
-                                        <span class="text-dark d-block" title="{{ req.pickup_address }}" style="max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        <span class="d-block" title="{{ req.pickup_address }}" style="max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                             {{ req.pickup_address }}
                                         </span>
                                     </td>
@@ -292,7 +302,7 @@
                                     <td class="font-monospace text-secondary fw-semibold">{{ req.scheduled_date|date:"d M Y" }}</td>
                                     <td class="fw-medium">
                                         {% if req.driver %}
-                                            <div class="text-dark"><i class="bi bi-person me-1 text-success"></i>{{ req.driver.user.username }}</div>
+                                            <div><i class="bi bi-person me-1 text-success"></i>{{ req.driver.user.username }}</div>
                                         {% else %}
                                             <div class="d-flex flex-column gap-1 align-items-start">
                                                 <span class="text-muted small italic"><i class="bi bi-exclamation-circle me-1"></i>Unassigned</span>
@@ -358,8 +368,8 @@
                     </select>
                 </div>
             </div>
-            <div class="modal-footer bg-light">
-                <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+            <div class="modal-footer bg-surface-alt">
+                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">Cancel</button>
                 <button class="btn btn-success px-4" onclick="assignDriver(this)">Confirm Dispatch</button>
             </div>
         </div>
@@ -384,7 +394,7 @@
 </div>
 {# ===== END PHOTO GALLERY MODAL ===== #}
 
-{% endblock %}
+{% endblock %}}
 
 {% block extra_js %}
 <script>

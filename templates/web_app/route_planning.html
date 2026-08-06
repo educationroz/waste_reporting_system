@@ -16,24 +16,30 @@
         height: 600px;
         border-radius: 8px;
         margin-bottom: 20px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color);
     }
 
     .route-controls {
-        background: white;
+        background: var(--bg-card);
+        color: var(--text-body);
         padding: 15px;
         border-radius: 8px;
         margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 4px var(--shadow-color);
+    }
+
+    .route-controls label {
+        color: var(--text-body);
     }
 
     .route-info-card {
-        background: white;
+        background: var(--bg-card);
+        color: var(--text-body);
         padding: 15px;
         border-radius: 8px;
         margin-bottom: 15px;
         border-left: 4px solid #28a745;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 4px var(--shadow-color);
     }
 
     .route-info-card h5 {
@@ -42,7 +48,8 @@
     }
 
     .waypoint-list {
-        background: white;
+        background: var(--bg-card);
+        color: var(--text-body);
         padding: 15px;
         border-radius: 8px;
         max-height: 400px;
@@ -51,20 +58,21 @@
 
     .waypoint-item {
         padding: 10px;
-        border-bottom: 1px solid #eee;
+        border-bottom: 1px solid var(--border-color);
         cursor: pointer;
         display: flex;
         justify-content: space-between;
         align-items: center;
         transition: background 0.2s;
+        color: var(--text-body);
     }
 
     .waypoint-item:hover {
-        background: #f5f5f5;
+        background: var(--bg-hover);
     }
 
     .waypoint-item.active {
-        background: #e7f5e7;
+        background: rgba(40, 167, 69, 0.12);
         border-left: 3px solid #28a745;
     }
 
@@ -80,7 +88,7 @@
     }
 
     .distance-info {
-        color: #666;
+        color: var(--text-muted);
         font-size: 0.9em;
     }
 
@@ -116,16 +124,16 @@
     }
 
     .map-legend-inline {
-        background: white;
+        background: var(--bg-card);
+        color: var(--text-muted);
         padding: 8px 15px;
         border-radius: 8px;
         margin-bottom: 15px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 4px var(--shadow-color);
         font-size: 0.85em;
         display: flex;
         gap: 1.25rem;
         flex-wrap: wrap;
-        color: #555;
     }
 </style>
 {% endblock %}

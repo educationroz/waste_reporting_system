@@ -248,6 +248,16 @@ nav.navbar {
     box-shadow: none;
 }
 
+/* Bootstrap's .table-light sets its own local --bs-table-bg/--bs-table-color
+   which bypasses our theme vars entirely unless overridden here. */
+[data-theme="dark"] .table-light,
+[data-theme="dark"] .table > :not(caption) > .table-light {
+    --bs-table-bg: var(--bg-card);
+    --bs-table-color: var(--text-body);
+    background-color: var(--bg-card) !important;
+    color: var(--text-body) !important;
+}
+
 .badge {
     font-weight: 500;
     font-size: 0.75rem;
@@ -363,4 +373,31 @@ nav.navbar {
         z-index: 1035;
         flex-direction: row;
     }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   THEME-AWARE SURFACE UTILITIES
+   Use these instead of Bootstrap's bg-white / bg-light whenever you
+   need a plain card-like or hover-like panel background that should
+   flip correctly with dark mode. bg-white / bg-light stay hardcoded
+   to light colors and will NOT adapt on their own.
+   ══════════════════════════════════════════════════════════════════ */
+.bg-surface {
+    background-color: var(--bg-card) !important;
+    color: var(--text-body);
+}
+.bg-surface-alt {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-body);
+}
+
+/* ── Safety net: catch any bg-white / bg-light still left in templates
+   that haven't been converted to .bg-surface / .bg-surface-alt yet ── */
+[data-theme="dark"] .bg-white {
+    background-color: var(--bg-card) !important;
+    color: var(--text-body) !important;
+}
+[data-theme="dark"] .bg-light:not(.site-footer .bg-light) {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-body) !important;
 }
