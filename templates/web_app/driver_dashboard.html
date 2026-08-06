@@ -645,6 +645,7 @@ let routeLine = null;
 let requestMarkersLayer = null;
 let checkpointsLayer = null;
 let hasFittedBounds = false; // only auto-fit the view once, on first load
+let lastBoundsPoints = [];
 
 if (!document.body.dataset._leafletCleanupBound) {
     document.body.addEventListener('htmx:beforeSwap', () => {
@@ -740,9 +741,14 @@ function extractList(data) {
 }
 
 function pickCoords(req) {
-    const lat = req.latitude !== null && req.latitude !== undefined ? parseFloat(req.latitude) : parseFloat(req.photo_latitude);
-    const lng = req.longitude !== null && req.longitude !== undefined ? parseFloat(req.longitude) : parseFloat(req.photo_longitude);
-    if (isNaN(lat) || isNaN(lng)) return null;
+    const lat = Number(req.latitude ?? req.photo_latitude);
+    const lng = Number(req.longitude ?? req.photo_longitude);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        console.error("Invalid request:", req);
+        return null;
+    }
+
     return [lat, lng];
 }
 
@@ -774,12 +780,30 @@ async function drawRoadFollowingLine(stopCoords) {
     }).addTo(driverMap);
 }
 
-let lastBoundsPoints = [];
-
 window.centerMap = function() {
     if (!driverMap || lastBoundsPoints.length === 0) return;
-    const allPoints = driverMarker ? lastBoundsPoints.concat([driverMarker.getLatLng()]) : lastBoundsPoints;
-    driverMap.fitBounds(allPoints, { padding: [30, 30], maxZoom: 15 });
+    const allPoints = [...lastBoundsPoints];
+
+    if (driverMarker) {
+        const p = driverMarker.getLatLng();
+        if (p && Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
+            allPoints.push([p.lat, p.lng]);
+        }
+    }
+
+    const validPoints = allPoints.filter(p =>
+        Array.isArray(p) &&
+        p.length === 2 &&
+        Number.isFinite(p[0]) &&
+        Number.isFinite(p[1])
+    );
+
+    if (validPoints.length > 0) {
+        driverMap.fitBounds(validPoints, {
+            padding: [30, 30],
+            maxZoom: 15
+        });
+    }
 };
 
 window.loadMapData = async function() {
