@@ -1,0 +1,76 @@
+diff --git a/static/web_app/css/layout.css b/static/web_app/css/layout.css
+index 23dff56..1069d31 100644
+--- a/static/web_app/css/layout.css
++++ b/static/web_app/css/layout.css
+@@ -297,4 +297,17 @@
+         .layout-wrapper.mobile-open ~ .sidebar-backdrop {
+             display: block !important;
+         }
++
++        /* Content area was using the same 1.5rem padding as desktop,
++           eating too much of the small screen's width/height. Tighter
++           padding on mobile only — desktop (>=768px) is untouched. */
++        .content-col {
++            padding: 1rem 0.75rem;
++        }
++    }
++
++    @media (max-width: 575.98px) {
++        .content-col {
++            padding: 0.85rem 0.6rem;
++        }
+     }
+\ No newline at end of file
+diff --git a/templates/web_app/home.html b/templates/web_app/home.html
+index f96169c..dd96973 100644
+--- a/templates/web_app/home.html
++++ b/templates/web_app/home.html
+@@ -117,6 +117,48 @@
+         color: #198754;
+         background: #f1f8f5;
+     }
++
++    /* ══════════════════════════════════════════════════════════════
++       MOBILE RESPONSIVE — CSS-only, scoped to this page's own markup
++       (#content-app > .container-fluid is this page's outer wrapper,
++       so the navbar's own .container-fluid in base.html is untouched).
++       No HTML/JS changed, no class removed — same layout/behaviour,
++       just tighter spacing + reflow-friendly sizing on small screens.
++       ══════════════════════════════════════════════════════════════ */
++    @media (max-width: 767.98px) {
++        /* Outer page padding was fixed at px-4 py-3 (24px sides) on
++           every screen size — wastes ~15% of width on a phone. */
++        #content-app > .container-fluid {
++            padding-left: 0.85rem !important;
++            padding-right: 0.85rem !important;
++            padding-top: 0.75rem !important;
++        }
++
++        /* Complaint-type picker (3 per row) — give it a bit more
++           breathing room so the label text doesn't feel cramped. */
++        .complaint-type-option {
++            font-size: 0.72rem;
++            padding: 0.5rem 0.3rem;
++        }
++        .complaint-type-option i {
++            font-size: 1.05rem;
++        }
++
++        /* Modal body padding (p-4 = 24px) is tight on small screens. */
++        #complaintModal .modal-body {
++            padding: 1rem !important;
++        }
++    }
++
++    @media (max-width: 400px) {
++        /* On very narrow phones, shrink the photo thumbnails a touch
++           so 3-per-row keeps fitting without forcing an early wrap. */
++        .photo-thumb,
++        .photo-thumb-add {
++            width: 76px;
++            height: 76px;
++        }
++    }
+ </style>
+ {% endblock %}
+ 
