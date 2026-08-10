@@ -70,6 +70,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'web_app.context_processors.google_client_id',
             ],
         },
     },
@@ -146,6 +147,9 @@ CACHES = {
 
 # ─── Custom User Model ────────────────────────────────────────────────────────
 AUTH_USER_MODEL = 'auth_app.User'
+
+GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID')
+ 
 
 # ─── Password Validation ──────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [

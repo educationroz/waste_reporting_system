@@ -14,6 +14,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login, logout as django_logout
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_auth_requests
 from .serializers import (
     ChangePasswordSerializer,
     CustomTokenObtainPairSerializer,
@@ -103,6 +105,80 @@ class CustomTokenObtainPairView(AnonScopedThrottleMixin, TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
     permission_classes = [AllowAny]
     throttle_scope = 'login'
+
+
+class GoogleLoginView(AnonScopedThrottleMixin, APIView):
+    """
+    Google Sign-In. The frontend sends the Google ID token (a JWT) it
+    receives from Google's Identity Services button. We verify that token
+    directly with Google's own servers (so it can't be forged), then
+    find-or-create a local User and issue our own access/refresh JWT pair —
+    exactly like a normal username/password login.
+    """
+    permission_classes = [AllowAny]
+    throttle_scope = 'login'  # reuse the same 5/min throttle as normal login
+
+    def post(self, request):
+        credential = request.data.get('credential')
+        if not credential:
+            return Response({'error': 'No Google credential provided.'}, status=400)
+
+        try:
+            idinfo = google_id_token.verify_oauth2_token(
+                credential,
+                google_auth_requests.Request(),
+                settings.GOOGLE_OAUTH_CLIENT_ID,
+            )
+        except ValueError:
+            # Token was malformed, expired, or its audience didn't match
+            # our Client ID — never trust it in that case.
+            return Response({'error': 'Invalid or expired Google token.'}, status=400)
+
+        email = idinfo.get('email')
+        email_verified = idinfo.get('email_verified')
+        if not email or not email_verified:
+            return Response({'error': 'Google account has no verified email.'}, status=400)
+
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            # New account — auto-provision it. Google has already verified
+            # the email address for us, so we skip our own verification
+            # email step entirely for Google sign-ups.
+            base_username = (email.split('@')[0] or 'user')[:20]
+            username = base_username
+            suffix = 1
+            while User.objects.filter(username=username).exists():
+                username = f'{base_username}{suffix}'
+                suffix += 1
+
+            user = User(
+                username=username,
+                email=email,
+                role='user',
+                is_verified=True,
+                is_active=True,
+            )
+            user.set_unusable_password()  # this account can only sign in via Google
+            user.save()
+
+        if not user.is_active:
+            return Response({'error': 'This account is inactive.'}, status=400)
+
+        refresh = RefreshToken.for_user(user)
+
+        # Also establish the Django session, matching what the normal
+        # username/password flow does via /auth/session-login/. Google
+        # users have no password for that endpoint to check against, so we
+        # log the session in directly here instead.
+        user.backend = 'django.contrib.auth.backends.ModelBackend'
+        login(request, user)
+
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': UserSerializer(user).data,
+        })
 
 
 class RegisterView(AnonScopedThrottleMixin, generics.CreateAPIView):

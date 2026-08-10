@@ -33,6 +33,14 @@
                 <span id="login-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
             </button>
 
+            <div class="d-flex align-items-center my-3">
+                <hr class="flex-grow-1">
+                <span class="px-2 text-muted small">or</span>
+                <hr class="flex-grow-1">
+            </div>
+
+            <div id="g_id_signin_container" class="d-flex justify-content-center"></div>
+
             <p class="text-center mt-3 mb-0">
                 <a href="{% url 'forgot-password' %}" class="small text-decoration-none" style="color:#6fcf97;">Forgot password?</a>
             </p>
@@ -59,6 +67,9 @@
         display: none !important;
     }
 </style>
+
+<!-- Google Identity Services SDK -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <script>
 function getCookie(name) {
@@ -166,6 +177,69 @@ async function doLogin() {
         btn.disabled = false;
         spinner.classList.add('d-none');
         text.textContent = 'Sign In';
+    }
+}
+
+// ── Google Sign-In ───────────────────────────────────────────────────────────
+// Yo redirect-based hoina — Google button click garda seedhai yehi page ma
+// ek id_token (credential) aauँcha, jun hamile backend ma verify garna
+// pathaunchhaun. Session cookie backend ley nai set garcha (GoogleLoginView),
+// tesaile yaha /auth/session-login/ call garnu pardaina.
+function initGoogleSignIn() {
+    if (typeof google === 'undefined' || !google.accounts) {
+        // GSI script avai load bhaisakeko chaina — sano retry
+        setTimeout(initGoogleSignIn, 200);
+        return;
+    }
+    google.accounts.id.initialize({
+    client_id: '{{ GOOGLE_CLIENT_ID }}',
+    callback: handleGoogleCredential,
+    use_fedcm_for_button: true,
+    });
+    google.accounts.id.renderButton(
+        document.getElementById('g_id_signin_container'),
+        { theme: 'outline', size: 'large', width: 320, text: 'signin_with' }
+    );
+}
+initGoogleSignIn();
+
+async function handleGoogleCredential(response) {
+    const errDiv = document.getElementById('error-alert');
+    errDiv.classList.add('d-none');
+
+    try {
+        const res = await fetch('/auth/google-login/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ credential: response.credential }),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            localStorage.setItem('access_token', data.access);
+            localStorage.setItem('refresh_token', data.refresh);
+
+            const role = data.user?.role || '';
+            if (role === 'user') {
+                await claimGuestRequests(data.access);
+            }
+
+            const redirectMap = {
+                admin: '/admin-dashboard/',
+                driver: '/driver-dashboard/',
+                user: '/',
+            };
+            window.location.href = redirectMap[role] || '/dashboard/';
+        } else {
+            errDiv.textContent = data.error || 'Google sign-in failed.';
+            errDiv.classList.remove('d-none');
+        }
+    } catch (e) {
+        errDiv.textContent = 'Network error: ' + e.message;
+        errDiv.classList.remove('d-none');
     }
 }
 
