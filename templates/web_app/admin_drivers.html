@@ -101,6 +101,18 @@
         border-color: #198754;
         background: rgba(25, 135, 84, 0.06);
     }
+
+    /* Profile modal header (avatar + name + availability badge) is a
+       strict no-wrap row — a long name could push the badge off-screen
+       on a narrow phone (modal-lg goes near-full-width on mobile). */
+    @media (max-width: 575.98px) {
+        [id^="profileModal"] .d-flex.align-items-center.gap-3.mb-4 {
+            flex-wrap: wrap;
+        }
+        [id^="profileModal"] .d-flex.align-items-center.gap-3.mb-4 .badge.ms-auto {
+            margin-left: 0 !important;
+        }
+    }
 </style>
 {% endblock %}
 

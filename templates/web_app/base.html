@@ -61,7 +61,11 @@
 
         #custom-lang-switcher {
             position: fixed;
-            top: 85px;
+            /* was a hardcoded 85px — drifted from the navbar on screens
+               where the navbar's real height differs (e.g. mobile).
+               main.js already computes --navbar-height on resize, so
+               anchor to that instead, with 85px as a safe fallback. */
+            top: calc(var(--navbar-height, 70px) + 15px);
             left: 50%;
             transform: translateX(-50%) translateY(-8px);
             z-index: 1040;
@@ -74,6 +78,16 @@
             visibility: hidden;
             pointer-events: none;
             transition: opacity 0.2s ease, transform 0.2s ease;
+            /* prevent horizontal overflow/clipping on narrow phones */
+            max-width: calc(100vw - 24px);
+            box-sizing: border-box;
+        }
+
+        @media (max-width: 480px) {
+            #custom-lang-switcher {
+                padding: 10px 16px;
+                border-radius: 20px;
+            }
         }
 
         #custom-lang-switcher.show {
