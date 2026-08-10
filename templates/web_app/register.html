@@ -15,6 +15,14 @@
             <div id="error-alert" class="alert alert-danger d-none"></div>
             <div id="success-alert" class="alert alert-success d-none"></div>
 
+            <div id="g_id_signin_container" class="d-flex justify-content-center mb-3"></div>
+
+            <div class="d-flex align-items-center mb-3">
+                <hr class="flex-grow-1">
+                <span class="px-2 text-muted small">or register with email</span>
+                <hr class="flex-grow-1">
+            </div>
+
             <div class="row">
                 <div class="col-6 mb-3">
                     <label class="form-label">Username *</label>
@@ -81,6 +89,9 @@
         display: none !important;
     }
 </style>
+
+<!-- Google Identity Services SDK -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <script>
 (function() {
@@ -166,6 +177,63 @@ function getCookie(name) {
         });
     }
     return cookieValue;
+}
+
+// ── Google Sign-In ───────────────────────────────────────────────────────────
+// Google le nai email verify garisakeko huncha, tesaile Google le banaeko
+// account seedhai active huncha — hamro afnai verification-email step
+// yaha skip huncha (backend ko GoogleLoginView herun्).
+function initGoogleSignIn() {
+    if (typeof google === 'undefined' || !google.accounts) {
+        setTimeout(initGoogleSignIn, 200);
+        return;
+    }
+    google.accounts.id.initialize({
+        client_id: '{{ GOOGLE_CLIENT_ID }}',
+        callback: handleGoogleCredential,
+        use_fedcm_for_button: true,
+    });
+    google.accounts.id.renderButton(
+        document.getElementById('g_id_signin_container'),
+        { theme: 'outline', size: 'large', width: 320, text: 'signup_with' }
+    );
+}
+initGoogleSignIn();
+
+async function handleGoogleCredential(response) {
+    const errDiv = document.getElementById('error-alert');
+    errDiv.classList.add('d-none');
+
+    try {
+        const res = await fetch('/auth/google-login/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ credential: response.credential }),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            localStorage.setItem('access_token', data.access);
+            localStorage.setItem('refresh_token', data.refresh);
+
+            const role = data.user?.role || '';
+            const redirectMap = {
+                admin: '/admin-dashboard/',
+                driver: '/driver-dashboard/',
+                user: '/',
+            };
+            window.location.href = redirectMap[role] || '/dashboard/';
+        } else {
+            errDiv.textContent = data.error || 'Google sign-in failed.';
+            errDiv.classList.remove('d-none');
+        }
+    } catch (e) {
+        errDiv.textContent = 'Network error: ' + e.message;
+        errDiv.classList.remove('d-none');
+    }
 }
 
 // Enter key थिच्दा अर्को इनपुट फिल्डमा फोकस लैजाने लोजिक
