@@ -4,8 +4,8 @@
 {% block title %}Register — Waste Collection{% endblock %}
 
 {% block content %}
-<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light py-4">
-    <div class="card shadow-sm" style="width:440px">
+<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light py-4 px-3">
+    <div class="card shadow-sm w-100" style="max-width:440px">
         <div class="card-body p-4">
             <div class="text-center mb-4">
                 <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="Logo" width="100" height="100" class="d-inline-block align-text-top me-2">
@@ -16,11 +16,11 @@
             <div id="success-alert" class="alert alert-success d-none"></div>
 
             <div class="row">
-                <div class="col-6 mb-3">
+                <div class="col-12 col-sm-6 mb-3">
                     <label class="form-label">Username *</label>
                     <input type="text" id="username" class="form-control" autofocus>
                 </div>
-                <div class="col-6 mb-3">
+                <div class="col-12 col-sm-6 mb-3">
                     <label class="form-label">Email *</label>
                     <input type="email" id="email" class="form-control">
                 </div>
@@ -37,7 +37,7 @@
                 </select>
             </div>
             <div class="row">
-                <div class="col-6 mb-3">
+                <div class="col-12 col-sm-6 mb-3">
                     <label class="form-label">Password *</label>
                     <div class="position-relative">
                         <input type="password" id="password" class="form-control pe-5" oninput="handlePasswordInput()">
@@ -45,7 +45,7 @@
                             id="toggle-password-icon" style="cursor: pointer; display: none;" onclick="togglePassword()"></i>
                     </div>
                 </div>
-                <div class="col-6 mb-3">
+                <div class="col-12 col-sm-6 mb-3">
                     <label class="form-label">Confirm Password *</label>
                     <div class="position-relative">
                         <input type="password" id="password2" class="form-control pe-5" oninput="handlePassword2Input()">

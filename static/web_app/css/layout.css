@@ -304,6 +304,18 @@
         .content-col {
             padding: 1rem 0.75rem;
         }
+
+        /* Every page template wraps its content in a top-level
+           .container-fluid.px-4.py-3 inside #content-app — same fixed
+           24px side padding on every screen size. Descendant selector
+           (not >) since it actually sits one level deeper, inside
+           .main-body-wrapper. Scoped to #content-app so the navbar's
+           own .container-fluid in base.html is never touched. */
+        #content-app .container-fluid {
+            padding-left: 0.85rem !important;
+            padding-right: 0.85rem !important;
+            padding-top: 0.75rem !important;
+        }
     }
 
     @media (max-width: 575.98px) {

@@ -126,13 +126,9 @@
        just tighter spacing + reflow-friendly sizing on small screens.
        ══════════════════════════════════════════════════════════════ */
     @media (max-width: 767.98px) {
-        /* Outer page padding was fixed at px-4 py-3 (24px sides) on
-           every screen size — wastes ~15% of width on a phone. */
-        #content-app > .container-fluid {
-            padding-left: 0.85rem !important;
-            padding-right: 0.85rem !important;
-            padding-top: 0.75rem !important;
-        }
+        /* Outer page padding (#content-app .container-fluid) is now
+           handled globally in layout.css so every page benefits, not
+           just this one. */
 
         /* Complaint-type picker (3 per row) — give it a bit more
            breathing room so the label text doesn't feel cramped. */
