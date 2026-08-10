@@ -135,6 +135,14 @@
         gap: 1.25rem;
         flex-wrap: wrap;
     }
+
+    /* 600px map height ate almost the whole viewport on a phone,
+       pushing controls/waypoints far below the fold. */
+    @media (max-width: 767.98px) {
+        #route-map {
+            height: 340px;
+        }
+    }
 </style>
 {% endblock %}
 
