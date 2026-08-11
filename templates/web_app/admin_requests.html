@@ -147,7 +147,7 @@
 
                         <div class="col-lg-3 col-md-6 col-sm-12">
                             <label class="form-label small fw-semibold text-secondary mb-1">Filter Pipeline Lifecycle</label>
-                            <select name="status" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').submit()">
+                            <select name="status" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').requestSubmit()">
                                 <option value="">All Lifecycles / Statuses</option>
                                 {% for key, label in status_choices %}
                                 <option value="{{ key }}" {% if current_status == key %}selected{% endif %}>{{ label }}</option>
@@ -157,7 +157,7 @@
 
                         <div class="col-lg-3 col-md-6 col-sm-12">
                             <label class="form-label small fw-semibold text-secondary mb-1">Filter Waste Type</label>
-                            <select name="waste_type" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').submit()">
+                            <select name="waste_type" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').requestSubmit()">
                                 <option value="">All Waste Types</option>
                                 {% for key, label in waste_type_choices %}
                                 <option value="{{ key }}" {% if current_waste_type == key %}selected{% endif %}>{{ label }}</option>
@@ -168,10 +168,17 @@
                         <div class="col-lg-3 col-md-6 col-sm-12">
                             <label class="form-label small fw-semibold text-secondary mb-1">Filter Report Date</label>
                             <input type="date" name="report_date" class="form-control" value="{{ current_report_date|default:'' }}"
-                                   style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').submit()">
+                                   style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').requestSubmit()">
+                        </div>
+                        <div class="col-lg-3 col-md-6 col-sm-12">
+                            <label class="form-label small fw-semibold text-secondary mb-1">Needs Review</label>
+                            <select name="needs_review" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').requestSubmit()">
+                                <option value="">All Requests</option>
+                                <option value="true" {% if current_needs_review == 'true' %}selected{% endif %}>Flagged for Review Only</option>
+                            </select>
                         </div>
 
-                        {% if current_status or current_search or current_waste_type or current_report_date %}
+                        {% if current_status or current_search or current_waste_type or current_report_date or current_needs_review %}
                         <div class="col-12 mt-2 text-end">
                             <a href="{% url 'admin-requests' %}" class="btn btn-sm btn-outline-secondary px-3">
                                 <i class="bi bi-x-circle me-1"></i>Clear All Active Filters
@@ -248,7 +255,7 @@
 
                                     {# ===== AI SEVERITY CELL — ML gatekeeper model prediction ===== #}
 
-                                    <td>
+                                    <td id="severity-cell-{{ req.id }}">
                                         {% if req.severity %}
                                             <div class="d-flex align-items-center gap-1">
                                                 <span class="badge severity-badge rounded-pill
@@ -267,6 +274,20 @@
                                             {% if req.ml_confidence %}
                                                 <div class="text-muted" style="font-size: 0.68rem;">{{ req.ml_confidence }}% confidence</div>
                                             {% endif %}
+                                            {# ===== REVIEW ACTIONS — only shown while needs_manual_review is True ===== #}
+                                            {% if req.needs_manual_review %}
+                                            <div class="d-flex gap-1 mt-1" id="review-actions-{{ req.id }}">
+                                                <button class="btn btn-outline-success py-0 px-1" style="font-size: 0.68rem;"
+                                                    onclick="resolveReview({{ req.id }}, 'approve', this)" title="Confirm this is real waste">
+                                                    <i class="bi bi-check-lg"></i> Approve
+                                                </button>
+                                                <button class="btn btn-outline-danger py-0 px-1" style="font-size: 0.68rem;"
+                                                    onclick="resolveReview({{ req.id }}, 'reject', this)" title="Confirm this is NOT waste — cancels the request">
+                                                    <i class="bi bi-x-lg"></i> Reject
+                                                </button>
+                                            </div>
+                                            {% endif %}
+                                            {# ===== END REVIEW ACTIONS ===== #}
                                         {% else %}
                                             <span class="text-muted small"><i class="bi bi-dash-circle me-1"></i>Not Scanned</span>
                                         {% endif %}
@@ -306,10 +327,12 @@
                                         {% else %}
                                             <div class="d-flex flex-column gap-1 align-items-start">
                                                 <span class="text-muted small italic"><i class="bi bi-exclamation-circle me-1"></i>Unassigned</span>
-                                                {% if req.status != 'completed' and req.status != 'cancelled' %}
+                                                {% if req.status != 'completed' and req.status != 'cancelled' and not req.needs_manual_review %}
                                                 <button class="btn btn-sm btn-outline-success py-1 px-2" style="font-size: 0.75rem;" onclick="openAssignModal({{ req.id }})">
                                                     <i class="bi bi-person-plus me-1"></i>Assign Driver
                                                 </button>
+                                                {% elif req.needs_manual_review %}
+                                                <span class="text-muted small" style="font-size: 0.7rem;"><i class="bi bi-hourglass-split me-1"></i>Awaiting Review</span>
                                                 {% endif %}
                                             </div>
                                         {% endif %}
@@ -328,7 +351,9 @@
                                         </div>
                                     </td>
                                     <td>
-                                        {% if req.status == 'completed' or req.status == 'cancelled' or req.status == 'assigned' or req.status == 'in_progress' %}
+                                        {% if req.needs_manual_review %}
+                                        <span class="text-muted small" title="Resolve the AI review flag before deleting">—</span>
+                                        {% elif req.status == 'completed' or req.status == 'cancelled' or req.status == 'assigned' or req.status == 'in_progress' %}
                                         <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }}, this)">
                                             <i class="bi bi-trash3"></i> Delete
                                         </button>
@@ -394,7 +419,7 @@
 </div>
 {# ===== END PHOTO GALLERY MODAL ===== #}
 
-{% endblock %}}
+{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -474,6 +499,14 @@ window.cancelRequest = async function(requestId, btn) {
             actionHtml: '<span class="text-muted small italic px-2">Lifecycle Locked</span>',
             showDelete: true,
         });
+        // Status cancelled bhaisake pachi "Assign Driver" button dekhinu hudaina
+        // (template logic sanga milaayera — status == 'cancelled' bhaye button hidden hunuparne).
+        // applyRequestRowUpdate le driverHtml: null pathayeko le driver cell chuँदैन, tesैले button
+        // yeहाँ explicitly हटाउनुपर्यो, natra reload nagarunjel purano button dekhirahancha.
+        const row = document.getElementById(`request-row-${requestId}`);
+        const driverCell = row ? row.children[8] : null;
+        const assignBtn = driverCell ? driverCell.querySelector('button') : null;
+        if (assignBtn) assignBtn.remove();
     } else {
         showToast('Failed to drop request pipeline node state.', 'danger');
     }
@@ -498,6 +531,67 @@ window.deleteRequest = async function(requestId, btn) {
         console.error(err);
         showToast("Delete failed.", "danger");
     }
+    });
+};
+
+// ── ML gatekeeper low-confidence review resolution (Approve / Reject) ─────
+window.resolveReview = async function(requestId, decision, btn) {
+    const confirmMsg = decision === 'approve'
+        ? 'Confirm this photo shows real waste? The review flag will be cleared.'
+        : 'Confirm this photo does NOT show waste? The request will be cancelled.';
+    if (!confirm(confirmMsg)) return;
+
+    await withButtonBusy(eventButton(btn), decision === 'approve' ? 'Approving...' : 'Rejecting...', async () => {
+        const data = await API.patch(`/api/waste-requests/${requestId}/resolve_review/`, { decision });
+        if (data && data.id) {
+            showToast(
+                decision === 'approve' ? 'Photo approved as waste.' : 'Request rejected and cancelled.',
+                decision === 'approve' ? 'success' : 'warning'
+            );
+            // Review action buttons + flag icon हटाउने — resolved भइसक्यो
+            const actionsDiv = document.getElementById(`review-actions-${requestId}`);
+            if (actionsDiv) actionsDiv.remove();
+            const cell = document.getElementById(`severity-cell-${requestId}`);
+            if (cell) {
+                const flagIcon = cell.querySelector('.review-flag');
+                if (flagIcon) flagIcon.remove();
+            }
+
+            if (decision === 'approve') {
+                // "Awaiting Review" hataayera Assign Driver button firta lyaune
+                // (driver already assigned bhaye touch nagarne)
+                const row = document.getElementById(`request-row-${requestId}`);
+                const driverCell = row ? row.children[8] : null;
+                if (driverCell && !driverCell.querySelector('button')) {
+                    const wrapper = driverCell.querySelector('.d-flex.flex-column');
+                    if (wrapper) {
+                        wrapper.innerHTML = `
+                            <span class="text-muted small italic"><i class="bi bi-exclamation-circle me-1"></i>Unassigned</span>
+                            <button class="btn btn-sm btn-outline-success py-1 px-2" style="font-size: 0.75rem;" onclick="openAssignModal(${requestId})">
+                                <i class="bi bi-person-plus me-1"></i>Assign Driver
+                            </button>`;
+                    }
+                }
+                // Delete button ni firta lyaune, yedi status delete-eligible cha bhane
+                // (pending ma delete hunna, tesle yo case ma normally lagu hudaina)
+                const controlCell = row ? row.children[10] : null;
+                if (controlCell && controlCell.textContent.trim() === '—') {
+                    // status pending bhaye Delete button dekhaaudaina (template logic sanga milcha)
+                }
+            }
+
+            // Reject गर्दा status pनि cancelled ma badल्ने
+            if (decision === 'reject') {
+                applyRequestRowUpdate(requestId, {
+                    statusKey: 'cancelled',
+                    driverHtml: null,
+                    actionHtml: '<span class="text-muted small italic px-2">Lifecycle Locked</span>',
+                    showDelete: true,
+                });
+            }
+        } else {
+            showToast('Failed to resolve review.', 'danger');
+        }
     });
 };
 
