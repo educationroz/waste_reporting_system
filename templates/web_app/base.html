@@ -15,6 +15,29 @@
 
     <!-- HTMX + Head-Support Extension -->
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js"></script>
+    <script>
+        // Disable htmx's sessionStorage history cache entirely.
+        // We were hitting QuotaExceededError trying to snapshot heavy
+        // pages (the dashboard's Leaflet map alone renders hundreds of
+        // tile/marker DOM elements) into sessionStorage on every single
+        // navigation — even after scoping the snapshot to #content-app
+        // via hx-history-elt, a few pages were still too big and every
+        // save attempt failed, spamming htmx:historyCacheError.
+        // Setting historyCacheSize to 0 stops htmx from writing snapshots
+        // at all: Back/Forward now always re-fetches the page fresh via
+        // a normal boosted AJAX GET instead of restoring from a cached
+        // blob. Still no full white-flash reload (only #content-app gets
+        // swapped, same as any other boosted navigation) — just no more
+        // storage writes, so no more quota errors and no more stale
+        // content (like the profile-picture-reverting bug) either.
+        htmx.config.historyCacheSize = 0;
+        try {
+            // Clean up any already-corrupted cache entry from before this fix.
+            sessionStorage.removeItem('htmx-history-cache');
+        } catch (e) {
+            // sessionStorage itself blocked (privacy mode etc.) — nothing to clean up.
+        }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/ext/head-support.js"></script>
 
     <!-- Google Translate API -->
@@ -36,14 +59,30 @@
         })();
     </script>
 
-    <!-- FOUC Prevention Hide Script -->
+    <!--
+        FOUC Prevention Hide Script
+
+        GUARD ADDED: this was the actual cause of "click on profile after
+        Back/sidebar doesn't work". On an hx-boost="true" site, native
+        Back navigation (history.back()) doesn't reload the document — it
+        makes htmx restore the page from its history cache, which
+        re-inserts and RE-RUNS every <script> in <head>, including this
+        one. Re-running it set documentElement.style.visibility = "hidden"
+        again, and for the next 2 seconds every element on the page —
+        including the profile dropdown — is invisible AND non-clickable
+        (visibility:hidden elements don't receive pointer events), even
+        though nothing looked different because the page briefly "flashed"
+        hidden/visible so fast you might not have consciously noticed it.
+        The guard below makes this run only once per real page load.
+    -->
     <script>
-        (function () {
+        if (!window.__ssFoucHideRan) {
+            window.__ssFoucHideRan = true;
             document.documentElement.style.visibility = "hidden";
             window.setTimeout(function () {
                 document.documentElement.style.visibility = "visible";
             }, 2000);
-        })();
+        }
     </script>
 
     <style>
@@ -57,6 +96,14 @@
         
         body {
             top: 0px !important;
+        }
+
+        .navbar-profile-pic {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid var(--border-color, #dee2e6);
         }
 
         #custom-lang-switcher {
@@ -157,9 +204,9 @@
     <div class="container-fluid d-flex align-items-center flex-nowrap position-relative">
         <a class="navbar-brand notranslate d-flex align-items-center flex-shrink-1 me-2" href="/" translate="no" style="min-width:0;">
             <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="Logo" width="40" height="40" class="d-inline-block align-text-top me-2 flex-shrink-0">
-            <span class="fw-semibold text-truncate" style="color: #56dd59;">
-                <span class="d-none d-sm-inline">Safha Sahar</span>
-                <span class="d-inline d-sm-none">Safha</span>
+            <span class="fw-semibold text-truncate" style="color: #25be27;">
+                <span class="d-none d-sm-inline">SafhaSahar</span>
+                
             </span>
         </a>
 
@@ -184,12 +231,25 @@
                 </a>
                 <div class="dropdown">
                     <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" hx-boost="false" data-bs-toggle="dropdown">
-                        <i class="bi bi-person-circle me-1"></i>
+                        <!--
+                            Wrapped in #navbar-avatar-slot so profile.html can
+                            swap the img/icon in place after a successful
+                            Save Changes — without needing a full page refresh.
+                            See window.updateNavbarAvatar() below.
+                        -->
+                        <span id="navbar-avatar-slot" class="d-inline-flex align-items-center me-1">
+                            {% if user.profile_picture %}
+                                <img id="navbar-profile-pic" src="{{ user.profile_picture.url }}" alt="Profile" class="navbar-profile-pic">
+                            {% else %}
+                                <i class="bi bi-person-circle" id="navbar-profile-pic-placeholder"></i>
+                            {% endif %}
+                        </span>
                         <span class="d-none d-lg-inline">{{ user.username }}</span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><span class="dropdown-item-text text-muted small">{{ user.role|capfirst }}</span></li>
                         <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person-circle me-2"></i>View Profile</a></li>
                         <li><a class="dropdown-item" href="#" hx-boost="false" onclick="toggleLangSwitcher(); return false;"><i class="bi bi-translate me-2"></i>Translate</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="#" hx-boost="false" onclick="logout(); return false;"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
@@ -205,8 +265,20 @@
 <!-- MOBILE OVERLAY BACKDROP -->
 <div id="sidebar-backdrop" class="sidebar-backdrop" onclick="toggleSidebarMenu()"></div>
 
-<!-- MAIN CONTENT AREA (HTMX TARGET) -->
-<main id="content-app" class="site-main">
+<!-- MAIN CONTENT AREA (HTMX TARGET)
+     hx-history-elt: tells htmx to snapshot/restore ONLY this element's
+     content for Back/forward navigation, instead of its default of the
+     whole <body>. Without this, htmx was caching the ENTIRE body
+     (navbar included) at each navigation and replaying that stale
+     snapshot on Back — which is why a profile-picture update made via
+     Save Changes would visually "undo itself" the moment you hit Back
+     (the navbar's live-updated avatar got overwritten by the earlier,
+     stale cached navbar), and why the avatar dropdown would sometimes
+     stop responding to clicks right after. Scoping the cache to
+     #content-app means the navbar is never part of any history
+     snapshot, so it simply stays as-is across every boosted / Back
+     navigation. -->
+<main id="content-app" class="site-main" hx-history-elt>
     <div class="main-body-wrapper">
         {% if messages %}
             <div class="container pt-3">
@@ -444,18 +516,40 @@ document.addEventListener("DOMContentLoaded", function() {
         if (p === 0) return s;
         return out + s.slice(p);
     };
+
+    // Called from profile.html right after a successful Save Changes, so the
+    // navbar avatar (top-right dropdown) updates instantly without a page
+    // refresh. `url` can be a real server URL or a local base64 data URL —
+    // either works since we just set it as the <img> src.
+    window.updateNavbarAvatar = function updateNavbarAvatar(url) {
+        const slot = document.getElementById('navbar-avatar-slot');
+        if (!slot || !url) return;
+        slot.innerHTML = '<img id="navbar-profile-pic" src="' + url + '" alt="Profile" class="navbar-profile-pic">';
+    };
 })();
 </script>
 
 <!-- AUTHENTICATED USER SCRIPT -->
 {% if user.is_authenticated %}
 <script>
+// GUARD: this whole block used to run again whenever htmx restored a page
+// from its history cache (e.g. after a native browser Back navigation on an
+// hx-boost="true" site) — the underlying <body> document never actually
+// unloads, only #content-app gets swapped, so re-running this script hit
+// "Identifier 'API' has already been declared" (const/let can't be
+// redeclared in the same scope) and also silently double-registered every
+// htmx/websocket event listener below. Wrapping everything in this guard
+// makes the whole init block idempotent: it does nothing after the first run.
+if (!window.__ssAuthScriptLoaded) {
+    window.__ssAuthScriptLoaded = true;
+
     const API = {
         get: (url) => apiFetch('GET', url),
         post: (url, data) => apiFetch('POST', url, data),
         patch: (url, data) => apiFetch('PATCH', url, data),
         delete: (url) => apiFetch('DELETE', url),
     };
+    window.API = API;
 
     function getToken() { return localStorage.getItem('access_token'); }
 
@@ -544,7 +638,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    async function authFetch(url, options = {}) {
+    window.authFetch = async function authFetch(url, options = {}) {
         let token = localStorage.getItem('access_token');
 
         const makeRequest = (t) => {
@@ -577,9 +671,9 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         return res;
-    }
+    };
 
-    async function logout() {
+    window.logout = async function logout() {
         const refresh = localStorage.getItem('refresh_token');
         if (refresh) {
             try {
@@ -604,7 +698,7 @@ document.addEventListener("DOMContentLoaded", function() {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         window.location.href = '/logout/';
-    }
+    };
 
     function refreshNotifBadge() {
         const badge = document.getElementById('notif-badge');
@@ -852,6 +946,7 @@ document.addEventListener("DOMContentLoaded", function() {
             setTimeout(() => window.location.reload(), 1000);
         }
     });
+} // end __ssAuthScriptLoaded guard
 </script>
 {% endif %}
 
@@ -862,6 +957,19 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!content) return;
         content.classList.remove('htmx-swapping');
         content.style.opacity = '';
+    });
+
+    // htmx tries to save a snapshot of #content-app (see hx-history-elt
+    // above) into sessionStorage on every navigation, so Back/forward can
+    // restore it instantly. Some browsers' privacy features (e.g. Edge's
+    // "Tracking Prevention", or private/incognito modes) block storage
+    // access and make that save throw — htmx surfaces this as a
+    // htmx:historyCacheError event. This is harmless: navigation itself
+    // still works fine, htmx just falls back to a normal boosted request
+    // instead of an instant cache restore. Without this listener the
+    // browser logs it as a loud uncaught error; we just quiet it down.
+    document.body.addEventListener('htmx:historyCacheError', function (evt) {
+        console.warn('htmx history cache unavailable (likely browser storage blocking) — navigation still works normally:', evt.detail);
     });
 
    // Dynamic Sidebar Toggle for Both Mobile & Desktop

@@ -323,6 +323,14 @@ class ProfileView(AuthScopedThrottleMixin, generics.RetrieveUpdateAPIView):
     # Uses DEFAULT_THROTTLE_RATES['user'] from settings.
     # No need for a tighter scope — profile writes are infrequent and owned.
 
+    def get_object(self):
+        # "My profile" endpoint — always the logged-in user, never looked up
+        # by a URL param/queryset filter. Without this, DRF's default
+        # get_object() tries self.get_queryset(), which isn't defined here,
+        # and raises an AssertionError → surfaces to the client as an
+        # unhandled 500 on every GET/PATCH to this endpoint.
+        return self.request.user
+
 
 class ChangePasswordView(AuthScopedThrottleMixin, APIView):
     """Change password. Requires current password for verification."""

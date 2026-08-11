@@ -1250,6 +1250,64 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def resolve_review(self, request, pk=None):
+        """
+        PATCH /api/waste-requests/{id}/resolve_review/
+        Admin manually resolves a low-ML-confidence photo that was flagged
+        for review (needs_manual_review=True). Two outcomes:
+          - decision='approve': admin confirms it IS real waste — clears the
+            review flag, keeps the ML-predicted severity as-is (admin trusts
+            it after eyeballing the photo).
+          - decision='reject': admin confirms it is NOT waste — cancels the
+            request outright (mirrors what would have happened if the ML
+            gatekeeper had rejected it at upload time) and clears the flag.
+        Either way needs_manual_review is cleared so it drops out of the
+        admin's review queue once actioned.
+        """
+        waste_request = self.get_object()
+        decision = request.data.get('decision')
+
+        if decision not in ('approve', 'reject'):
+            return Response(
+                {'error': "decision must be 'approve' or 'reject'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not waste_request.needs_manual_review:
+            return Response(
+                {'error': 'This request is not flagged for review.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        waste_request.needs_manual_review = False
+        update_fields = ['needs_manual_review']
+
+        if decision == 'reject':
+            waste_request.status = 'cancelled'
+            update_fields.append('status')
+
+        waste_request.save(update_fields=update_fields)
+
+        _log_admin_action(
+            request, 'update', 'WasteRequest', waste_request,
+            f'Admin {request.user.username} {"approved" if decision == "approve" else "rejected"} '
+            f'low-confidence photo review for request #{waste_request.id} '
+            f'(ML confidence was {waste_request.ml_confidence}%).'
+        )
+
+        if decision == 'reject' and waste_request.user_id:
+            _create_notification(
+                user=waste_request.user,
+                title='Request Cancelled',
+                message=f'Your report #{waste_request.id} was reviewed and cancelled — '
+                        f'the photo did not appear to show waste.',
+                notification_type='warning',
+                related_request=waste_request,
+            )
+
+        return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
+
     @action(detail=True, methods=['patch'])
     def soft_delete(self, request, pk=None):
         """

@@ -147,6 +147,12 @@ class LoginPageView(TemplateView):
             return redirect_by_role(request.user)
         return super().dispatch(request, *args, **kwargs)
 
+class ProfilePageView(LoginRequiredMixin, TemplateView):
+    """Renders the logged-in user's profile page. Data comes straight from
+    request.user (no extra queries needed) — editing (phone/address/photo)
+    happens client-side via auth_app's existing /auth/profile/ PATCH endpoint."""
+    template_name = 'web_app/profile.html'
+
 
 class RegisterPageView(TemplateView):
     """Renders the register page. Registration via REST API + JS."""
@@ -308,9 +314,13 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         waste_type_filter = self.request.GET.get('waste_type')
         search_query = self.request.GET.get('search', '').strip()
         report_date = parse_date(self.request.GET.get('report_date', '').strip())
+        needs_review_filter = self.request.GET.get('needs_review', '').strip().lower()
 
         if status_filter:
             qs = qs.filter(status=status_filter)
+
+        if needs_review_filter == 'true':
+            qs = qs.filter(needs_manual_review=True)
 
         if waste_type_filter:
             qs = qs.filter(waste_type=waste_type_filter)
@@ -342,6 +352,7 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         ctx['current_search'] = self.request.GET.get('search', '')
         ctx['current_waste_type'] = self.request.GET.get('waste_type', '')
         ctx['current_report_date'] = self.request.GET.get('report_date', '')
+        ctx['current_needs_review'] = self.request.GET.get('needs_review', '')
         return ctx
 
 class AdminDriverListView(LoginRequiredMixin, ListView):
