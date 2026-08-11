@@ -27,7 +27,7 @@ from .models import (
     AdminLog, Bin, Checkpoint, Complaint, Driver, Notification, Route, Schedule,
     SystemSettings, Vehicle, WasteRequest, WasteRequestPhoto,
 )
-from .permissions import IsAdminOrReadOnly, IsAdminUser, IsOwnerOrAdmin
+from .permissions import IsAdminOrReadOnly, IsAdminUser, IsOwnerOrAdmin, IsSuperAdminUser
 from .serializers import (
     AdminLogSerializer,
     BinSerializer,
@@ -275,8 +275,13 @@ def _notify_admins(title, message, notification_type='info'):
         )
 
 class DatabaseBackupViewSet(viewsets.GenericViewSet):
-    """Create, list, download, restore, and delete JSON database backups."""
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    """Create, list, download, restore, and delete JSON database backups.
+
+    Restricted to superadmins — this is the most destructive surface in the
+    app (restore replaces live data), so a regular operator admin shouldn't
+    be able to reach it even though they're role='admin'.
+    """
+    permission_classes = [IsAuthenticated, IsSuperAdminUser]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     @action(detail=False, methods=['get'])
@@ -686,7 +691,7 @@ class CheckpointViewSet(viewsets.ModelViewSet):
         
 class AdminUserCreateView(APIView):
     """POST /api/auth/create-admin/ — superadmin creates a new admin account."""
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsSuperAdminUser]
 
     def post(self, request):
         username = request.data.get('username')
@@ -694,6 +699,9 @@ class AdminUserCreateView(APIView):
         email = request.data.get('email', '')
         first_name = request.data.get('first_name', '')
         last_name = request.data.get('last_name', '')
+        # Only reachable by a superadmin (permission_classes above), so it's
+        # safe to let the requester set this flag directly on create.
+        is_superadmin = bool(request.data.get('is_superadmin', False))
 
         if not username or not password:
             return Response(
@@ -716,11 +724,13 @@ class AdminUserCreateView(APIView):
         )
         admin_user.role = 'admin'
         admin_user.is_staff = True
-        admin_user.save(update_fields=['role', 'is_staff'])
+        admin_user.is_superadmin = is_superadmin
+        admin_user.save(update_fields=['role', 'is_staff', 'is_superadmin'])
 
         _log_admin_action(
             request, 'create', 'AdminUser', admin_user,
             f'Created admin account {admin_user.username}'
+            + (' (superadmin)' if is_superadmin else '')
         )
 
         return Response({
@@ -730,12 +740,13 @@ class AdminUserCreateView(APIView):
             'first_name': admin_user.first_name,
             'last_name': admin_user.last_name,
             'role': admin_user.role,
+            'is_superadmin': admin_user.is_superadmin,
         }, status=status.HTTP_201_CREATED)
 
 
 class AdminUserUpdateView(APIView):
     """PATCH/PUT /api/auth/admin/{admin_id}/update/ — edit an admin account."""
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsSuperAdminUser]
 
     def patch(self, request, admin_id):
         try:
@@ -746,6 +757,12 @@ class AdminUserUpdateView(APIView):
         for field in ('first_name', 'last_name', 'email'):
             if field in request.data:
                 setattr(admin_user, field, request.data[field])
+
+        # A superadmin can grant/revoke is_superadmin on other admins, but
+        # never on themselves — otherwise the last superadmin could lock
+        # themselves out, or demote themselves mid-session by accident.
+        if 'is_superadmin' in request.data and admin_user.id != request.user.id:
+            admin_user.is_superadmin = bool(request.data['is_superadmin'])
 
         new_password = request.data.get('password')
         if new_password:
@@ -765,6 +782,7 @@ class AdminUserUpdateView(APIView):
             'first_name': admin_user.first_name,
             'last_name': admin_user.last_name,
             'role': admin_user.role,
+            'is_superadmin': admin_user.is_superadmin,
         })
 
     def put(self, request, admin_id):
@@ -773,7 +791,7 @@ class AdminUserUpdateView(APIView):
 
 class AdminUserDeleteView(APIView):
     """DELETE /api/auth/admin/{admin_id}/delete/ — remove an admin account."""
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsSuperAdminUser]
 
     def delete(self, request, admin_id):
         try:

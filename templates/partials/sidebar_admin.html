@@ -23,9 +23,11 @@
     <a href="{% url 'route-planning' %}" class="nav-link mb-2 d-flex align-items-center {% if request.resolver_match.url_name == 'route-planning' %}active bg-success{% endif %}">
         <i class="bi bi-map me-2"></i><span class="sidebar-link-text">Route Planning</span>
     </a>
+    {% if user.is_superadmin %}
     <a href="{% url 'admin-users' %}" class="nav-link mb-2 d-flex align-items-center {% if request.resolver_match.url_name == 'admin-users' %}active bg-success{% endif %}">
         <i class="bi bi-shield-check me-2"></i><span class="sidebar-link-text">Security Admins</span>
     </a>
+    {% endif %}
     <a href="{% url 'admin-logs' %}" class="nav-link mb-2 d-flex align-items-center {% if request.resolver_match.url_name == 'admin-logs' %}active bg-success{% endif %}">
         <i class="bi bi-file-earmark-text me-2"></i><span class="sidebar-link-text">Activity Logs</span>
     </a>

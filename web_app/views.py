@@ -526,6 +526,11 @@ class AdminUsersManagementView(LoginRequiredMixin, ListView):
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated and request.user.role != 'admin':
             return redirect_by_role(request.user)
+        # Managing other admin accounts (including granting superadmin) is
+        # superadmin-only — a regular operator admin gets bounced to the
+        # dashboard instead.
+        if request.user.is_authenticated and not request.user.is_superadmin:
+            return redirect('/admin-dashboard/')
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -591,6 +596,7 @@ class AdminSettingsView(LoginRequiredMixin, TemplateView):
         from api_app.models import SystemSettings
         ctx = super().get_context_data(**kwargs)
         ctx['settings'] = SystemSettings.objects.all()
+        ctx['is_superadmin'] = self.request.user.is_superadmin
         ctx['system_info'] = {
             'total_requests': WasteRequest.objects.count(),
             'total_users': User.objects.filter(role='user').count(),

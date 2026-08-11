@@ -16,6 +16,11 @@ class User(AbstractUser):
         upload_to='profile_pics/', blank=True, null=True
     )
     is_verified = models.BooleanField(default=False)
+    is_superadmin = models.BooleanField(
+        default=False,
+        help_text='Superadmins can manage other admin accounts and restore the database. '
+                   'Regular admins (operators) cannot.'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
  

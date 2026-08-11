@@ -105,7 +105,12 @@
                                             </div>
                                         {% endif %}
                                         <div>
-                                            <div class="fw-bold">{{ admin.get_full_name|default:admin.username }}</div>
+                                            <div class="fw-bold">
+                                                {{ admin.get_full_name|default:admin.username }}
+                                                {% if admin.is_superadmin %}
+                                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle rounded-pill px-2 py-0.5 ms-1" style="font-size: 0.65rem;"><i class="bi bi-star-fill me-1"></i>Superadmin</span>
+                                                {% endif %}
+                                            </div>
                                             <div class="small text-muted">{{ admin.phone|default:"-" }}</div>
                                         </div>
                                     </div>
@@ -139,6 +144,7 @@
                                             data-admin-last-name="{{ admin.last_name|escape }}"
                                             data-admin-full-name="{{ admin.get_full_name|default:admin.username|escape }}"
                                             data-admin-active="{{ admin.is_active|yesno:'true,false' }}"
+                                            data-admin-is-superadmin="{{ admin.is_superadmin|yesno:'true,false' }}"
                                             title="Edit Administrative Access"
                                         >
                                             <i class="bi bi-pencil"></i>
@@ -191,6 +197,13 @@
                         <label class="form-label small fw-semibold text-secondary">Password Security</label>
                         <input type="password" class="form-control" id="password" placeholder="Create robust password" required>
                     </div>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="is_superadmin">
+                        <label class="form-check-label small fw-semibold text-secondary" for="is_superadmin">
+                            Superadmin
+                            <span class="text-muted fw-normal">— can manage other admins and restore the database</span>
+                        </label>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer bg-surface-alt border-top-0">
@@ -228,9 +241,17 @@
                         <label class="form-label small fw-semibold text-secondary">New Password</label>
                         <input type="password" class="form-control" id="edit_password" placeholder="Leave blank to keep current password">
                     </div>
-                    <div class="form-check form-switch mb-0">
+                    <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" id="edit_is_active">
                         <label class="form-check-label small fw-semibold text-secondary" for="edit_is_active">Active account</label>
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="edit_is_superadmin">
+                        <label class="form-check-label small fw-semibold text-secondary" for="edit_is_superadmin">
+                            Superadmin
+                            <span class="text-muted fw-normal">— can manage other admins and restore the database</span>
+                        </label>
+                        <div id="edit_is_superadmin_self_note" class="form-text small d-none">You can't change your own superadmin status.</div>
                     </div>
                 </form>
             </div>
@@ -246,6 +267,8 @@
 {% block extra_js %}
 <script>
 (function() {
+const currentUserId = {{ request.user.id }};
+
 const editAdminModal = document.getElementById('editAdminModal');
 if (editAdminModal) {
     editAdminModal.addEventListener('show.bs.modal', function (event) {
@@ -260,6 +283,13 @@ if (editAdminModal) {
         document.getElementById('edit_full_name').value = button.dataset.adminFullName || '';
         document.getElementById('edit_password').value = '';
         document.getElementById('edit_is_active').checked = (button.dataset.adminActive === 'true');
+
+        const isEditingSelf = String(button.dataset.adminId) === String(currentUserId);
+        const superadminCheckbox = document.getElementById('edit_is_superadmin');
+        const selfNote = document.getElementById('edit_is_superadmin_self_note');
+        superadminCheckbox.checked = (button.dataset.adminIsSuperadmin === 'true');
+        superadminCheckbox.disabled = isEditingSelf;
+        selfNote.classList.toggle('d-none', !isEditingSelf);
     });
 }
 
@@ -327,10 +357,15 @@ function buildAdminRowHtml(admin, isActive) {
     const lastName = escapeHtml(admin.last_name || '');
     const phone = escapeHtml(admin.phone || '-');
     const adminId = admin.id;
+    const isSuperadmin = !!admin.is_superadmin;
 
     const statusBadge = isActive
         ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5"><i class="bi bi-check-circle me-1"></i>Active</span>'
         : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5"><i class="bi bi-x-circle me-1"></i>Inactive</span>';
+
+    const superadminBadge = isSuperadmin
+        ? '<span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle rounded-pill px-2 py-0.5 ms-1" style="font-size: 0.65rem;"><i class="bi bi-star-fill me-1"></i>Superadmin</span>'
+        : '';
 
     return `
         <tr id="admin-row-${adminId}">
@@ -340,7 +375,7 @@ function buildAdminRowHtml(admin, isActive) {
                         <i class="bi bi-person text-success fs-5"></i>
                     </div>
                     <div>
-                        <div class="fw-bold text-dark">${name}</div>
+                        <div class="fw-bold text-dark">${name}${superadminBadge}</div>
                         <div class="small text-muted">${phone}</div>
                     </div>
                 </div>
@@ -370,6 +405,7 @@ function buildAdminRowHtml(admin, isActive) {
                         data-admin-last-name="${lastName}"
                         data-admin-full-name="${name}"
                         data-admin-active="${isActive}"
+                        data-admin-is-superadmin="${isSuperadmin}"
                         title="Edit Administrative Access"
                     >
                         <i class="bi bi-pencil"></i>
@@ -395,9 +431,16 @@ function updateAdminRowDom(admin, isActive) {
     const row = document.getElementById(`admin-row-${admin.id}`);
     if (!row) return;
     const name = adminFullName(admin);
+    const isSuperadmin = !!admin.is_superadmin;
 
     const nameEl = row.children[0].querySelector('.fw-bold');
-    if (nameEl) nameEl.textContent = name;
+    if (nameEl) {
+        nameEl.textContent = name;
+        if (isSuperadmin) {
+            nameEl.insertAdjacentHTML('beforeend',
+                ' <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle rounded-pill px-2 py-0.5 ms-1" style="font-size: 0.65rem;"><i class="bi bi-star-fill me-1"></i>Superadmin</span>');
+        }
+    }
 
     const phoneEl = row.children[0].querySelector('.small.text-muted');
     if (phoneEl) phoneEl.textContent = admin.phone || '-';
@@ -423,6 +466,7 @@ function updateAdminRowDom(admin, isActive) {
         editBtn.dataset.adminLastName = admin.last_name || '';
         editBtn.dataset.adminFullName = name;
         editBtn.dataset.adminActive = isActive;
+        editBtn.dataset.adminIsSuperadmin = isSuperadmin;
     }
 }
 
@@ -433,6 +477,7 @@ window.addAdmin = async function(btn) {
     const email = document.getElementById('email').value.trim();
     const full_name = document.getElementById('full_name').value.trim();
     const password = document.getElementById('password').value;
+    const is_superadmin = document.getElementById('is_superadmin').checked;
     const [first_name, last_name] = splitFullName(full_name);
 
     if (!username || !email || !password) {
@@ -457,6 +502,7 @@ window.addAdmin = async function(btn) {
                 last_name: last_name,
                 password: password,
                 role: 'admin',
+                is_superadmin: is_superadmin,
             }),
         });
 
@@ -488,6 +534,13 @@ window.updateAdmin = async function(btn) {
     const fullName = document.getElementById('edit_full_name').value.trim();
     const password = document.getElementById('edit_password').value;
     const isActive = document.getElementById('edit_is_active').checked;
+    const superadminCheckbox = document.getElementById('edit_is_superadmin');
+    // Checkbox is disabled when editing your own account (see show.bs.modal
+    // handler above) — in that case we omit the field entirely rather than
+    // send a value, so it mirrors what the backend already enforces
+    // (a superadmin can't change their own flag) instead of silently lying
+    // about what was actually submitted.
+    const isSuperadmin = superadminCheckbox.disabled ? null : superadminCheckbox.checked;
     const [first_name, last_name] = splitFullName(fullName);
 
     if (!adminId || !username || !email) {
@@ -497,20 +550,25 @@ window.updateAdmin = async function(btn) {
 
     await withButtonBusy(eventButton(btn), 'Saving...', async () => {
     try {
+        const payload = {
+            username: username,
+            email: email,
+            first_name: first_name,
+            last_name: last_name,
+            password: password,
+            is_active: isActive,
+        };
+        if (isSuperadmin !== null) {
+            payload.is_superadmin = isSuperadmin;
+        }
+
         const res = await fetch(`/api/auth/admin/${adminId}/update/`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
             },
-            body: JSON.stringify({
-                username: username,
-                email: email,
-                first_name: first_name,
-                last_name: last_name,
-                password: password,
-                is_active: isActive,
-            }),
+            body: JSON.stringify(payload),
         });
 
         const data = await res.json();
