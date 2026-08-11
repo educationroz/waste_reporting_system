@@ -115,11 +115,13 @@
                                 <i class="bi bi-bell me-2"></i>Notifications
                             </button>
                         </li>
+                        {% if is_superadmin %}
                         <li class="nav-item">
                             <button class="nav-link fw-semibold text-secondary" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup-panel" type="button" role="tab">
                                 <i class="bi bi-cloud-arrow-down me-2"></i>Backup & Restore
                             </button>
                         </li>
+                        {% endif %}
                     </ul>
                 </div>
 
@@ -353,6 +355,7 @@
                         </div>
                     </div>
 
+                    {% if is_superadmin %}
                     <div class="tab-pane fade p-4" id="backup-panel" role="tabpanel">
                         <div class="row g-4">
                             <div class="col-12">
@@ -404,6 +407,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
             </div>
         </div> <!-- /content-col -->

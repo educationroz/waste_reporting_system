@@ -7,6 +7,23 @@ class IsAdminUser(BasePermission):
         return bool(request.user and request.user.is_authenticated and request.user.role == 'admin')
 
 
+class IsSuperAdminUser(BasePermission):
+    """Allow only admins with is_superadmin=True.
+
+    Used to gate the most destructive/sensitive admin actions — database
+    backup & restore, and creating/editing/deleting other admin accounts —
+    so a regular operator admin can't touch them even though they're
+    role='admin'.
+    """
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role == 'admin'
+            and request.user.is_superadmin
+        )
+
+
 class IsDriverUser(BasePermission):
     """Allow only users with role='driver'."""
     def has_permission(self, request, view):
