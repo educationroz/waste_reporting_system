@@ -14,6 +14,7 @@ from .views import (
     ForgotPasswordPageView,
     HomeView,
     LoginPageView,
+    ProfilePageView,
     NotificationsView,
     RegisterPageView,
     ResetPasswordPageView,
@@ -31,6 +32,7 @@ urlpatterns = [
     path('recycle-bin/', UserRecycleBinView.as_view(), name='user-recycle-bin'),
     path('login/',    LoginPageView.as_view(),    name='login'),
     path('logout/',   web_logout,                 name='web-logout'),
+    path('profile/', ProfilePageView.as_view(), name='profile'),
     path('register/', RegisterPageView.as_view(), name='register'),
 
     # Password reset (pages only — the actual reset logic lives in

@@ -47,7 +47,11 @@ CLASS_LABELS = [
     {'raw': 'medium', 'display': 'Medium Waste', 'is_waste': True, 'severity': 'medium'},
 ]
 
-LOW_CONFIDENCE_THRESHOLD = 45.0  # tapaiको testing script bata
+# LOW_CONFIDENCE_THRESHOLD = 45.0  # tapaiको testing script bata
+LOW_CONFIDENCE_THRESHOLD = 80.0  # 45 → 80: model kaile kaahi fake/wrong
+                                  # confident predict garne bhayeko le,
+                                  # confidence 80% bhanda tala aaye admin
+                                  # manual review ma pathaune
 
 
 def predict_waste(image_path_or_file):
