@@ -347,6 +347,29 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Extra friction for the single most destructive action in the admin
+        # panel: re-entering your own password. A stolen/left-open session
+        # (or a click-through on the JS confirm() dialog) isn't enough on
+        # its own to wipe and replace the live database.
+        admin_password = request.data.get('admin_password') or request.POST.get('admin_password')
+        if not admin_password or not request.user.check_password(admin_password):
+            try:
+                AdminLog.objects.create(
+                    admin_user=request.user,
+                    action='other',
+                    content_type='DatabaseBackup',
+                    object_id=None,
+                    object_description='Restore blocked: password confirmation failed or was missing.',
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+                )
+            except Exception as log_exc:
+                backup_logger.warning('Failed to log rejected restore password check: %s', log_exc)
+            return Response(
+                {'error': 'Incorrect password. Restore was cancelled for your protection.'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
         uploaded_file = request.FILES.get('backup_file')
         if not uploaded_file:
             return Response({'error': 'backup_file is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -354,6 +377,25 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
         uploaded_name = Path(uploaded_file.name).name
         if not uploaded_name.endswith('.json'):
             return Response({'error': 'Only .json backup files are supported.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Log the ATTEMPT itself — who and when — before any destructive
+        # work happens. The existing success-path log entry below records
+        # the outcome, but if the process crashes or the worker dies mid
+        # restore, this earlier entry is what still tells you who pulled
+        # the trigger and at what time. Best-effort: a logging hiccup here
+        # must never block the restore itself.
+        try:
+            AdminLog.objects.create(
+                admin_user=request.user,
+                action='other',
+                content_type='DatabaseBackup',
+                object_id=None,
+                object_description=f'Restore initiated from file {uploaded_name}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+            )
+        except Exception as log_exc:
+            backup_logger.warning('Failed to log restore attempt: %s', log_exc)
 
         # BUG FIX (T3.1): this used to stage the file, run its OWN manual
         # flush()+loaddata() right here with no safety net, THEN call
@@ -400,6 +442,18 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
                     'Restore failed for %r requested by %s: %s',
                     uploaded_file.name, request.user.username, msg,
                 )
+                try:
+                    AdminLog.objects.create(
+                        admin_user=request.user,
+                        action='other',
+                        content_type='DatabaseBackup',
+                        object_id=None,
+                        object_description=f'Restore FAILED for file {uploaded_name}: {msg[:200]}',
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+                    )
+                except Exception as log_exc:
+                    backup_logger.warning('Failed to log restore failure: %s', log_exc)
 
                 # Pre-flush validation failures (bad JSON / not a fixture /
                 # empty file) are safe, curated messages — nothing was
@@ -1245,64 +1299,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 title='Request Status Changed',
                 message=f'Request #{waste_request.id} was updated to "{new_status}" by an admin.',
                 notification_type='info',
-                related_request=waste_request,
-            )
-
-        return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
-
-    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
-    def resolve_review(self, request, pk=None):
-        """
-        PATCH /api/waste-requests/{id}/resolve_review/
-        Admin manually resolves a low-ML-confidence photo that was flagged
-        for review (needs_manual_review=True). Two outcomes:
-          - decision='approve': admin confirms it IS real waste — clears the
-            review flag, keeps the ML-predicted severity as-is (admin trusts
-            it after eyeballing the photo).
-          - decision='reject': admin confirms it is NOT waste — cancels the
-            request outright (mirrors what would have happened if the ML
-            gatekeeper had rejected it at upload time) and clears the flag.
-        Either way needs_manual_review is cleared so it drops out of the
-        admin's review queue once actioned.
-        """
-        waste_request = self.get_object()
-        decision = request.data.get('decision')
-
-        if decision not in ('approve', 'reject'):
-            return Response(
-                {'error': "decision must be 'approve' or 'reject'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not waste_request.needs_manual_review:
-            return Response(
-                {'error': 'This request is not flagged for review.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        waste_request.needs_manual_review = False
-        update_fields = ['needs_manual_review']
-
-        if decision == 'reject':
-            waste_request.status = 'cancelled'
-            update_fields.append('status')
-
-        waste_request.save(update_fields=update_fields)
-
-        _log_admin_action(
-            request, 'update', 'WasteRequest', waste_request,
-            f'Admin {request.user.username} {"approved" if decision == "approve" else "rejected"} '
-            f'low-confidence photo review for request #{waste_request.id} '
-            f'(ML confidence was {waste_request.ml_confidence}%).'
-        )
-
-        if decision == 'reject' and waste_request.user_id:
-            _create_notification(
-                user=waste_request.user,
-                title='Request Cancelled',
-                message=f'Your report #{waste_request.id} was reviewed and cancelled — '
-                        f'the photo did not appear to show waste.',
-                notification_type='warning',
                 related_request=waste_request,
             )
 
