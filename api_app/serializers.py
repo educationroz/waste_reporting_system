@@ -69,6 +69,14 @@ class CheckpointSerializer(serializers.ModelSerializer):
         model = Checkpoint
         fields = '__all__'
 
+    def validate(self, data):
+        lat = data.get('latitude')
+        lng = data.get('longitude')
+        if lat is not None and not (-90 <= lat <= 90):
+            raise serializers.ValidationError({'latitude': 'Latitude must be between -90 and 90.'})
+        if lng is not None and not (-180 <= lng <= 180):
+            raise serializers.ValidationError({'longitude': 'Longitude must be between -180 and 180.'})
+        return data
 
 class WasteRequestPhotoSerializer(serializers.ModelSerializer):
     """Read-only representation of an extra photo attached to a WasteRequest."""
