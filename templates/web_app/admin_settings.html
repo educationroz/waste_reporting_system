@@ -451,7 +451,68 @@
         </div>
     </div>
 </div>
-{% endblock %}}
+<!-- Restore Confirmation Modal — extra friction for the most destructive
+     action in the admin panel: requires re-entering your password on top
+     of the file picker, instead of a single dismissable window.confirm(). -->
+<div class="modal fade" id="restoreConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white border-bottom-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle me-2"></i>Confirm Database Restore</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-warning small mb-3">
+                    <strong>This will permanently replace all current system data</strong> with
+                    <span id="restoreFileNameLabel" class="fw-semibold">the selected backup file</span>.
+                    This cannot be undone. A safety backup of the current data is taken automatically
+                    before the restore runs.
+                </div>
+                <form id="restoreConfirmForm">
+                    <div class="mb-0">
+                        <label class="form-label small fw-semibold text-secondary">Re-enter your password to confirm</label>
+                        <input type="password" class="form-control" id="restore_admin_password" placeholder="Your account password" required autocomplete="current-password">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-surface-alt border-top-0">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger px-4 fw-semibold" id="restoreConfirmSubmitBtn">
+                    <i class="bi bi-cloud-arrow-up me-1"></i>Restore Database
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Backup Confirmation Modal — replaces the bare window.confirm()
+     with a clearer warning, since deleting a backup file can remove your
+     only recovery point if something goes wrong later. -->
+<div class="modal fade" id="deleteBackupConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white border-bottom-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle me-2"></i>Delete Backup File</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-warning small mb-0">
+                    <strong>This will permanently delete
+                    <span id="deleteBackupFileNameLabel" class="fw-semibold">this backup file</span>.</strong>
+                    This cannot be undone. If this is your only backup of a certain point in time,
+                    you will lose the ability to restore to it.
+                </div>
+            </div>
+            <div class="modal-footer bg-surface-alt border-top-0">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger px-4 fw-semibold" id="deleteBackupConfirmSubmitBtn">
+                    <i class="bi bi-trash me-1"></i>Delete Backup
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -987,9 +1048,7 @@ async function createBackup() {
     }
 }
 
-async function deleteBackup(fileName) {
-    if (!window.confirm(`Delete ${fileName}?`)) return;
-
+async function performBackupDelete(fileName) {
     try {
         const res = await authFetch(`/api/database-backups/delete/?file_name=${encodeURIComponent(fileName)}`, {
             method: 'DELETE',
@@ -1008,19 +1067,39 @@ async function deleteBackup(fileName) {
     }
 }
 
-async function restoreBackup(file) {
-    if (!file) return;
+let pendingDeleteBackupFileName = null;
 
-    const confirmed = window.confirm(
-        'WARNING: This will PERMANENTLY REPLACE all current system data with the backup file. ' +
-        'This action cannot be undone. A safety backup of your current data will be created automatically.\n\n' +
-        'Are you sure you want to restore?'
-    );
-    if (!confirmed) return;
+function deleteBackup(fileName) {
+    pendingDeleteBackupFileName = fileName;
+    document.getElementById('deleteBackupFileNameLabel').textContent = fileName;
+
+    const modalEl = document.getElementById('deleteBackupConfirmModal');
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+(function bindDeleteBackupConfirm() {
+    const submitBtn = document.getElementById('deleteBackupConfirmSubmitBtn');
+    if (!submitBtn || submitBtn.dataset._bound) return;
+    submitBtn.addEventListener('click', async () => {
+        if (!pendingDeleteBackupFileName) return;
+        const fileName = pendingDeleteBackupFileName;
+        pendingDeleteBackupFileName = null;
+
+        const modalEl = document.getElementById('deleteBackupConfirmModal');
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+
+        await performBackupDelete(fileName);
+    });
+    submitBtn.dataset._bound = '1';
+})();
+
+async function restoreBackup(file, adminPassword) {
+    if (!file) return;
 
     const formData = new FormData();
     formData.append('backup_file', file);
     formData.append('confirm', 'true');
+    formData.append('admin_password', adminPassword);
 
     try {
         showToast('Restoring backup... this may take a moment.', 'info');
@@ -1055,12 +1134,44 @@ function attachBackupHandlers() {
 
     if (restoreBtn && fileInput && !restoreBtn.dataset._bound) {
         restoreBtn.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', async (event) => {
+
+        let pendingRestoreFile = null;
+
+        fileInput.addEventListener('change', (event) => {
             const file = event.target.files?.[0];
-            if (!file) return;
-            await restoreBackup(file);
             event.target.value = '';
+            if (!file) return;
+
+            pendingRestoreFile = file;
+            document.getElementById('restoreFileNameLabel').textContent = file.name;
+            document.getElementById('restore_admin_password').value = '';
+
+            const modalEl = document.getElementById('restoreConfirmModal');
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
         });
+
+        const submitBtn = document.getElementById('restoreConfirmSubmitBtn');
+        if (submitBtn && !submitBtn.dataset._bound) {
+            submitBtn.addEventListener('click', async () => {
+                const passwordInput = document.getElementById('restore_admin_password');
+                const password = passwordInput.value;
+                if (!password) {
+                    passwordInput.focus();
+                    return;
+                }
+                if (!pendingRestoreFile) return;
+
+                const modalEl = document.getElementById('restoreConfirmModal');
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+
+                const file = pendingRestoreFile;
+                pendingRestoreFile = null;
+                await restoreBackup(file, password);
+                passwordInput.value = '';
+            });
+            submitBtn.dataset._bound = '1';
+        }
+
         restoreBtn.dataset._bound = '1';
     }
 }
