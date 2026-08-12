@@ -174,7 +174,7 @@
                                 </h6>
                                 <p class="text-muted small mb-0">
                                     All generated routes will start from this fixed location.
-                                    Click the map or drag the marker to set the exact position.
+                                    Click the map or drag the marker to set the exact position, then save it — it stays fixed until you change it again.
                                 </p>
                             </div>
                             <div class="col-md-4">
@@ -200,7 +200,7 @@
                                 <div id="depot-map" style="height:350px; border-radius:8px;"></div>
                                 <small class="text-muted mt-1 d-block">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    Click anywhere on the map or drag the marker to adjust the depot location.
+                                    Click anywhere on the map or drag the marker to adjust the depot location. The shaded outline shows the Pokhara Metropolitan City boundary.
                                 </small>
                             </div>
                             <div class="col-12">
@@ -214,20 +214,84 @@
                     <div class="tab-pane fade p-4" id="checkpoint-panel" role="tabpanel">
                         <div class="row g-3">
                             <div class="col-12">
-                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
                                     <div>
                                         <h6 class="fw-bold mb-1">
                                             <i class="bi bi-flag-fill me-2 text-success"></i>Designated Checkpoints
                                         </h6>
                                         <p class="text-muted small mb-0">
                                             Create and manage pickup/drop-off checkpoints that users can select when submitting a request.
+                                            Saved checkpoints show up as 🚩 flags on the map below — drag a flag to move it, or use its popup to edit/delete.
                                         </p>
                                     </div>
-                                    <button class="btn btn-outline-success" onclick="resetCheckpointForm()">
-                                        <i class="bi bi-plus-circle me-1"></i>New Checkpoint
-                                    </button>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-outline-primary" onclick="toggleAutoGeneratePanel()">
+                                            <i class="bi bi-grid-3x3-gap-fill me-1"></i>Auto-Generate Checkpoints
+                                        </button>
+                                        <button class="btn btn-outline-success" onclick="resetCheckpointForm()">
+                                            <i class="bi bi-plus-circle me-1"></i>New Checkpoint
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
+
+                            <!-- ── Auto-Generate Checkpoints Panel ────────────────────────
+                                 Depot Location (Depot tab) lai center मानेर grid मा
+                                 checkpoint pins generate गर्छ। Points Pokhara Metropolitan
+                                 City को real boundary bhitra parekaहरू matra generate
+                                 huncha — river/forest/hills jasto human basti nabhaeko
+                                 outside-boundary area मा pin basdaina। Direct database मा
+                                 save hudaina — hareक pin drag/rename gareर matra
+                                 individually वा "Save All" ले save गर्नुपर्छ। ── -->
+                            <div class="col-12">
+                                <div id="auto-generate-panel" class="d-none border rounded-3 p-3 mb-2" style="background:var(--bg-hover);">
+                                    <h6 class="fw-bold mb-2"><i class="bi bi-grid-3x3-gap-fill me-2 text-primary"></i>Auto-Generate Checkpoints Around Depot</h6>
+                                    <p class="text-muted small mb-3">
+                                        Depot Location (Depot tab मा save गरेको) lai center मानेर grid मा checkpoint flags generate गर्छ।
+                                        <strong>Pokhara Metropolitan City को actual boundary bhanda बाहिर पर्ने बिन्दुहरू (नदी, वन, डाँडा-कान्ला जस्ता human settlement नभएका क्षेत्र) auto-skip हुन्छन्</strong> —
+                                        radius मात्र होइन, real municipal boundary check गरेर।
+                                        हरेक pin drag/rename गरेर मात्र save गर्न सक्नुहुन्छ — auto-generate ले सिधै database मा save गर्दैन।
+                                    </p>
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-md-3">
+                                            <label class="form-label small fw-semibold text-secondary">Spacing (meters)</label>
+                                            <input type="number" class="form-control form-control-sm" id="auto_gen_spacing" value="800" min="100" step="10">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small fw-semibold text-secondary">Radius (meters)</label>
+                                            <input type="number" class="form-control form-control-sm" id="auto_gen_radius" value="8000" min="200" step="50">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <button class="btn btn-primary btn-sm w-100" onclick="generateCheckpointGrid()">
+                                                <i class="bi bi-magic me-1"></i>Generate
+                                            </button>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <button class="btn btn-outline-secondary btn-sm w-100" onclick="clearPendingCheckpoints()">
+                                                <i class="bi bi-x-circle me-1"></i>Clear Pending
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 align-items-end mt-1">
+                                        <div class="col-12">
+                                            <button class="btn btn-outline-success btn-sm w-100" onclick="coverFullMetroArea()">
+                                                <i class="bi bi-globe-asia-australia me-1"></i>Cover Entire Pokhara Metropolitan Area
+                                            </button>
+                                            <small class="text-muted d-block mt-1">
+                                                Quick preset: generates a wide grid around the depot, still clipped to the real Pokhara Metropolitan City boundary, so checkpoints span the full municipality without landing outside it.
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div id="auto-generate-summary" class="small text-muted mt-2"></div>
+                                    <div id="pending-checkpoints-list" class="mt-3"></div>
+                                    <div class="mt-2 d-none" id="pending-save-all-row">
+                                        <button class="btn btn-success btn-sm" onclick="saveAllPendingCheckpoints()">
+                                            <i class="bi bi-check2-all me-1"></i>Save All Pending Checkpoints
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="col-md-4">
                                 <label class="form-label small fw-semibold text-secondary">Checkpoint Name</label>
                                 <input type="text" class="form-control" id="checkpoint_name" placeholder="e.g. Main Street Depot">
@@ -264,14 +328,38 @@
                             <div class="col-12">
                                 <div id="checkpoint-map" style="height:300px; border-radius:8px;"></div>
                                 <small class="text-muted mt-1 d-block">
-                                    Click the map or drag the marker to position the checkpoint.
+                                    Click the map (or the new-checkpoint marker) to position a new checkpoint. The shaded outline is the Pokhara Metropolitan City boundary — checkpoints outside it won't be accepted. Existing checkpoints appear as 🚩 flags — drag a flag to move it, then use its popup to save the new position, edit, or delete it.
                                 </small>
                             </div>
                             <div class="col-12">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="small text-muted">
+                                        Select checkpoints you want to delete.
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        id="bulkDeleteCheckpointsBtn"
+                                        class="btn btn-danger btn-sm"
+                                        onclick="deleteSelectedCheckpoints()"
+                                        disabled>
+                                        <i class="bi bi-trash me-1"></i>
+                                        Delete Selected
+                                    </button>
+                                </div>
                                 <div class="table-responsive">
                                     <table class="table table-sm table-bordered align-middle mb-0">
                                         <thead class="table-light text-secondary small">
                                             <tr>
+                                                <th style="width: 45px;" class="text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        class="form-check-input"
+                                                        id="selectAllCheckpoints"
+                                                        onchange="toggleSelectAllCheckpoints(this)"
+                                                        title="Select All"
+                                                    >
+                                                </th>
                                                 <th>Name</th>
                                                 <th>Coordinates</th>
                                                 <th>Status</th>
@@ -280,7 +368,7 @@
                                         </thead>
                                         <tbody id="checkpoint-table-body" class="small">
                                             <tr>
-                                                <td colspan="4" class="text-muted text-center py-3">Loading checkpoints...</td>
+                                                <td colspan="5" class="text-muted text-center py-3">Loading checkpoints...</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -451,12 +539,54 @@
         </div>
     </div>
 </div>
-{% endblock %}}
+{% endblock %}
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function() {
+// ── Pokhara Metropolitan City boundary (simplified from Open Knowledge Nepal's
+//    LocalBoundaries dataset, CC BY 4.0: https://localboundries.oknp.org/) ──
+//    [lat, lng] pairs, closed ring. Used to keep checkpoints inside the actual
+//    municipal area — not just "within N meters of the depot" — so grid
+//    generation doesn't drop pins in rivers, forest, or hillside outside town.
+const POKHARA_BOUNDARY = [[28.32749,84.02078],[28.34105,84.00476],[28.32805,83.99061],[28.32746,83.96883],[28.31112,83.96167],[28.2926,83.93472],[28.30134,83.92599],[28.29149,83.91023],[28.29717,83.88678],[28.28219,83.8781],[28.2764,83.88576],[28.25642,83.88306],[28.26656,83.86117],[28.26244,83.84762],[28.26522,83.83842],[28.22837,83.80045],[28.20986,83.81882],[28.21416,83.82625],[28.21185,83.83988],[28.19385,83.85811],[28.1975,83.87313],[28.1921,83.8804],[28.19442,83.89294],[28.17775,83.90682],[28.16831,83.92563],[28.16044,83.92925],[28.15141,83.92543],[28.144,83.93214],[28.13893,83.9635],[28.143,83.98234],[28.13121,84.00414],[28.12128,84.00106],[28.11043,84.01679],[28.106,84.01453],[28.10546,84.02869],[28.09624,84.02996],[28.09988,84.03257],[28.09451,84.04422],[28.09109,84.04004],[28.08329,84.05196],[28.08782,84.06104],[28.07753,84.07178],[28.10754,84.10088],[28.11034,84.10784],[28.10601,84.11576],[28.11589,84.13003],[28.12309,84.12366],[28.13101,84.1256],[28.1352,84.11251],[28.14452,84.11293],[28.16125,84.12085],[28.17547,84.14665],[28.18827,84.14377],[28.19137,84.1499],[28.19875,84.14488],[28.20307,84.12924],[28.20899,84.12983],[28.21136,84.11083],[28.22138,84.10896],[28.22376,84.0999],[28.21947,84.08875],[28.21219,84.08501],[28.20941,84.07223],[28.2114,84.06953],[28.21483,84.08411],[28.22084,84.06427],[28.21837,84.05407],[28.25968,84.0648],[28.28017,84.06331],[28.30036,84.0336],[28.32749,84.02078]];
+
+// Backend ko latitude/longitude DecimalField ले 6 decimal places bhanda
+// dherai accept gardaina — JS floating-point math (center.lat + i*spacing
+// jasto) le 15+ decimal digit ko number बनाउँछ, ani त्यही unrounded value
+// सिधै API मा गयो भने serializer.is_valid() ले "no more than 6 decimal
+// places" भनेर 400 Bad Request दिन्छ। Save हुनुअघि जहाँ पनि lat/lng बन्छ,
+// generate हुन्छ, वा drag गरिन्छ, त्यहाँ यो round6() लगाउने।
+function round6(n) {
+    return Math.round(n * 1e6) / 1e6;
+}
+
+// Ray-casting point-in-polygon test. poly = [[lat,lng], ...] closed ring.
+function isInsidePokhara(lat, lng) {
+    let inside = false;
+    for (let i = 0, j = POKHARA_BOUNDARY.length - 1; i < POKHARA_BOUNDARY.length; j = i++) {
+        const yi = POKHARA_BOUNDARY[i][0], xi = POKHARA_BOUNDARY[i][1];
+        const yj = POKHARA_BOUNDARY[j][0], xj = POKHARA_BOUNDARY[j][1];
+        const intersects = ((yi > lat) !== (yj > lat)) &&
+            (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+        if (intersects) inside = !inside;
+    }
+    return inside;
+}
+
+function drawPokharaBoundary(map) {
+    if (!map) return;
+    L.polygon(POKHARA_BOUNDARY, {
+        color: '#198754',
+        weight: 2,
+        fill: true,
+        fillColor: '#198754',
+        fillOpacity: 0.05,
+        dashArray: '6 4',
+    }).addTo(map).bindTooltip('Pokhara Metropolitan City boundary', { sticky: true });
+}
+
 // ── Depot Map Logic ──────────────────────────────────────────────────────────
 let depotMap = null;
 let depotMarker = null;
@@ -465,6 +595,15 @@ let checkpointMarker = null;
 let editingCheckpointId = null;
 const DEFAULT_LAT = 28.2096;
 const DEFAULT_LNG = 83.9856;
+
+// ── Auto-Generate Checkpoints state ──────────────────────────────────────────
+let pendingCheckpointsLayer = null;
+let pendingCheckpoints = [];
+let pendingIdCounter = 0;
+
+// ── Saved checkpoints shown/edited directly on the map ───────────────────────
+let savedCheckpointsLayer = null;
+let markerRegistry = {};
 
 if (!document.body.dataset._leafletCleanupBound) {
     document.body.addEventListener('htmx:beforeSwap', () => {
@@ -479,6 +618,10 @@ if (!document.body.dataset._leafletCleanupBound) {
         depotMarker = null;
         checkpointMarker = null;
         editingCheckpointId = null;
+        pendingCheckpointsLayer = null;
+        pendingCheckpoints = [];
+        savedCheckpointsLayer = null;
+        markerRegistry = {};
     });
     document.body.dataset._leafletCleanupBound = '1';
 }
@@ -557,6 +700,8 @@ function initDepotMap() {
         maxZoom: 19,
     }).addTo(depotMap);
 
+    drawPokharaBoundary(depotMap);
+
     depotMarker = L.marker([DEFAULT_LAT, DEFAULT_LNG], { draggable: true })
         .addTo(depotMap)
         .bindPopup('<strong>🏢 Depot Location</strong><br>Drag to adjust')
@@ -596,7 +741,7 @@ async function loadDepotLocation() {
             const lat = data.value.latitude;
             const lng = data.value.longitude;
             moveDepotMarker(lat, lng);
-            showDepotStatus(`Depot set to ${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`);
+            showDepotStatus(`Depot fixed at ${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`);
         }
     } catch (e) {
         console.error('Failed to load depot location:', e);
@@ -604,8 +749,8 @@ async function loadDepotLocation() {
 }
 
 async function saveDepotLocation() {
-    const lat = parseFloat(document.getElementById('depot_lat').value);
-    const lng = parseFloat(document.getElementById('depot_lng').value);
+    const lat = round6(parseFloat(document.getElementById('depot_lat').value));
+    const lng = round6(parseFloat(document.getElementById('depot_lng').value));
 
     if (isNaN(lat) || isNaN(lng)) {
         showToast('Please enter valid coordinates or click the map.', 'warning');
@@ -613,6 +758,10 @@ async function saveDepotLocation() {
     }
     if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
         showToast('Coordinates out of range. Lat: -90 to 90, Lng: -180 to 180.', 'warning');
+        return;
+    }
+    if (!isInsidePokhara(lat, lng)) {
+        showToast('That point looks like it is outside Pokhara Metropolitan City. Please pick a depot location inside the municipal boundary (shown shaded on the map).', 'warning');
         return;
     }
 
@@ -646,8 +795,8 @@ async function saveDepotLocation() {
     }
 
     if (res.ok) {
-        showToast('Depot location saved! All future routes will start here.', 'success');
-        showDepotStatus(`Depot set to ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        showToast('Depot location saved and fixed! All future routes will start here.', 'success');
+        showDepotStatus(`Depot fixed at ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
         moveDepotMarker(lat, lng);
     } else {
         const err = await res.json().catch(() => ({}));
@@ -696,9 +845,11 @@ function initCheckpointMap() {
         maxZoom: 19,
     }).addTo(checkpointMap);
 
+    drawPokharaBoundary(checkpointMap);
+
     checkpointMarker = L.marker([DEFAULT_LAT, DEFAULT_LNG], { draggable: true })
         .addTo(checkpointMap)
-        .bindPopup('<strong>🏁 Checkpoint Location</strong><br>Drag to adjust')
+        .bindPopup('<strong>🏁 New Checkpoint Location</strong><br>Drag to adjust')
         .openPopup();
 
     checkpointMarker.on('dragend', function () {
@@ -710,6 +861,8 @@ function initCheckpointMap() {
         checkpointMarker.setLatLng(e.latlng);
         setCheckpointInputs(e.latlng.lat, e.latlng.lng);
     });
+
+    savedCheckpointsLayer = L.layerGroup().addTo(checkpointMap);
 }
 
 function setCheckpointInputs(lat, lng) {
@@ -748,36 +901,399 @@ function hideCheckpointStatus() {
     el.classList.add('d-none');
 }
 
+// /api/checkpoints/ ले DRF pagination use garyo bhane, response ma
+// {results, next, count} aauncha ra `results` le PAGE 1 matra dincha.
+// Pahila यहाँ `raw.results` लाई नै final list मानिन्थ्यो — त्यसैले धेरै
+// checkpoint auto-generate + save गरिसकेपछि पनि table मा पहिलो page (e.g.
+// 10-20 vota) matra dekhincha, baki sabai DB मा साँच्चै save भइसकेका भए
+// tapani UI मा kahilei dekhindainan। Yo function ले `next` link followed
+// गरेर SABAI page fetch गर्छ ani sabai checkpoint concat गरेर firtaउँछ।
+async function fetchAllCheckpoints() {
+    let checkpoints = [];
+    let url = '/api/checkpoints/';
+    let guard = 0; // infinite-loop safety, just in case `next` ever loops back
+
+    while (url && guard < 200) {
+        guard++;
+        let raw;
+        if (typeof API !== 'undefined' && url === '/api/checkpoints/') {
+            raw = await API.get(url);
+        } else {
+            const res = await fetch(url);
+            raw = await res.json();
+        }
+
+        if (Array.isArray(raw)) {
+            // Non-paginated backend — single flat array, nothing more to fetch.
+            checkpoints = checkpoints.concat(raw);
+            break;
+        }
+
+        checkpoints = checkpoints.concat(raw.results || []);
+        url = raw.next || null; // DRF gives a full absolute URL here — fetch() handles that fine.
+    }
+
+    return checkpoints;
+}
+
 async function loadCheckpoints() {
     try {
-        const raw = (typeof API !== 'undefined') ? await API.get('/api/checkpoints/') : await (await fetch('/api/checkpoints/')).json();
-        const checkpoints = Array.isArray(raw) ? raw : (raw.results || []);
+        const checkpoints = await fetchAllCheckpoints();
         renderCheckpointTable(checkpoints);
+        renderCheckpointMapMarkers(checkpoints);
     } catch (e) {
         console.error('Checkpoint load failed:', e);
         document.getElementById('checkpoint-table-body').innerHTML =
-            '<tr><td colspan="4" class="text-danger text-center py-3">Unable to load checkpoints.</td></tr>';
+            '<tr><td colspan="5" class="text-danger text-center py-3">Unable to load checkpoints.</td></tr>';
     }
 }
 
 function renderCheckpointTable(checkpoints) {
     const tbody = document.getElementById('checkpoint-table-body');
+
+    // Reset Select All checkbox
+    const selectAll = document.getElementById('selectAllCheckpoints');
+    if (selectAll) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+    }
+
     if (!checkpoints.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-muted text-center py-3">No checkpoints configured.</td></tr>';
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-muted text-center py-3">
+                    No checkpoints configured.
+                </td>
+            </tr>
+        `;
+        updateBulkDeleteButton();
         return;
     }
 
     tbody.innerHTML = checkpoints.map(ch => `
         <tr>
+            <td class="text-center">
+                <input
+                    type="checkbox"
+                    class="form-check-input checkpoint-select"
+                    value="${escapeHtml(ch.id)}"
+                    onchange="updateBulkDeleteButton()"
+                >
+            </td>
+
             <td>${escapeHtml(ch.name)}</td>
-            <td>${escapeHtml(parseFloat(ch.latitude).toFixed(6))}, ${escapeHtml(parseFloat(ch.longitude).toFixed(6))}</td>
-            <td>${ch.is_active ? 'Active' : 'Inactive'}</td>
+
             <td>
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="editCheckpoint(${escapeHtml(ch.id)})">Edit</button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteCheckpoint(${escapeHtml(ch.id)})">Delete</button>
+                ${escapeHtml(parseFloat(ch.latitude).toFixed(6))},
+                ${escapeHtml(parseFloat(ch.longitude).toFixed(6))}
+            </td>
+
+            <td>
+                ${ch.is_active ? 'Active' : 'Inactive'}
+            </td>
+
+            <td>
+                <button
+                    class="btn btn-sm btn-outline-primary me-1"
+                    onclick="editCheckpoint(${escapeHtml(ch.id)})">
+                    Edit
+                </button>
+
+                <button
+                    class="btn btn-sm btn-outline-danger"
+                    onclick="deleteCheckpoint(${escapeHtml(ch.id)})">
+                    Delete
+                </button>
             </td>
         </tr>
     `).join('');
+
+    updateBulkDeleteButton();
+}
+
+// ── Saved checkpoints as draggable/editable flags on the map ────────────────
+function buildSavedCheckpointPopup(ch, pendingLat, pendingLng) {
+    const hasPending = pendingLat !== undefined && pendingLng !== undefined;
+    const coordsText = hasPending
+        ? `${pendingLat.toFixed(6)}, ${pendingLng.toFixed(6)} (unsaved)`
+        : `${parseFloat(ch.latitude).toFixed(6)}, ${parseFloat(ch.longitude).toFixed(6)}`;
+
+    return `
+        <div style="min-width:190px;">
+            <strong>🚩 ${escapeHtml(ch.name)}</strong><br>
+            <span class="text-muted small">${escapeHtml(coordsText)}</span>
+            <div class="d-flex flex-wrap gap-1 mt-2">
+                ${hasPending ? `<button class="btn btn-sm btn-success py-0 px-2" onclick="saveMovedCheckpoint(${ch.id})">Save Position</button>` : ''}
+                <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="editCheckpoint(${ch.id})">Edit</button>
+                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteCheckpoint(${ch.id})">Delete</button>
+            </div>
+        </div>
+    `;
+}
+
+// ============================================================
+// CHECKPOINT BULK SELECT / DELETE
+// ============================================================
+
+function toggleSelectAllCheckpoints(checkbox) {
+    const checkboxes = document.querySelectorAll('.checkpoint-select');
+
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+
+    updateBulkDeleteButton();
+}
+
+
+function updateBulkDeleteButton() {
+    const checkboxes = Array.from(
+        document.querySelectorAll('.checkpoint-select')
+    );
+
+    const selected = checkboxes.filter(cb => cb.checked);
+
+    const deleteBtn = document.getElementById('bulkDeleteCheckpointsBtn');
+    const selectAll = document.getElementById('selectAllCheckpoints');
+
+    if (deleteBtn) {
+        deleteBtn.disabled = selected.length === 0;
+
+        deleteBtn.innerHTML = selected.length > 0
+            ? `<i class="bi bi-trash me-1"></i> Delete Selected (${selected.length})`
+            : `<i class="bi bi-trash me-1"></i> Delete Selected`;
+    }
+
+    if (selectAll) {
+        if (checkboxes.length === 0) {
+            selectAll.checked = false;
+            selectAll.indeterminate = false;
+        } else if (selected.length === checkboxes.length) {
+            selectAll.checked = true;
+            selectAll.indeterminate = false;
+        } else if (selected.length > 0) {
+            selectAll.checked = false;
+            selectAll.indeterminate = true;
+        } else {
+            selectAll.checked = false;
+            selectAll.indeterminate = false;
+        }
+    }
+}
+
+
+// Delete selected checkpoints one by one
+async function deleteSelectedCheckpoints() {
+
+    const selectedCheckboxes = Array.from(
+        document.querySelectorAll('.checkpoint-select:checked')
+    );
+
+    const ids = selectedCheckboxes.map(cb => cb.value);
+
+    if (!ids.length) {
+        showCheckpointStatus(
+            'Please select at least one checkpoint.',
+            'danger'
+        );
+        return;
+    }
+
+    const confirmed = confirm(
+        `Are you sure you want to delete ${ids.length} selected checkpoint(s)?\n\n` +
+        `This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    const deleteBtn = document.getElementById(
+        'bulkDeleteCheckpointsBtn'
+    );
+
+    if (deleteBtn) {
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML =
+            `<span class="spinner-border spinner-border-sm me-1"></span>
+             Deleting...`;
+    }
+
+    let deleted = 0;
+    let failed = 0;
+
+    try {
+
+        for (const id of ids) {
+
+            try {
+
+                let success = false;
+
+                // Retry a little if API returns temporary throttling
+                for (let attempt = 0; attempt < 3; attempt++) {
+
+                    const res = await fetch(
+                        `/api/checkpoints/${id}/`,
+                        {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization':
+                                    `Bearer ${getToken()}`,
+                            },
+                        }
+                    );
+
+                    if (res.ok || res.status === 204) {
+                        success = true;
+                        break;
+                    }
+
+                    // If API throttles, wait before retry
+                    if (res.status === 429) {
+                        await new Promise(resolve =>
+                            setTimeout(resolve, 700 * (attempt + 1))
+                        );
+                        continue;
+                    }
+
+                    break;
+                }
+
+                if (success) {
+                    deleted++;
+                } else {
+                    failed++;
+                }
+
+            } catch (error) {
+                console.error(
+                    `Failed to delete checkpoint ${id}:`,
+                    error
+                );
+                failed++;
+            }
+
+            // Small delay to avoid API throttling
+            await new Promise(resolve =>
+                setTimeout(resolve, 150)
+            );
+        }
+
+        if (failed === 0) {
+
+            showCheckpointStatus(
+                `${deleted} checkpoint(s) deleted successfully.`,
+                'success'
+            );
+
+        } else {
+
+            showCheckpointStatus(
+                `${deleted} deleted, ${failed} failed.`,
+                'danger'
+            );
+        }
+
+        // Refresh table + map
+        await loadCheckpoints();
+
+    } catch (error) {
+
+        console.error(
+            'Bulk checkpoint deletion failed:',
+            error
+        );
+
+        showCheckpointStatus(
+            'Bulk deletion failed. Please try again.',
+            'danger'
+        );
+
+    } finally {
+
+        updateBulkDeleteButton();
+    }
+}
+
+function renderCheckpointMapMarkers(checkpoints) {
+    if (!checkpointMap) return;
+    if (!savedCheckpointsLayer) {
+        savedCheckpointsLayer = L.layerGroup().addTo(checkpointMap);
+    }
+    savedCheckpointsLayer.clearLayers();
+    markerRegistry = {};
+
+    if (!checkpoints.length) return;
+
+    const bounds = [];
+
+    checkpoints.forEach(ch => {
+        const lat = parseFloat(ch.latitude);
+        const lng = parseFloat(ch.longitude);
+        if (isNaN(lat) || isNaN(lng)) return;
+        bounds.push([lat, lng]);
+
+        const marker = L.marker([lat, lng], {
+            draggable: true,
+            icon: L.divIcon({
+                className: 'saved-checkpoint-icon',
+                html: '<span style="font-size:1.6rem;">🚩</span>',
+                iconSize: [26, 26],
+                iconAnchor: [13, 26],
+            }),
+        }).addTo(savedCheckpointsLayer);
+
+        marker.bindPopup(buildSavedCheckpointPopup(ch));
+
+        marker.on('dragend', function () {
+            const pos = marker.getLatLng();
+            marker._pendingLat = pos.lat;
+            marker._pendingLng = pos.lng;
+            marker.setPopupContent(buildSavedCheckpointPopup(ch, pos.lat, pos.lng));
+            marker.openPopup();
+        });
+
+        markerRegistry[ch.id] = marker;
+    });
+
+    if (bounds.length) {
+        checkpointMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+    }
+}
+
+async function saveMovedCheckpoint(id) {
+    const marker = markerRegistry[id];
+    if (!marker || marker._pendingLat === undefined) return;
+
+    const lat = round6(marker._pendingLat);
+    const lng = round6(marker._pendingLng);
+
+    if (!isInsidePokhara(lat, lng)) {
+        showToast('That spot is outside Pokhara Metropolitan City — drag the flag to somewhere inside the shaded boundary before saving.', 'warning');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/checkpoints/${id}/`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ latitude: lat, longitude: lng }),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to update checkpoint position.');
+        }
+
+        showToast('Checkpoint position updated.', 'success');
+        delete marker._pendingLat;
+        delete marker._pendingLng;
+        loadCheckpoints();
+    } catch (e) {
+        showToast(e.message || 'Failed to update checkpoint position.', 'danger');
+    }
 }
 
 async function saveCheckpoint() {
@@ -785,8 +1301,8 @@ async function saveCheckpoint() {
 
     const name = document.getElementById('checkpoint_name').value.trim();
     const description = document.getElementById('checkpoint_description').value.trim();
-    const lat = parseFloat(document.getElementById('checkpoint_lat').value);
-    const lng = parseFloat(document.getElementById('checkpoint_lng').value);
+    const lat = round6(parseFloat(document.getElementById('checkpoint_lat').value));
+    const lng = round6(parseFloat(document.getElementById('checkpoint_lng').value));
     const btn = document.getElementById('checkpoint-save-btn');
 
     if (!name) {
@@ -795,6 +1311,10 @@ async function saveCheckpoint() {
     }
     if (isNaN(lat) || isNaN(lng)) {
         showCheckpointStatus('Please select a valid checkpoint location.', 'danger');
+        return;
+    }
+    if (!isInsidePokhara(lat, lng)) {
+        showCheckpointStatus('This point falls outside Pokhara Metropolitan City (river/forest/hillside area). Pick a spot inside the shaded boundary on the map.', 'danger');
         return;
     }
 
@@ -893,6 +1413,425 @@ function useCheckpointGPS() {
         () => showCheckpointStatus('Could not get GPS location. Allow location access and try again.', 'danger'),
         { timeout: 8000 }
     );
+}
+
+// ── Auto-Generate Checkpoints (Depot-centered grid, clipped to Pokhara boundary) ──
+
+function distanceInMeters(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// depot_lat/lng input (Depot tab) bharिएको भए त्यही use garne, chaina bhane
+// saved depot_location API bata fetch garne, tyo पनि fail bhaye DEFAULT.
+async function getDepotCenter() {
+    const latInput = document.getElementById('depot_lat');
+    const lngInput = document.getElementById('depot_lng');
+    if (latInput && lngInput && latInput.value && lngInput.value) {
+        const lat = parseFloat(latInput.value);
+        const lng = parseFloat(lngInput.value);
+        if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+    }
+    try {
+        const res = await fetch('/api/system-settings/depot_location/', {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            return { lat: parseFloat(data.value.latitude), lng: parseFloat(data.value.longitude) };
+        }
+    } catch (e) {
+        console.warn('Depot location fetch failed, using default:', e);
+    }
+    return { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
+}
+
+function toggleAutoGeneratePanel() {
+    const panel = document.getElementById('auto-generate-panel');
+    if (!panel) return;
+    const opening = panel.classList.contains('d-none');
+    panel.classList.toggle('d-none');
+    if (opening && !checkpointMap) {
+        initCheckpointMap();
+    }
+}
+
+async function generateCheckpointGrid() {
+    if (!checkpointMap) initCheckpointMap();
+
+    ensureLeafletLoaded(async () => {
+        const spacing = parseFloat(document.getElementById('auto_gen_spacing').value) || 800;
+        const radius = parseFloat(document.getElementById('auto_gen_radius').value) || 8000;
+        const center = await getDepotCenter();
+
+        if (!isInsidePokhara(center.lat, center.lng)) {
+            showToast('The depot location itself is outside the Pokhara Metropolitan City boundary — set the depot inside the shaded area first (Depot Location tab).', 'warning');
+        }
+
+        clearPendingCheckpoints();
+
+        if (!pendingCheckpointsLayer) {
+            pendingCheckpointsLayer = L.layerGroup().addTo(checkpointMap);
+        }
+
+        const latSpacing = spacing / 111320;
+        const steps = Math.ceil(radius / spacing);
+        let count = 0;
+        let skippedOutside = 0;
+
+        for (let i = -steps; i <= steps; i++) {
+            for (let j = -steps; j <= steps; j++) {
+                if (i === 0 && j === 0) continue; // depot मै checkpoint नबनाउने
+                const rawLat = center.lat + (i * latSpacing);
+                const lngSpacing = spacing / (111320 * Math.cos(rawLat * Math.PI / 180));
+                const rawLng = center.lng + (j * lngSpacing);
+                // Round इमेडिएटली, ताकि distance check ra boundary check दुवैले
+                // साँच्चै save हुने (rounded) value माथि नै काम गरून् — round
+                // गर्नुअघिको value माथि गरिएको check ले round गरेपछि boundary
+                // बाहिर पुग्ने edge-case जोगिन्छ।
+                const lat = round6(rawLat);
+                const lng = round6(rawLng);
+
+                if (distanceInMeters(center.lat, center.lng, lat, lng) > radius) continue;
+
+                // Real municipal boundary bhitra matra — nadi/ban/danda-kanla
+                // jasto human basti nabhaeko area बाट pin auto-skip.
+                if (!isInsidePokhara(lat, lng)) {
+                    skippedOutside++;
+                    continue;
+                }
+
+                count++;
+                addPendingCheckpoint(lat, lng, `Checkpoint ${count}`);
+            }
+        }
+
+        checkpointMap.setView([center.lat, center.lng], count > 300 ? 11 : 14);
+        renderPendingList();
+
+        const summaryEl = document.getElementById('auto-generate-summary');
+        if (summaryEl) {
+            summaryEl.textContent = skippedOutside > 0
+                ? `${count} checkpoint(s) generated inside the Pokhara boundary. ${skippedOutside} point(s) in the grid landed outside the municipality (river/forest/hillside) and were skipped automatically.`
+                : (count > 0 ? `${count} checkpoint(s) generated, all inside the Pokhara boundary.` : '');
+        }
+
+        if (pendingCheckpoints.length) {
+            showToast(`${pendingCheckpoints.length} checkpoint(s) generated — drag to adjust, rename, then save.`, 'success');
+        } else {
+            showToast('No checkpoints generated inside the Pokhara boundary. Try increasing the radius or moving the depot.', 'warning');
+        }
+    });
+}
+
+// Quick preset: fills in a wide radius/spacing so the generated grid spans
+// roughly the whole Pokhara Metropolitan City area around the depot, instead
+// of just the small neighborhood around it. Still clipped to the real
+// boundary polygon, so it won't place pins beyond city limits.
+async function coverFullMetroArea() {
+    document.getElementById('auto_gen_spacing').value = 1200;
+    document.getElementById('auto_gen_radius').value = 15000;
+    const panel = document.getElementById('auto-generate-panel');
+    if (panel && panel.classList.contains('d-none')) {
+        panel.classList.remove('d-none');
+    }
+    await generateCheckpointGrid();
+}
+
+function addPendingCheckpoint(lat, lng, name) {
+    const id = 'pending-' + (++pendingIdCounter);
+    const marker = L.marker([lat, lng], {
+        draggable: true,
+        icon: L.divIcon({
+            className: 'pending-checkpoint-icon',
+            html: '<span style="font-size:1.5rem;">📍</span>',
+            iconSize: [26, 26],
+            iconAnchor: [13, 26],
+        }),
+    }).addTo(pendingCheckpointsLayer).bindPopup(name);
+
+    marker.on('dragend', function () {
+        const pos = marker.getLatLng();
+        const item = pendingCheckpoints.find(p => p.id === id);
+        if (item) {
+            item.lat = round6(pos.lat);
+            item.lng = round6(pos.lng);
+            renderPendingList();
+        }
+    });
+
+    pendingCheckpoints.push({ id, lat, lng, name, marker });
+}
+
+function renderPendingList() {
+    const container = document.getElementById('pending-checkpoints-list');
+    const saveAllRow = document.getElementById('pending-save-all-row');
+    if (!container) return;
+
+    if (!pendingCheckpoints.length) {
+        container.innerHTML = '';
+        if (saveAllRow) saveAllRow.classList.add('d-none');
+        return;
+    }
+
+    if (saveAllRow) saveAllRow.classList.remove('d-none');
+
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light text-secondary small">
+                    <tr>
+                        <th>Name</th>
+                        <th>Coordinates</th>
+                        <th style="width:140px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="small">
+                    ${pendingCheckpoints.map(p => `
+                        <tr>
+                            <td>
+                                <input type="text" class="form-control form-control-sm pending-name-input"
+                                    data-id="${p.id}" value="${escapeHtml(p.name)}">
+                            </td>
+                            <td>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}${!isInsidePokhara(p.lat, p.lng) ? ' <span class="text-danger">(outside!)</span>' : ''}</td>
+                            <td>
+                                <button class="btn btn-sm btn-success py-0 px-2" onclick="savePendingCheckpoint('${p.id}')">Save</button>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="removePendingCheckpoint('${p.id}')">Remove</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    container.querySelectorAll('.pending-name-input').forEach(input => {
+        input.addEventListener('change', function () {
+            const item = pendingCheckpoints.find(p => p.id === this.dataset.id);
+            if (item) {
+                item.name = this.value;
+                if (item.marker) item.marker.setPopupContent(this.value);
+            }
+        });
+    });
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// POST गर्दा 429 (rate limited) आयो भने, Retry-After header (वा exponential
+// backoff) पर्खेर retry गर्छ। "Save All" जस्तो bulk operation ले धेरै requests
+// एकैचोटि पठाउँदा backend/API throttling ले 429 दिन्छ — त्यो बेला silently
+// fail नगरी retry गरेर pass गराउने।
+async function postCheckpointWithRetry(payload, { maxRetries = 2 } = {}) {
+    let attempt = 0;
+    while (true) {
+        const res = await fetch('/api/checkpoints/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (res.status !== 429) return res;
+
+        attempt++;
+        if (attempt > maxRetries) return res;
+
+        const retryAfterHeader = parseFloat(res.headers.get('Retry-After'));
+        const waitMs = !isNaN(retryAfterHeader)
+            ? retryAfterHeader * 1000
+            : Math.min(1000 * (2 ** attempt), 8000); // 2s, 4s, 8s, 8s...
+        await sleep(waitMs);
+    }
+}
+
+async function savePendingCheckpoint(id, { silent = false } = {}) {
+    const item = pendingCheckpoints.find(p => p.id === id);
+    if (!item) return { ok: false, name: null };
+
+    const nameInput = document.querySelector(`.pending-name-input[data-id="${id}"]`);
+    const name = nameInput ? nameInput.value.trim() : item.name;
+    if (!name) {
+        if (!silent) showToast('Please give this checkpoint a name before saving.', 'warning');
+        return { ok: false, name };
+    }
+
+    // Marker manually drag गरेर boundary bahira purya-eko bhaye pani save huna dine haina.
+    if (!isInsidePokhara(item.lat, item.lng)) {
+        if (!silent) showToast(`"${name}" is outside Pokhara Metropolitan City — drag it inside the shaded boundary before saving.`, 'warning');
+        return { ok: false, name };
+    }
+
+    try {
+        const res = await postCheckpointWithRetry({
+            name,
+            description: 'Auto-generated checkpoint',
+            latitude: round6(item.lat),
+            longitude: round6(item.lng),
+            is_active: true,
+        });
+
+        if (!res.ok) {
+            if (res.status === 429) {
+                const msg = 'Server is rate-limiting requests (429) — still failing after retries.';
+                if (!silent) showToast(msg, 'danger');
+                return { ok: false, name, error: msg, rateLimited: true };
+            }
+            const err = await res.json().catch(() => ({}));
+            // DRF validation errors (400) come back as {field: [messages]},
+            // not {detail: ...} — surface the real reason instead of a
+            // generic "failed" message so field-level bugs (like too many
+            // decimal places) are actually diagnosable from the toast.
+            const fieldError = err.detail
+                || (err && typeof err === 'object'
+                    ? Object.entries(err).map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(' ') : msgs}`).join(' | ')
+                    : null);
+            throw new Error(fieldError || 'Failed to save checkpoint.');
+        }
+
+        // Backend ले proximity-based dedup गरेर euta already-existing
+        // checkpoint firtaउन सक्छ (checkpoint.deduped === true) — त्यो बेला
+        // NAYA record बनेको हुँदैन, sanga sanga rakheko existing lai matra
+        // point गareko huncha। Yo silently "saved" bhaneर treat gare
+        // generated 300 grid point मध्ये dherai euta हि existing checkpoint
+        // मा merge भएर table मा kम matra dekhincha — tesैले deduped case
+        // lai छुट्टै track गर्ने।
+        const data = await res.json().catch(() => ({}));
+
+        if (data.deduped) {
+            if (!silent) {
+                showToast(`"${name}" matched an already-saved checkpoint nearby (ID ${data.existing_checkpoint_id}) — no new checkpoint was created.`, 'info');
+                loadCheckpoints();
+            }
+            removePendingCheckpoint(id);
+            return { ok: true, name, deduped: true, existingId: data.existing_checkpoint_id };
+        }
+
+        if (!silent) {
+            showToast(`"${name}" saved as a checkpoint.`, 'success');
+            loadCheckpoints();
+        }
+        removePendingCheckpoint(id);
+        return { ok: true, name };
+    } catch (e) {
+        if (!silent) showToast(e.message || 'Failed to save checkpoint.', 'danger');
+        return { ok: false, name, error: e.message };
+    }
+}
+
+function removePendingCheckpoint(id) {
+    const idx = pendingCheckpoints.findIndex(p => p.id === id);
+    if (idx === -1) return;
+    const [item] = pendingCheckpoints.splice(idx, 1);
+    if (item.marker && pendingCheckpointsLayer) {
+        pendingCheckpointsLayer.removeLayer(item.marker);
+    }
+    renderPendingList();
+}
+
+// Bulk save button क्लिक गर्दा एकैचोटि N वटा POST fire नगरी, हरेक request बीच
+// delay दिन्छ। यो delay FIXED होइन, ADAPTIVE छ — screenshot मा देखिएको जस्तो
+// 429 checkpoints/POST मा मात्र होइन, उही admin session को notifications/
+// complaints GET मा समेत आउनु भनेको backend को rate-limit चाहिं PER-USER
+// GLOBAL bucket हो (endpoint-specific होइन) — यो loop ले नै त्यो पूरा quota
+// खाइरहेको हो। त्यसैले 429 आयो भने delay लाई बल्ल-बल्ल बढाउँदै लैजाने (ताकि
+// बाँकी page (notification badge, complaints polling) लाई पनि साँस फेर्न
+// मौका मिलोस्), ani लगातार साफ (कुनै 429 नआएको) streak पछि बिस्तारै फेरि
+// छिटो पार्ने।
+const SAVE_ALL_BASE_DELAY_MS = 700;
+const SAVE_ALL_MAX_DELAY_MS = 6000;
+const SAVE_ALL_BACKOFF_MULTIPLIER = 1.8;
+const SAVE_ALL_RECOVERY_STREAK = 5; // यति वटा लगातार सफल भएपछि मात्र delay घटाउने
+
+async function saveAllPendingCheckpoints() {
+    const btn = document.querySelector('#pending-save-all-row button');
+    const outside = pendingCheckpoints.filter(p => !isInsidePokhara(p.lat, p.lng));
+    if (outside.length) {
+        showToast(`${outside.length} pending checkpoint(s) are outside the Pokhara boundary — drag them inside first, they'll be skipped otherwise.`, 'warning');
+    }
+    const ids = pendingCheckpoints.filter(p => isInsidePokhara(p.lat, p.lng)).map(p => p.id);
+    if (!ids.length) return;
+
+    if (ids.length > 150) {
+        showToast(`${ids.length} checkpoints pending — that's a lot for one save run and may take a while if the server rate-limits. Consider a wider spacing next time to generate fewer points.`, 'info');
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.dataset._originalHtml = btn.innerHTML;
+    }
+
+    let saved = 0;
+    let deduped = 0;
+    let rateLimitHits = 0;
+    let cleanStreak = 0;
+    let delay = SAVE_ALL_BASE_DELAY_MS;
+    const failed = [];
+
+    for (let i = 0; i < ids.length; i++) {
+        if (btn) btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Saving ${i + 1}/${ids.length}${rateLimitHits ? ' (slowed — server busy)' : ''}...`;
+
+        const result = await savePendingCheckpoint(ids[i], { silent: true });
+        if (result.ok) {
+            if (result.deduped) {
+                // Matched an existing nearby checkpoint — no new row was
+                // created, so don't count it toward "saved".
+                deduped++;
+            } else {
+                saved++;
+            }
+            cleanStreak++;
+            if (cleanStreak >= SAVE_ALL_RECOVERY_STREAK && delay > SAVE_ALL_BASE_DELAY_MS) {
+                delay = Math.max(SAVE_ALL_BASE_DELAY_MS, delay / SAVE_ALL_BACKOFF_MULTIPLIER);
+                cleanStreak = 0;
+            }
+        } else {
+            if (result.rateLimited) {
+                rateLimitHits++;
+                cleanStreak = 0;
+                delay = Math.min(SAVE_ALL_MAX_DELAY_MS, delay * SAVE_ALL_BACKOFF_MULTIPLIER);
+            } else if (result.name) {
+                failed.push(result.name);
+            }
+        }
+
+        if (i < ids.length - 1) await sleep(delay);
+    }
+
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = btn.dataset._originalHtml || '<i class="bi bi-check2-all me-1"></i>Save All Pending Checkpoints';
+    }
+
+    if (saved) loadCheckpoints();
+
+    const stillPending = pendingCheckpoints.length;
+    if (rateLimitHits && stillPending) {
+        showToast(`Saved ${saved} checkpoint(s), but the server kept rate-limiting requests (${rateLimitHits} time(s)) — ${stillPending} still pending. Click "Save All" again in a minute to continue, or save smaller batches at a time.`, 'warning');
+    } else if (failed.length) {
+        showToast(`Saved ${saved} checkpoint(s). ${failed.length} failed: ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '...' : ''}. You can retry those individually.`, failed.length === ids.length ? 'danger' : 'warning');
+    } else {
+        showToast(`All ${saved} checkpoint(s) saved successfully.`, 'success');
+    }
+}
+
+function clearPendingCheckpoints() {
+    if (pendingCheckpointsLayer) {
+        pendingCheckpointsLayer.clearLayers();
+    }
+    pendingCheckpoints = [];
+    renderPendingList();
+    const summaryEl = document.getElementById('auto-generate-summary');
+    if (summaryEl) summaryEl.textContent = '';
 }
 
 // ── Database Backup / Restore ──────────────────────────────────────────────
@@ -1126,6 +2065,17 @@ window.useCheckpointGPS = useCheckpointGPS;
 window.downloadBackup = downloadBackup;
 window.deleteBackup = deleteBackup;
 window.addSetting = addSetting;
+window.toggleAutoGeneratePanel = toggleAutoGeneratePanel;
+window.generateCheckpointGrid = generateCheckpointGrid;
+window.coverFullMetroArea = coverFullMetroArea;
+window.clearPendingCheckpoints = clearPendingCheckpoints;
+window.savePendingCheckpoint = savePendingCheckpoint;
+window.removePendingCheckpoint = removePendingCheckpoint;
+window.saveAllPendingCheckpoints = saveAllPendingCheckpoints;
+window.saveMovedCheckpoint = saveMovedCheckpoint;
+window.toggleSelectAllCheckpoints = toggleSelectAllCheckpoints;
+window.updateBulkDeleteButton = updateBulkDeleteButton;
+window.deleteSelectedCheckpoints = deleteSelectedCheckpoints;
 })();
 </script>
 {% endblock %}

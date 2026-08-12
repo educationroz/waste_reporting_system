@@ -41,7 +41,8 @@
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/ext/head-support.js"></script>
 
     <!-- Google Translate API -->
-    <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+    <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
+        onerror="window.__ssTranslateLoadFailed = true;"></script>
 
 
     <!-- Theme Early-Initialization -->
@@ -338,9 +339,12 @@ function googleTranslateElementInit() {
 }
 
 function toggleLangSwitcher() {
+    if (window.__ssTranslateLoadFailed || typeof google === 'undefined') {
+        showToast('Translate service unavailable right now — try refreshing.', 'warning');
+        return;
+    }
     document.getElementById('custom-lang-switcher').classList.toggle('show');
 }
-
 function forceHideGoogleBanner() {
     var selectors = [
         'iframe.goog-te-banner-frame',
@@ -415,6 +419,15 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         } else if (attempts > 100) {
             clearInterval(checkDropdown);
+            window.__ssTranslateLoadFailed = true;
+            // Widget kailei aayena — khali popup deखाउनुको satta bandha
+            // garne ra user lai clear message dine. Yesले "page change
+            // pachi khali box aauxa" wala confusion hataucha.
+            var switcher = document.getElementById("custom-lang-switcher");
+            if (switcher && switcher.classList.contains('show')) {
+                switcher.classList.remove('show');
+                showToast('Translate service unavailable right now — try hard refreshing.', 'warning');
+            }
             console.warn("Google Translate widget failed to load.");
         }
     }, 100); 
