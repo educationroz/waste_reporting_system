@@ -539,7 +539,7 @@
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock %}}
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1926,9 +1926,7 @@ async function createBackup() {
     }
 }
 
-async function deleteBackup(fileName) {
-    if (!window.confirm(`Delete ${fileName}?`)) return;
-
+async function performBackupDelete(fileName) {
     try {
         const res = await authFetch(`/api/database-backups/delete/?file_name=${encodeURIComponent(fileName)}`, {
             method: 'DELETE',
@@ -1947,19 +1945,39 @@ async function deleteBackup(fileName) {
     }
 }
 
-async function restoreBackup(file) {
-    if (!file) return;
+let pendingDeleteBackupFileName = null;
 
-    const confirmed = window.confirm(
-        'WARNING: This will PERMANENTLY REPLACE all current system data with the backup file. ' +
-        'This action cannot be undone. A safety backup of your current data will be created automatically.\n\n' +
-        'Are you sure you want to restore?'
-    );
-    if (!confirmed) return;
+function deleteBackup(fileName) {
+    pendingDeleteBackupFileName = fileName;
+    document.getElementById('deleteBackupFileNameLabel').textContent = fileName;
+
+    const modalEl = document.getElementById('deleteBackupConfirmModal');
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+(function bindDeleteBackupConfirm() {
+    const submitBtn = document.getElementById('deleteBackupConfirmSubmitBtn');
+    if (!submitBtn || submitBtn.dataset._bound) return;
+    submitBtn.addEventListener('click', async () => {
+        if (!pendingDeleteBackupFileName) return;
+        const fileName = pendingDeleteBackupFileName;
+        pendingDeleteBackupFileName = null;
+
+        const modalEl = document.getElementById('deleteBackupConfirmModal');
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+
+        await performBackupDelete(fileName);
+    });
+    submitBtn.dataset._bound = '1';
+})();
+
+async function restoreBackup(file, adminPassword) {
+    if (!file) return;
 
     const formData = new FormData();
     formData.append('backup_file', file);
     formData.append('confirm', 'true');
+    formData.append('admin_password', adminPassword);
 
     try {
         showToast('Restoring backup... this may take a moment.', 'info');
@@ -1994,12 +2012,44 @@ function attachBackupHandlers() {
 
     if (restoreBtn && fileInput && !restoreBtn.dataset._bound) {
         restoreBtn.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', async (event) => {
+
+        let pendingRestoreFile = null;
+
+        fileInput.addEventListener('change', (event) => {
             const file = event.target.files?.[0];
-            if (!file) return;
-            await restoreBackup(file);
             event.target.value = '';
+            if (!file) return;
+
+            pendingRestoreFile = file;
+            document.getElementById('restoreFileNameLabel').textContent = file.name;
+            document.getElementById('restore_admin_password').value = '';
+
+            const modalEl = document.getElementById('restoreConfirmModal');
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
         });
+
+        const submitBtn = document.getElementById('restoreConfirmSubmitBtn');
+        if (submitBtn && !submitBtn.dataset._bound) {
+            submitBtn.addEventListener('click', async () => {
+                const passwordInput = document.getElementById('restore_admin_password');
+                const password = passwordInput.value;
+                if (!password) {
+                    passwordInput.focus();
+                    return;
+                }
+                if (!pendingRestoreFile) return;
+
+                const modalEl = document.getElementById('restoreConfirmModal');
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+
+                const file = pendingRestoreFile;
+                pendingRestoreFile = null;
+                await restoreBackup(file, password);
+                passwordInput.value = '';
+            });
+            submitBtn.dataset._bound = '1';
+        }
+
         restoreBtn.dataset._bound = '1';
     }
 }
