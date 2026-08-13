@@ -279,16 +279,13 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Designated Drop-off Point</label>
-                            <select id="checkpoint-select" class="form-select" onchange="onCheckpointSelect(this.value)">
-                                <option value="">Use custom location on map</option>
-                            </select>
-                            {% comment %} <div class="form-text text-muted small">
-                                Use a checkpoint set by administration, or choose a custom location on the map.
-                            </div> {% endcomment %}
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Preferred Date</label>
-                            <input type="datetime-local" id="scheduled-date" class="form-control">
+                            <!-- Manual dropdown हटाइयो — GPS location अनुसार सबैभन्दा नजिकको
+                                 checkpoint auto-detect हुन्छ। 100m भित्र भए auto-assign हुन्छ,
+                                 भन्दा टाढा भए recommend मात्र गरिन्छ (assign हुँदैन)। -->
+                            <div class="form-control bg-light d-flex align-items-center" id="checkpoint-auto-display" style="min-height:38px;">
+                                <span class="text-muted small">Set your location to auto-detect nearest checkpoint...</span>
+                            </div>
+                            <input type="hidden" id="checkpoint-select" value="">
                         </div>
                         <div class="col-12">
                             <label class="form-label">Description (optional)</label>
@@ -564,6 +561,21 @@ let locationLockedByPhoto = false;
 // यो थ्रेसहोल्ड भन्दा टाढाको फोटो भए "फरक ठाउँ" मानेर reject गर्ने
 const SAME_LOCATION_THRESHOLD_METERS = 150;
 
+// ── Auto-assign nearest checkpoint ──────────────────────────────────────────
+// User-selected location यो दूरी (मिटर) भित्र भएमा मात्र त्यो checkpoint
+// auto-assign हुन्छ (dropoff_checkpoint_id पठाइन्छ)। भन्दा टाढा भए
+// submit गर्न दिइँदैन — user लाई नजिकको checkpoint सम्म गएर मात्र request
+// गर्न लगाइन्छ (हेर्नुहोस् submitRequest())। कुनै manual dropdown छैन —
+// user ले आफैं checkpoint choose गर्न पाउँदैनन्, GPS ले नै auto-detect गर्छ।
+const CHECKPOINT_AUTO_ASSIGN_METERS = 100;
+
+// Map मा एकैचोटि सबै checkpoint (३००+ हुन सक्ने) देखाउँदा भिड-भाड र
+// नराम्रो देखिन्छ — त्यसैले afno location bata यति टाढासम्मका checkpoint
+// मात्र flag भएर देखिन्छन्। यसभन्दा टाढा भए पनि सबैभन्दा नजिकको एउटा
+// checkpoint भने जहिले पनि देखाइन्छ (कता जाने भन्ने दिशा-निर्देशको लागि) —
+// हेर्नुहोस् renderNearbyCheckpointMarkers()।
+const NEARBY_CHECKPOINT_DISPLAY_RADIUS_METERS = 1000;
+
 if (!document.body.dataset._leafletCleanupBound) {
     document.body.addEventListener('htmx:beforeSwap', () => {
         if (map) {
@@ -637,6 +649,87 @@ function distanceInMeters(lat1, lng1, lat2, lng2) {
     return R * c;
 }
 
+// ── Nearest checkpoint detection ────────────────────────────────────────────
+// checkpointData भित्रका सबै checkpoint मध्ये दिइएको lat/lng बाट सबैभन्दा
+// नजिकको फेला पार्ने। कुनै checkpoint नै लोड नभएको भए null फर्काउँछ।
+function findNearestCheckpoint(lat, lng) {
+    if (!checkpointData.length) return null;
+    let nearest = null;
+    let minDist = Infinity;
+    checkpointData.forEach(ch => {
+        const chLat = parseFloat(ch.latitude);
+        const chLng = parseFloat(ch.longitude);
+        if (isNaN(chLat) || isNaN(chLng)) return;
+        const dist = distanceInMeters(lat, lng, chLat, chLng);
+        if (dist < minDist) {
+            minDist = dist;
+            nearest = ch;
+        }
+    });
+    return nearest ? { checkpoint: nearest, distance: minDist } : null;
+}
+
+// Nearest checkpoint पत्ता लगाएर UI अपडेट गर्ने — 100m भित्र भए auto-assign
+// (hidden #checkpoint-select मा checkpoint id सेट हुन्छ, submit मा त्यही
+// पठाइन्छ)। भन्दा टाढा भए hidden field खाली नै रहन्छ, र submit गर्न
+// दिइँदैन — display मा स्पष्ट "यहाँ गएर submit गर्नुहोस्" जस्तो
+// निर्देशन देखाइन्छ (हेर्नुहोस् submitRequest())।
+function updateNearestCheckpointDisplay(lat, lng) {
+    const display = document.getElementById('checkpoint-auto-display');
+    const hiddenInput = document.getElementById('checkpoint-select');
+    if (!display || !hiddenInput) return;
+
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    const result = findNearestCheckpoint(lat, lng);
+
+    if (!result) {
+        hiddenInput.value = '';
+        display.innerHTML = '<span class="text-danger small"><i class="bi bi-exclamation-circle-fill me-1"></i>No checkpoints configured yet — a request cannot be submitted.</span>';
+        return;
+    }
+
+    const { checkpoint, distance } = result;
+    const distRounded = Math.round(distance);
+
+    if (distance <= CHECKPOINT_AUTO_ASSIGN_METERS) {
+        hiddenInput.value = checkpoint.id;
+        display.innerHTML = `
+            <span class="text-success fw-semibold"><i class="bi bi-check-circle-fill me-1"></i>${escapeHtml(checkpoint.name)}</span>
+            <span class="text-muted small ms-1">(${distRounded}m away — auto-assigned)</span>`;
+    } else {
+        hiddenInput.value = '';
+        display.innerHTML = `
+            <div class="text-warning fw-semibold"><i class="bi bi-signpost-split-fill me-1"></i>Nearest checkpoint: ${escapeHtml(checkpoint.name)}</div>
+            <div class="text-muted small mt-1">${distRounded}m away — please go there to submit. You must be within ${CHECKPOINT_AUTO_ASSIGN_METERS}m of a checkpoint to submit a request.</div>`;
+    }
+}
+
+// Map मा सबै checkpoint नदेखाई, दिइएको lat/lng बाट
+// NEARBY_CHECKPOINT_DISPLAY_RADIUS_METERS भित्रकाहरू मात्र flag भएर
+// देखाउने — साथसाथै सबैभन्दा नजिकको checkpoint (त्यो भन्दा टाढा भए पनि)
+// जहिले पनि थपेर देखाउने, ताकि user लाई कता जाने भन्ने दिशा-निर्देश मिलोस्।
+function renderNearbyCheckpointMarkers(lat, lng) {
+    if (isNaN(lat) || isNaN(lng)) {
+        renderCheckpointMarkers(checkpointData);
+        return;
+    }
+
+    const nearby = checkpointData.filter(ch => {
+        const chLat = parseFloat(ch.latitude);
+        const chLng = parseFloat(ch.longitude);
+        if (isNaN(chLat) || isNaN(chLng)) return false;
+        return distanceInMeters(lat, lng, chLat, chLng) <= NEARBY_CHECKPOINT_DISPLAY_RADIUS_METERS;
+    });
+
+    const nearestResult = findNearestCheckpoint(lat, lng);
+    if (nearestResult && !nearby.some(ch => ch.id === nearestResult.checkpoint.id)) {
+        nearby.push(nearestResult.checkpoint);
+    }
+
+    renderCheckpointMarkers(nearby);
+}
+
 // ── Map ──────────────────────────────────────────────────────────────────────
 function updateLocationLockUI() {
     const note = document.getElementById('location-lock-note');
@@ -682,8 +775,9 @@ function initMap(lat, lng) {
     // tried to run, so it silently did nothing. Now that the layer exists,
     // immediately render whatever's already been fetched (checkpointData
     // starts as [] and gets replaced once the fetch resolves, at which point
-  // loadCheckpoints() below re-renders again using the now-existing layer).
-    renderCheckpointMarkers(checkpointData);
+    // loadCheckpoints() below re-renders again using the now-existing layer).
+    // Sabai checkpoint hoina, यही lat/lng bata najik ka matra देखाउने।
+    renderNearbyCheckpointMarkers(lat, lng);
     loadDriverMarkers();
 
     marker = L.marker([lat, lng], { draggable: !locationLockedByPhoto })
@@ -720,6 +814,12 @@ function updateCoords(lat, lng) {
     document.getElementById('req-lng').value = lngF;
 
     reverseGeocodeDebounced(latF, lngF);
+
+    // Location हरेक पटक बदलिँदा nearest checkpoint फेरि गणना गर्ने —
+    // auto-assign/recommend दुबै यहीँबाट अपडेट हुन्छन्, र map माथिको
+    // checkpoint flag list पनि नयाँ location अनुसार (1km भित्र मात्र) पुनः-draw हुन्छ।
+    updateNearestCheckpointDisplay(parseFloat(latF), parseFloat(lngF));
+    renderNearbyCheckpointMarkers(parseFloat(latF), parseFloat(lngF));
 }
 
 // ── Reverse Geocoding ────────────────────────────────────────────────────────
@@ -793,58 +893,58 @@ function isCheckpointActive(ch) {
     return true;
 }
 
-async function loadCheckpoints() {
-    const select = document.getElementById('checkpoint-select');
-    if (!select) return;
+// FIX (checkpoints not showing on Home): /api/checkpoints/ can be paginated
+// (DRF default), in which case the old code only ever read page 1 via
+// `data.results` — any checkpoints beyond the first page silently never
+// rendered here, even though they exist and show fine on the Admin
+// Settings checkpoint table (which already follows `next` fully). This
+// follows `next` the same way so Home always sees the complete list.
+async function fetchAllCheckpoints() {
+    let checkpoints = [];
+    let url = '/api/checkpoints/';
+    let guard = 0; // safety net against a `next` link that ever loops back
 
-    try {
-        const res = await fetch('/api/checkpoints/');
+    while (url && guard < 200) {
+        guard++;
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to load checkpoints');
         const data = await res.json();
-        const checkpoints = extractCheckpointList(data);
+
+        if (Array.isArray(data)) {
+            // Non-paginated backend — flat array, nothing more to fetch.
+            checkpoints = checkpoints.concat(data);
+            break;
+        }
+
+        checkpoints = checkpoints.concat(extractCheckpointList(data));
+        url = data.next || null; // DRF gives a full absolute URL — fetch() handles that fine.
+    }
+
+    return checkpoints;
+}
+
+async function loadCheckpoints() {
+    try {
+        const checkpoints = await fetchAllCheckpoints();
         checkpointData = checkpoints.filter(isCheckpointActive);
 
-        select.innerHTML = '<option value="">Use custom location on map</option>' +
-            checkpointData.map(ch =>
-                `<option value="${ch.id}" data-lat="${ch.latitude}" data-lng="${ch.longitude}">` +
-                `${ch.name} — ${parseFloat(ch.latitude).toFixed(6)}, ${parseFloat(ch.longitude).toFixed(6)}` +
-                `</option>`
-            ).join('');
-
-        // Render immediately if the map's already up; if not, initMap()
-        // will render this same checkpointData once it finishes setting up
-        // (see the renderCheckpointMarkers(checkpointData) call added there).
-        renderCheckpointMarkers(checkpointData);
+        // Location पहिले नै सेट भइसकेको भए (map init भइसकेको बेला checkpoint
+        // list पछि आइपुगेको केसमा), त्यही coords माथि nearest checkpoint फेरि
+        // गणना गर्ने र map मा पनि (1km भित्रका) checkpoint फेरि draw गर्ने,
+        // ताकि auto-assign/recommend दुबै up-to-date रहोस्। Location अझै
+        // थाहा नभएको भए, geolocation आइपुगेपछि initMap()->updateCoords() ले
+        // नै पहिलो पटक render गर्नेछ — यहाँ full unfiltered list कहिल्यै
+        // नदेखाउने (सबै checkpoint एकैचोटि देखाउँदा नराम्रो देखिन्छ)।
+        const latVal = document.getElementById('req-lat').value;
+        const lngVal = document.getElementById('req-lng').value;
+        if (latVal && lngVal) {
+            updateNearestCheckpointDisplay(parseFloat(latVal), parseFloat(lngVal));
+            renderNearbyCheckpointMarkers(parseFloat(latVal), parseFloat(lngVal));
+        }
     } catch (e) {
         console.warn('Checkpoint load failed:', e);
     }
 }
-
-window.onCheckpointSelect = function(value) {
-    if (!value) {
-        return;
-    }
-    if (locationLockedByPhoto) {
-        showToast('Location is locked to the photo\'s GPS. Remove the photo to pick a checkpoint instead.', 'warning');
-        // Selection revert garne — pin lock bhaisakeko bela checkpoint choose
-        // gareko dropdown value le confuse nagaros.
-        document.getElementById('checkpoint-select').value = '';
-        return;
-    }
-    const select = document.getElementById('checkpoint-select');
-    const selectedOption = select.options[select.selectedIndex];
-    const lat = parseFloat(selectedOption.dataset.lat);
-    const lng = parseFloat(selectedOption.dataset.lng);
-    if (!isNaN(lat) && !isNaN(lng)) {
-        if (!map) {
-            initMap(lat, lng);
-        } else {
-            marker.setLatLng([lat, lng]);
-            map.setView([lat, lng], 16);
-            updateCoords(lat, lng);
-        }
-    }
-};
 
 function renderCheckpointMarkers(checkpoints) {
     if (!checkpointMarkersLayer) return;
@@ -1369,9 +1469,6 @@ function insertHomeRequestRow(req) {
 // ── Submit Request ───────────────────────────────────────────────────────────
 window.submitRequest = async function() {
     const address  = document.getElementById('pickup-address').value.trim();
-    const date     = document.getElementById('scheduled-date').value;
-    const lat      = document.getElementById('req-lat').value;
-    const lng      = document.getElementById('req-lng').value;
     const btn      = document.getElementById('submit-btn');
     const text     = document.getElementById('submit-text');
     const spinner  = document.getElementById('submit-spinner');
@@ -1380,26 +1477,75 @@ window.submitRequest = async function() {
         showToast('Please enter a pickup address.', 'warning');
         return;
     }
-    if (!date) {
-        showToast('Please select a preferred date.', 'warning');
+
+    btn.disabled = true;
+    spinner.classList.remove('d-none');
+
+    // फोटोको GPS मा pin पहिले नै lock भइसकेको छैन भने (यानि फोटो GPS-सहित
+    // छैन, वा फोटो नै अटैच गरिएको छैन), submit गर्नुअघि device बाट ताजा
+    // (fresh) GPS location फेरि लिने — page-load-time को पुरानो location वा
+    // manually map click/drag गरेको location मा भरोसा नगरी, "submit" थिचेकै
+    // क्षणको वास्तविक स्थान प्रयोग गर्ने। यसले तलको 100m checkpoint जाँच
+    // सही र भरपर्दो बनाउँछ (टाढैबाट pin तानेर checkpoint नजिक देखाउन मिल्दैन)।
+    if (!locationLockedByPhoto) {
+        text.innerHTML = 'Confirming your location...';
+        try {
+            const freshPos = await new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation not supported by this browser.'));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                });
+            });
+            initMap(freshPos.coords.latitude, freshPos.coords.longitude);
+        } catch (e) {
+            btn.disabled = false;
+            text.innerHTML = '<i class="bi bi-send me-2"></i>Submit Request';
+            spinner.classList.add('d-none');
+            showToast('Please enable location access to submit a request — we need your current GPS location to confirm you\'re near a checkpoint.', 'danger');
+            return;
+        }
+    }
+
+    text.innerHTML = 'Submitting...';
+
+    const lat = document.getElementById('req-lat').value;
+    const lng = document.getElementById('req-lng').value;
+
+    // checkpoint-select hidden field हो — 100m भित्रको nearest checkpoint
+    // भएमा मात्र auto-assign भएर यहाँ value भरिएको हुन्छ (updateNearestCheckpointDisplay
+    // हेर्नुहोस्)। खाली भए submit गर्न दिइँदैन — user लाई नजिकको checkpoint
+    // सम्म गएर मात्र request गर्न लगाइन्छ, टाढैबाट custom location मा गर्न मिल्दैन।
+    const checkpointId = document.getElementById('checkpoint-select').value;
+    if (!checkpointId) {
+        btn.disabled = false;
+        text.innerHTML = '<i class="bi bi-send me-2"></i>Submit Request';
+        spinner.classList.add('d-none');
+
+        const nearest = findNearestCheckpoint(parseFloat(lat), parseFloat(lng));
+        if (nearest) {
+            showToast(`You're ${Math.round(nearest.distance)}m away from the nearest checkpoint ("${nearest.checkpoint.name}"). Please go there — within ${CHECKPOINT_AUTO_ASSIGN_METERS}m — to submit your request.`, 'danger');
+        } else {
+            showToast('No checkpoint is configured nearby. A request cannot be submitted right now.', 'danger');
+        }
         return;
     }
 
-    btn.disabled = true;
-    text.innerHTML = 'Submitting...';
-    spinner.classList.remove('d-none');
+    // "Preferred Date" field हटाइयो — submit गर्ने बित्तिकैको current
+    // date/time नै scheduled_date को रूपमा पठाइन्छ।
+    const scheduledDate = new Date().toISOString();
 
     const formData = new FormData();
     formData.append('waste_type',     document.getElementById('waste-type').value);
     formData.append('pickup_address', address);
-    formData.append('scheduled_date', date);
+    formData.append('scheduled_date', scheduledDate);
     formData.append('description',    document.getElementById('description').value.trim());
     formData.append('latitude',       lat);
     formData.append('longitude',      lng);
-    const checkpointId = document.getElementById('checkpoint-select').value;
-    if (checkpointId) {
-        formData.append('dropoff_checkpoint_id', checkpointId);
-    }
+    formData.append('dropoff_checkpoint_id', checkpointId);
 
     let currentGuestToken = null;
     if (!localStorage.getItem('access_token')) {
@@ -1450,12 +1596,16 @@ window.submitRequest = async function() {
                 //showToast('Tip: Login or register to track this request and get notifications!', 'info');
             }
             document.getElementById('pickup-address').value = '';
-            document.getElementById('scheduled-date').value = '';
             document.getElementById('description').value = '';
             photoFiles = [];
             firstPhotoGPS = null;
             locationLockedByPhoto = false;
             renderPhotoThumbnails();
+
+            // Drop-off auto-display र hidden checkpoint value रिसेट गर्ने
+            document.getElementById('checkpoint-select').value = '';
+            document.getElementById('checkpoint-auto-display').innerHTML =
+                '<span class="text-muted small">Set your location to auto-detect nearest checkpoint...</span>';
 
             // Reload नगरी: नयाँ request Recent Requests table मा थप्ने,
             // pending count तुरुन्तै अपडेट गर्ने

@@ -205,7 +205,7 @@
                                     <th>AI Severity</th>
                                     <th>Geospatial Address Context</th>
                                     <th>Status Sign</th>
-                                    <th>Scheduled Timeline</th>
+                                    <th>Submitted Date</th>
                                     <th>Assigned Logistics Crew</th>
                                     <th class="text-end pe-4">Pipeline Action Dispatch</th>
                                     <th> Action Control </th>
@@ -309,7 +309,6 @@
                                             {% else %}bg-primary bg-opacity-10 text-primary{% endif %}">
                                             {{ req.get_status_display }}
                                         </span>
-                                        <span class="d-block text-muted small" style="font-size: 0.68rem;">{{ req.created_at|date:"d M Y, H:i" }}</span>
 
                                         {# ===== LOCATION MISMATCH FLAG — driver ले pickup location भन्दा टाढा complete मार्क गर्यो ===== #}
                                         {% if req.completion_flagged %}
@@ -320,7 +319,8 @@
                                         {% endif %}
                                         {# ===== END LOCATION MISMATCH FLAG ===== #}
                                     </td>
-                                    <td class="font-monospace text-secondary fw-semibold">{{ req.scheduled_date|date:"d M Y" }}</td>
+                                    
+                                    <td class="font-monospace text-secondary fw-semibold">{{ req.created_at|date:"d M Y, H:i" }}</td>
                                     <td class="fw-medium">
                                         {% if req.driver %}
                                             <div><i class="bi bi-person me-1 text-success"></i>{{ req.driver.user.username }}</div>
@@ -600,7 +600,7 @@ function applyRequestRowUpdate(requestId, { statusKey, driverHtml, actionHtml, s
     const row = document.getElementById(`request-row-${requestId}`);
     if (!row) return; // row bhetिएन भने silently skip
 
-    // Status Sign cell (7th <td>, index 6) — timestamp/mismatch line नछोई badge matra replace
+    // Status Sign cell (7th <td>, index 6) — location-mismatch badge (yedi cha) नछोई status badge matra replace
     const statusCell = row.children[6];
     if (statusCell) {
         const badge = statusCell.querySelector('.badge');

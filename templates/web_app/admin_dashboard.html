@@ -239,7 +239,7 @@
                                 <table class="table table-hover mb-0 align-middle">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>ID</th><th>Client</th><th>Waste Context</th><th>AI Severity</th><th>Status Check</th><th>Assigned Driver</th><th>Date</th><th>Action Control</th>
+                                            <th>ID</th><th>Client</th><th>Waste Context</th><th>AI Severity</th><th>Status Check</th><th>Assigned Driver</th><th>Submitted</th><th>Action Control</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -292,7 +292,11 @@
                                                     <span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>Unassigned</span>
                                                 {% endif %}
                                             </td>
-                                            <td class="small text-muted">{{ req.scheduled_date|date:"d M Y" }}</td>
+                                            <!-- Submitted date — jaba citizen le request pesh gareko thiyo (created_at).
+                                                 scheduled_date pahile "Preferred Date" thiyo, tara tyo field ab
+                                                 user form बाट हटाइसकिएको छ (home.html), tesले yaha created_at
+                                                 nai "पठाएको दिन" ko sahi source ho. -->
+                                            <td class="small text-muted">{{ req.created_at|date:"d M Y" }}</td>
                                             <td>
                                                 {% if req.status == 'pending' %}
                                                 <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }}, this)">
