@@ -427,9 +427,9 @@
             const checkpointMarker = L.marker([lat, lng], {
                 icon: L.divIcon({
                     className: 'checkpoint-marker-icon',
-                    html: '<span style="font-size:1.4rem;">🚩</span>',
-                    iconSize: [24, 24],
-                    iconAnchor: [12, 24],
+                    html: '<span style="font-size:1rem;">🚩</span>',
+                    iconSize: [15, 15],
+                    iconAnchor: [15, 15],
                 }),
             }).bindPopup(`<strong>🚩 ${ch.name || 'Checkpoint'}</strong><br>${ch.description || 'Designated checkpoint'}`);
 

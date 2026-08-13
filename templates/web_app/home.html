@@ -208,7 +208,7 @@
             <!-- New Request Card -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white fw-bold">
-                    <i class="bi bi-plus-circle text-success me-2"></i>New Pickup Request
+                    <i class="bi bi-plus-circle text-success me-2"></i>New Pickup Request (Flags are 3km Around Your Location only)
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
@@ -562,19 +562,10 @@ let locationLockedByPhoto = false;
 const SAME_LOCATION_THRESHOLD_METERS = 150;
 
 // ── Auto-assign nearest checkpoint ──────────────────────────────────────────
-// User-selected location यो दूरी (मिटर) भित्र भएमा मात्र त्यो checkpoint
-// auto-assign हुन्छ (dropoff_checkpoint_id पठाइन्छ)। भन्दा टाढा भए
-// submit गर्न दिइँदैन — user लाई नजिकको checkpoint सम्म गएर मात्र request
-// गर्न लगाइन्छ (हेर्नुहोस् submitRequest())। कुनै manual dropdown छैन —
-// user ले आफैं checkpoint choose गर्न पाउँदैनन्, GPS ले नै auto-detect गर्छ।
-const CHECKPOINT_AUTO_ASSIGN_METERS = 100;
 
-// Map मा एकैचोटि सबै checkpoint (३००+ हुन सक्ने) देखाउँदा भिड-भाड र
-// नराम्रो देखिन्छ — त्यसैले afno location bata यति टाढासम्मका checkpoint
-// मात्र flag भएर देखिन्छन्। यसभन्दा टाढा भए पनि सबैभन्दा नजिकको एउटा
-// checkpoint भने जहिले पनि देखाइन्छ (कता जाने भन्ने दिशा-निर्देशको लागि) —
-// हेर्नुहोस् renderNearbyCheckpointMarkers()।
-const NEARBY_CHECKPOINT_DISPLAY_RADIUS_METERS = 1000;
+const CHECKPOINT_AUTO_ASSIGN_METERS = 200;
+
+const NEARBY_CHECKPOINT_DISPLAY_RADIUS_METERS = 2000;
 
 if (!document.body.dataset._leafletCleanupBound) {
     document.body.addEventListener('htmx:beforeSwap', () => {
@@ -817,7 +808,7 @@ function updateCoords(lat, lng) {
 
     // Location हरेक पटक बदलिँदा nearest checkpoint फेरि गणना गर्ने —
     // auto-assign/recommend दुबै यहीँबाट अपडेट हुन्छन्, र map माथिको
-    // checkpoint flag list पनि नयाँ location अनुसार (1km भित्र मात्र) पुनः-draw हुन्छ।
+    // checkpoint flag list पनि नयाँ location अनुसार (5km भित्र मात्र) पुनः-draw हुन्छ।
     updateNearestCheckpointDisplay(parseFloat(latF), parseFloat(lngF));
     renderNearbyCheckpointMarkers(parseFloat(latF), parseFloat(lngF));
 }
@@ -930,7 +921,7 @@ async function loadCheckpoints() {
 
         // Location पहिले नै सेट भइसकेको भए (map init भइसकेको बेला checkpoint
         // list पछि आइपुगेको केसमा), त्यही coords माथि nearest checkpoint फेरि
-        // गणना गर्ने र map मा पनि (1km भित्रका) checkpoint फेरि draw गर्ने,
+        // गणना गर्ने र map मा पनि (5km भित्रका) checkpoint फेरि draw गर्ने,
         // ताकि auto-assign/recommend दुबै up-to-date रहोस्। Location अझै
         // थाहा नभएको भए, geolocation आइपुगेपछि initMap()->updateCoords() ले
         // नै पहिलो पटक render गर्नेछ — यहाँ full unfiltered list कहिल्यै
@@ -958,9 +949,9 @@ function renderCheckpointMarkers(checkpoints) {
         const checkpointMarker = L.marker([lat, lng], {
             icon: L.divIcon({
                 className: 'checkpoint-marker-icon',
-                html: '<span style="font-size:1.4rem;">🚩</span>',
-                iconSize: [24, 24],
-                iconAnchor: [12, 24],
+                html: '<span style="font-size:0.75rem; line-height:1;">🚩</span>',
+                iconSize: [13, 13],
+                iconAnchor: [6, 13],
             }),
         }).bindPopup(`<strong>🚩 ${ch.name || 'Checkpoint'}</strong><br>${ch.description || 'Designated checkpoint'}`);
 
@@ -1033,6 +1024,10 @@ function getCameraModal() {
     return bootstrap.Modal.getOrCreateInstance(cameraModalEl);
 }
 
+// GPS-lock सहितको camera open — 'garbage' target मा GPS confirm नभएसम्म
+// shutter disable रहन्छ (यसले EXIF-रहित / इन्टरनेटबाट ल्याइएको फोटोलाई
+// camera भएर pass हुनबाट रोक्छ, किनकि live camera ले नै आफ्नै GPS पहिले
+// पक्का लिनैपर्छ)। 'complaint' target मा GPS अनिवार्य छैन, पहिलेजस्तै रहन्छ।
 window.openCamera = async function(target) {
     cameraTarget = target; // 'garbage' or 'complaint'
     cameraFacingMode = 'environment';
@@ -1041,15 +1036,19 @@ window.openCamera = async function(target) {
 
     document.getElementById('camera-error').classList.add('d-none');
     document.getElementById('camera-video').classList.remove('d-none');
-    document.getElementById('camera-shutter-btn').disabled = false;
 
-    // 'garbage' target मा multiple shot counter देखाउने, complaint मा एउटै फोटो पर्याप्त
+    const shutterBtn = document.getElementById('camera-shutter-btn');
     const counter = document.getElementById('camera-shot-counter');
+
     if (target === 'garbage') {
+        shutterBtn.disabled = true;
+        shutterBtn.title = 'Detecting location...';
         counter.textContent = '0 photo(s) taken';
         counter.classList.remove('d-none');
         document.getElementById('camera-done-btn').textContent = 'Done';
     } else {
+        shutterBtn.disabled = false;
+        shutterBtn.title = '';
         counter.classList.add('d-none');
         document.getElementById('camera-done-btn').textContent = 'Cancel';
     }
@@ -1066,10 +1065,24 @@ window.openCamera = async function(target) {
                     lat: pos.coords.latitude,
                     lng: pos.coords.longitude
                 };
+                if (target === 'garbage') {
+                    shutterBtn.disabled = false;
+                    shutterBtn.title = '';
+                }
             },
-            () => { liveCameraGPS = null; },
+            () => {
+                liveCameraGPS = null;
+                if (target === 'garbage') {
+                    showToast('Please enable Location Services to take a garbage photo — this confirms where the garbage actually is.', 'danger');
+                    shutterBtn.disabled = true;
+                    shutterBtn.title = 'Location required';
+                }
+            },
             { enableHighAccuracy: true, timeout: 8000 }
         );
+    } else if (target === 'garbage') {
+        showToast('This browser does not support location detection — a garbage photo cannot be taken.', 'danger');
+        shutterBtn.disabled = true;
     }
 };
 
@@ -1123,6 +1136,13 @@ window.capturePhoto = function() {
 
     if (!video.videoWidth) return; // stream not ready yet
 
+    // Defense-in-depth: shutter already disabled until GPS locks for
+    // 'garbage', but double-check here in case of any race.
+    if (cameraTarget === 'garbage' && !liveCameraGPS) {
+        showToast('Waiting for location — please enable Location Services.', 'warning');
+        return;
+    }
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -1173,29 +1193,21 @@ window.handlePhotoUpload = async function(input) {
 };
 
 // Live camera बाट खिचेको फोटो — EXIF हुँदैन, geolocation प्रयोग गर्ने।
-// पहिलो फोटो भए reference बनाउने, पछिका फोटो भए same-location check गर्ने।
+// GPS नआएको फोटो अब accept हुँदैन (garbage target मा shutter नै GPS
+// नआएसम्म disable हुन्छ, तर यहाँ पनि defense-in-depth राखिएको छ)।
 function addGarbagePhoto(file, gps) {
+    if (!gps) {
+        showToast('Location is required to take this photo. Please enable Location Services and try again.', 'danger');
+        return;
+    }
+
     if (photoFiles.length === 0) {
         // पहिलो फोटो — यसैको GPS लाई reference बनाउने, ra pin lock गर्ने
-        photoFiles.push({ file, gps: gps || null });
-        firstPhotoGPS = gps || null;
+        photoFiles.push({ file, gps });
+        firstPhotoGPS = gps;
         renderPhotoThumbnails();
-        if (gps) {
-            locationLockedByPhoto = true;
-            initMap(gps.lat, gps.lng);
-        }
-        return;
-    }
-
-    if (!firstPhotoGPS) {
-        // पहिलो फोटोमा नै GPS थिएन — तुलना गर्न सकिँदैन, accept गरिदिने
-        photoFiles.push({ file, gps: gps || null });
-        renderPhotoThumbnails();
-        return;
-    }
-
-    if (!gps) {
-        showToast('Could not detect location for this photo. Please take the photo at the same spot as the first one.', 'warning');
+        locationLockedByPhoto = true;
+        initMap(gps.lat, gps.lng);
         return;
     }
 
@@ -1209,7 +1221,9 @@ function addGarbagePhoto(file, gps) {
     renderPhotoThumbnails();
 }
 
-// Gallery फोटो — EXIF बाट GPS निकाल्ने कोशिस, अनि उही same-location check
+// Gallery फोटो — EXIF बाट GPS निकाल्ने कोशिस। EXIF मा GPS फेला परेन भने
+// फोटो accept गरिँदैन — user लाई Location Services अन गरेर फेरि लिन/छान्न
+// भनिन्छ (यसले GPS-रहित फोटो, जस्तै इन्टरनेटबाट झिकेको, upload हुनबाट रोक्छ)।
 async function addGarbagePhotoWithExif(file) {
     let gps = null;
     try {
@@ -1222,27 +1236,18 @@ async function addGarbagePhotoWithExif(file) {
         // EXIF पढ्न सकिएन — gps null नै रहन्छ
     }
 
+    if (!gps) {
+        showToast('This photo has no location data. Please turn ON Location Services on your phone and select or take the photo again.', 'danger');
+        return;
+    }
+
     if (photoFiles.length === 0) {
-        // पहिलो फोटो — reference set गर्ने, ra GPS भए pin lock गर्ने
+        // पहिलो फोटो — reference set गर्ने, pin lock गर्ने
         photoFiles.push({ file, gps });
         firstPhotoGPS = gps;
         renderPhotoThumbnails();
-        if (gps) {
-            locationLockedByPhoto = true;
-            initMap(gps.lat, gps.lng);
-        }
-        return;
-    }
-
-    if (!firstPhotoGPS) {
-        // पहिलो फोटोमा नै GPS थिएन — तुलना गर्न सकिँदैन, accept गरिदिने
-        photoFiles.push({ file, gps });
-        renderPhotoThumbnails();
-        return;
-    }
-
-    if (!gps) {
-        showToast('This photo has no location data. Please use a photo of the same location as the first one.', 'warning');
+        locationLockedByPhoto = true;
+        initMap(gps.lat, gps.lng);
         return;
     }
 
@@ -1282,19 +1287,11 @@ function renderPhotoThumbnails() {
     `).join('');
 
     const withGps = photoFiles.filter(p => p.gps).length;
-    if (withGps > 0) {
-        exifInfo.innerHTML = `
-            <span class="text-success">
-                <i class="bi bi-geo-alt-fill me-1"></i>
-                ${photoFiles.length} photo(s) attached — ${withGps} with location data.
-            </span>`;
-    } else {
-        exifInfo.innerHTML = `
-            <span class="text-warning">
-                <i class="bi bi-exclamation-circle me-1"></i>
-                ${photoFiles.length} photo(s) attached — no GPS found, set location manually on the map.
-            </span>`;
-    }
+    exifInfo.innerHTML = `
+        <span class="text-success">
+            <i class="bi bi-geo-alt-fill me-1"></i>
+            ${photoFiles.length} photo(s) attached — ${withGps} with location data.
+        </span>`;
 }
 
 // एउटा फोटो हटाउने — पहिलो फोटो (index 0) हटायो भने reference र location-lock
@@ -1312,7 +1309,7 @@ window.removeGarbagePhoto = function(index) {
             locationLockedByPhoto = true;
             initMap(photoFiles[0].gps.lat, photoFiles[0].gps.lng);
         } else {
-            // फोटो नै छैन, वा बाँकी पहिलो फोटोमा GPS छैन — lock हटाउने
+            // फोटो नै छैन — lock हटाउने
             locationLockedByPhoto = false;
             if (marker) {
                 marker.dragging.enable();
