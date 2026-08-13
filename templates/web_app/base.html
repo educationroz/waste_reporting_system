@@ -539,6 +539,48 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!slot || !url) return;
         slot.innerHTML = '<img id="navbar-profile-pic" src="' + url + '" alt="Profile" class="navbar-profile-pic">';
     };
+
+    // Shared CSV/file download helper for every "bulk_export" endpoint
+    // (requests, complaints, schedules). A plain <a href> can't carry the
+    // JWT Bearer token these API endpoints require, so we fetch the file
+    // through authFetch (which already handles the refresh-and-retry
+    // dance) and turn the response into a Blob download instead.
+    window.downloadFile = async function downloadFile(url, fallbackFilename) {
+        if (typeof authFetch !== 'function') {
+            console.error('authFetch not available — is the user authenticated?');
+            return false;
+        }
+        try {
+            const res = await authFetch(url, { method: 'GET' });
+            if (!res || !res.ok) {
+                let msg = 'Export failed.';
+                try {
+                    const data = await res.json();
+                    msg = (data && data.error) ? data.error : msg;
+                } catch (e) { /* body may not be JSON */ }
+                if (typeof showToast === 'function') showToast(msg, 'danger');
+                return false;
+            }
+            const blob = await res.blob();
+            const disposition = res.headers.get('Content-Disposition') || '';
+            const match = disposition.match(/filename="?([^";]+)"?/);
+            const filename = (match && match[1]) ? match[1] : fallbackFilename;
+
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(objectUrl);
+            return true;
+        } catch (e) {
+            console.error('Download failed:', e);
+            if (typeof showToast === 'function') showToast('Network error during export.', 'danger');
+            return false;
+        }
+    };
 })();
 </script>
 
