@@ -250,6 +250,13 @@ class WasteRequest(models.Model):
                    'submits a request, so it can later be claimed/linked to '
                    'their account once they register or log in.'
     )
+    guest_email = models.EmailField(
+        blank=True, null=True,
+        help_text='Optional email a guest can provide at submission time. '
+                   'Used to send a claim link as a backup in case the '
+                   'browser-stored guest_token (localStorage) is lost — e.g. '
+                   'cleared browser data or switching devices before registering.'
+    )
 
     # ── ML Gatekeeper Classification (auto-filled on photo upload) ──────
     severity = models.CharField(

@@ -30,6 +30,17 @@
         font-size: 0.88rem; 
         vertical-align: middle; 
     }
+
+    /* ==========================================
+       BULK ACTION TOOLBAR
+       ========================================== */
+    .bulk-toolbar {
+        background: var(--bg-surface-alt, #f8f9fa);
+        color: var(--text-body, inherit);
+    }
+    .bulk-toolbar.d-flex {
+        display: flex !important;
+    }
 </style>
 {% endblock %}
 
@@ -51,17 +62,45 @@
             <div class="card dashboard-card">
                 <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
                     <h6 class="mb-0 fw-bold">All Complaints</h6>
-                    <select id="status-filter" class="form-select form-select-sm w-auto" onchange="renderComplaints()">
-                        <option value="">All Statuses</option>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <select id="status-filter" class="form-select form-select-sm w-auto" onchange="renderComplaints()">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="under_review">Under Review</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportFilteredComplaints()">
+                            <i class="bi bi-download me-1"></i>Export (CSV)
+                        </button>
+                    </div>
+                </div>
+
+                {# ===== BULK ACTION TOOLBAR ===== #}
+                <div id="bulk-toolbar" class="d-none align-items-center gap-2 px-3 py-2 border-bottom bulk-toolbar">
+                    <span class="fw-semibold small"><span id="bulk-selected-count">0</span> selected</span>
+                    <select id="bulk-status-select" class="form-select form-select-sm w-auto">
                         <option value="pending">Pending</option>
                         <option value="under_review">Under Review</option>
                         <option value="completed">Completed</option>
                     </select>
+                    <button type="button" class="btn btn-sm btn-success" onclick="bulkUpdateComplaintStatus()">
+                        <i class="bi bi-check2-square me-1"></i>Apply Status
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportSelectedComplaints()">
+                        <i class="bi bi-download me-1"></i>Export Selected (CSV)
+                    </button>
+                    <button type="button" class="btn btn-sm btn-link text-muted ms-auto" onclick="clearComplaintSelection()">
+                        Clear selection
+                    </button>
                 </div>
+
                 <div class="table-responsive">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
+                                <th style="width: 2.5rem;">
+                                    <input type="checkbox" class="form-check-input" id="select-all-complaints" onchange="toggleSelectAllComplaints(this)">
+                                </th>
                                 <th>ID</th>
                                 <th>User</th>
                                 <th>Type</th>
@@ -73,7 +112,7 @@
                             </tr>
                         </thead>
                         <tbody id="complaint-table-body">
-                            <tr><td colspan="8" class="text-center text-muted py-4">Loading...</td></tr>
+                            <tr><td colspan="9" class="text-center text-muted py-4">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -170,7 +209,7 @@
             console.error('Failed to load complaints:', e);
             allComplaints = [];
             if (body) {
-                body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Unable to load complaints right now.</td></tr>';
+                body.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">Unable to load complaints right now.</td></tr>';
             }
             showToast('Unable to load complaints right now.', 'warning');
         }
@@ -184,12 +223,14 @@
         if (!body) return;
 
         if (!rows.length) {
-            body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No complaints found.</td></tr>';
+            body.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No complaints found.</td></tr>';
+            updateComplaintBulkToolbar();
             return;
         }
 
         body.innerHTML = rows.map(c => `
             <tr id="complaint-row-${escapeHtml(c.id)}">
+                <td><input type="checkbox" class="form-check-input complaint-row-checkbox" value="${escapeHtml(c.id)}" onchange="onComplaintCheckboxChange()"></td>
                 <td class="fw-bold text-secondary">#${escapeHtml(c.id)}</td>
                 <td>${escapeHtml(c.username)}</td>
                 <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">${escapeHtml(c.complaint_type_display)}</span></td>
@@ -209,7 +250,95 @@
                 </td>
             </tr>
         `).join('');
+        updateComplaintBulkToolbar();
     }
+
+    /* ================================================================
+       BULK SELECTION + BULK ACTIONS
+       ================================================================ */
+    function getComplaintCheckboxes() {
+        return Array.from(document.querySelectorAll('.complaint-row-checkbox'));
+    }
+
+    function getSelectedComplaintIds() {
+        return getComplaintCheckboxes().filter(cb => cb.checked).map(cb => parseInt(cb.value, 10));
+    }
+
+    function updateComplaintBulkToolbar() {
+        const ids = getSelectedComplaintIds();
+        const toolbar = document.getElementById('bulk-toolbar');
+        const countEl = document.getElementById('bulk-selected-count');
+        if (countEl) countEl.textContent = ids.length;
+        if (toolbar) {
+            toolbar.classList.toggle('d-none', ids.length === 0);
+            toolbar.classList.toggle('d-flex', ids.length > 0);
+        }
+        const all = getComplaintCheckboxes();
+        const selectAll = document.getElementById('select-all-complaints');
+        if (selectAll) {
+            selectAll.checked = all.length > 0 && ids.length === all.length;
+            selectAll.indeterminate = ids.length > 0 && ids.length < all.length;
+        }
+    }
+
+    window.onComplaintCheckboxChange = function() {
+        updateComplaintBulkToolbar();
+    };
+
+    window.toggleSelectAllComplaints = function(masterCheckbox) {
+        getComplaintCheckboxes().forEach(cb => { cb.checked = masterCheckbox.checked; });
+        updateComplaintBulkToolbar();
+    };
+
+    window.clearComplaintSelection = function() {
+        getComplaintCheckboxes().forEach(cb => { cb.checked = false; });
+        const selectAll = document.getElementById('select-all-complaints');
+        if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
+        updateComplaintBulkToolbar();
+    };
+
+    window.bulkUpdateComplaintStatus = async function() {
+        const ids = getSelectedComplaintIds();
+        if (!ids.length) return;
+        const newStatus = document.getElementById('bulk-status-select').value;
+        if (!confirm(`Update ${ids.length} selected complaint(s) to "${newStatus}"?`)) return;
+
+        // Track which of the selected ones were pending BEFORE the update,
+        // so the sidebar/collapsed complaints badge count stays accurate —
+        // same accounting submitReview() already does for a single complaint.
+        const wasPendingCount = allComplaints.filter(c => ids.includes(c.id) && c.status === 'pending').length;
+        const willBePending = newStatus === 'pending';
+
+        await withButtonBusy(null, '', async () => {
+            const data = await API.post('/api/complaints/bulk_update_status/', { ids, status: newStatus });
+            if (data && typeof data.updated === 'number') {
+                const parts = [`${data.updated} complaint(s) updated`];
+                if (data.missing_ids && data.missing_ids.length) parts.push(`${data.missing_ids.length} not found`);
+                showToast(parts.join(', '), data.updated > 0 ? 'success' : 'warning');
+
+                if (!willBePending && wasPendingCount) adjustComplaintsBadge(-wasPendingCount);
+                else if (willBePending && data.updated) adjustComplaintsBadge(data.updated - wasPendingCount);
+
+                clearComplaintSelection();
+                loadComplaints();
+            } else {
+                showToast('Bulk status update failed.', 'danger');
+            }
+        });
+    };
+
+    window.exportSelectedComplaints = async function() {
+        const ids = getSelectedComplaintIds();
+        if (!ids.length) return;
+        await downloadFile(`/api/complaints/bulk_export/?ids=${ids.join(',')}`, 'complaints.csv');
+    };
+
+    window.exportFilteredComplaints = async function() {
+        const filterEl = document.getElementById('status-filter');
+        const filter = filterEl ? filterEl.value : '';
+        const qs = filter ? `?status=${encodeURIComponent(filter)}` : '';
+        await downloadFile(`/api/complaints/bulk_export/${qs}`, 'complaints.csv');
+    };
 
     function openReview(id) {
         const complaint = allComplaints.find(c => c.id == id);
@@ -278,6 +407,8 @@
 
                 if (!allComplaints.length) {
                     renderComplaints();
+                } else {
+                    updateComplaintBulkToolbar();
                 }
             } else {
                 let errMsg = 'Failed to delete complaint.';

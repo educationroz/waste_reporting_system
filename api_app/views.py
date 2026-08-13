@@ -8,6 +8,7 @@ from .backup_utils import BACKUP_DIR as BACKUP_DIR_FOR_UPLOADS
 from .backup_utils import BackupError, verify_backup_file
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
 from django.core.management import call_command
 from django.db import transaction
 from django.db.models import F, Q
@@ -161,6 +162,38 @@ def _log_admin_action(request, action_type, content_type, obj, description=''):
         object_description=description or str(obj),
         ip_address=request.META.get('REMOTE_ADDR'),
         user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+    )
+
+
+def send_guest_claim_email(waste_request, request):
+    """
+    Backup path for claiming a guest-submitted request: the primary claim
+    mechanism is the 'guest_token' saved client-side in localStorage
+    (guest_claim_tokens), which is auto-claimed on next login/register. That
+    breaks if the guest clears browser data or switches devices before
+    registering — so if they optionally gave an email at submission time,
+    email them a direct claim link carrying the same guest_token as a
+    'claim_token' URL param. login.html reads that param and merges it into
+    guest_claim_tokens before the existing post-login claim call runs, so no
+    separate backend endpoint is needed for the link itself.
+    Follows the same send_mail pattern as auth_app.views.send_verification_email.
+    """
+    claim_path = f'/login/?claim_token={waste_request.guest_token}'
+    claim_url = request.build_absolute_uri(claim_path)
+
+    send_mail(
+        subject='Your pickup request — claim it to track online',
+        message=(
+            f'Hi,\n\n'
+            f'Thanks for submitting pickup request #{waste_request.id}.\n\n'
+            f'To track its status and get notifications, log in (or register, then log in) '
+            f'using the link below and it will automatically be linked to your account:\n'
+            f'{claim_url}\n\n'
+            f'If you already claimed this request, you can ignore this email.'
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[waste_request.guest_email],
+        fail_silently=True,
     )
 
 
@@ -1027,6 +1060,16 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 self.request, 'create', 'WasteRequest', waste_request,
                 f'{user.username} submitted pickup request #{waste_request.id}{photo_note}'
             )
+        elif waste_request.guest_email:
+            # Guest submission with an optional email given — send the
+            # backup claim link (see send_guest_claim_email docstring).
+            try:
+                send_guest_claim_email(waste_request, self.request)
+            except Exception:
+                logger.warning(
+                    f'[GUEST CLAIM EMAIL] failed to send for request={waste_request.id} '
+                    f'— guest_token claiming via localStorage is unaffected.'
+                )
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def assign_driver(self, request, pk=None):

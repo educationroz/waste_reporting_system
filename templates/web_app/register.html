@@ -69,7 +69,7 @@
             </button>
 
             <p class="text-center mt-3 mb-0 small">
-                Already have an account? <a href="{% url 'login' %}" class="text-success">Sign in</a>
+                Already have an account? <a href="{% url 'login' %}" id="signin-link" class="text-success">Sign in</a>
             </p>
         </div>
     </div>
@@ -105,7 +105,6 @@ window.doRegister = async function() {
     const btn = document.getElementById('reg-btn');
     errDiv.classList.add('d-none');
     sucDiv.classList.add('d-none');
-
     const payload = {
         username: document.getElementById('username').value.trim(),
         email: document.getElementById('email').value.trim(),
@@ -149,7 +148,12 @@ window.doRegister = async function() {
             btn.disabled = true;
             text.textContent = 'Check your email';
 
-            setTimeout(() => window.location.href = "{% url 'login' %}", 3000);
+            setTimeout(() => {
+                const params = new URLSearchParams(window.location.search);
+                const claimToken = params.get('claim_token');
+                const loginUrl = "{% url 'login' %}" + (claimToken ? `?claim_token=${encodeURIComponent(claimToken)}` : '');
+                window.location.href = loginUrl;
+            }, 3000);
         } else {
             const msgs = Object.entries(data).map(([k,v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('<br>');
             errDiv.innerHTML = msgs || 'Registration failed.';
@@ -178,6 +182,24 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+// ── Guest claim-link backup (email) ─────────────────────────────────────────
+// If this page was reached via the emailed claim link (?claim_token=...),
+// keep that token attached to the Sign-in link too, in case this guest
+// actually already has an account and just needs to log in instead.
+// The successful-registration redirect above forwards it onward as well.
+(function forwardClaimTokenToSignin() {
+    const params = new URLSearchParams(window.location.search);
+    const claimToken = params.get('claim_token');
+    if (!claimToken) return;
+
+    const signinLink = document.getElementById('signin-link');
+    if (signinLink) {
+        const url = new URL(signinLink.href, window.location.origin);
+        url.searchParams.set('claim_token', claimToken);
+        signinLink.href = url.toString();
+    }
+})();
 
 // ── Google Sign-In ───────────────────────────────────────────────────────────
 // Google le nai email verify garisakeko huncha, tesaile Google le banaeko
