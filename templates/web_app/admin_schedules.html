@@ -45,6 +45,17 @@
         background-color: #198754;
         border-color: #198754;
     }
+
+    /* ==========================================
+       BULK ACTION TOOLBAR
+       ========================================== */
+    .bulk-toolbar {
+        background: var(--bg-surface-alt, var(--bg-card));
+        color: var(--text-body);
+    }
+    .bulk-toolbar.d-flex {
+        display: flex !important;
+    }
 </style>
 {% endblock %}
 
@@ -71,14 +82,41 @@
             </div>
 
             <div class="card dashboard-card">
-                <div class="card-header py-3">
+                <div class="card-header py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
                     <h6 class="mb-0 fw-bold"><i class="bi bi-calendar2-range me-2 text-success"></i>Configured Operational Route Intervals</h6>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportFilteredSchedules()">
+                        <i class="bi bi-download me-1"></i>Export (CSV)
+                    </button>
                 </div>
+
+                {# ===== BULK ACTION TOOLBAR ===== #}
+                <div id="bulk-toolbar" class="d-none align-items-center gap-2 px-3 py-2 border-bottom bulk-toolbar">
+                    <span class="fw-semibold small"><span id="bulk-selected-count">0</span> selected</span>
+                    <button type="button" class="btn btn-sm btn-success" onclick="bulkSetSchedulesActive(true)">
+                        <i class="bi bi-toggle-on me-1"></i>Activate
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkSetSchedulesActive(false)">
+                        <i class="bi bi-toggle-off me-1"></i>Deactivate
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="bulkDeleteSchedules()">
+                        <i class="bi bi-trash me-1"></i>Purge Selected
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportSelectedSchedules()">
+                        <i class="bi bi-download me-1"></i>Export Selected (CSV)
+                    </button>
+                    <button type="button" class="btn btn-sm btn-link text-muted ms-auto" onclick="clearScheduleSelection()">
+                        Clear selection
+                    </button>
+                </div>
+
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
+                                    <th style="width: 2.5rem;">
+                                        <input type="checkbox" class="form-check-input" id="select-all-schedules" onchange="toggleSelectAllSchedules(this)">
+                                    </th>
                                     <th># ID</th>
                                     <th>Sector / Zone Name</th>
                                     <th>Recurring Day</th>
@@ -92,6 +130,10 @@
                             <tbody id="schedules-table-body">
                                 {% for schedule in schedules %}
                                 <tr id="schedule-row-{{ schedule.id }}">
+                                    <td>
+                                        <input type="checkbox" class="form-check-input schedule-row-checkbox"
+                                               value="{{ schedule.id }}" onchange="onScheduleCheckboxChange()">
+                                    </td>
                                     <td class="fw-bold text-secondary">#{{ schedule.id }}</td>
                                     <td class="fw-bold">{{ schedule.zone_name }}</td>
                                     <td class="fw-medium">
@@ -146,7 +188,7 @@
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-5">
+                                    <td colspan="9" class="text-center text-muted py-5">
                                         <i class="bi bi-inbox fs-3 d-block mb-1"></i> No system-wide scheduling matrices map inside active storage logs.
                                     </td>
                                 </tr>
@@ -232,6 +274,112 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+/* ================================================================
+   BULK SELECTION + BULK ACTIONS
+   ================================================================ */
+function getScheduleCheckboxes() {
+    return Array.from(document.querySelectorAll('.schedule-row-checkbox'));
+}
+
+function getSelectedScheduleIds() {
+    return getScheduleCheckboxes().filter(cb => cb.checked).map(cb => parseInt(cb.value, 10));
+}
+
+function updateScheduleBulkToolbar() {
+    const ids = getSelectedScheduleIds();
+    const toolbar = document.getElementById('bulk-toolbar');
+    const countEl = document.getElementById('bulk-selected-count');
+    if (countEl) countEl.textContent = ids.length;
+    if (toolbar) {
+        toolbar.classList.toggle('d-none', ids.length === 0);
+        toolbar.classList.toggle('d-flex', ids.length > 0);
+    }
+    const all = getScheduleCheckboxes();
+    const selectAll = document.getElementById('select-all-schedules');
+    if (selectAll) {
+        selectAll.checked = all.length > 0 && ids.length === all.length;
+        selectAll.indeterminate = ids.length > 0 && ids.length < all.length;
+    }
+}
+
+function onScheduleCheckboxChange() {
+    updateScheduleBulkToolbar();
+}
+
+function toggleSelectAllSchedules(masterCheckbox) {
+    getScheduleCheckboxes().forEach(cb => { cb.checked = masterCheckbox.checked; });
+    updateScheduleBulkToolbar();
+}
+
+function clearScheduleSelection() {
+    getScheduleCheckboxes().forEach(cb => { cb.checked = false; });
+    const selectAll = document.getElementById('select-all-schedules');
+    if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
+    updateScheduleBulkToolbar();
+}
+
+async function bulkSetSchedulesActive(isActive) {
+    const ids = getSelectedScheduleIds();
+    if (!ids.length) return;
+    const verb = isActive ? 'activate' : 'deactivate';
+    if (!confirm(`Are you sure you want to ${verb} ${ids.length} selected schedule(s)?`)) return;
+
+    await withButtonBusy(null, '', async () => {
+        const data = await API.post('/api/schedules/bulk_set_active/', { ids, is_active: isActive });
+        if (data && typeof data.updated === 'number') {
+            const parts = [`${data.updated} schedule(s) ${isActive ? 'activated' : 'deactivated'}`];
+            if (data.missing_ids && data.missing_ids.length) parts.push(`${data.missing_ids.length} not found`);
+            showToast(parts.join(', '), data.updated > 0 ? 'success' : 'warning');
+
+            (data.updated_ids || []).forEach(id => {
+                const toggle = document.getElementById(`schedule-active-${id}`);
+                if (toggle) toggle.checked = isActive;
+            });
+            clearScheduleSelection();
+        } else {
+            showToast('Bulk activation update failed.', 'danger');
+        }
+    });
+}
+
+async function bulkDeleteSchedules() {
+    const ids = getSelectedScheduleIds();
+    if (!ids.length) return;
+    if (!confirm(`Permanently delete ${ids.length} selected schedule(s)? This cannot be undone.`)) return;
+
+    await withButtonBusy(null, '', async () => {
+        const data = await API.post('/api/schedules/bulk_delete/', { ids });
+        if (data && typeof data.deleted === 'number') {
+            const parts = [`${data.deleted} schedule(s) deleted`];
+            if (data.missing_ids && data.missing_ids.length) parts.push(`${data.missing_ids.length} not found`);
+            showToast(parts.join(', '), data.deleted > 0 ? 'success' : 'warning');
+
+            (data.deleted_ids || []).forEach(id => {
+                const row = document.getElementById(`schedule-row-${id}`);
+                if (row) row.remove();
+            });
+
+            const tbody = document.getElementById('schedules-table-body');
+            if (tbody && !tbody.querySelector('tr')) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-1"></i> No system-wide scheduling matrices map inside active storage logs.</td></tr>';
+            }
+            clearScheduleSelection();
+        } else {
+            showToast('Bulk delete failed.', 'danger');
+        }
+    });
+}
+
+async function exportSelectedSchedules() {
+    const ids = getSelectedScheduleIds();
+    if (!ids.length) return;
+    await downloadFile(`/api/schedules/bulk_export/?ids=${ids.join(',')}`, 'schedules.csv');
+}
+
+async function exportFilteredSchedules() {
+    await downloadFile('/api/schedules/bulk_export/', 'schedules.csv');
+}
+
 async function toggleActive(scheduleId, isActive, el) {
     // Checkbox, so there is no label to swap — just lock it until the PATCH
     // resolves. Without this a fast double-toggle fires two requests that can
@@ -280,7 +428,9 @@ async function deleteSchedule(scheduleId, btn) {
             // नगरी नै, natra fallback reload ekdum rare edge-case ma matra chahिन्छ
             const tbody = document.getElementById('schedules-table-body');
             if (tbody && !tbody.querySelector('tr')) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-1"></i> No system-wide scheduling matrices map inside active storage logs.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-1"></i> No system-wide scheduling matrices map inside active storage logs.</td></tr>';
+            } else {
+                updateScheduleBulkToolbar();
             }
         } else {
             let errMsg = 'Failed to drop scheduling database record node.';
@@ -373,6 +523,7 @@ function insertScheduleRow(scheduleData, ctx) {
 
     const rowHtml = `
         <tr id="schedule-row-${scheduleData.id}">
+            <td><input type="checkbox" class="form-check-input schedule-row-checkbox" value="${scheduleData.id}" onchange="onScheduleCheckboxChange()"></td>
             <td class="fw-bold text-secondary">#${scheduleData.id}</td>
             <td class="fw-bold text-dark">${safeZoneName}</td>
             <td class="fw-medium text-dark">${dayHtml}</td>

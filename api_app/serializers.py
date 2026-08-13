@@ -120,7 +120,7 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             'completion_latitude', 'completion_longitude',
             'completion_distance_meters', 'completion_flagged',
             'severity', 'severity_display', 'ml_confidence', 'needs_manual_review',
-            'guest_token',  # for guest submissions that can later be claimed
+            'guest_token', 'guest_email',  # for guest submissions that can later be claimed
             'scheduled_date', 'completed_at',
             'notes', 'created_at', 'updated_at',
             'route_id', 'route_status',

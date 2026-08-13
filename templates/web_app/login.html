@@ -46,7 +46,7 @@
             </p>
 
             <p class="text-center mt-2 mb-0 small">
-                Don't have an account? <a href="{% url 'register' %}" class="text-success">Register</a>
+                Don't have an account? <a href="{% url 'register' %}" id="register-link" class="text-success">Register</a>
             </p>
         </div>
     </div>
@@ -84,6 +84,34 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+// ── Guest claim-link backup (email) ─────────────────────────────────────────
+// A guest who gave an email at submission time gets a link like
+// /login/?claim_token=<guest_token> (see api_app.views.send_guest_claim_email).
+// Merge that token into the same guest_claim_tokens list the normal
+// localStorage flow uses, so the existing post-login claimGuestRequests()
+// call below picks it up automatically — no separate claim path needed.
+// Also forward the token onto the Register link, in case this guest doesn't
+// have an account yet and needs to register before logging in.
+(function handleClaimTokenFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const claimToken = params.get('claim_token');
+    if (!claimToken) return;
+
+    const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
+    if (!tokens.includes(claimToken)) {
+        tokens.push(claimToken);
+        localStorage.setItem('guest_claim_tokens', JSON.stringify(tokens));
+    }
+
+    const registerLink = document.getElementById('register-link');
+    if (registerLink) {
+        const url = new URL(registerLink.href, window.location.origin);
+        url.searchParams.set('claim_token', claimToken);
+        registerLink.href = url.toString();
+    }
+})();
+
 async function claimGuestRequests(accessToken) {
     const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
     if (!tokens.length) return;
