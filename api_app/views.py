@@ -27,6 +27,7 @@ from .models import (
     AdminLog, Bin, Checkpoint, Complaint, Driver, Notification, Route, Schedule,
     SystemSettings, Vehicle, WasteRequest, WasteRequestPhoto,
 )
+from rest_framework.pagination import PageNumberPagination
 from .permissions import IsAdminOrReadOnly, IsAdminUser, IsOwnerOrAdmin, IsSuperAdminUser
 from .serializers import (
     AdminLogSerializer,
@@ -662,10 +663,23 @@ class BinViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+
+class CheckpointPagination(PageNumberPagination):
+    """
+    Checkpoints ko list सामान्यतया धेरै ठूलो हुँदैन (हजारौं होइनन्), र
+    frontend (home map) ले सधैं पूरै list एकैचोटि चाहिन्छ ताकि nearest-
+    checkpoint calculation ठीक होस्। Global PAGE_SIZE=20 यहाँ लागू भएर
+    300+ checkpoint भएको केसमा 15+ page-fetch गराउँथ्यो, जसले anon
+    throttle (20/min) चाँडै भत्काउँथ्यो — त्यही 429 को कारण थियो।
+    """
+    page_size = 1000
+    max_page_size = 1000
+
 class CheckpointViewSet(viewsets.ModelViewSet):
     """Admin-managed designated drop-off locations."""
     queryset = Checkpoint.objects.all().order_by('-created_at')
     serializer_class = CheckpointSerializer
+    pagination_class = CheckpointPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'description']
     ordering_fields = ['created_at', 'name']
