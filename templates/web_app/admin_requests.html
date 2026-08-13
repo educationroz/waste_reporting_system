@@ -106,6 +106,17 @@
         padding: 0.3rem 0.5rem;
         cursor: help;
     }
+
+    /* ==========================================
+       BULK ACTION TOOLBAR
+       ========================================== */
+    .bulk-toolbar {
+        background: var(--bg-surface-alt, var(--bg-card));
+        color: var(--text-body);
+    }
+    .bulk-toolbar.d-flex {
+        display: flex !important;
+    }
 </style>
 {% endblock %}
 
@@ -190,14 +201,40 @@
             </div>
 
             <div class="card dashboard-card">
-                <div class="card-header py-3">
+                <div class="card-header py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
                     <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>Dispatched Manifest & Pipeline Streams</h6>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportFilteredRequests()">
+                            <i class="bi bi-download me-1"></i>Export Filtered (CSV)
+                        </button>
+                    </div>
                 </div>
+
+                {# ===== BULK ACTION TOOLBAR — only visible once rows are checked ===== #}
+                <div id="bulk-toolbar" class="d-none align-items-center gap-2 px-3 py-2 border-bottom bulk-toolbar">
+                    <span class="fw-semibold small"><span id="bulk-selected-count">0</span> selected</span>
+                    <button type="button" class="btn btn-sm btn-success" onclick="openBulkAssignModal()">
+                        <i class="bi bi-person-plus me-1"></i>Assign Driver
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="bulkCancelSelected()">
+                        <i class="bi bi-slash-circle me-1"></i>Cancel Selected
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportSelectedRequests()">
+                        <i class="bi bi-download me-1"></i>Export Selected (CSV)
+                    </button>
+                    <button type="button" class="btn btn-sm btn-link text-muted ms-auto" onclick="clearRequestSelection()">
+                        Clear selection
+                    </button>
+                </div>
+
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
+                                    <th style="width: 2.5rem;">
+                                        <input type="checkbox" class="form-check-input" id="select-all-requests" onchange="toggleSelectAllRequests(this)">
+                                    </th>
                                     <th># ID</th>
                                     <th>Citizen User</th>
                                     <th>Waste Vector Classification</th>
@@ -214,6 +251,10 @@
                             <tbody id="requests-table-body">
                                 {% for req in requests %}
                                 <tr id="request-row-{{ req.id }}" data-request-id="{{ req.id }}">
+                                    <td>
+                                        <input type="checkbox" class="form-check-input request-row-checkbox"
+                                               value="{{ req.id }}" onchange="onRequestCheckboxChange()">
+                                    </td>
                                     <td class="fw-bold text-secondary">#{{ req.id }}</td>
                                     {% if req.user %}
                                     <td class="fw-semibold">{{ req.user.username }}</td>
@@ -363,7 +404,7 @@
                                     </td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="11" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>
+                                <tr><td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>
 
                                 {% endfor %}
                             </tbody>
@@ -400,6 +441,37 @@
         </div>
     </div>
 </div>
+
+{# ===== BULK ASSIGN DRIVER MODAL ===== #}
+<div class="modal fade" id="bulkAssignModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-people-fill me-2"></i>Bulk Assign Driver</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small mb-3">
+                    Assigning to <strong id="bulk-assign-count">0</strong> selected request(s).
+                    Requests already completed/cancelled, or still awaiting AI review, will be skipped automatically.
+                </p>
+                <div class="mb-2">
+                    <label class="form-label fw-semibold text-secondary">Select Active Field Driver</label>
+                    <select id="bulk-assign-driver-select" class="form-select form-select-lg" style="font-size: 0.95rem;">
+                        {% for driver in drivers %}
+                        <option value="{{ driver.id }}">{{ driver.user.username }} — [{{ driver.vehicle.plate_number|default:"No Asset Machine Linked" }}]</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer bg-surface-alt">
+                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success px-4" onclick="submitBulkAssign(this)">Confirm Bulk Dispatch</button>
+            </div>
+        </div>
+    </div>
+</div>
+{# ===== END BULK ASSIGN DRIVER MODAL ===== #}
 
 {# ===== PHOTO GALLERY MODAL — shows all photos for a request ===== #}
 <div class="modal fade" id="photoGalleryModal" tabindex="-1">
@@ -487,6 +559,159 @@ window.assignDriver = async function(btn) {
     });
 };
 
+/* ================================================================
+   BULK SELECTION + BULK ACTIONS
+   ================================================================ */
+function getRequestCheckboxes() {
+    return Array.from(document.querySelectorAll('.request-row-checkbox'));
+}
+
+function getSelectedRequestIds() {
+    return getRequestCheckboxes()
+        .filter(cb => cb.checked)
+        .map(cb => parseInt(cb.value, 10));
+}
+
+function updateBulkToolbar() {
+    const ids = getSelectedRequestIds();
+    const toolbar = document.getElementById('bulk-toolbar');
+    const countEl = document.getElementById('bulk-selected-count');
+    if (countEl) countEl.textContent = ids.length;
+    if (toolbar) {
+        toolbar.classList.toggle('d-none', ids.length === 0);
+        toolbar.classList.toggle('d-flex', ids.length > 0);
+    }
+
+    // Keep the header "select all" checkbox in sync (checked / indeterminate / unchecked)
+    const all = getRequestCheckboxes();
+    const selectAll = document.getElementById('select-all-requests');
+    if (selectAll && all.length) {
+        selectAll.checked = ids.length === all.length;
+        selectAll.indeterminate = ids.length > 0 && ids.length < all.length;
+    }
+}
+
+window.onRequestCheckboxChange = function() {
+    updateBulkToolbar();
+};
+
+window.toggleSelectAllRequests = function(masterCheckbox) {
+    getRequestCheckboxes().forEach(cb => { cb.checked = masterCheckbox.checked; });
+    updateBulkToolbar();
+};
+
+window.clearRequestSelection = function() {
+    getRequestCheckboxes().forEach(cb => { cb.checked = false; });
+    const selectAll = document.getElementById('select-all-requests');
+    if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
+    updateBulkToolbar();
+};
+
+function summarizeBulkResult(data, verbPast) {
+    const parts = [`${data.updated} request(s) ${verbPast}`];
+    if (data.ineligible_ids && data.ineligible_ids.length) {
+        parts.push(`${data.ineligible_ids.length} skipped (not eligible)`);
+    }
+    if (data.missing_ids && data.missing_ids.length) {
+        parts.push(`${data.missing_ids.length} not found`);
+    }
+    return parts.join(', ');
+}
+
+window.openBulkAssignModal = function() {
+    const ids = getSelectedRequestIds();
+    if (!ids.length) return;
+    document.getElementById('bulk-assign-count').textContent = ids.length;
+
+    const el = document.getElementById('bulkAssignModal');
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap JS failed to load — modal cannot open.');
+        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        return;
+    }
+    bootstrap.Modal.getOrCreateInstance(el).show();
+};
+
+window.submitBulkAssign = async function(btn) {
+    const ids = getSelectedRequestIds();
+    if (!ids.length) return;
+    const driverSelect = document.getElementById('bulk-assign-driver-select');
+    const driverId = driverSelect.value;
+    const driverName = escapeHtml(driverSelect.options[driverSelect.selectedIndex].text.split('—')[0].trim());
+
+    await withButtonBusy(eventButton(btn), 'Assigning...', async () => {
+        const data = await API.post('/api/waste-requests/bulk_assign_driver/', { ids, driver_id: driverId });
+        if (data && typeof data.updated === 'number') {
+            showToast(summarizeBulkResult(data, 'assigned'), data.updated > 0 ? 'success' : 'warning');
+            const modalEl = document.getElementById('bulkAssignModal');
+            if (typeof bootstrap !== 'undefined') {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+            (data.updated_ids || []).forEach(id => {
+                applyRequestRowUpdate(id, {
+                    statusKey: 'assigned',
+                    driverHtml: `<div class="text-dark"><i class="bi bi-person me-1 text-success"></i>${driverName}</div>`,
+                    actionHtml: '',
+                    showDelete: true,
+                });
+            });
+            clearRequestSelection();
+        } else {
+            showToast('Bulk assignment failed.', 'danger');
+        }
+    });
+};
+
+window.bulkCancelSelected = async function() {
+    const ids = getSelectedRequestIds();
+    if (!ids.length) return;
+    if (!confirm(`Cancel ${ids.length} selected request(s)? Only pending requests will be affected.`)) return;
+
+    await withButtonBusy(null, '', async () => {
+        const data = await API.post('/api/waste-requests/bulk_cancel/', { ids });
+        if (data && typeof data.updated === 'number') {
+            showToast(summarizeBulkResult(data, 'cancelled'), data.updated > 0 ? 'success' : 'warning');
+            (data.updated_ids || []).forEach(id => {
+                applyRequestRowUpdate(id, {
+                    statusKey: 'cancelled',
+                    driverHtml: null,
+                    actionHtml: '<span class="text-muted small italic px-2">Lifecycle Locked</span>',
+                    showDelete: true,
+                });
+                const row = document.getElementById(`request-row-${id}`);
+                const driverCell = row ? row.children[9] : null;
+                const assignBtn = driverCell ? driverCell.querySelector('button') : null;
+                if (assignBtn) assignBtn.remove();
+            });
+            clearRequestSelection();
+        } else {
+            showToast('Bulk cancel failed.', 'danger');
+        }
+    });
+};
+
+window.exportSelectedRequests = async function() {
+    const ids = getSelectedRequestIds();
+    if (!ids.length) return;
+    await downloadFile(`/api/waste-requests/bulk_export/?ids=${ids.join(',')}`, 'waste_requests.csv');
+};
+
+window.exportFilteredRequests = async function() {
+    // Mirror the exact filters currently applied on this page (the GET
+    // form above the table), so the CSV always matches what's on screen.
+    const form = document.getElementById('requests-filter-form');
+    const params = new URLSearchParams();
+    if (form) {
+        const fd = new FormData(form);
+        for (const [key, value] of fd.entries()) {
+            if (value) params.set(key, value);
+        }
+    }
+    const qs = params.toString();
+    await downloadFile(`/api/waste-requests/bulk_export/${qs ? '?' + qs : ''}`, 'waste_requests.csv');
+};
+
 window.cancelRequest = async function(requestId, btn) {
     if (!confirm('Are you absolutely sure you want to cancel this municipal request matrix?')) return;
     await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
@@ -504,7 +729,7 @@ window.cancelRequest = async function(requestId, btn) {
         // applyRequestRowUpdate le driverHtml: null pathayeko le driver cell chuँदैन, tesैले button
         // yeहाँ explicitly हटाउनुपर्यो, natra reload nagarunjel purano button dekhirahancha.
         const row = document.getElementById(`request-row-${requestId}`);
-        const driverCell = row ? row.children[8] : null;
+        const driverCell = row ? row.children[9] : null;
         const assignBtn = driverCell ? driverCell.querySelector('button') : null;
         if (assignBtn) assignBtn.remove();
     } else {
@@ -525,7 +750,7 @@ window.deleteRequest = async function(requestId, btn) {
 
         const tbody = document.getElementById('requests-table-body');
         if (tbody && !tbody.querySelector('tr')) {
-            tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>';
         }
     } catch (err) {
         console.error(err);
@@ -561,7 +786,7 @@ window.resolveReview = async function(requestId, decision, btn) {
                 // "Awaiting Review" hataayera Assign Driver button firta lyaune
                 // (driver already assigned bhaye touch nagarne)
                 const row = document.getElementById(`request-row-${requestId}`);
-                const driverCell = row ? row.children[8] : null;
+                const driverCell = row ? row.children[9] : null;
                 if (driverCell && !driverCell.querySelector('button')) {
                     const wrapper = driverCell.querySelector('.d-flex.flex-column');
                     if (wrapper) {
@@ -574,7 +799,7 @@ window.resolveReview = async function(requestId, decision, btn) {
                 }
                 // Delete button ni firta lyaune, yedi status delete-eligible cha bhane
                 // (pending ma delete hunna, tesle yo case ma normally lagu hudaina)
-                const controlCell = row ? row.children[10] : null;
+                const controlCell = row ? row.children[11] : null;
                 if (controlCell && controlCell.textContent.trim() === '—') {
                     // status pending bhaye Delete button dekhaaudaina (template logic sanga milcha)
                 }
@@ -600,8 +825,8 @@ function applyRequestRowUpdate(requestId, { statusKey, driverHtml, actionHtml, s
     const row = document.getElementById(`request-row-${requestId}`);
     if (!row) return; // row bhetिएन भने silently skip
 
-    // Status Sign cell (7th <td>, index 6) — location-mismatch badge (yedi cha) नछोई status badge matra replace
-    const statusCell = row.children[6];
+    // Status Sign cell (8th <td>, index 7) — location-mismatch badge (yedi cha) नछोई status badge matra replace
+    const statusCell = row.children[7];
     if (statusCell) {
         const badge = statusCell.querySelector('.badge');
         if (badge) {
@@ -610,19 +835,19 @@ function applyRequestRowUpdate(requestId, { statusKey, driverHtml, actionHtml, s
         }
     }
 
-    // Assigned Logistics Crew cell (9th <td>, index 8)
+    // Assigned Logistics Crew cell (10th <td>, index 9)
     if (driverHtml !== null) {
-        const driverCell = row.children[8];
+        const driverCell = row.children[9];
         if (driverCell) driverCell.innerHTML = driverHtml;
     }
 
-    // Pipeline Action Dispatch cell (10th <td>, index 9)
-    const actionCell = row.children[9];
+    // Pipeline Action Dispatch cell (11th <td>, index 10)
+    const actionCell = row.children[10];
     if (actionCell) actionCell.innerHTML = `<div class="d-inline-flex gap-2">${actionHtml}</div>`;
 
-    // Action Control / Delete cell (11th <td>, index 10)
+    // Action Control / Delete cell (12th <td>, index 11)
     if (showDelete) {
-        const controlCell = row.children[10];
+        const controlCell = row.children[11];
         if (controlCell) {
             controlCell.innerHTML = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${requestId}, this)"><i class="bi bi-trash3"></i> Delete</button>`;
         }
