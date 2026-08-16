@@ -1,581 +1,1131 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Admin Dashboard{% endblock %}
+{% block title %}Driver Dashboard{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-    /* Dashboard specific card/metric styling only */
-    .metric-card {
-        border: none;
-        border-radius: 12px;
-        transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    .nav-pills .nav-link:not(.active):hover {
+        background-color: #f8f9fa;
+        color: #198754 !important;
     }
 
-    .metric-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 20px rgba(25, 135, 84, 0.08);
-    }
-
-    .cursor-pointer {
-        cursor: pointer;
-    }
-
-    .dashboard-card {
-        border: none;
-        border-radius: 14px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
-        background: #ffffff;
-    }
-
-    .dashboard-card .card-header {
-        border-bottom: 1px solid #f1f3f5;
-        padding: 1.25rem;
-    }
-
-    .table-responsive {
+    /* ==========================================
+       MAP CARD
+       ========================================== */
+    #driver-map {
+        height: 420px;
+        width: 100%;
         border-radius: 0 0 14px 14px;
+        z-index: 1; /* keep below modals/dropdowns */
     }
 
-    .table th {
-        font-size: 0.78rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        font-weight: 600;
+    .map-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        padding: 0.75rem 1rem;
+        font-size: 0.82rem;
+        border-top: 1px solid #f1f3f5;
+    }
+
+    .map-legend .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: #495057;
+    }
+
+    .map-legend .legend-dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+
+    .driver-marker-icon {
+        font-size: 1.4rem;
+        text-align: center;
+        line-height: 1;
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+    }
+
+    .map-empty-note {
+        padding: 2.5rem 1rem;
+        text-align: center;
         color: #6c757d;
-        padding: 1rem;
     }
 
-    .table td {
-        padding: 1rem;
-        font-size: 0.88rem;
+    /* ==========================================
+       COMPLETED WORK HISTORY
+       ========================================== */
+    .history-photo-thumb {
+        width: 40px;
+        height: 40px;
+        object-fit: cover;
+        border-radius: 6px;
     }
 
-    .severity-badge {
-        font-size: 0.72rem;
-        padding: 0.32rem 0.65rem;
-        white-space: nowrap;
-    }
-
-    .location-mismatch-badge {
-        font-size: 0.62rem;
-        padding: 0.28rem 0.45rem;
-        cursor: help;
+    /* Map card header (title + route-info + Center/Refresh buttons) was
+       forced into one row — cramped/overflowing on narrow phones. */
+    @media (max-width: 575.98px) {
+        .map-card-header {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 0.5rem;
+        }
+        .map-card-header .map-header-actions {
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .map-card-header .map-header-actions #map-route-info {
+            margin-right: 0 !important;
+            width: 100%;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid px-4 py-3">
-    <div class="layout-wrapper">
+    <div class="layout-wrapper {% if not driver %}justify-content-center{% endif %}">
 
-        <!-- Sidebar Column -->
+        <!-- DYNAMIC SIDEBAR INCLUDE -->
         <div class="sidebar-col">
             {% include 'partials/sidebar.html' %}
         </div>
 
-        <!-- Main Content Column -->
+        <!-- ── मुख्य सामाग्री (Main Content Area) ── -->
         <div class="content-col">
+            <h2 class="mb-4"><i class="bi bi-truck text-success me-2"></i>Driver Dashboard</h2>
 
-            <!-- Header Section -->
-            <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
-                <div>
-                    <h2 class="mb-1 fw-bold"><i class="bi bi-grid-1x2-fill text-success me-2"></i>Admin Management Console</h2>
-                    <p class="text-muted mb-0">
-                        Active Session: <span class="fw-semibold">{{ request.user.username }}</span>
-                        <span class="badge bg-success bg-opacity-10 text-success ms-2 text-uppercase font-monospace" style="font-size: 0.75rem;">{{ admin_role }}</span>
-                    </p>
-                </div>
-                <div class="text-md-end bg-surface p-2 px-3 border rounded-3 shadow-xs">
-                    <div class="small text-muted"><i class="bi bi-clock me-1"></i>Updated: {{ now|date:"d M Y H:i" }}</div>
-                    <div class="fw-semibold text-success small mt-1">Users Matrix: {{ total_users }} total | {{ total_admin_users }} admins</div>
-                </div>
+            {% if not driver %}
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                No driver profile found for your account. Contact admin.
             </div>
+            {% else %}
 
-            {% if system_alerts %}
-            <div class="row g-3 mb-4">
-                {% for alert in system_alerts %}
-                <div class="col-12">
-                    <div class="alert alert-{{ alert.type }} border-0 shadow-sm alert-dismissible fade show" role="alert">
-                        <i class="bi bi-{{ alert.icon }} me-2 fs-5 align-middle"></i>
-                        <strong>{{ alert.title }}</strong> — {{ alert.message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            <!-- Quick Action Toolbar -->
-            <div class="d-flex flex-wrap gap-2 mb-4 bg-surface p-2 rounded-3 border">
-                <button class="btn btn-success btn-sm px-3 rounded-2" data-bs-toggle="modal" data-bs-target="#quickAddModal">
-                    <i class="bi bi-plus-circle me-1"></i>Action Terminal
-                </button>
-                <a href="{% url 'admin-drivers' %}" class="btn btn-sm border px-3 bg-surface-alt text-secondary">
-                    <i class="bi bi-person-plus text-info me-1"></i>Drivers Registry
-                </a>
-                <a href="{% url 'admin-vehicles' %}" class="btn btn-sm border px-3 bg-surface-alt text-secondary">
-                    <i class="bi bi-truck text-primary me-1"></i>Fleet Terminal
-                </a>
-                <a href="{% url 'admin-schedules' %}" class="btn btn-sm border px-3 bg-surface-alt text-secondary">
-                    <i class="bi bi-calendar-week text-warning me-1"></i>Calendar Setup
-                </a>
-            </div>
-
-            <!-- Metric Cards (Row 1) -->
-            <div class="row g-3 mb-3">
-                <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}'">
-                        <div class="card-body p-4">
-                            <div class="text-success fw-semibold small mb-1">Total Requests</div>
-                            <div class="display-6 fw-bold text-success">{{ total_requests }}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-warning bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=pending'">
-                        <div class="card-body p-4">
-                            <div class="text-warning fw-semibold small mb-1">Pending Sync</div>
-                            <div class="display-6 fw-bold text-warning">{{ pending_requests }}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-danger bg-opacity-10 h-100 cursor-pointer">
-                        <div class="card-body p-4">
-                            <div class="text-danger fw-semibold small mb-1">Overdue Alerts</div>
-                            <div class="display-6 fw-bold text-danger">{{ overdue_requests }}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=assigned'">
-                        <div class="card-body p-4">
-                            <div class="text-info fw-semibold small mb-1">Assigned Tasks</div>
-                            <div class="display-6 fw-bold text-info">{{ assigned_requests_count }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Metric Cards (Row 2) -->
+            <!-- Stats -->
             <div class="row g-3 mb-4">
                 <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=in_progress'">
-                        <div class="card-body p-4">
-                            <div class="text-primary fw-semibold small mb-1">In Progress</div>
-                            <div class="display-6 fw-bold text-primary">{{ in_progress_requests_count }}</div>
+                    <div class="card border-0 bg-success bg-opacity-10 h-100">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">Completed Today</div>
+                            <div class="fs-2 fw-bold text-success" id="stat-completed-today">{{ completed_today }}</div>
                         </div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=completed'">
-                        <div class="card-body p-4">
-                            <div class="text-success fw-semibold small mb-1">Completed Jobs</div>
-                            <div class="display-6 fw-bold text-success">{{ completed_requests_count }}</div>
+                    <div class="card border-0 bg-info bg-opacity-10 h-100">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">Total Trips</div>
+                            <div class="fs-2 fw-bold text-info" id="stat-total-trips">{{ driver.total_trips }}</div>
                         </div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-drivers' %}'">
-                        <div class="card-body p-4">
-                            <div class="text-info fw-semibold small mb-1">Active Drivers</div>
-                            <div class="display-6 fw-bold text-info">{{ active_drivers }}<span class="fs-5 text-secondary fw-normal">/{{ total_drivers }}</span></div>
+                    <div class="card border-0 bg-warning bg-opacity-10 h-100">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">
+                                This Month
+                                <span class="text-muted" style="font-size:0.7rem;">({{ current_month_label }})</span>
+                            </div>
+                            <div class="fs-2 fw-bold text-warning" id="stat-completed-month">{{ completed_this_month }}</div>
                         </div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-vehicles' %}'">
-                        <div class="card-body p-4">
-                            <div class="text-primary fw-semibold small mb-1">Fleet Available</div>
-                            <div class="display-6 fw-bold text-primary">{{ available_vehicles }}<span class="fs-5 text-secondary fw-normal">/{{ total_vehicles }}</span></div>
+                    <div class="card border-0 {% if driver.is_available %}bg-success{% else %}bg-secondary{% endif %} bg-opacity-10 h-100" id="availability-stat-card">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">Status</div>
+                            <div class="fw-bold {% if driver.is_available %}text-success{% else %}text-secondary{% endif %}" id="availability-label">
+                                {% if driver.is_available %}Available{% else %}Busy{% endif %}
+                            </div>
+                            <button class="btn btn-sm {% if driver.is_available %}btn-outline-secondary{% else %}btn-outline-success{% endif %} mt-1"
+                                id="toggle-availability-btn"
+                                onclick="toggleAvailability()">
+                                Toggle
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-primary bg-opacity-10 h-100">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">Vehicle</div>
+                            <div class="fw-bold text-primary">{{ driver.vehicle.plate_number|default:"Not assigned" }}</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="row g-4">
-                <!-- Left Column -->
-                <div class="col-lg-8">
-                    <!-- Query Filter Card -->
-                    <div class="card dashboard-card mb-4">
-                        <div class="card-header">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-search me-2 text-success"></i>Query Filter Terminal</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row g-2">
-                                <div class="col-md-6">
-                                    <input type="text" class="form-control" placeholder="Search request ID or user log tags..." id="search-box">
-                                </div>
-                                <div class="col-md-3">
-                                    <select class="form-select" id="filter-status">
-                                        <option value="">All Statuses</option>
-                                        <option value="pending">Pending</option>
-                                        <option value="assigned">Assigned</option>
-                                        <option value="in_progress">In Progress</option>
-                                        <option value="completed">Completed</option>
-                                        <option value="cancelled">Cancelled</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <button class="btn btn-success w-100" onclick="applyFilters()">
-                                        <i class="bi bi-funnel me-1"></i>Execute Filter
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Recent Logs Table Card -->
-                    <div class="card dashboard-card mb-4">
-                        <div class="card-header d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2">
-                            <div>
-                                <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>Recent Log Streams</h6>
-                                <div class="small text-muted" style="font-size: 0.8rem;">Live pipeline updates for ongoing municipality requests.</div>
-                            </div>
-                            <a href="{% url 'admin-requests' %}" class="btn btn-sm btn-outline-success px-3">Full Logs</a>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-hover mb-0 align-middle">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>ID</th><th>Client</th><th>Waste Context</th><th>AI Severity</th><th>Status Check</th><th>Assigned Driver</th><th>Submitted</th><th>Action Control</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for req in recent_requests %}
-                                        <tr>
-                                            <td class="fw-bold text-secondary">#{{ req.id }}</td>
-                                            {% if req.user %}
-                                            <td>{{ req.user.username }}</td>
-                                            {% else %}
-                                            <td><span class="badge bg-secondary bg-opacity-10 text-secondary border"><i class="bi bi-person-x me-1"></i>Guest</span></td>
-                                            {% endif %}
-                                            <td>
-                                                <span class="badge bg-secondary bg-opacity-10 text-secondary border px-2.5 py-1">
-                                                    {{ req.get_waste_type_display }}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                {% if req.severity %}
-                                                    <span class="badge severity-badge rounded-pill
-                                                        {% if req.severity == 'high' %}bg-danger text-white
-                                                        {% elif req.severity == 'medium' %}bg-warning text-dark
-                                                        {% else %}bg-primary text-white{% endif %}">
-                                                        {{ req.get_severity_display }}
-                                                    </span>
-                                                {% else %}
-                                                    <span class="text-muted small">—</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                <span class="badge px-2 py-1
-                                                    {% if req.status == 'completed' %}bg-success
-                                                    {% elif req.status == 'pending' %}bg-warning text-dark
-                                                    {% elif req.status == 'in_progress' %}bg-info
-                                                    {% elif req.status == 'cancelled' %}bg-danger
-                                                    {% else %}bg-primary{% endif %}">
-                                                    {{ req.get_status_display }}
-                                                </span>
-
-                                                {% if req.completion_flagged %}
-                                                <span class="badge bg-danger text-white mt-1 d-inline-flex align-items-center gap-1 location-mismatch-badge"
-                                                      title="Driver was ~{{ req.completion_distance_meters|floatformat:0 }}m away from the reported pickup location when marking this completed.">
-                                                    <i class="bi bi-exclamation-triangle-fill"></i>{{ req.completion_distance_meters|floatformat:0 }}m off
-                                                </span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if req.driver %}
-                                                    <span><i class="bi bi-person me-1"></i>{{ req.driver.user.username }}</span>
-                                                {% else %}
-                                                    <span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>Unassigned</span>
-                                                {% endif %}
-                                            </td>
-                                            <!-- Submitted date — jaba citizen le request pesh gareko thiyo (created_at).
-                                                 scheduled_date pahile "Preferred Date" thiyo, tara tyo field ab
-                                                 user form बाट हटाइसकिएको छ (home.html), tesले yaha created_at
-                                                 nai "पठाएको दिन" ko sahi source ho. -->
-                                            <td class="small text-muted">{{ req.created_at|date:"d M Y" }}</td>
-                                            <td>
-                                                {% if req.status == 'pending' %}
-                                                <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }}, this)">
-                                                    Cancel
-                                                </button>
-                                                {% elif req.status == 'completed' or req.status == 'cancelled' or req.status == 'assigned' or req.status == 'in_progress' %}
-                                                <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }}, this)">
-                                                    <i class="bi bi-trash3"></i> Delete
-                                                </button>
-                                                {% else %}
-                                                —
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        {% empty %}
-                                        <tr><td colspan="8" class="text-center text-muted py-4">No requests reported in this pipeline node yet.</td></tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Audit Trail -->
-                    <div class="card dashboard-card">
-                        <div class="card-header">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-arrow-repeat me-2 text-success"></i>State Transition Audit Trail</h6>
-                        </div>
-                        <div class="list-group list-group-flush">
-                            {% for req in recent_status_changes %}
-                            <div class="list-group-item d-flex justify-content-between align-items-center p-3 bg-surface">
-                                <div>
-                                    <div class="fw-semibold">Request Record #{{ req.id }} — <span class="text-muted">{% if req.user %}{{ req.user.username }}{% else %}<i class="bi bi-person-x"></i> Guest{% endif %}</span></div>
-                                    <div class="small text-secondary mt-1">Status compiled to <strong>{{ req.get_status_display }}</strong> on {{ req.updated_at|date:"d M Y H:i" }}</div>
-                                </div>
-                                <span class="badge {% if req.status == 'completed' %}bg-success{% elif req.status == 'pending' %}bg-warning text-dark{% elif req.status == 'in_progress' %}bg-info{% elif req.status == 'cancelled' %}bg-danger{% else %}bg-primary{% endif %} rounded-pill px-3">{{ req.get_status_display }}</span>
-                            </div>
-                            {% empty %}
-                            <div class="list-group-item text-center text-muted py-4 bg-surface">No recent lifecycle status events.</div>
-                            {% endfor %}
-                        </div>
+            <!-- Route & Reports Map -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center map-card-header">
+                    <span><i class="bi bi-map text-success me-2"></i>My Route &amp; Reported Locations</span>
+                    <div class="map-header-actions">
+                        <span id="map-route-info" class="text-muted small me-3"></span>
+                        <button class="btn btn-sm btn-outline-secondary me-1" onclick="centerMap()" title="Re-center and fit all pins">
+                            <i class="bi bi-crosshair"></i> Center Map
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" onclick="loadMapData()" title="Refresh map">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
                     </div>
                 </div>
+                <div id="driver-map"></div>
+                <div id="map-empty-note" class="map-empty-note d-none">
+                    <i class="bi bi-geo fs-3 d-block mb-1"></i>
+                    No active locations right now — completed jobs are removed from the map automatically.
+                </div>
+                <div class="map-legend">
+                    <span class="legend-item"><span class="legend-dot" style="background:#fd7e14;"></span>Pending</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#0d6efd;"></span>Assigned</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#0dcaf0;"></span>In Progress</span>
+                    <span class="legend-item">🚩 Checkpoint (drop-off point)</span>
+                    <span class="legend-item">🚛 Your last known location</span>
+                    <span class="legend-item"><span style="border-top:3px solid #198754; width:20px; display:inline-block;"></span>Admin-generated route (road path)</span>
+                </div>
+            </div>
 
-                <!-- Right Column -->
-                <div class="col-lg-4">
-                    <div class="card dashboard-card mb-4">
-                        <div class="card-header">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-geo-alt me-2 text-success"></i>Live Fleet Dispatches</h6>
+            <!-- Location Update -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-geo-alt text-success me-2"></i>Update My Location
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <input type="number" id="lat" class="form-control" placeholder="Latitude" step="any">
                         </div>
-                        <div class="card-body">
-                            <div class="small text-muted mb-3">Currently deployed routes and active logistics tracking.</div>
-                            {% if active_routes %}
-                            <div class="d-flex flex-column gap-2">
-                                {% for route in active_routes %}
-                                <div class="p-3 border rounded-3 bg-surface-alt">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="fw-bold text-sm">Route Node #{{ route.id }}</span>
-                                        <span class="badge bg-info text-white font-monospace" style="font-size: 0.75rem;">{{ route.get_status_display }}</span>
+                        <div class="col-md-4">
+                            <input type="number" id="lng" class="form-control" placeholder="Longitude" step="any">
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-outline-success w-100" onclick="useGPS()">
+                                <i class="bi bi-crosshair me-1"></i>Use GPS
+                            </button>
+                        </div>
+                    </div>
+                    <button class="btn btn-success mt-2" onclick="updateLocation()">
+                        <i class="bi bi-send me-1"></i>Send Location
+                    </button>
+                </div>
+            </div>
+
+            <!-- Assigned Requests -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-clipboard-check text-success me-2"></i>My Assigned Requests
+                </div>
+                <div class="card-body p-0 table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr><th>#</th><th>User</th><th>Address</th><th>Type</th><th>Status</th><th>Date</th><th>Action</th></tr>
+                        </thead>
+                        <tbody id="assigned-requests-body">
+                            {% for req in assigned_requests %}
+                            <tr id="assigned-row-{{ req.id }}">
+                                <td>{{ req.id }}</td>
+                                <td>{{ req.user.username }}</td>
+                                <td class="small">{{ req.pickup_address|truncatechars:30 }}</td>
+                                <td><span class="badge bg-secondary">{{ req.get_waste_type_display }}</span></td>
+                                <td>
+                                    <span class="badge {% if req.status == 'in_progress' %}bg-info{% else %}bg-primary{% endif %}">
+                                        {{ req.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="small text-muted">{{ req.scheduled_date|date:"d M" }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        {% if req.status == 'assigned' %}
+                                        <button class="btn btn-outline-info" onclick="updateStatus({{ req.id }}, 'in_progress', this)">Start</button>
+                                        {% endif %}
+                                        {% if req.status == 'in_progress' %}
+                                        <button class="btn btn-outline-success" onclick="updateStatus({{ req.id }}, 'completed', this)">Done</button>
+                                        {% endif %}
                                     </div>
-                                    <div class="small text-muted"><i class="bi bi-person-badge me-1"></i>Driver: {{ route.driver.user.username|default:"Unassigned" }}</div>
-                                    <div class="small text-muted"><i class="bi bi-truck me-1"></i>Plate Number: {{ route.vehicle.plate_number|default:"None" }}</div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                            {% else %}
-                            <div class="text-center text-muted py-4 bg-surface-alt rounded-3">
-                                <i class="bi bi-map text-secondary fs-3 d-block mb-1"></i>
-                                <span class="small">No fleet dispatch lines open currently.</span>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <div class="card dashboard-card">
-                        <div class="card-header">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-people me-2 text-success"></i>Crew Roster Status</h6>
-                        </div>
-                        <ul class="list-group list-group-flush">
-                            {% for driver in drivers|slice:":5" %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center p-3 bg-surface">
-                                <div>
-                                    <div class="fw-semibold">{{ driver.user.username }}</div>
-                                    <div class="small text-muted font-monospace"><i class="bi bi-card-text me-1"></i>{{ driver.vehicle.plate_number|default:"No Asset Linked" }}</div>
-                                </div>
-                                <span class="badge {% if driver.is_available %}bg-success bg-opacity-10 text-success{% else %}bg-secondary bg-opacity-10 text-secondary{% endif %} px-3 rounded-pill">
-                                    {% if driver.is_available %}Available{% else %}Active Route{% endif %}
-                                </span>
-                            </li>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="7" class="text-center text-muted py-3">No assigned requests.</td></tr>
                             {% endfor %}
-                            <li class="list-group-item text-center bg-surface-alt py-2">
-                                <a href="{% url 'admin-drivers' %}" class="small text-success text-decoration-none fw-semibold">Manage Complete Roster ({{ total_drivers }})</a>
-                            </li>
-                        </ul>
-                    </div>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-        </div> <!-- /content-col -->
+
+            {# ===== COMPLETED WORK HISTORY — "kaam garyo kaha bata uthayo" log ===== #}
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-check2-circle text-success me-2"></i>Completed Pickup History</span>
+                    <span class="text-muted small">Last {{ completed_history|length }} completed job(s)</span>
+                </div>
+                <div class="card-body p-0 table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Photo</th>
+                                <th>Picked Up From</th>
+                                <th>Waste Type</th>
+                                <th>Citizen</th>
+                                <th>Completed On</th>
+                            </tr>
+                        </thead>
+                        <tbody id="completed-history-body">
+                            {% for req in completed_history %}
+                            <tr>
+                                <td class="fw-bold text-secondary">#{{ req.id }}</td>
+                                <td>
+                                    {% if req.photo %}
+                                    <a href="{{ req.photo.url }}" target="_blank">
+                                        <img src="{{ req.photo.url }}" alt="photo" class="history-photo-thumb">
+                                    </a>
+                                    {% else %}
+                                    <span class="text-muted small">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small" style="max-width: 260px;">{{ req.pickup_address|truncatechars:50 }}</td>
+                                <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">{{ req.get_waste_type_display }}</span></td>
+                                <td class="small">{% if req.user %}{{ req.user.username }}{% else %}<i class="bi bi-person-x"></i> Guest{% endif %}</td>
+                                <td class="small text-muted">{{ req.completed_at|date:"d M Y, h:i A"|default:"—" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="6" class="text-center text-muted py-4">No completed pickups yet — finished jobs will show up here.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {# ===== END COMPLETED WORK HISTORY ===== #}
+
+            {% endif %}
+        </div> <!-- /मुख्य सामाग्री -->
     </div> <!-- /layout-wrapper -->
-</div>
-
-<!-- Assign Modal -->
-<div class="modal fade" id="assignModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Assign Crew Dispatch</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <input type="hidden" id="modal-request-id">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold text-secondary">Select Available Crew Member</label>
-                    <select id="modal-driver-select" class="form-select form-select-lg" style="font-size: 0.95rem;">
-                        {% for driver in drivers %}
-                        {% if driver.is_available %}
-                        <option value="{{ driver.id }}">{{ driver.user.username }} [Asset: {{ driver.vehicle.plate_number|default:"No Vehicle Allocated" }}]</option>
-                        {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer bg-surface-alt">
-                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">Abort</button>
-                <button class="btn btn-success px-4" onclick="assignDriver(this)">Confirm Dispatch</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Quick Add Modal -->
-<div class="modal fade" id="quickAddModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-terminal me-2"></i>Action Hub Terminal</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-0">
-                <div class="list-group list-group-flush">
-                    <a href="{% url 'admin-requests' %}" class="list-group-item list-group-item-action p-3 bg-surface">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 fw-bold text-success"><i class="bi bi-plus-circle me-2"></i>Log Manual Collection Request</h6>
-                        </div>
-                        <p class="mb-1 small text-muted">Manually append and drop a waste collection node into maps pipeline.</p>
-                    </a>
-                    <a href="{% url 'admin-drivers' %}" class="list-group-item list-group-item-action p-3 bg-surface">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 fw-bold text-info"><i class="bi bi-person-badge me-2"></i>Register New Driver Node</h6>
-                        </div>
-                        <p class="mb-1 small text-muted">Provision a new profile to staff pool and allocate vehicle resources.</p>
-                    </a>
-                    <a href="{% url 'admin-vehicles' %}" class="list-group-item list-group-item-action p-3 bg-surface">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 fw-bold text-primary"><i class="bi bi-truck me-2"></i>Commission New Fleet Asset</h6>
-                        </div>
-                        <p class="mb-1 small text-muted">Register structural machinery details and license plates inside DB logs.</p>
-                    </a>
-                    <a href="{% url 'admin-schedules' %}" class="list-group-item list-group-item-action p-3 bg-surface">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 fw-bold text-warning"><i class="bi bi-calendar-event me-2"></i>Map Zone Routing Calendar</h6>
-                        </div>
-                        <p class="mb-1 small text-muted">Set routine automated pickup loops for synchronized city zones.</p>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-function getAssignModal() {
-    if (typeof bootstrap === 'undefined') {
-        console.error('Bootstrap JS failed to load — modal cannot open.');
-        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
-        return null;
+(function() {
+// ── XSS escaping helper ────────────────────────────────────────────────────
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+}
+
+const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+const token = localStorage.getItem('access_token');
+const locationWSURL = token
+    ? `${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`
+    : `${protocol}${location.host}/ws/driver-locations/`;
+let locationWS = null;
+window._locationReconnectAttempt = 0;
+window._locationReconnectWarned = false;
+window._locationReconnectTimer = null;
+
+async function connectLocationWebSocket() {
+    if (window._locationReconnectTimer) {
+        clearTimeout(window._locationReconnectTimer);
+        window._locationReconnectTimer = null;
     }
-    return bootstrap.Modal.getOrCreateInstance(document.getElementById('assignModal'));
-}
 
-function getQuickAddModal() {
-    if (typeof bootstrap === 'undefined') {
-        console.error('Bootstrap JS failed to load — modal cannot open.');
-        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
-        return null;
-    }
-    return bootstrap.Modal.getOrCreateInstance(document.getElementById('quickAddModal'));
-}
-
-function openAssignModal(requestId) {
-    document.getElementById('modal-request-id').value = requestId;
-    const modal = getAssignModal();
-    if (modal) modal.show();
-}
-
-async function assignDriver(btn) {
-    const requestId = document.getElementById('modal-request-id').value;
-    const driverId = document.getElementById('modal-driver-select').value;
-
-    if (!driverId) {
-        showToast('No active available driver was chosen.', 'danger');
+    const token = await (window.getFreshAccessTokenForSockets ? window.getFreshAccessTokenForSockets() : Promise.resolve(localStorage.getItem('access_token')));
+    if (!token) {
+        if (localStorage.getItem('refresh_token')) logout();
         return;
     }
 
-    await withButtonBusy(eventButton(btn), 'Assigning...', async () => {
-    const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
-    if (data && data.id) {
-        showToast('Driver dispatch successfully configured!', 'success');
-        const modal = getAssignModal();
-        if (modal) modal.hide();
-        setTimeout(() => location.reload(), 1000);
-    } else {
-        showToast('Failed to deploy driver node.', 'danger');
+    const wsURL = `${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`;
+    const ws = new WebSocket(wsURL);
+    locationWS = ws;
+    window.locationWS = ws;
+
+    function scheduleLocationReconnect() {
+        if (window._locationReconnectTimer) return;
+        const delay = Math.min(30000, 1000 * Math.pow(2, window._locationReconnectAttempt || 0));
+        window._locationReconnectAttempt = (window._locationReconnectAttempt || 0) + 1;
+        window._locationReconnectTimer = setTimeout(() => {
+            window._locationReconnectTimer = null;
+            connectLocationWebSocket();
+        }, delay);
     }
-    });
+
+    function notifyLocationSocketIssue(label, event) {
+        console.warn(label, event);
+        if (!window._locationReconnectWarned) {
+            showToast('Connection lost — live updates paused', 'warning');
+            window._locationReconnectWarned = true;
+        }
+        scheduleLocationReconnect();
+    }
+
+    ws.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'route_update' && data.driver_id === {{ driver.id|default:'null' }}) {
+                showToast(`New route generated: ${data.total_stops} stops, ${data.total_distance} km`, 'info');
+                loadMapData();
+            }
+            if (data.type === 'driver_location') {
+                const driverId = data.driver_id;
+                const lat = parseFloat(data.latitude);
+                const lng = parseFloat(data.longitude);
+                if (isNaN(lat) || isNaN(lng) || !driverId) return;
+
+                const name = data.driver_name || `Driver #${driverId}`;
+                const popupHtml = `<strong>🚛 ${name}</strong><br>Live driver location`;
+                const icon = L.divIcon({
+                    className: 'driver-marker-icon',
+                    html: '<span style="font-size:1.4rem; line-height:1;">🚛</span>',
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                });
+
+                let driverMarker = driverMarkers.get(driverId);
+                if (driverMarker) {
+                    driverMarker.setLatLng([lat, lng]);
+                    driverMarker.setPopupContent(popupHtml);
+                } else if (driverMarkersLayer) {
+                    driverMarker = L.marker([lat, lng], { icon })
+                        .addTo(driverMarkersLayer)
+                        .bindPopup(popupHtml);
+                    driverMarkers.set(driverId, driverMarker);
+                }
+            }
+        } catch (err) {
+            console.warn('Driver location WebSocket message parse failed:', err);
+        }
+    };
+    ws.onopen = () => {
+        window._locationReconnectAttempt = 0;
+        window._locationReconnectWarned = false;
+    };
+    ws.onerror = (e) => notifyLocationSocketIssue('Driver location WebSocket error:', e);
+    ws.onclose = (e) => notifyLocationSocketIssue('Driver location WebSocket closed:', e);
 }
 
-async function cancelRequest(requestId, btn) {
-    if (!confirm('Cancel this request?')) return;
-    await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
-    const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
-    if (data && data.id) {
-        showToast('Request cancelled.', 'success');
-        setTimeout(() => location.reload(), 1000);
-    } else {
-        showToast('Failed to cancel request.', 'danger');
+connectLocationWebSocket();
+
+window.useGPS = function() {
+    if (!navigator.geolocation) { showToast('GPS not supported.', 'warning'); return; }
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            document.getElementById('lat').value = pos.coords.latitude.toFixed(6);
+            document.getElementById('lng').value = pos.coords.longitude.toFixed(6);
+        },
+        () => showToast('Could not get GPS location.', 'danger')
+    );
+};
+
+window.updateLocation = async function() {
+    const lat = document.getElementById('lat').value;
+    const lng = document.getElementById('lng').value;
+    if (!lat || !lng) { showToast('Enter coordinates.', 'warning'); return; }
+
+    if (!locationWS || locationWS.readyState !== WebSocket.OPEN) {
+        showToast('Connection lost — live updates paused', 'warning');
+        return;
     }
-    });
+
+    locationWS.send(JSON.stringify({ latitude: lat, longitude: lng }));
+
+    const driverId = {{ driver.id|default:'null' }};
+    if (driverId) {
+        await API.patch(`/api/drivers/${driverId}/update_location/`, { latitude: lat, longitude: lng });
+    }
+    showToast('Location updated!', 'success');
+
+    // Move the driver marker on the map immediately, no need to refetch
+    if (typeof updateDriverMarker === 'function') {
+        updateDriverMarker(parseFloat(lat), parseFloat(lng));
+    }
+};
+
+// ── Live DOM helpers (no reload) ─────────────────────────────────────────
+
+function bumpStat(elId, delta) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const current = parseInt(el.textContent) || 0;
+    el.textContent = current + delta;
 }
 
-async function deleteRequest(requestId, btn) {
-    if (!confirm('Permanently delete this request? This cannot be undone.')) return;
+// Assigned table row status/action cell update — "Start" clicked (assigned -> in_progress)
+function applyAssignedRowUpdate(requestId, newStatus) {
+    const row = document.getElementById(`assigned-row-${requestId}`);
+    if (!row) return;
 
-    await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
+    const statusCell = row.children[4]; // Status is 5th <td>, index 4
+    if (statusCell) {
+        const badge = statusCell.querySelector('.badge');
+        if (badge) {
+            badge.className = `badge ${newStatus === 'in_progress' ? 'bg-info' : 'bg-primary'}`;
+            badge.textContent = newStatus === 'in_progress' ? 'In Progress' : newStatus;
+        }
+    }
+
+    const actionCell = row.children[6]; // Action is 7th <td>, index 6
+    if (actionCell && newStatus === 'in_progress') {
+        actionCell.innerHTML = `
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-success" onclick="updateStatus(${requestId}, 'completed', this)">Done</button>
+            </div>`;
+    }
+}
+
+// Job completed — row assigned table बाट हटाउने (completed row त्यहाँ देखिनु हुँदैन)
+function removeAssignedRow(requestId) {
+    const row = document.getElementById(`assigned-row-${requestId}`);
+    if (row) row.remove();
+
+    const tbody = document.getElementById('assigned-requests-body');
+    if (tbody && !tbody.querySelector('tr')) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No assigned requests.</td></tr>';
+    }
+}
+
+// Job completed — Completed Pickup History table मा नयाँ row माथि थप्ने
+function prependCompletedHistoryRow(req) {
+    const tbody = document.getElementById('completed-history-body');
+    if (!tbody) return;
+
+    const emptyRow = tbody.querySelector('tr td[colspan]');
+    if (emptyRow) emptyRow.closest('tr').remove();
+
+    // req.photo is a server-generated file URL, not free text — safe to
+    // interpolate directly into href/src.
+    const photoCell = req.photo
+        ? `<a href="${req.photo}" target="_blank"><img src="${req.photo}" alt="photo" class="history-photo-thumb"></a>`
+        : '<span class="text-muted small">—</span>';
+
+    const citizenRaw = req.user
+        ? (req.user.username || (typeof req.user === 'string' ? req.user : '—'))
+        : null;
+    const citizen = citizenRaw ? escapeHtml(citizenRaw) : '<i class="bi bi-person-x"></i> Guest';
+
+    const completedAt = req.completed_at
+        ? new Date(req.completed_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : '—';
+
+    const addressRaw = (req.pickup_address || '').length > 50
+        ? req.pickup_address.slice(0, 50) + '…'
+        : (req.pickup_address || '');
+    const address = escapeHtml(addressRaw);
+
+    const wasteType = escapeHtml(req.waste_type_display || req.waste_type || '');
+
+    const rowHtml = `
+        <tr>
+            <td class="fw-bold text-secondary">#${req.id}</td>
+            <td>${photoCell}</td>
+            <td class="small" style="max-width: 260px;">${address}</td>
+            <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">${wasteType}</span></td>
+            <td class="small">${citizen}</td>
+            <td class="small text-muted">${completedAt}</td>
+        </tr>
+    `;
+    tbody.insertAdjacentHTML('afterbegin', rowHtml);
+}
+
+// Marks an assigned row as queued-for-sync (offline path) instead of
+// moving it into Completed History — we don't have the server's copy of
+// the request (photo url, canonical completed_at, etc.) until it actually
+// syncs, so the row stays here with a "Pending sync" badge until then.
+function markAssignedRowPendingSync(requestId, newStatus) {
+    const row = document.getElementById(`assigned-row-${requestId}`);
+    if (!row) return;
+    row.classList.add('table-warning');
+
+    const actionCell = row.children[6];
+    if (actionCell) {
+        actionCell.innerHTML = '<span class="text-muted small"><i class="bi bi-cloud-arrow-up me-1"></i>Pending sync</span>';
+    }
+}
+
+// ── Update Request Status ────────────────────────────────────────────────
+// "Completed" mark गर्नु अघि GPS चाहिन्छ — HARD BLOCK. GPS नपाए backend सम्म
+// request नै पुग्दैन। GPS पाए, backend मा पुगेपछि pickup location सँग
+// compare भएर completion_flagged set हुन्छ (admin ले हेर्न पाउँछ)।
+//
+// OFFLINE HANDLING: GPS itself works offline (device-local), so a driver
+// in a dead zone can still capture location and mark a job as started/
+// completed. If the network call fails — either because navigator.onLine
+// is already false, or because the fetch itself throws despite onLine
+// being true (a flaky connection dropping mid-request, common on patchy
+// mobile data) — the update is queued via OfflineQueue instead of being
+// lost, and syncs automatically once connectivity returns (see base.html).
+window.updateStatus = async function(requestId, newStatus, btn) {
+    const busyLabel = newStatus === 'completed' ? 'Completing...' : 'Starting...';
+    await withButtonBusy(eventButton(btn), busyLabel, async () => {
+    let payload = { status: newStatus };
+
+    if (newStatus === 'completed') {
+        if (!navigator.geolocation) {
+            showToast('GPS is not supported on this device. Cannot mark as completed.', 'danger');
+            return;
+        }
+
+        showToast('Getting your location, please wait...', 'info');
+
+        try {
+            const position = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                });
+            });
+            payload.latitude = position.coords.latitude;
+            payload.longitude = position.coords.longitude;
+        } catch (err) {
+            showToast('Location access is required to mark this job as completed. Please enable GPS/location permission and try again.', 'danger');
+            return;
+        }
+    }
+
+    const url = `/api/waste-requests/${requestId}/update_status/`;
+    const authHeader = `Bearer ${localStorage.getItem('access_token')}`;
+
+    async function queueOffline() {
+        try {
+            await OfflineQueue.enqueue({
+                url,
+                method: 'PATCH',
+                headers: { 'Authorization': authHeader },
+                body: payload,
+                label: `Request #${requestId} → ${newStatus}`,
+            });
+        } catch (e) {
+            showToast('Could not save — this device may not support offline storage.', 'danger');
+            return false;
+        }
+        showToast(`Saved — will sync "${newStatus}" for #${requestId} when back online`, 'info');
+        if (newStatus === 'completed') {
+            markAssignedRowPendingSync(requestId, newStatus);
+        } else {
+            applyAssignedRowUpdate(requestId, newStatus);
+        }
+        return true;
+    }
+
+    // Already known offline — skip the fetch attempt entirely.
+    if (!navigator.onLine) {
+        await queueOffline();
+        return;
+    }
+
     try {
-        const res = await fetch(`/api/waste-requests/${requestId}/`, {
-            method: 'DELETE',
+        const res = await fetch(url, {
+            method: 'PATCH',
             headers: {
-                'Authorization': `Bearer ${getToken()}`,
+                'Authorization': authHeader,
+                'Content-Type': 'application/json',
             },
+            body: JSON.stringify(payload),
         });
 
-        if (res.ok) {
-            showToast('Request deleted.', 'success');
-            setTimeout(() => location.reload(), 800);
-        } else {
-            let errMsg = 'Failed to delete request.';
-            try {
-                const data = await res.json();
-                errMsg = typeof data === 'object'
-                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
-                    : String(data);
+        const data = await res.json();
 
-            } catch (e) {
-                console.error('Failed to parse error response JSON:', e);
+        if (res.ok && data.id) {
+            showToast(`Status updated to ${newStatus}`, 'success');
+
+            if (newStatus === 'completed') {
+                removeAssignedRow(requestId);
+                prependCompletedHistoryRow(data);
+                bumpStat('stat-completed-today', 1);
+                bumpStat('stat-total-trips', 1);
+                bumpStat('stat-completed-month', 1);
+                if (typeof loadMapData === 'function') loadMapData();
+            } else {
+                applyAssignedRowUpdate(requestId, newStatus);
             }
-            showToast(errMsg, 'danger');
+        } else {
+            showToast(data.error || 'Update failed.', 'danger');
         }
     } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
+        // navigator.onLine said we were online but the request still
+        // failed outright (connection dropped mid-flight) — fall back to
+        // the same queue path used above.
+        await queueOffline();
     }
+    });
+};
+
+window.toggleAvailability = async function() {
+    const driverId = {{ driver.id|default:'null' }};
+    if (!driverId) return;
+
+    const data = await API.patch(`/api/drivers/${driverId}/toggle_availability/`, {});
+    if (data && data.id) {
+        showToast(`Changed to ${data.is_available ? 'Available' : 'Busy'}`, 'success');
+
+        const label = document.getElementById('availability-label');
+        const btn = document.getElementById('toggle-availability-btn');
+        const statCard = document.getElementById('availability-stat-card');
+
+        if (label) {
+            label.textContent = data.is_available ? 'Available' : 'Busy';
+            label.className = `fw-bold ${data.is_available ? 'text-success' : 'text-secondary'}`;
+        }
+        if (btn) {
+            btn.className = `btn btn-sm ${data.is_available ? 'btn-outline-secondary' : 'btn-outline-success'} mt-1`;
+        }
+        if (statCard) {
+            statCard.className = `card border-0 ${data.is_available ? 'bg-success' : 'bg-secondary'} bg-opacity-10 h-100`;
+        }
+    } else {
+        showToast('Failed to update availability.', 'danger');
+    }
+};
+
+/* ==========================================================
+   ROUTE & REPORTS MAP
+   Plots only ACTIVE work: pending / assigned / in_progress.
+   Completed and cancelled requests are intentionally excluded
+   from the map (see ACTIVE_MAP_STATUSES below) — once a job is
+   done it belongs in the "Completed Pickup History" table, not
+   the live map, so the map doesn't fill up with stale green pins.
+   Also plots:
+     - A dashed/road line connecting the stops belonging to this
+       driver's current active/planned Route.
+     - The driver's own last-known position.
+   Refreshes on: manual button click, a 30s interval, and any
+   'route_update' broadcast on the driver_locations WebSocket.
+   ========================================================== */
+
+{% if driver %}
+const DRIVER_ID = {{ driver.id }};
+const INITIAL_DRIVER_LAT = {{ driver.current_latitude|default:'null' }};
+const INITIAL_DRIVER_LNG = {{ driver.current_longitude|default:'null' }};
+
+// Only these statuses are considered "active work" and shown on the map.
+// completed/cancelled requests are filtered out entirely below.
+const ACTIVE_MAP_STATUSES = ['pending', 'assigned', 'in_progress'];
+
+const STATUS_COLORS = {
+    pending: '#fd7e14',
+    assigned: '#0d6efd',
+    in_progress: '#0dcaf0',
+};
+
+const DEFAULT_CENTER = [28.2096, 83.9856]; // Pokhara fallback center
+const DEFAULT_DEPOT = [28.2096, 83.9856];
+
+let driverMap = null;
+let driverMarker = null;
+let routeLine = null;
+let requestMarkersLayer = null;
+let checkpointsLayer = null;
+let hasFittedBounds = false; // only auto-fit the view once, on first load
+let lastBoundsPoints = [];
+let mapRefreshIntervalId = null; // FIX: track the interval so it can actually be cleared
+
+if (!document.body.dataset._leafletCleanupBound) {
+    document.body.addEventListener('htmx:beforeSwap', () => {
+        // FIX: previously the 30s setInterval kept running forever after an
+        // htmx page swap, because nothing ever called clearInterval() on it.
+        // The stale interval kept calling loadMapData() against DOM elements
+        // (#map-route-info, #map-empty-note) that no longer existed on the
+        // new page, causing "Cannot set properties of null" crashes.
+        if (mapRefreshIntervalId) {
+            clearInterval(mapRefreshIntervalId);
+            mapRefreshIntervalId = null;
+        }
+        if (driverMap) {
+            // FIX: if fitBounds' zoom/pan animation is still mid-flight when
+            // htmx swaps the page, its transitionend handler can fire after
+            // this map (and its renderer) is torn down — that's what caused
+            // the uncaught Bounds.js crash right after sidebar navigation.
+            // stop() cancels any in-progress animation immediately.
+            try { driverMap.stop(); } catch (e) {}
+            driverMap.remove();
+            driverMap = null;
+        }
+        driverMarker = null;
+        routeLine = null;
+        requestMarkersLayer = null;
+        checkpointsLayer = null;
+        hasFittedBounds = false;
+    });
+    document.body.dataset._leafletCleanupBound = '1';
+}
+
+function ensureLeafletLoaded(onReady) {
+    if (typeof L !== 'undefined') {
+        onReady();
+        return;
+    }
+
+    if (window._driverLeafletLoadPromise) {
+        window._driverLeafletLoadPromise.then(onReady).catch(() => {});
+        return;
+    }
+
+    window._driverLeafletLoadPromise = new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-leaflet-loader="driver-dashboard"]');
+        if (existing) {
+            existing.addEventListener('load', resolve, { once: true });
+            existing.addEventListener('error', reject, { once: true });
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.async = true;
+        script.dataset.leafletLoader = 'driver-dashboard';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+
+    window._driverLeafletLoadPromise.then(onReady).catch((error) => {
+        console.error('Leaflet failed to load for driver dashboard:', error);
+        showToast('Map failed to load. Please refresh the page.', 'danger');
     });
 }
 
-function applyFilters() {
-    const searchTerm = document.getElementById('search-box').value.trim();
-    const status = document.getElementById('filter-status').value;
+function initDriverMap() {
+    if (typeof L === 'undefined') {
+        ensureLeafletLoaded(initDriverMap);
+        return;
+    }
 
-    let url = '{% url "admin-requests" %}?';
-    if (searchTerm) url += `search=${encodeURIComponent(searchTerm)}&`;
-    if (status) url += `status=${status}`;
+    driverMap = L.map('driver-map', { scrollWheelZoom: true }).setView(DEFAULT_CENTER, 13);
 
-    window.location.href = url;
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(driverMap);
+
+    requestMarkersLayer = L.layerGroup().addTo(driverMap);
+    checkpointsLayer = L.layerGroup().addTo(driverMap);
+
+    if (INITIAL_DRIVER_LAT !== null && INITIAL_DRIVER_LNG !== null) {
+        updateDriverMarker(INITIAL_DRIVER_LAT, INITIAL_DRIVER_LNG);
+    }
+
+    // FIX: force the renderer through an _update() cycle before we ever
+    // touch it — invalidateSize() + setView() (same zoom/center) makes
+    // Leaflet recompute and populate renderer._bounds.min/max, which is
+    // what whenRendererReady() now actually checks for below.
+    driverMap.whenReady(() => {
+        driverMap.invalidateSize();
+        driverMap.setView(driverMap.getCenter(), driverMap.getZoom(), { animate: false });
+
+        whenRendererReady(() => {
+            loadMapData();
+            mapRefreshIntervalId = setInterval(loadMapData, 30000);
+        });
+    });
 }
 
-document.getElementById('search-box').addEventListener('keypress', e => {
-    if (e.key === 'Enter') applyFilters();
-});
+// FIX: instead of guessing with a fixed number of animation frames, this
+// polls Leaflet's actual internal readiness signal (_renderer._bounds)
+// before doing anything that touches SVG paths (adding CircleMarkers,
+// calling fitBounds). This is what finally makes the "reading 'x'" issue
+// go away instead of just catching it after the fact — we simply never
+// call into Leaflet's path/bounds code before it's genuinely ready.
+function whenRendererReady(callback, attempt) {
+    attempt = attempt || 0;
+    const renderer = driverMap && driverMap._renderer;
+    // FIX: renderer._bounds is truthy the instant the renderer object is
+    // created (it's an empty Bounds() by default), so the old check
+    // (`renderer && renderer._bounds`) passed before .min/.max were ever
+    // populated — the first marker added (e.g. request #52) then crashed
+    // inside Bounds.intersects() reading undefined.min.x. Now we wait for
+    // .min AND .max to actually exist (populated by a real _update() cycle).
+    const ready = renderer && renderer._bounds && renderer._bounds.min && renderer._bounds.max;
+    if (ready || attempt > 20) {
+        callback();
+        return;
+    }
+    requestAnimationFrame(() => whenRendererReady(callback, attempt + 1));
+}
+
+function updateDriverMarker(lat, lng) {
+    if (!driverMap || isNaN(lat) || isNaN(lng)) return;
+    const icon = L.divIcon({
+        html: '🚛',
+        className: 'driver-marker-icon',
+        iconSize: [30, 30],
+    });
+    if (driverMarker) {
+        driverMarker.setLatLng([lat, lng]);
+    } else {
+        driverMarker = L.marker([lat, lng], { icon }).addTo(driverMap).bindPopup('Your last known location');
+    }
+}
+
+function extractList(data) {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.results)) return data.results;
+    return [];
+}
+
+function pickCoords(req) {
+    const lat = Number(req.latitude ?? req.photo_latitude);
+    const lng = Number(req.longitude ?? req.photo_longitude);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        console.error("Invalid request (non-numeric coords):", req.id);
+        return null;
+    }
+
+    // Reject null-island / obviously bogus coords
+    if (lat === 0 && lng === 0) {
+        console.error("Invalid request (0,0 coords):", req.id);
+        return null;
+    }
+
+    // Sanity range check (Nepal-ish box, adjust if needed)
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        console.error("Invalid request (out of range coords):", req.id);
+        return null;
+    }
+
+    return [lat, lng];
+}
+
+async function drawRoadFollowingLine(stopCoords) {
+    const orderedPoints = [DEFAULT_DEPOT, ...stopCoords];
+
+    let roadCoords = null;
+    try {
+        const coordStr = orderedPoints.map(([lat, lon]) => `${lon},${lat}`).join(';');
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+        const res = await fetch(osrmUrl);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                roadCoords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+            }
+        }
+    } catch (e) {
+        console.warn('OSRM routing failed, falling back to straight line:', e);
+    }
+
+    const lineCoords = roadCoords || orderedPoints;
+
+    try {
+        routeLine = L.polyline(lineCoords, {
+            color: '#198754',
+            weight: 4,
+            opacity: 0.85,
+            ...(roadCoords ? {} : { dashArray: '8,8' }),
+        }).addTo(driverMap);
+    } catch (err) {
+        console.warn('Failed to draw route line:', err);
+    }
+}
+
+window.centerMap = function() {
+    if (!driverMap || lastBoundsPoints.length === 0) return;
+    const allPoints = [...lastBoundsPoints];
+
+    if (driverMarker) {
+        const p = driverMarker.getLatLng();
+        if (p && Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
+            allPoints.push([p.lat, p.lng]);
+        }
+    }
+
+    const validPoints = allPoints.filter(p =>
+        Array.isArray(p) &&
+        p.length === 2 &&
+        Number.isFinite(p[0]) &&
+        Number.isFinite(p[1])
+    );
+
+    if (validPoints.length > 0) {
+        whenRendererReady(() => {
+            try {
+                driverMap.invalidateSize();
+                driverMap.fitBounds(validPoints, {
+                    padding: [30, 30],
+                    maxZoom: 15,
+                    animate: false
+                });
+            } catch (err) {
+                console.warn('centerMap fitBounds failed:', err, validPoints);
+            }
+        });
+    }
+};
+
+window.loadMapData = async function() {
+    // FIX: bail out if the map or its layers no longer exist — covers the
+    // case where this call was already in flight (awaiting the API calls
+    // below) when htmx swapped the page out from under it.
+    if (!driverMap || !requestMarkersLayer || !checkpointsLayer) return;
+
+    const [requestsData, routesData, checkpointsData] = await Promise.all([
+        API.get('/api/waste-requests/'),
+        API.get('/api/routes/'),
+        API.get('/api/checkpoints/'),
+    ]);
+
+    // FIX: re-check after the await — if htmx swapped the page while these
+    // three API calls were in flight, driverMap/its layers may have been
+    // torn down in the meantime. Bail out quietly instead of touching
+    // removed Leaflet objects or a detached DOM.
+    if (!driverMap || !requestMarkersLayer || !checkpointsLayer) return;
+
+    const allRequests = extractList(requestsData);
+    const routes = extractList(routesData);
+    const checkpoints = extractList(checkpointsData);
+
+    // ── Only active work goes on the map — completed/cancelled requests
+    // are dropped here so finished pins don't keep showing green forever.
+    const requests = allRequests.filter(req => ACTIVE_MAP_STATUSES.includes(req.status));
+
+    requestMarkersLayer.clearLayers();
+    checkpointsLayer.clearLayers();
+    if (routeLine) {
+        driverMap.removeLayer(routeLine);
+        routeLine = null;
+    }
+
+    const coordsById = {};
+    const boundsPoints = [];
+
+    requests.forEach(req => {
+        const coords = pickCoords(req);
+        if (!coords) return;
+
+        coordsById[req.id] = coords;
+        boundsPoints.push(coords);
+
+        const color = STATUS_COLORS[req.status] || '#6c757d';
+
+        // FIX: switched from L.circleMarker (SVG Path renderer) to
+        // L.marker + L.divIcon (plain HTML/CSS dot). circleMarker crashed
+        // because Leaflet's SVG renderer has a well-known internal race
+        // condition around _pxBounds readiness that no amount of "wait for
+        // renderer" polling fully closes. divIcon markers are plain HTML
+        // elements positioned with CSS transforms — they never touch the
+        // SVG Path/Bounds code at all, so this class of crash is impossible.
+        const dotIcon = L.divIcon({
+            className: '',
+            html: `<div style="width:16px;height:16px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div>`,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8],
+        });
+
+        const marker = L.marker(coords, { icon: dotIcon });
+
+        marker.bindPopup(`
+            <strong>#${req.id} — ${escapeHtml(req.status_display || req.status)}</strong><br>
+            ${req.pickup_address ? escapeHtml(req.pickup_address) : 'No address given'}<br>
+            <span class="text-muted">${escapeHtml(req.waste_type_display || req.waste_type || '')}</span>
+        `);
+
+        try {
+            marker.addTo(requestMarkersLayer);
+        } catch (err) {
+            console.warn('Failed to add marker for request', req.id, err);
+        }
+    });
+
+    checkpoints.forEach(cp => {
+        const lat = parseFloat(cp.latitude);
+        const lng = parseFloat(cp.longitude);
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        boundsPoints.push([lat, lng]);
+
+        const marker = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'checkpoint-marker-icon',
+                html: '<span style="font-size:1.4rem;">🚩</span>',
+                iconSize: [24, 24],
+                iconAnchor: [12, 24],
+            }),
+        });
+        marker.bindPopup(`
+            <strong>🚩 ${escapeHtml(cp.name || 'Checkpoint')}</strong><br>
+            ${cp.description ? escapeHtml(cp.description) : 'Designated checkpoint'}
+            ${cp.status ? `<br><span class="text-muted">${escapeHtml(cp.status)}</span>` : ''}
+        `);
+
+        try {
+            marker.addTo(checkpointsLayer);
+        } catch (err) {
+            console.warn('Failed to add checkpoint marker', cp.id, err);
+        }
+    });
+
+    const myRoutes = routes.filter(r => r.status === 'active')
+        .concat(routes.filter(r => r.status === 'planned'))
+        .sort((a, b) => (b.id || 0) - (a.id || 0));
+    const currentRoute = myRoutes[0];
+
+    // FIX: guard against these elements being gone — if the interval fires
+    // after the page has already been swapped out by htmx (a stale timer
+    // that slipped through before cleanup, or any other detached-DOM edge
+    // case), getElementById returns null and setting .textContent on it
+    // used to throw an uncaught "Cannot set properties of null" that killed
+    // the rest of this function.
+    const infoEl = document.getElementById('map-route-info');
+    if (currentRoute) {
+        const stopCoords = (currentRoute.waste_request_ids || [])
+            .map(id => coordsById[id])
+            .filter(Boolean);
+
+        if (stopCoords.length > 0) {
+            await drawRoadFollowingLine(stopCoords);
+        }
+
+        if (infoEl) {
+            infoEl.textContent = `Route #${currentRoute.id} (${currentRoute.status_display || currentRoute.status}) — ${currentRoute.total_distance_km ? currentRoute.total_distance_km + ' km' : ''}`;
+        }
+    } else if (infoEl) {
+        infoEl.textContent = 'No active route assigned yet';
+    }
+
+    const emptyNote = document.getElementById('map-empty-note');
+    lastBoundsPoints = boundsPoints;
+    if (boundsPoints.length === 0) {
+        if (emptyNote) emptyNote.classList.remove('d-none');
+    } else {
+        if (emptyNote) emptyNote.classList.add('d-none');
+        if (!hasFittedBounds) {
+            const allPoints = driverMarker ? boundsPoints.concat([driverMarker.getLatLng()]) : boundsPoints;
+            const validPoints = allPoints.filter(p =>
+                Array.isArray(p) ? (Number.isFinite(p[0]) && Number.isFinite(p[1]))
+                : (p && Number.isFinite(p.lat) && Number.isFinite(p.lng))
+            );
+            if (validPoints.length > 0) {
+                whenRendererReady(() => {
+                    try {
+                        driverMap.invalidateSize();
+                        driverMap.fitBounds(validPoints, { padding: [30, 30], maxZoom: 15, animate: false });
+                    } catch (err) {
+                        console.warn('fitBounds crashed, skipping:', err, validPoints);
+                    }
+                });
+            }
+            hasFittedBounds = true;
+        }
+    }
+};
+
+const driverMapEl = document.getElementById('driver-map');
+if (driverMapEl && !driverMapEl.dataset._bound) {
+    driverMapEl.dataset._bound = '1';
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDriverMap);
+    } else {
+        initDriverMap();
+    }
+}
+{% endif %}
+
+})();
 </script>
 {% endblock %}

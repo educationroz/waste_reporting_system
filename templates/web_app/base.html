@@ -584,6 +584,199 @@ document.addEventListener("DOMContentLoaded", function() {
 })();
 </script>
 
+<!-- OFFLINE SUPPORT: service worker registration + IndexedDB request queue.
+     Available to EVERYONE (guests included), since the two actions worth
+     queuing offline — a guest/user submitting a pickup request, and a
+     driver updating a job's status — both happen outside (or alongside)
+     the authenticated-only script block below. -->
+<script>
+(function () {
+    // ── Service worker registration ─────────────────────────────────────
+    // Registered at '/sw.js' (root scope) — see api_app... actually
+    // web_app's ServiceWorkerView, which serves the file with the app
+    // root as its scope so it can control every page, not just /static/.
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js').then(function (reg) {
+                console.log('SafhaSahar service worker registered:', reg.scope);
+            }).catch(function (err) {
+                console.warn('Service worker registration failed:', err);
+            });
+        });
+    }
+
+    // ── Offline request queue (IndexedDB) ───────────────────────────────
+    // Deliberately narrow scope: this is for the two actions that matter
+    // most for field usage on patchy mobile data —
+    //   1. Guest/user submitting a new pickup request (home.html)
+    //   2. Driver updating a request's status (driver_dashboard.html)
+    // Both send small JSON bodies, so this queue only supports JSON
+    // payloads (no FormData/file uploads — offline photo upload was
+    // scoped out as a stretch item, see prior discussion).
+    const DB_NAME = 'safhasahar_offline';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'outbox';
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            if (!('indexedDB' in window)) {
+                reject(new Error('IndexedDB not supported'));
+                return;
+            }
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = function (e) {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    // item: { url, method, headers (plain object, optional), body (plain
+    // JS object, optional), label (string shown in sync toasts, optional) }
+    async function enqueue(item) {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            const record = Object.assign({ createdAt: Date.now() }, item);
+            const req = store.add(record);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async function getAll() {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async function removeItem(id) {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.delete(id);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async function count() {
+        try {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.count();
+                req.onsuccess = () => resolve(req.result || 0);
+                req.onerror = () => reject(req.error);
+            });
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    let flushing = false;
+    async function flush() {
+        if (flushing || !navigator.onLine) {
+            return { synced: 0, remaining: await count() };
+        }
+        flushing = true;
+        let synced = 0;
+        try {
+            const items = await getAll();
+            // Oldest first, so queued actions replay in the order they
+            // were originally made.
+            items.sort((a, b) => a.createdAt - b.createdAt);
+
+            for (const item of items) {
+                try {
+                    const headers = Object.assign(
+                        { 'Content-Type': 'application/json' },
+                        item.headers || {}
+                    );
+
+                    // Re-fetch a fresh access token at sync time rather than
+                    // reusing whatever was captured while offline — the
+                    // queued item may have sat for a while and that token
+                    // could have expired in the meantime.
+                    if (headers.Authorization && typeof getFreshAccessTokenForSockets === 'function') {
+                        const fresh = await getFreshAccessTokenForSockets();
+                        if (fresh) headers.Authorization = 'Bearer ' + fresh;
+                    }
+
+                    const res = await fetch(item.url, {
+                        method: item.method || 'POST',
+                        headers,
+                        body: item.body !== undefined ? JSON.stringify(item.body) : undefined,
+                    });
+
+                    if (res.ok) {
+                        await removeItem(item.id);
+                        synced++;
+                    } else if (res.status >= 400 && res.status < 500) {
+                        // Server rejected it outright (bad data, auth that
+                        // couldn't be refreshed, etc.) — retrying forever
+                        // won't fix that, so drop it and say so.
+                        await removeItem(item.id);
+                        showToast(
+                            'Could not sync a saved action' + (item.label ? (' (' + item.label + ')') : '') + ' — it was discarded.',
+                            'danger'
+                        );
+                    } else {
+                        // 5xx or similar transient server-side failure —
+                        // leave it queued, try again on the next pass.
+                        break;
+                    }
+                } catch (e) {
+                    // Network failed again mid-flush — stop here, the
+                    // 'online' listener / interval below will retry later.
+                    break;
+                }
+            }
+        } finally {
+            flushing = false;
+        }
+        return { synced, remaining: await count() };
+    }
+
+    window.OfflineQueue = { enqueue, getAll, remove: removeItem, count, flush };
+
+    window.addEventListener('online', function () {
+        flush().then(({ synced }) => {
+            if (synced > 0) {
+                showToast('Back online — synced ' + synced + ' saved item(s).', 'success');
+            }
+        }).catch((e) => console.warn('OfflineQueue: flush on reconnect failed', e));
+    });
+
+    // Periodic retry: some mobile browsers are unreliable about firing the
+    // 'online' event even once connectivity genuinely returns, so this
+    // covers that gap.
+    setInterval(function () {
+        if (navigator.onLine) {
+            flush().then(({ synced }) => {
+                if (synced > 0) showToast('Synced ' + synced + ' saved item(s).', 'success');
+            }).catch(() => {});
+        }
+    }, 20000);
+
+    document.addEventListener('DOMContentLoaded', function () {
+        flush().catch(() => {});
+    });
+})();
+</script>
+
 <!-- AUTHENTICATED USER SCRIPT -->
 {% if user.is_authenticated %}
 <script>
@@ -645,6 +838,7 @@ if (!window.__ssAuthScriptLoaded) {
             return null;
         }
     }
+    window.getFreshAccessTokenForSockets = getFreshAccessTokenForSockets;
 
     async function apiFetch(method, url, data = null) {
         let token = localStorage.getItem('access_token');
