@@ -1562,6 +1562,13 @@
       }
     }
 
+<<<<<<< HEAD
+=======
+    // Delete selected checkpoints one by one
+   // Delete selected checkpoints — euta-euta request nagari, sabai id
+    // euटै bulk_delete request मा euta pataka pathaउँछ। Pahile jasto loop
+    // ma euta-euta DELETE le dherai checkpoint bhaye throttle (429) bhatकिन्थ्यो।
+>>>>>>> 00bb5094acf1cb5e98cc0d4953e2a00984fafeac
     async function deleteSelectedCheckpoints() {
       const selectedCheckboxes = Array.from(
         document.querySelectorAll(".checkpoint-select:checked"),
@@ -1592,14 +1599,17 @@
              Deleting...`;
       }
 
-      let deleted = 0;
-      let failed = 0;
-
       try {
-        for (const id of ids) {
-          try {
-            let success = false;
+        const res = await fetch("/api/checkpoints/bulk_delete/", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ids }),
+        });
 
+<<<<<<< HEAD
             for (let attempt = 0; attempt < 3; attempt++) {
               const res = await fetch(`/api/checkpoints/${id}/`, {
                 method: "DELETE",
@@ -1634,33 +1644,37 @@
           }
 
           await new Promise((resolve) => setTimeout(resolve, 150));
+=======
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Bulk deletion failed.");
+>>>>>>> 00bb5094acf1cb5e98cc0d4953e2a00984fafeac
         }
 
-        if (failed === 0) {
+        const data = await res.json();
+        if (data.missing_ids && data.missing_ids.length) {
           showCheckpointStatus(
-            `${deleted} checkpoint(s) deleted successfully.`,
+            `${data.deleted} checkpoint(s) deleted. ${data.missing_ids.length} were already gone.`,
             "success",
           );
         } else {
           showCheckpointStatus(
-            `${deleted} deleted, ${failed} failed.`,
-            "danger",
+            `${data.deleted} checkpoint(s) deleted successfully.`,
+            "success",
           );
         }
 
         await loadCheckpoints();
       } catch (error) {
         console.error("Bulk checkpoint deletion failed:", error);
-
         showCheckpointStatus(
-          "Bulk deletion failed. Please try again.",
+          error.message || "Bulk deletion failed. Please try again.",
           "danger",
         );
       } finally {
         updateBulkDeleteButton();
       }
     }
-
     function renderCheckpointMapMarkers(checkpoints) {
       if (!checkpointMap) return;
       if (!savedCheckpointsLayer) {
@@ -2051,7 +2065,7 @@
     const center = await getDepotCenter();
     const requiredRadius = maxDistanceToBoundary(center.lat, center.lng);
 
-    document.getElementById("auto_gen_spacing").value = 800;
+    document.getElementById("auto_gen_spacing").value = 600;
     document.getElementById("auto_gen_radius").value = requiredRadius;
 
     const panel = document.getElementById("auto-generate-panel");
