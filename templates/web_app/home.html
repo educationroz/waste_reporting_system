@@ -906,10 +906,8 @@ function isCheckpointActive(ch) {
 
 // FIX (checkpoints not showing on Home): /api/checkpoints/ can be paginated
 // (DRF default), in which case the old code only ever read page 1 via
-// `data.results` — any checkpoints beyond the first page silently never
-// rendered here, even though they exist and show fine on the Admin
-// Settings checkpoint table (which already follows `next` fully). This
-// follows `next` the same way so Home always sees the complete list.
+// `data.results`. This follows `next` fully so Home always sees the
+// complete list, same as the Admin Settings checkpoint table.
 async function fetchAllCheckpoints() {
     let checkpoints = [];
     let url = '/api/checkpoints/';
@@ -1478,6 +1476,13 @@ function insertHomeRequestRow(req) {
 }
 
 // ── Submit Request ───────────────────────────────────────────────────────────
+// OFFLINE HANDLING: this only queues requests that have NO attached photos.
+// The offline queue (see base.html's OfflineQueue) only stores small JSON
+// bodies — a photo upload is a multipart FormData with binary file content,
+// which is a meaningfully bigger and riskier thing to persist in IndexedDB
+// and replay later (large payloads, stale files, partial uploads on retry).
+// That was scoped out as a stretch item earlier, so a request WITH photos
+// still requires a live connection to submit, same as before this change.
 window.submitRequest = async function() {
     const address  = document.getElementById('pickup-address').value.trim();
     const btn      = document.getElementById('submit-btn');
@@ -1498,6 +1503,8 @@ window.submitRequest = async function() {
     // manually map click/drag गरेको location मा भरोसा नगरी, "submit" थिचेकै
     // क्षणको वास्तविक स्थान प्रयोग गर्ने। यसले तलको 100m checkpoint जाँच
     // सही र भरपर्दो बनाउँछ (टाढैबाट pin तानेर checkpoint नजिक देखाउन मिल्दैन)।
+    // GPS itself is device-local and works without a network connection,
+    // so this step still runs the same whether online or offline.
     if (!locationLockedByPhoto) {
         text.innerHTML = 'Confirming your location...';
         try {
@@ -1530,6 +1537,11 @@ window.submitRequest = async function() {
     // भएमा मात्र auto-assign भएर यहाँ value भरिएको हुन्छ (updateNearestCheckpointDisplay
     // हेर्नुहोस्)। खाली भए submit गर्न दिइँदैन — user लाई नजिकको checkpoint
     // सम्म गएर मात्र request गर्न लगाइन्छ, टाढैबाट custom location मा गर्न मिल्दैन।
+    // Note: checkpointData is only as fresh as the last successful
+    // /api/checkpoints/ fetch (loadCheckpoints(), run on page load) — if the
+    // device went offline after that, this still works fine against the
+    // already-loaded list; it just won't reflect checkpoints added elsewhere
+    // since then.
     const checkpointId = document.getElementById('checkpoint-select').value;
     if (!checkpointId) {
         btn.disabled = false;
@@ -1549,6 +1561,98 @@ window.submitRequest = async function() {
     // date/time नै scheduled_date को रूपमा पठाइन्छ।
     const scheduledDate = new Date().toISOString();
 
+    const hasPhotos = photoFiles.length > 0;
+
+    let currentGuestToken = null;
+    if (!localStorage.getItem('access_token')) {
+        currentGuestToken = getOrCreateGuestToken();
+    }
+
+    // Resets the form the same way a successful online submit does —
+    // shared by both the normal success path and the offline-queued path
+    // below, so the UI behaves identically either way (minus the new row,
+    // which the queued path can't render without a server-assigned id).
+    function resetFormAfterSubmit() {
+        if (currentGuestToken) {
+            savePendingClaimToken(currentGuestToken);
+            localStorage.removeItem('current_guest_token');
+        }
+        document.getElementById('pickup-address').value = '';
+        document.getElementById('description').value = '';
+        const guestEmailField = document.getElementById('guest-email');
+        if (guestEmailField) guestEmailField.value = '';
+        photoFiles = [];
+        firstPhotoGPS = null;
+        locationLockedByPhoto = false;
+        renderPhotoThumbnails();
+        document.getElementById('checkpoint-select').value = '';
+        document.getElementById('checkpoint-auto-display').innerHTML =
+            '<span class="text-muted small">Set your location to auto-detect nearest checkpoint...</span>';
+    }
+
+    // Queues the request via OfflineQueue (see base.html) instead of
+    // losing it. Only usable when there are no photos attached — see the
+    // note above submitRequest(). Returns true if it queued successfully.
+    async function tryQueueOffline() {
+        if (hasPhotos) {
+            showToast('Photos can\'t be saved offline yet — remove the photo(s) to submit without one now, or wait until you\'re back online.', 'warning');
+            return false;
+        }
+
+        const payload = {
+            waste_type: document.getElementById('waste-type').value,
+            pickup_address: address,
+            scheduled_date: scheduledDate,
+            description: document.getElementById('description').value.trim(),
+            latitude: lat,
+            longitude: lng,
+            dropoff_checkpoint_id: checkpointId,
+        };
+        if (currentGuestToken) {
+            payload.guest_token = currentGuestToken;
+            const guestEmailField = document.getElementById('guest-email');
+            const guestEmail = guestEmailField ? guestEmailField.value.trim() : '';
+            if (guestEmail) payload.guest_email = guestEmail;
+        }
+
+        const headers = {};
+        const accessToken = localStorage.getItem('access_token');
+        if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+        try {
+            await OfflineQueue.enqueue({
+                url: '/api/waste-requests/',
+                method: 'POST',
+                headers,
+                body: payload,
+                label: `Pickup request (${payload.waste_type})`,
+            });
+        } catch (e) {
+            showToast('Could not save offline — this device may not support offline storage.', 'danger');
+            return false;
+        }
+
+        showToast('You\'re offline — saved and will submit automatically once you\'re back online.', 'info');
+        resetFormAfterSubmit();
+
+        // We don't have a server-assigned id yet, so we can't insert a real
+        // row into Recent Requests — it'll appear there once this syncs.
+        // The pending count is still safe to bump optimistically.
+        if (accessToken) bumpStat('stat-pending-count', 1);
+
+        return true;
+    }
+
+    // Already known offline — skip straight to queuing, no point trying
+    // the fetch first.
+    if (!navigator.onLine) {
+        await tryQueueOffline();
+        btn.disabled = false;
+        text.innerHTML = '<i class="bi bi-send me-2"></i>Submit Request';
+        spinner.classList.add('d-none');
+        return;
+    }
+
     const formData = new FormData();
     formData.append('waste_type',     document.getElementById('waste-type').value);
     formData.append('pickup_address', address);
@@ -1558,9 +1662,7 @@ window.submitRequest = async function() {
     formData.append('longitude',      lng);
     formData.append('dropoff_checkpoint_id', checkpointId);
 
-    let currentGuestToken = null;
-    if (!localStorage.getItem('access_token')) {
-        currentGuestToken = getOrCreateGuestToken();
+    if (currentGuestToken) {
         formData.append('guest_token', currentGuestToken);
 
         const guestEmailField = document.getElementById('guest-email');
@@ -1607,24 +1709,7 @@ window.submitRequest = async function() {
 
         if (res.ok) {
             showToast('Request submitted successfully!', 'success');
-            if (currentGuestToken) {
-                savePendingClaimToken(currentGuestToken);
-                localStorage.removeItem('current_guest_token');
-                //showToast('Tip: Login or register to track this request and get notifications!', 'info');
-            }
-            document.getElementById('pickup-address').value = '';
-            document.getElementById('description').value = '';
-            const guestEmailField = document.getElementById('guest-email');
-            if (guestEmailField) guestEmailField.value = '';
-            photoFiles = [];
-            firstPhotoGPS = null;
-            locationLockedByPhoto = false;
-            renderPhotoThumbnails();
-
-            // Drop-off auto-display र hidden checkpoint value रिसेट गर्ने
-            document.getElementById('checkpoint-select').value = '';
-            document.getElementById('checkpoint-auto-display').innerHTML =
-                '<span class="text-muted small">Set your location to auto-detect nearest checkpoint...</span>';
+            resetFormAfterSubmit();
 
             // Reload नगरी: नयाँ request Recent Requests table मा थप्ने,
             // pending count तुरुन्तै अपडेट गर्ने
@@ -1639,7 +1724,13 @@ window.submitRequest = async function() {
             showToast('Error: ' + errMsg, 'danger');
         }
     } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
+        // navigator.onLine said we were online but the request still
+        // failed outright (connection dropped mid-flight, common on
+        // patchy mobile data) — fall back to the offline queue.
+        const queued = await tryQueueOffline();
+        if (!queued) {
+            showToast('Network error: ' + e.message, 'danger');
+        }
     } finally {
         btn.disabled = false;
         text.innerHTML = '<i class="bi bi-send me-2"></i>Submit Request';
