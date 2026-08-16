@@ -995,17 +995,10 @@
       [28.32749, 84.02078],
     ];
 
-    // Backend ko latitude/longitude DecimalField ले 6 decimal places bhanda
-    // dherai accept gardaina — JS floating-point math (center.lat + i*spacing
-    // jasto) le 15+ decimal digit ko number बनाउँछ, ani त्यही unrounded value
-    // सिधै API मा गयो भने serializer.is_valid() ले "no more than 6 decimal
-    // places" भनेर 400 Bad Request दिन्छ। Save हुनुअघि जहाँ पनि lat/lng बन्छ,
-    // generate हुन्छ, वा drag गरिन्छ, त्यहाँ यो round6() लगाउने।
     function round6(n) {
       return Math.round(n * 1e6) / 1e6;
     }
 
-    // Ray-casting point-in-polygon test. poly = [[lat,lng], ...] closed ring.
     function isInsidePokhara(lat, lng) {
       let inside = false;
       for (
@@ -1039,7 +1032,6 @@
         .bindTooltip("Pokhara Metropolitan City boundary", { sticky: true });
     }
 
-    // ── Depot Map Logic ──────────────────────────────────────────────────────────
     let depotMap = null;
     let depotMarker = null;
     let checkpointMap = null;
@@ -1048,12 +1040,10 @@
     const DEFAULT_LAT = 28.2096;
     const DEFAULT_LNG = 83.9856;
 
-    // ── Auto-Generate Checkpoints state ──────────────────────────────────────────
     let pendingCheckpointsLayer = null;
     let pendingCheckpoints = [];
     let pendingIdCounter = 0;
 
-    // ── Saved checkpoints shown/edited directly on the map ───────────────────────
     let savedCheckpointsLayer = null;
     let markerRegistry = {};
 
@@ -1391,17 +1381,10 @@
       el.classList.add("d-none");
     }
 
-    // /api/checkpoints/ ले DRF pagination use garyo bhane, response ma
-    // {results, next, count} aauncha ra `results` le PAGE 1 matra dincha.
-    // Pahila यहाँ `raw.results` लाई नै final list मानिन्थ्यो — त्यसैले धेरै
-    // checkpoint auto-generate + save गरिसकेपछि पनि table मा पहिलो page (e.g.
-    // 10-20 vota) matra dekhincha, baki sabai DB मा साँच्चै save भइसकेका भए
-    // tapani UI मा kahilei dekhindainan। Yo function ले `next` link followed
-    // गरेर SABAI page fetch गर्छ ani sabai checkpoint concat गरेर firtaउँछ।
     async function fetchAllCheckpoints() {
       let checkpoints = [];
       let url = "/api/checkpoints/";
-      let guard = 0; // infinite-loop safety, just in case `next` ever loops back
+      let guard = 0;
 
       while (url && guard < 200) {
         guard++;
@@ -1414,19 +1397,29 @@
         }
 
         if (Array.isArray(raw)) {
-          // Non-paginated backend — single flat array, nothing more to fetch.
           checkpoints = checkpoints.concat(raw);
           break;
         }
 
         checkpoints = checkpoints.concat(raw.results || []);
-        url = raw.next || null; // DRF gives a full absolute URL here — fetch() handles that fine.
+        url = raw.next || null;
       }
 
       return checkpoints;
     }
 
     async function loadCheckpoints() {
+      // Show a skeleton immediately so the tab doesn't sit on the plain
+      // "Loading checkpoints..." text while fetchAllCheckpoints() (which
+      // can be multiple paginated requests) is still in flight.
+      const tbody = document.getElementById("checkpoint-table-body");
+      if (tbody && typeof renderSkeletonRows === "function") {
+        renderSkeletonRows(
+          tbody,
+          [{ width: "20px" }, { width: "55%" }, { width: "70%" }, { width: "40%" }, { width: "80%" }],
+          4,
+        );
+      }
       try {
         const checkpoints = await fetchAllCheckpoints();
         renderCheckpointTable(checkpoints);
@@ -1441,7 +1434,6 @@
     function renderCheckpointTable(checkpoints) {
       const tbody = document.getElementById("checkpoint-table-body");
 
-      // Reset Select All checkbox
       const selectAll = document.getElementById("selectAllCheckpoints");
       if (selectAll) {
         selectAll.checked = false;
@@ -1505,7 +1497,6 @@
       updateBulkDeleteButton();
     }
 
-    // ── Saved checkpoints as draggable/editable flags on the map ────────────────
     function buildSavedCheckpointPopup(ch, pendingLat, pendingLng) {
       const hasPending = pendingLat !== undefined && pendingLng !== undefined;
       const coordsText = hasPending
@@ -1524,10 +1515,6 @@
         </div>
     `;
     }
-
-    // ============================================================
-    // CHECKPOINT BULK SELECT / DELETE
-    // ============================================================
 
     function toggleSelectAllCheckpoints(checkbox) {
       const checkboxes = document.querySelectorAll(".checkpoint-select");
@@ -1575,7 +1562,6 @@
       }
     }
 
-    // Delete selected checkpoints one by one
     async function deleteSelectedCheckpoints() {
       const selectedCheckboxes = Array.from(
         document.querySelectorAll(".checkpoint-select:checked"),
@@ -1614,7 +1600,6 @@
           try {
             let success = false;
 
-            // Retry a little if API returns temporary throttling
             for (let attempt = 0; attempt < 3; attempt++) {
               const res = await fetch(`/api/checkpoints/${id}/`, {
                 method: "DELETE",
@@ -1628,7 +1613,6 @@
                 break;
               }
 
-              // If API throttles, wait before retry
               if (res.status === 429) {
                 await new Promise((resolve) =>
                   setTimeout(resolve, 700 * (attempt + 1)),
@@ -1649,7 +1633,6 @@
             failed++;
           }
 
-          // Small delay to avoid API throttling
           await new Promise((resolve) => setTimeout(resolve, 150));
         }
 
@@ -1665,7 +1648,6 @@
           );
         }
 
-        // Refresh table + map
         await loadCheckpoints();
       } catch (error) {
         console.error("Bulk checkpoint deletion failed:", error);
@@ -1933,8 +1915,6 @@
       );
     }
 
-    // ── Auto-Generate Checkpoints (Depot-centered grid, clipped to Pokhara boundary) ──
-
     function distanceInMeters(lat1, lng1, lat2, lng2) {
       const R = 6371000;
       const toRad = (d) => (d * Math.PI) / 180;
@@ -1946,8 +1926,6 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    // depot_lat/lng input (Depot tab) bharिएको भए त्यही use garne, chaina bhane
-    // saved depot_location API bata fetch garne, tyo पनि fail bhaye DEFAULT.
     async function getDepotCenter() {
       const latInput = document.getElementById("depot_lat");
       const lngInput = document.getElementById("depot_lng");
@@ -1983,10 +1961,6 @@
       }
     }
 
-    // Depot center bata Pokhara boundary ko sabai vertex samma ko max distance
-    // nikalne — ani त्यो नै "पूरै boundary समात्न कति radius चाहिन्छ" हो।
-    // Margin (1.05x) थपेको ताकि polygon को कुनाहरू ठ्याक्कै edge मा नपरी
-    // छोटो radius ले clip नहोस्।
     function maxDistanceToBoundary(centerLat, centerLng) {
     let maxDist = 0;
     POKHARA_BOUNDARY.forEach(([lat, lng]) => {
@@ -2025,23 +1999,17 @@
 
         for (let i = -steps; i <= steps; i++) {
           for (let j = -steps; j <= steps; j++) {
-            if (i === 0 && j === 0) continue; // depot मै checkpoint नबनाउने
+            if (i === 0 && j === 0) continue;
             const rawLat = center.lat + i * latSpacing;
             const lngSpacing =
               spacing / (111320 * Math.cos((rawLat * Math.PI) / 180));
             const rawLng = center.lng + j * lngSpacing;
-            // Round इमेडिएटली, ताकि distance check ra boundary check दुवैले
-            // साँच्चै save हुने (rounded) value माथि नै काम गरून् — round
-            // गर्नुअघिको value माथि गरिएको check ले round गरेपछि boundary
-            // बाहिर पुग्ने edge-case जोगिन्छ।
             const lat = round6(rawLat);
             const lng = round6(rawLng);
 
             if (distanceInMeters(center.lat, center.lng, lat, lng) > radius)
               continue;
 
-            // Real municipal boundary bhitra matra — nadi/ban/danda-kanla
-            // jasto human basti nabhaeko area बाट pin auto-skip.
             if (!isInsidePokhara(lat, lng)) {
               skippedOutside++;
               continue;
@@ -2079,10 +2047,6 @@
       });
     }
 
-    // Quick preset: fills in a wide radius/spacing so the generated grid spans
-    // roughly the whole Pokhara Metropolitan City area around the depot, instead
-    // of just the small neighborhood around it. Still clipped to the real
-    // boundary polygon, so it won't place pins beyond city limits.
     async function coverFullMetroArea() {
     const center = await getDepotCenter();
     const requiredRadius = maxDistanceToBoundary(center.lat, center.lng);
@@ -2185,10 +2149,6 @@
       return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
-    // POST गर्दा 429 (rate limited) आयो भने, Retry-After header (वा exponential
-    // backoff) पर्खेर retry गर्छ। "Save All" जस्तो bulk operation ले धेरै requests
-    // एकैचोटि पठाउँदा backend/API throttling ले 429 दिन्छ — त्यो बेला silently
-    // fail नगरी retry गरेर pass गराउने।
     async function postCheckpointWithRetry(payload, { maxRetries = 2 } = {}) {
       let attempt = 0;
       while (true) {
@@ -2209,7 +2169,7 @@
         const retryAfterHeader = parseFloat(res.headers.get("Retry-After"));
         const waitMs = !isNaN(retryAfterHeader)
           ? retryAfterHeader * 1000
-          : Math.min(1000 * 2 ** attempt, 8000); // 2s, 4s, 8s, 8s...
+          : Math.min(1000 * 2 ** attempt, 8000);
         await sleep(waitMs);
       }
     }
@@ -2231,7 +2191,6 @@
         return { ok: false, name };
       }
 
-      // Marker manually drag गरेर boundary bahira purya-eko bhaye pani save huna dine haina.
       if (!isInsidePokhara(item.lat, item.lng)) {
         if (!silent)
           showToast(
@@ -2258,10 +2217,6 @@
             return { ok: false, name, error: msg, rateLimited: true };
           }
           const err = await res.json().catch(() => ({}));
-          // DRF validation errors (400) come back as {field: [messages]},
-          // not {detail: ...} — surface the real reason instead of a
-          // generic "failed" message so field-level bugs (like too many
-          // decimal places) are actually diagnosable from the toast.
           const fieldError =
             err.detail ||
             (err && typeof err === "object"
@@ -2275,13 +2230,6 @@
           throw new Error(fieldError || "Failed to save checkpoint.");
         }
 
-        // Backend ले proximity-based dedup गरेर euta already-existing
-        // checkpoint firtaउन सक्छ (checkpoint.deduped === true) — त्यो बेला
-        // NAYA record बनेको हुँदैन, sanga sanga rakheko existing lai matra
-        // point गareko huncha। Yo silently "saved" bhaneर treat gare
-        // generated 300 grid point मध्ये dherai euta हि existing checkpoint
-        // मा merge भएर table मा kम matra dekhincha — tesैले deduped case
-        // lai छुट्टै track गर्ने।
         const data = await res.json().catch(() => ({}));
 
         if (data.deduped) {
@@ -2324,19 +2272,10 @@
       renderPendingList();
     }
 
-    // Bulk save button क्लिक गर्दा एकैचोटि N वटा POST fire नगरी, हरेक request बीच
-    // delay दिन्छ। यो delay FIXED होइन, ADAPTIVE छ — screenshot मा देखिएको जस्तो
-    // 429 checkpoints/POST मा मात्र होइन, उही admin session को notifications/
-    // complaints GET मा समेत आउनु भनेको backend को rate-limit चाहिं PER-USER
-    // GLOBAL bucket हो (endpoint-specific होइन) — यो loop ले नै त्यो पूरा quota
-    // खाइरहेको हो। त्यसैले 429 आयो भने delay लाई बल्ल-बल्ल बढाउँदै लैजाने (ताकि
-    // बाँकी page (notification badge, complaints polling) लाई पनि साँस फेर्न
-    // मौका मिलोस्), ani लगातार साफ (कुनै 429 नआएको) streak पछि बिस्तारै फेरि
-    // छिटो पार्ने।
     const SAVE_ALL_BASE_DELAY_MS = 700;
     const SAVE_ALL_MAX_DELAY_MS = 6000;
     const SAVE_ALL_BACKOFF_MULTIPLIER = 1.8;
-    const SAVE_ALL_RECOVERY_STREAK = 5; // यति वटा लगातार सफल भएपछि मात्र delay घटाउने
+    const SAVE_ALL_RECOVERY_STREAK = 5;
 
     async function saveAllPendingCheckpoints() {
       const btn = document.querySelector("#pending-save-all-row button");
@@ -2380,8 +2319,6 @@
         const result = await savePendingCheckpoint(ids[i], { silent: true });
         if (result.ok) {
           if (result.deduped) {
-            // Matched an existing nearby checkpoint — no new row was
-            // created, so don't count it toward "saved".
             deduped++;
           } else {
             saved++;
@@ -2452,6 +2389,16 @@
     async function loadBackupFiles() {
       const tableBody = document.getElementById("backup-table-body");
       if (!tableBody) return;
+
+      // Same idea as loadCheckpoints(): swap the static "Loading backups..."
+      // text for a shimmer immediately, before the authFetch resolves.
+      if (typeof renderSkeletonRows === "function") {
+        renderSkeletonRows(
+          tableBody,
+          [{ width: "60%" }, { width: "35%" }, { width: "50%" }, { width: "45%" }],
+          3,
+        );
+      }
 
       try {
         const res = await authFetch("/api/database-backups/history/");
@@ -2739,8 +2686,6 @@
       }
     }
 
-    // ── Inline onclick= handlers ma bata call hune functions,
-    //    window scope ma expose garne (IIFE bhitra local bhaye pani) ──
     window.saveDepotLocation = saveDepotLocation;
     window.useMyGPS = useMyGPS;
     window.initCheckpointMap = initCheckpointMap;

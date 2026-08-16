@@ -197,6 +197,27 @@
     async function loadComplaints() {
         const body = document.getElementById('complaint-table-body');
 
+        // Swap the plain "Loading..." text for a shimmering skeleton right
+        // away, before the fetch resolves — same shared helper used by the
+        // admin-settings checkpoint/backup tables.
+        if (body && typeof renderSkeletonRows === 'function') {
+            renderSkeletonRows(
+                body,
+                [
+                    { width: '16px' },
+                    { width: '30px' },
+                    { width: '70%' },
+                    { width: '55%' },
+                    { width: '85%' },
+                    { width: '32px' },
+                    { width: '50%' },
+                    { width: '60%' },
+                    { width: '75%' },
+                ],
+                6,
+            );
+        }
+
         try {
             const data = await API.get('/api/complaints/');
             if (!data) {
