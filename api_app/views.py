@@ -789,6 +789,53 @@ class CheckpointViewSet(viewsets.ModelViewSet):
             notification_type='warning',
         )
         instance.delete()
+
+    @action(detail=False, methods=['post'])
+    def bulk_delete(self, request):
+        """
+        POST /api/checkpoints/bulk_delete/ — one-shot delete for multiple
+        checkpoints. Frontend को "Delete Selected" le pahile har checkpoint
+        ko lagi euta-euta DELETE request pathauँथ्यो, jasले dherai checkpoint
+        euta pataka delete garda anon/user throttle (429) bhatकाउँथ्यो। Yo
+        endpoint ले सबै id euटै request मा लिएर euta DB transaction भित्र
+        सबै delete गर्छ — no per-item HTTP round-trip, no throttle risk।
+        """
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin only.'}, status=status.HTTP_403_FORBIDDEN)
+
+        ids = request.data.get('ids', [])
+        if not ids or not isinstance(ids, list):
+            return Response(
+                {'error': 'ids (list) is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        checkpoints = list(Checkpoint.objects.filter(id__in=ids))
+        found_ids = [ch.id for ch in checkpoints]
+        names = [ch.name for ch in checkpoints]
+        missing_ids = [int(i) for i in ids if int(i) not in found_ids]
+
+        with transaction.atomic():
+            Checkpoint.objects.filter(id__in=found_ids).delete()
+
+        _log_admin_action(
+            request, 'delete', 'Checkpoint', None,
+            f'Bulk-deleted {len(found_ids)} checkpoint(s): {names[:10]}'
+            + (f' (+{len(names) - 10} more)' if len(names) > 10 else '')
+        )
+
+        if found_ids:
+            _notify_all_users(
+                title='Checkpoints Removed',
+                message=f'{len(found_ids)} checkpoint(s) have been removed from the map.',
+                notification_type='warning',
+            )
+
+        return Response({
+            'deleted': len(found_ids),
+            'deleted_ids': found_ids,
+            'missing_ids': missing_ids,
+        })
         
 class AdminUserCreateView(APIView):
     """POST /api/auth/create-admin/ — superadmin creates a new admin account."""
