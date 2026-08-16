@@ -194,6 +194,36 @@
         .theme-toggle-btn:focus {
             box-shadow: 0 0 0 0.2rem rgba(40,167,69,0.25);
         }
+
+        /* ==========================================
+           SHARED SKELETON LOADER (client-fetched tables)
+           Used by window.renderSkeletonRows(), see the toast/utility
+           script block below. Swaps a plain "Loading..." row for a
+           shimmering placeholder while a table's data is fetched via
+           fetch()/htmx after the page has already rendered.
+           ========================================== */
+        .skeleton-bar {
+            display: inline-block;
+            height: 0.85em;
+            min-width: 24px;
+            border-radius: 4px;
+            background: linear-gradient(
+                90deg,
+                var(--bg-surface-alt, #edf0f2) 25%,
+                var(--bg-hover, #e2e5e8) 37%,
+                var(--bg-surface-alt, #edf0f2) 63%
+            );
+            background-size: 400% 100%;
+            animation: skeleton-shimmer 1.4s ease infinite;
+        }
+        @keyframes skeleton-shimmer {
+            0% { background-position: 100% 50%; }
+            100% { background-position: 0 50%; }
+        }
+        tr.skeleton-row td {
+            padding-top: 0.9rem;
+            padding-bottom: 0.9rem;
+        }
     </style>
 
     {% block extra_css %}{% endblock %}
@@ -528,6 +558,40 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         if (p === 0) return s;
         return out + s.slice(p);
+    };
+
+    // Shared skeleton-loader for any table whose rows are populated via
+    // fetch()/htmx AFTER the page has already rendered (as opposed to
+    // Django-rendered tables, which have real data on first paint and
+    // don't need this). Swaps a plain "Loading..." placeholder for a
+    // shimmering set of placeholder rows while the real fetch is in
+    // flight — call it right before kicking off that fetch, then
+    // overwrite tbody.innerHTML again once the real data arrives.
+    //
+    // tbody:      the <tbody> element to fill.
+    // columns:    either a number (how many <td> per row, evenly styled)
+    //             or an array of column configs, e.g.
+    //             [{}, {width:'40%'}, {width:'70%'}] to hint bar widths
+    //             per column (falls back to a repeating pattern otherwise).
+    // rowCount:   how many placeholder rows to show (default 4).
+    window.renderSkeletonRows = function renderSkeletonRows(tbody, columns, rowCount) {
+        if (!tbody) return;
+        rowCount = rowCount || 4;
+        const cols = Array.isArray(columns)
+            ? columns
+            : Array.from({ length: columns }, () => ({}));
+        const fallbackWidths = ['85%', '60%', '75%', '45%', '65%'];
+
+        let html = '';
+        for (let r = 0; r < rowCount; r++) {
+            html += '<tr class="skeleton-row">';
+            cols.forEach(function (col, i) {
+                const width = col.width || fallbackWidths[i % fallbackWidths.length];
+                html += '<td><span class="skeleton-bar" style="width:' + width + ';"></span></td>';
+            });
+            html += '</tr>';
+        }
+        tbody.innerHTML = html;
     };
 
     // Called from profile.html right after a successful Save Changes, so the
