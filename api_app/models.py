@@ -1,22 +1,23 @@
 from django.conf import settings
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
 from .validators import validate_image_file, validate_pdf_file
 
 class Vehicle(models.Model):
     STATUS_CHOICES = [
-        ('available', 'Available'),
-        ('on_route', 'On Route'),
-        ('maintenance', 'Under Maintenance'),
-        ('inactive', 'Inactive'),
+        ('available', _('Available')),
+        ('on_route', _('On Route')),
+        ('maintenance', _('Under Maintenance')),
+        ('inactive', _('Inactive')),
     ]
     # Base/legacy types — still used as the default suggestions in the UI,
     # but vehicle_type itself is now free text (no `choices=` enforcement),
     # so admins can add their own custom vehicle types beyond this list.
     TYPE_CHOICES = [
-        ('truck', 'Garbage Truck'),
-        ('van', 'Van'),
-        ('compactor', 'Compactor'),
+        ('truck', _('Garbage Truck')),
+        ('van', _('Van')),
+        ('compactor', _('Compactor')),
     ]
 
     plate_number = models.CharField(max_length=20, unique=True)
@@ -96,16 +97,16 @@ class Driver(models.Model):
 
 class Bin(models.Model):
     TYPE_CHOICES = [
-        ('general', 'General Waste'),
-        ('recyclable', 'Recyclable'),
-        ('organic', 'Organic'),
-        ('hazardous', 'Hazardous'),
+        ('general', _('General Waste')),
+        ('recyclable', _('Recyclable')),
+        ('organic', _('Organic')),
+        ('hazardous', _('Hazardous')),
     ]
     STATUS_CHOICES = [
-        ('empty', 'Empty'),
-        ('half_full', 'Half Full'),
-        ('full', 'Full'),
-        ('overflow', 'Overflow'),
+        ('empty', _('Empty')),
+        ('half_full', _('Half Full')),
+        ('full', _('Full')),
+        ('overflow', _('Overflow')),
     ]
 
     bin_code = models.CharField(max_length=30, unique=True)
@@ -159,23 +160,23 @@ class Checkpoint(models.Model):
 
 class WasteRequest(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('assigned', 'Assigned'),
-        ('in_progress', 'In Progress'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled'),
+        ('pending', _('Pending')),
+        ('assigned', _('Assigned')),
+        ('in_progress', _('In Progress')),
+        ('completed', _('Completed')),
+        ('cancelled', _('Cancelled')),
     ]
     WASTE_TYPE_CHOICES = [
-        ('general', 'General Waste'),
-        ('recyclable', 'Recyclable'),
-        ('organic', 'Organic'),
-        ('bulky', 'Bulky Item'),
-        ('hazardous', 'Hazardous'),
+        ('general', _('General Waste')),
+        ('recyclable', _('Recyclable')),
+        ('organic', _('Organic')),
+        ('bulky', _('Bulky Item')),
+        ('hazardous', _('Hazardous')),
     ]
     SEVERITY_CHOICES = [
-        ('low', 'Low'),
-        ('medium', 'Medium'),
-        ('high', 'High'),
+        ('low', _('Low')),
+        ('medium', _('Medium')),
+        ('high', _('High')),
     ]
 
     user = models.ForeignKey(
@@ -250,13 +251,6 @@ class WasteRequest(models.Model):
                    'submits a request, so it can later be claimed/linked to '
                    'their account once they register or log in.'
     )
-    guest_email = models.EmailField(
-        blank=True, null=True,
-        help_text='Optional email a guest can provide at submission time. '
-                   'Used to send a claim link as a backup in case the '
-                   'browser-stored guest_token (localStorage) is lost — e.g. '
-                   'cleared browser data or switching devices before registering.'
-    )
 
     # ── ML Gatekeeper Classification (auto-filled on photo upload) ──────
     severity = models.CharField(
@@ -329,10 +323,10 @@ class WasteRequestPhoto(models.Model):
 
 class Route(models.Model):
     STATUS_CHOICES = [
-        ('planned', 'Planned'),
-        ('active', 'Active'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled'),
+        ('planned', _('Planned')),
+        ('active', _('Active')),
+        ('completed', _('Completed')),
+        ('cancelled', _('Cancelled')),
     ]
 
     driver = models.ForeignKey(
@@ -377,20 +371,20 @@ class Route(models.Model):
 
 class Schedule(models.Model):
     FREQUENCY_CHOICES = [
-        ('daily', 'Daily'),
-        ('weekly', 'Weekly'),
-        ('biweekly', 'Bi-Weekly'),
-        ('monthly', 'Monthly'),
+        ('daily', _('Daily')),
+        ('weekly', _('Weekly')),
+        ('biweekly', _('Bi-Weekly')),
+        ('monthly', _('Monthly')),
     ]
 
     DAY_OF_WEEK_CHOICES = [
-        (0, 'Monday'),
-        (1, 'Tuesday'),
-        (2, 'Wednesday'),
-        (3, 'Thursday'),
-        (4, 'Friday'),
-        (5, 'Saturday'),
-        (6, 'Sunday'),
+        (0, _('Monday')),
+        (1, _('Tuesday')),
+        (2, _('Wednesday')),
+        (3, _('Thursday')),
+        (4, _('Friday')),
+        (5, _('Saturday')),
+        (6, _('Sunday')),
     ]
 
     zone_name = models.CharField(max_length=100)
@@ -426,10 +420,10 @@ class Schedule(models.Model):
 
 class Notification(models.Model):
     TYPE_CHOICES = [
-        ('info', 'Information'),
-        ('warning', 'Warning'),
-        ('success', 'Success'),
-        ('alert', 'Alert'),
+        ('info', _('Information')),
+        ('warning', _('Warning')),
+        ('success', _('Success')),
+        ('alert', _('Alert')),
     ]
 
     user = models.ForeignKey(
@@ -463,14 +457,14 @@ class Notification(models.Model):
 class AdminLog(models.Model):
     """Log admin actions for audit trail."""
     ACTION_CHOICES = [
-        ('create', 'Create'),
-        ('update', 'Update'),
-        ('delete', 'Delete'),
-        ('assign', 'Assign'),
-        ('status_change', 'Status Change'),
-        ('login', 'Login'),
-        ('permission_change', 'Permission Change'),
-        ('other', 'Other'),
+        ('create', _('Create')),
+        ('update', _('Update')),
+        ('delete', _('Delete')),
+        ('assign', _('Assign')),
+        ('status_change', _('Status Change')),
+        ('login', _('Login')),
+        ('permission_change', _('Permission Change')),
+        ('other', _('Other')),
     ]
 
     admin_user = models.ForeignKey(
@@ -525,17 +519,17 @@ class SystemSettings(models.Model):
 
 class Complaint(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('under_review', 'Under Review'),
-        ('completed', 'Completed'),
+        ('pending', _('Pending')),
+        ('under_review', _('Under Review')),
+        ('completed', _('Completed')),
     ]
     TYPE_CHOICES = [
-        ('missed_pickup', 'Missed Pickup'),
-        ('driver_behavior', 'Driver Behavior'),
-        ('illegal_dumping', 'Illegal Dumping'),
-        ('overflowing_bin', 'Overflowing Bin'),
-        ('app_issue', 'App Issue'),
-        ('other', 'Other'),
+        ('missed_pickup', _('Missed Pickup')),
+        ('driver_behavior', _('Driver Behavior')),
+        ('illegal_dumping', _('Illegal Dumping')),
+        ('overflowing_bin', _('Overflowing Bin')),
+        ('app_issue', _('App Issue')),
+        ('other', _('Other')),
     ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)

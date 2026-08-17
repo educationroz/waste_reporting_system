@@ -50,6 +50,14 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # must be first
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    # Must come after SessionMiddleware (reads the user's saved language from
+    # the session) and before CommonMiddleware (which needs the active
+    # language already resolved to redirect correctly). This is what makes
+    # {% trans %}/{% blocktrans %} and get_FOO_display() render in the
+    # visitor's chosen language on every request — replaces the old
+    # Google Translate widget, which translated the DOM client-side after
+    # the fact and depended on a third-party endpoint staying reachable.
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -70,6 +78,10 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # Exposes LANGUAGE_CODE / LANGUAGES / get_current_language in
+                # every template — powers the <html lang="{{ LANGUAGE_CODE }}">
+                # attribute and the language switcher in base.html.
+                'django.template.context_processors.i18n',
                 'web_app.context_processors.google_client_id',
             ],
         },
@@ -253,7 +265,20 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 # ─── Localisation ─────────────────────────────────────────────────────────────
+# Local Django i18n replaces the old Google Translate widget: instead of a
+# third-party script rewriting the rendered DOM client-side (slow, an extra
+# network dependency, and prone to silently failing — see base.html's old
+# __ssTranslateLoadFailed handling), every {% trans %}/{% blocktrans %} tag
+# and every get_FOO_display() call now renders server-side in whichever
+# language LocaleMiddleware resolves for the request (URL prefix → saved
+# session language → browser Accept-Language header → LANGUAGE_CODE).
 LANGUAGE_CODE = 'en-us'
+LANGUAGES = [
+    ('en', 'English'),
+    ('ne', 'नेपाली'),  # Nepali
+]
+# django-admin makemessages / compilemessages read and write .po/.mo files here.
+LOCALE_PATHS = [BASE_DIR / 'locale']
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
