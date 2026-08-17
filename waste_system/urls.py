@@ -27,6 +27,13 @@ urlpatterns = [
     # api_app REST API
     path('api/', include('api_app.urls')),
 
+    # Django's built-in set_language view — POST {'language': 'ne'} here to
+    # switch languages. It writes the choice into the session (and a
+    # django_language cookie for anonymous visitors) and LocaleMiddleware
+    # picks it up on the very next request. Powers the language switcher
+    # in base.html; replaces the old googtrans localStorage/cookie hack.
+    path('i18n/', include('django.conf.urls.i18n')),
+
     # web_app HTML pages (catch-all last)
     path('', include('web_app.urls')),
 ]

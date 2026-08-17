@@ -1,6 +1,7 @@
 {% load static %}
+{% load i18n %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -40,11 +41,6 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/ext/head-support.js"></script>
 
-    <!-- Google Translate API -->
-    <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
-        onerror="window.__ssTranslateLoadFailed = true;"></script>
-
-
     <!-- Theme Early-Initialization -->
     <script>
         (function () {
@@ -61,40 +57,15 @@
     </script>
 
     <!--
-        FOUC Prevention Hide Script
-
-        GUARD ADDED: this was the actual cause of "click on profile after
-        Back/sidebar doesn't work". On an hx-boost="true" site, native
-        Back navigation (history.back()) doesn't reload the document — it
-        makes htmx restore the page from its history cache, which
-        re-inserts and RE-RUNS every <script> in <head>, including this
-        one. Re-running it set documentElement.style.visibility = "hidden"
-        again, and for the next 2 seconds every element on the page —
-        including the profile dropdown — is invisible AND non-clickable
-        (visibility:hidden elements don't receive pointer events), even
-        though nothing looked different because the page briefly "flashed"
-        hidden/visible so fast you might not have consciously noticed it.
-        The guard below makes this run only once per real page load.
+        NOTE: this used to be a "FOUC Prevention Hide Script" that hid the
+        whole page for up to 2 seconds to mask Google Translate rewriting
+        the DOM after load. Language is now resolved server-side by
+        LocaleMiddleware before the response is even sent, so the page
+        renders once, correctly, on the first paint — no hide/reveal dance
+        needed at all.
     -->
-    <script>
-        if (!window.__ssFoucHideRan) {
-            window.__ssFoucHideRan = true;
-            document.documentElement.style.visibility = "hidden";
-            window.setTimeout(function () {
-                document.documentElement.style.visibility = "visible";
-            }, 2000);
-        }
-    </script>
 
     <style>
-        .goog-te-banner-frame, 
-        .goog-te-banner-frame.skiptranslate, 
-        .goog-vi-gtrans, 
-        #goog-gt-tt, 
-        .goog-te-balloon-frame {
-            display: none !important;
-        }
-        
         body {
             top: 0px !important;
         }
@@ -107,67 +78,22 @@
             border: 1px solid var(--border-color, #dee2e6);
         }
 
-        #custom-lang-switcher {
-            position: fixed;
-            /* was a hardcoded 85px — drifted from the navbar on screens
-               where the navbar's real height differs (e.g. mobile).
-               main.js already computes --navbar-height on resize, so
-               anchor to that instead, with 85px as a safe fallback. */
-            top: calc(var(--navbar-height, 70px) + 15px);
-            left: 50%;
-            transform: translateX(-50%) translateY(-8px);
-            z-index: 1040;
+        /* ==========================================
+           NATIVE LANGUAGE SWITCHER
+           Replaces the old Google Translate widget (#custom-lang-switcher
+           popup + goog-te-* iframe/banner suppression) with a plain
+           <select> that POSTs to Django's set_language view. No third-party
+           script, no iframe, no polling for a widget that might not load.
+           ========================================== */
+        .lang-switcher-select {
+            border: 1px solid var(--border-color, #dee2e6);
             background: var(--bg-card, #ffffff);
-            padding: 12px 24px;
-            border-radius: 30px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-            border: 2px solid #049b09;
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-            transition: opacity 0.2s ease, transform 0.2s ease;
-            /* prevent horizontal overflow/clipping on narrow phones */
-            max-width: calc(100vw - 24px);
-            box-sizing: border-box;
-        }
-
-        @media (max-width: 480px) {
-            #custom-lang-switcher {
-                padding: 10px 16px;
-                border-radius: 20px;
-            }
-        }
-
-        #custom-lang-switcher.show {
-            opacity: 1;
-            visibility: visible;
-            pointer-events: auto;
-            transform: translateX(-50%) translateY(0);
-        }
-
-        .goog-logo-link {
-            display: none !important;
-        }
-        
-        .goog-te-gadget {
-            color: transparent !important;
-            font-size: 0px !important;
-        }
-
-        .goog-te-gadget .goog-te-combo {
-            color: #333 !important;
-            font-size: 15px !important;
+            color: var(--text-primary, #000000);
+            font-size: 0.85rem;
             font-weight: 600;
-            padding: 6px 15px;
+            padding: 6px 10px;
             border-radius: 20px;
-            border: 1px solid #ccc;
             cursor: pointer;
-            outline: none;
-        }
-
-        #custom-lang-switcher .btn-close {
-            font-size: 0.65rem;
-            margin: 0;
         }
 
         .htmx-swapping #content-app {
@@ -194,36 +120,6 @@
         .theme-toggle-btn:focus {
             box-shadow: 0 0 0 0.2rem rgba(40,167,69,0.25);
         }
-
-        /* ==========================================
-           SHARED SKELETON LOADER (client-fetched tables)
-           Used by window.renderSkeletonRows(), see the toast/utility
-           script block below. Swaps a plain "Loading..." row for a
-           shimmering placeholder while a table's data is fetched via
-           fetch()/htmx after the page has already rendered.
-           ========================================== */
-        .skeleton-bar {
-            display: inline-block;
-            height: 0.85em;
-            min-width: 24px;
-            border-radius: 4px;
-            background: linear-gradient(
-                90deg,
-                var(--bg-surface-alt, #edf0f2) 25%,
-                var(--bg-hover, #e2e5e8) 37%,
-                var(--bg-surface-alt, #edf0f2) 63%
-            );
-            background-size: 400% 100%;
-            animation: skeleton-shimmer 1.4s ease infinite;
-        }
-        @keyframes skeleton-shimmer {
-            0% { background-position: 100% 50%; }
-            100% { background-position: 0 50%; }
-        }
-        tr.skeleton-row td {
-            padding-top: 0.9rem;
-            padding-bottom: 0.9rem;
-        }
     </style>
 
     {% block extra_css %}{% endblock %}
@@ -243,7 +139,7 @@
 
         <!-- MOBILE: single toggle button that reveals the icon group -->
             <button class="btn nav-quick-toggle-btn d-inline-flex d-md-none ms-auto" type="button"
-                    onclick="toggleNavQuickMenu()" aria-label="More options" title="More options">
+                    onclick="toggleNavQuickMenu()" aria-label="{% trans 'More options' %}" title="{% trans 'More options' %}">
                 <i class="bi bi-list"></i>
             </button>
 
@@ -251,9 +147,32 @@
         <div id="navQuickMenu" class="d-none d-md-flex align-items-center ms-md-auto gap-2 flex-shrink-0">
             <!-- Dark/Light Theme Toggle -->
             <button id="theme-toggle-btn" class="btn theme-toggle-btn"
-                    type="button" onclick="toggleTheme()" aria-label="Toggle dark/light theme" title="Toggle theme">
+                    type="button" onclick="toggleTheme()" aria-label="{% trans 'Toggle dark/light theme' %}" title="{% trans 'Toggle theme' %}">
                 <i class="bi bi-moon-stars-fill" id="theme-icon"></i>
             </button>
+
+            <!--
+                NATIVE LANGUAGE SWITCHER — replaces the old Google Translate
+                popup. Posts straight to Django's built-in set_language view
+                (wired in waste_system/urls.py): it stores the chosen
+                language in the session (+ a cookie for anonymous visitors)
+                and LocaleMiddleware picks it up on the very next request,
+                so every "trans"/"blocktrans" template tag and every
+                get_FOO_display() call renders in that language from then on.
+                No third-party script, no iframe, nothing that can fail to load.
+            -->
+            <form action="{% url 'set_language' %}" method="post" class="d-flex align-items-center" hx-boost="false">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <select name="language" class="form-select form-select-sm lang-switcher-select"
+                        onchange="this.form.submit()" aria-label="{% trans 'Choose language' %}">
+                    {% get_current_language as CURRENT_LANGUAGE %}
+                    {% get_available_languages as AVAILABLE_LANGUAGES %}
+                    {% for lang_code, lang_name in AVAILABLE_LANGUAGES %}
+                        <option value="{{ lang_code }}" {% if lang_code == CURRENT_LANGUAGE %}selected{% endif %}>{{ lang_name }}</option>
+                    {% endfor %}
+                </select>
+            </form>
 
             {% if user.is_authenticated %}
                 <a class="nav-link position-relative px-1" href="{% url 'notifications' %}">
@@ -270,7 +189,7 @@
                         -->
                         <span id="navbar-avatar-slot" class="d-inline-flex align-items-center me-1">
                             {% if user.profile_picture %}
-                                <img id="navbar-profile-pic" src="{{ user.profile_picture.url }}" alt="Profile" class="navbar-profile-pic">
+                                <img id="navbar-profile-pic" src="{{ user.profile_picture.url }}" alt="{% trans 'Profile' %}" class="navbar-profile-pic">
                             {% else %}
                                 <i class="bi bi-person-circle" id="navbar-profile-pic-placeholder"></i>
                             {% endif %}
@@ -280,15 +199,14 @@
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><span class="dropdown-item-text text-muted small">{{ user.role|capfirst }}</span></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person-circle me-2"></i>View Profile</a></li>
-                        <li><a class="dropdown-item" href="#" hx-boost="false" onclick="toggleLangSwitcher(); return false;"><i class="bi bi-translate me-2"></i>Translate</a></li>
+                        <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person-circle me-2"></i>{% trans 'View Profile' %}</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#" hx-boost="false" onclick="logout(); return false;"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                        <li><a class="dropdown-item" href="#" hx-boost="false" onclick="logout(); return false;"><i class="bi bi-box-arrow-right me-2"></i>{% trans 'Logout' %}</a></li>
                     </ul>
                 </div>
             {% else %}
-                <a class="nav-link" href="{% url 'login' %}" hx-boost="false"><i class="bi bi-box-arrow-in-right me-1"></i>Sign In</a>
-                <a class="nav-link" href="{% url 'register' %}" hx-boost="false"><i class="bi bi-person-plus me-1"></i>Register</a>
+                <a class="nav-link" href="{% url 'login' %}" hx-boost="false"><i class="bi bi-box-arrow-in-right me-1"></i>{% trans 'Sign In' %}</a>
+                <a class="nav-link" href="{% url 'register' %}" hx-boost="false"><i class="bi bi-person-plus me-1"></i>{% trans 'Register' %}</a>
             {% endif %}
         </div>
     </div>
@@ -334,7 +252,7 @@
 <!-- FOOTER -->
 <footer class="site-footer">
     <div class="text-center py-3 bg-light">
-        <small>&copy; Safha Sahar {% now "Y" %}. All rights reserved. | RA Innovations</small>
+        <small>&copy; Safha Sahar {% now "Y" %}. {% trans "All rights reserved." %} | RA Innovations</small>
     </div>
 </footer>
 
@@ -342,59 +260,8 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{% static 'web_app/js/main.js' %}"></script>
 
-<!-- LANGUAGE SWITCHER POPUP -->
-<div id="custom-lang-switcher">
-    <button type="button" class="btn-close position-absolute top-0 end-0"
-            style="margin: 10px; z-index: 1041;"
-            onclick="document.getElementById('custom-lang-switcher').classList.remove('show');"
-            aria-label="Close"></button>
-    <div id="google_translate_element"></div>
-</div>
-
-<!-- GOOGLE TRANSLATE & THEME LOGIC -->
+<!-- THEME LOGIC -->
 <script type="text/javascript">
-var isUserLoggedIn = {% if user.is_authenticated %}true{% else %}false{% endif %};
-
-function googleTranslateElementInit() {
-    new google.translate.TranslateElement({
-        pageLanguage: 'en',
-        includedLanguages: 'ne,en',
-        layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-        autoDisplay: false
-    }, 'google_translate_element');
-
-    setTimeout(function () {
-        document.documentElement.style.visibility = "visible";
-    }, 1000);
-}
-
-function toggleLangSwitcher() {
-    if (window.__ssTranslateLoadFailed || typeof google === 'undefined') {
-        showToast('Translate service unavailable right now — try refreshing.', 'warning');
-        return;
-    }
-    document.getElementById('custom-lang-switcher').classList.toggle('show');
-}
-function forceHideGoogleBanner() {
-    var selectors = [
-        'iframe.goog-te-banner-frame',
-        '.goog-te-banner-frame',
-        'iframe[id$=".container"]',
-        '.skiptranslate > iframe'
-    ];
-    selectors.forEach(function (sel) {
-        document.querySelectorAll(sel).forEach(function (el) {
-            el.style.setProperty('display', 'none', 'important');
-            el.style.setProperty('visibility', 'hidden', 'important');
-            el.style.setProperty('height', '0px', 'important');
-        });
-    });
-    if (document.body) {
-        document.body.style.setProperty('top', '0px', 'important');
-    }
-    document.documentElement.style.setProperty('top', '0px', 'important');
-}
-
 function applyThemeIcon(theme) {
     var icon = document.getElementById('theme-icon');
     if (!icon) return;
@@ -411,56 +278,6 @@ function toggleTheme() {
 
 document.addEventListener("DOMContentLoaded", function() {
     applyThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
-
-    const saved = localStorage.getItem("googtrans");
-
-    if (saved) {
-        const wait = setInterval(function () {
-            const combo = document.querySelector(".goog-te-combo");
-            if (combo) {
-                clearInterval(wait);
-                combo.value = saved.split("/")[2];
-                combo.dispatchEvent(new Event("change"));
-            }
-        }, 100);
-    }
-  
-    if (!isUserLoggedIn && !localStorage.getItem("safhasahar_popup_shown_once")) {
-        document.getElementById("custom-lang-switcher").classList.add('show');
-        localStorage.setItem("safhasahar_popup_shown_once", "true");
-    }
-
-    forceHideGoogleBanner();
-    setInterval(forceHideGoogleBanner, 150);
-
-    var bannerObserver = new MutationObserver(forceHideGoogleBanner);
-    bannerObserver.observe(document.body, { childList: true, subtree: false });
-
-    var attempts = 0;
-    var checkDropdown = setInterval(function() {
-        var selectElem = document.querySelector('.goog-te-combo');
-        attempts++;
-        if (selectElem) {
-            clearInterval(checkDropdown);
-            selectElem.addEventListener('change', function () {
-                localStorage.setItem("googtrans", "/en/" + selectElem.value);
-                document.cookie = "googtrans=/en/" + selectElem.value + ";path=/";
-                document.getElementById("custom-lang-switcher").classList.remove("show");
-            });
-        } else if (attempts > 100) {
-            clearInterval(checkDropdown);
-            window.__ssTranslateLoadFailed = true;
-            // Widget kailei aayena — khali popup deखाउनुको satta bandha
-            // garne ra user lai clear message dine. Yesले "page change
-            // pachi khali box aauxa" wala confusion hataucha.
-            var switcher = document.getElementById("custom-lang-switcher");
-            if (switcher && switcher.classList.contains('show')) {
-                switcher.classList.remove('show');
-                showToast('Translate service unavailable right now — try hard refreshing.', 'warning');
-            }
-            console.warn("Google Translate widget failed to load.");
-        }
-    }, 100); 
 });
 </script>
 
@@ -560,40 +377,6 @@ document.addEventListener("DOMContentLoaded", function() {
         return out + s.slice(p);
     };
 
-    // Shared skeleton-loader for any table whose rows are populated via
-    // fetch()/htmx AFTER the page has already rendered (as opposed to
-    // Django-rendered tables, which have real data on first paint and
-    // don't need this). Swaps a plain "Loading..." placeholder for a
-    // shimmering set of placeholder rows while the real fetch is in
-    // flight — call it right before kicking off that fetch, then
-    // overwrite tbody.innerHTML again once the real data arrives.
-    //
-    // tbody:      the <tbody> element to fill.
-    // columns:    either a number (how many <td> per row, evenly styled)
-    //             or an array of column configs, e.g.
-    //             [{}, {width:'40%'}, {width:'70%'}] to hint bar widths
-    //             per column (falls back to a repeating pattern otherwise).
-    // rowCount:   how many placeholder rows to show (default 4).
-    window.renderSkeletonRows = function renderSkeletonRows(tbody, columns, rowCount) {
-        if (!tbody) return;
-        rowCount = rowCount || 4;
-        const cols = Array.isArray(columns)
-            ? columns
-            : Array.from({ length: columns }, () => ({}));
-        const fallbackWidths = ['85%', '60%', '75%', '45%', '65%'];
-
-        let html = '';
-        for (let r = 0; r < rowCount; r++) {
-            html += '<tr class="skeleton-row">';
-            cols.forEach(function (col, i) {
-                const width = col.width || fallbackWidths[i % fallbackWidths.length];
-                html += '<td><span class="skeleton-bar" style="width:' + width + ';"></span></td>';
-            });
-            html += '</tr>';
-        }
-        tbody.innerHTML = html;
-    };
-
     // Called from profile.html right after a successful Save Changes, so the
     // navbar avatar (top-right dropdown) updates instantly without a page
     // refresh. `url` can be a real server URL or a local base64 data URL —
@@ -645,199 +428,6 @@ document.addEventListener("DOMContentLoaded", function() {
             return false;
         }
     };
-})();
-</script>
-
-<!-- OFFLINE SUPPORT: service worker registration + IndexedDB request queue.
-     Available to EVERYONE (guests included), since the two actions worth
-     queuing offline — a guest/user submitting a pickup request, and a
-     driver updating a job's status — both happen outside (or alongside)
-     the authenticated-only script block below. -->
-<script>
-(function () {
-    // ── Service worker registration ─────────────────────────────────────
-    // Registered at '/sw.js' (root scope) — see api_app... actually
-    // web_app's ServiceWorkerView, which serves the file with the app
-    // root as its scope so it can control every page, not just /static/.
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
-            navigator.serviceWorker.register('/sw.js').then(function (reg) {
-                console.log('SafhaSahar service worker registered:', reg.scope);
-            }).catch(function (err) {
-                console.warn('Service worker registration failed:', err);
-            });
-        });
-    }
-
-    // ── Offline request queue (IndexedDB) ───────────────────────────────
-    // Deliberately narrow scope: this is for the two actions that matter
-    // most for field usage on patchy mobile data —
-    //   1. Guest/user submitting a new pickup request (home.html)
-    //   2. Driver updating a request's status (driver_dashboard.html)
-    // Both send small JSON bodies, so this queue only supports JSON
-    // payloads (no FormData/file uploads — offline photo upload was
-    // scoped out as a stretch item, see prior discussion).
-    const DB_NAME = 'safhasahar_offline';
-    const DB_VERSION = 1;
-    const STORE_NAME = 'outbox';
-
-    function openDB() {
-        return new Promise((resolve, reject) => {
-            if (!('indexedDB' in window)) {
-                reject(new Error('IndexedDB not supported'));
-                return;
-            }
-            const req = indexedDB.open(DB_NAME, DB_VERSION);
-            req.onupgradeneeded = function (e) {
-                const db = e.target.result;
-                if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-                }
-            };
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
-        });
-    }
-
-    // item: { url, method, headers (plain object, optional), body (plain
-    // JS object, optional), label (string shown in sync toasts, optional) }
-    async function enqueue(item) {
-        const db = await openDB();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(STORE_NAME, 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            const record = Object.assign({ createdAt: Date.now() }, item);
-            const req = store.add(record);
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
-        });
-    }
-
-    async function getAll() {
-        const db = await openDB();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(STORE_NAME, 'readonly');
-            const store = tx.objectStore(STORE_NAME);
-            const req = store.getAll();
-            req.onsuccess = () => resolve(req.result || []);
-            req.onerror = () => reject(req.error);
-        });
-    }
-
-    async function removeItem(id) {
-        const db = await openDB();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(STORE_NAME, 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            const req = store.delete(id);
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
-        });
-    }
-
-    async function count() {
-        try {
-            const db = await openDB();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(STORE_NAME, 'readonly');
-                const store = tx.objectStore(STORE_NAME);
-                const req = store.count();
-                req.onsuccess = () => resolve(req.result || 0);
-                req.onerror = () => reject(req.error);
-            });
-        } catch (e) {
-            return 0;
-        }
-    }
-
-    let flushing = false;
-    async function flush() {
-        if (flushing || !navigator.onLine) {
-            return { synced: 0, remaining: await count() };
-        }
-        flushing = true;
-        let synced = 0;
-        try {
-            const items = await getAll();
-            // Oldest first, so queued actions replay in the order they
-            // were originally made.
-            items.sort((a, b) => a.createdAt - b.createdAt);
-
-            for (const item of items) {
-                try {
-                    const headers = Object.assign(
-                        { 'Content-Type': 'application/json' },
-                        item.headers || {}
-                    );
-
-                    // Re-fetch a fresh access token at sync time rather than
-                    // reusing whatever was captured while offline — the
-                    // queued item may have sat for a while and that token
-                    // could have expired in the meantime.
-                    if (headers.Authorization && typeof getFreshAccessTokenForSockets === 'function') {
-                        const fresh = await getFreshAccessTokenForSockets();
-                        if (fresh) headers.Authorization = 'Bearer ' + fresh;
-                    }
-
-                    const res = await fetch(item.url, {
-                        method: item.method || 'POST',
-                        headers,
-                        body: item.body !== undefined ? JSON.stringify(item.body) : undefined,
-                    });
-
-                    if (res.ok) {
-                        await removeItem(item.id);
-                        synced++;
-                    } else if (res.status >= 400 && res.status < 500) {
-                        // Server rejected it outright (bad data, auth that
-                        // couldn't be refreshed, etc.) — retrying forever
-                        // won't fix that, so drop it and say so.
-                        await removeItem(item.id);
-                        showToast(
-                            'Could not sync a saved action' + (item.label ? (' (' + item.label + ')') : '') + ' — it was discarded.',
-                            'danger'
-                        );
-                    } else {
-                        // 5xx or similar transient server-side failure —
-                        // leave it queued, try again on the next pass.
-                        break;
-                    }
-                } catch (e) {
-                    // Network failed again mid-flush — stop here, the
-                    // 'online' listener / interval below will retry later.
-                    break;
-                }
-            }
-        } finally {
-            flushing = false;
-        }
-        return { synced, remaining: await count() };
-    }
-
-    window.OfflineQueue = { enqueue, getAll, remove: removeItem, count, flush };
-
-    window.addEventListener('online', function () {
-        flush().then(({ synced }) => {
-            if (synced > 0) {
-                showToast('Back online — synced ' + synced + ' saved item(s).', 'success');
-            }
-        }).catch((e) => console.warn('OfflineQueue: flush on reconnect failed', e));
-    });
-
-    // Periodic retry: some mobile browsers are unreliable about firing the
-    // 'online' event even once connectivity genuinely returns, so this
-    // covers that gap.
-    setInterval(function () {
-        if (navigator.onLine) {
-            flush().then(({ synced }) => {
-                if (synced > 0) showToast('Synced ' + synced + ' saved item(s).', 'success');
-            }).catch(() => {});
-        }
-    }, 20000);
-
-    document.addEventListener('DOMContentLoaded', function () {
-        flush().catch(() => {});
-    });
 })();
 </script>
 
@@ -902,7 +492,6 @@ if (!window.__ssAuthScriptLoaded) {
             return null;
         }
     }
-    window.getFreshAccessTokenForSockets = getFreshAccessTokenForSockets;
 
     async function apiFetch(method, url, data = null) {
         let token = localStorage.getItem('access_token');
