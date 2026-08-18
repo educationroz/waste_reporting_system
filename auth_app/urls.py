@@ -1,30 +1,6 @@
 from django.urls import path
 
-from .views import (
-    AdminComplaintListView,
-    AdminDashboardView,
-    AdminDriverListView,
-    AdminRequestListView,
-    AdminScheduleListView,
-    AdminVehicleListView,
-    AdminUsersManagementView,
-    AdminLogsView,
-    AdminSettingsView,
-    DriverDashboardView,
-    ForgotPasswordPageView,
-    HomeView,
-    LoginPageView,
-    ProfilePageView,
-    NotificationsView,
-    RegisterPageView,
-    ResetPasswordPageView,
-    RoutePlanningView,
-    ServiceWorkerView,
-    UserRecycleBinView,
-    UserRequestListView,
-    UserComplaintListView,
-    web_logout,
-)
+from .views import *
 
 urlpatterns = [
     path('login/',           CustomTokenObtainPairView.as_view(),  name='auth-login'),
