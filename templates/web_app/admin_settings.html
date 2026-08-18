@@ -912,7 +912,7 @@
     </div>
   </div>
 </div>
-{% endblock %}} {% block extra_js %}
+{% endblock %} {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   (function () {
@@ -1562,13 +1562,8 @@
       }
     }
 
-<<<<<<< HEAD
-=======
-    // Delete selected checkpoints one by one
-   // Delete selected checkpoints — euta-euta request nagari, sabai id
-    // euटै bulk_delete request मा euta pataka pathaउँछ। Pahile jasto loop
-    // ma euta-euta DELETE le dherai checkpoint bhaye throttle (429) bhatकिन्थ्यो।
->>>>>>> 00bb5094acf1cb5e98cc0d4953e2a00984fafeac
+    // Delete selected checkpoints — sends all ids in a single bulk_delete
+    // request instead of one-by-one, avoiding per-checkpoint throttling (429).
     async function deleteSelectedCheckpoints() {
       const selectedCheckboxes = Array.from(
         document.querySelectorAll(".checkpoint-select:checked"),
@@ -1609,46 +1604,9 @@
           body: JSON.stringify({ ids }),
         });
 
-<<<<<<< HEAD
-            for (let attempt = 0; attempt < 3; attempt++) {
-              const res = await fetch(`/api/checkpoints/${id}/`, {
-                method: "DELETE",
-                headers: {
-                  Authorization: `Bearer ${getToken()}`,
-                },
-              });
-
-              if (res.ok || res.status === 204) {
-                success = true;
-                break;
-              }
-
-              if (res.status === 429) {
-                await new Promise((resolve) =>
-                  setTimeout(resolve, 700 * (attempt + 1)),
-                );
-                continue;
-              }
-
-              break;
-            }
-
-            if (success) {
-              deleted++;
-            } else {
-              failed++;
-            }
-          } catch (error) {
-            console.error(`Failed to delete checkpoint ${id}:`, error);
-            failed++;
-          }
-
-          await new Promise((resolve) => setTimeout(resolve, 150));
-=======
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           throw new Error(err.error || "Bulk deletion failed.");
->>>>>>> 00bb5094acf1cb5e98cc0d4953e2a00984fafeac
         }
 
         const data = await res.json();
