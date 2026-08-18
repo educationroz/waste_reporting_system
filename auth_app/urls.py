@@ -18,8 +18,8 @@ from .views import (
 
 urlpatterns = [
     path('login/',           CustomTokenObtainPairView.as_view(),  name='auth-login'),
-    path('google-login/',    GoogleLoginView.as_view(),            name='auth-google-login'),
-    path('token/refresh/',   CustomTokenRefreshView.as_view(),     name='auth-token-refresh'),
+    path('token/refresh/',   CustomTokenRefreshView.as_view(),     name='token-refresh'),
+    path('google-login/',    GoogleLoginView.as_view(),            name='google-login'),
     path('register/',        RegisterView.as_view(),              name='auth-register'),
     path('logout/',          LogoutView.as_view(),                name='auth-logout'),
     path('profile/',         ProfileView.as_view(),               name='auth-profile'),
