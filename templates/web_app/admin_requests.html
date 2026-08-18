@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Admin - Requests Management{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Admin - Requests Management" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -134,8 +135,8 @@
 
             <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold"><i class="bi bi-clipboard-list text-success me-2"></i>Requests Management</h2>
-                    <p class="text-muted mb-0">Evaluate citizen pick-up requests, filter pipeline segments, and dispatch operational field units.</p>
+                    <h2 class="mb-1 fw-bold"><i class="bi bi-clipboard-list text-success me-2"></i>{% trans "Requests Management" %}</h2>
+                    <p class="text-muted mb-0">{% trans "Evaluate citizen pick-up requests, filter pipeline segments, and dispatch operational field units." %}</p>
                 </div>
             </div>
 
@@ -144,22 +145,22 @@
                     <form method="get" class="row g-3" id="requests-filter-form">
 
                         <div class="col-lg-6 col-md-12">
-                            <label class="form-label small fw-semibold text-secondary mb-1">Search Requests</label>
+                            <label class="form-label small fw-semibold text-secondary mb-1">{% trans "Search Requests" %}</label>
                             <div class="input-group">
                                 <span class="input-group-text border-end-0">
                                     <i class="bi bi-search"></i>
                                 </span>
                                 <input type="text" name="search" class="form-control border-start-0 ps-0"
-                                       placeholder="Search by Citizen name, Request ID"
+                                       placeholder="{% trans 'Search by Citizen name, Request ID' %}"
                                        value="{{ current_search|default:'' }}" style="font-size: 0.9rem;">
-                                <button class="btn btn-success px-4" type="submit">Search</button>
+                                <button class="btn btn-success px-4" type="submit">{% trans "Search" %}</button>
                             </div>
                         </div>
 
                         <div class="col-lg-3 col-md-6 col-sm-12">
-                            <label class="form-label small fw-semibold text-secondary mb-1">Filter Pipeline Lifecycle</label>
+                            <label class="form-label small fw-semibold text-secondary mb-1">{% trans "Filter Pipeline Lifecycle" %}</label>
                             <select name="status" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').requestSubmit()">
-                                <option value="">All Lifecycles / Statuses</option>
+                                <option value="">{% trans "All Lifecycles / Statuses" %}</option>
                                 {% for key, label in status_choices %}
                                 <option value="{{ key }}" {% if current_status == key %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
@@ -167,9 +168,9 @@
                         </div>
 
                         <div class="col-lg-3 col-md-6 col-sm-12">
-                            <label class="form-label small fw-semibold text-secondary mb-1">Filter Waste Type</label>
+                            <label class="form-label small fw-semibold text-secondary mb-1">{% trans "Filter Waste Type" %}</label>
                             <select name="waste_type" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').requestSubmit()">
-                                <option value="">All Waste Types</option>
+                                <option value="">{% trans "All Waste Types" %}</option>
                                 {% for key, label in waste_type_choices %}
                                 <option value="{{ key }}" {% if current_waste_type == key %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
@@ -177,22 +178,22 @@
                         </div>
 
                         <div class="col-lg-3 col-md-6 col-sm-12">
-                            <label class="form-label small fw-semibold text-secondary mb-1">Filter Report Date</label>
+                            <label class="form-label small fw-semibold text-secondary mb-1">{% trans "Filter Report Date" %}</label>
                             <input type="date" name="report_date" class="form-control" value="{{ current_report_date|default:'' }}"
                                    style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').requestSubmit()">
                         </div>
                         <div class="col-lg-3 col-md-6 col-sm-12">
-                            <label class="form-label small fw-semibold text-secondary mb-1">Needs Review</label>
+                            <label class="form-label small fw-semibold text-secondary mb-1">{% trans "Needs Review" %}</label>
                             <select name="needs_review" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').requestSubmit()">
-                                <option value="">All Requests</option>
-                                <option value="true" {% if current_needs_review == 'true' %}selected{% endif %}>Flagged for Review Only</option>
+                                <option value="">{% trans "All Requests" %}</option>
+                                <option value="true" {% if current_needs_review == 'true' %}selected{% endif %}>{% trans "Flagged for Review Only" %}</option>
                             </select>
                         </div>
 
                         {% if current_status or current_search or current_waste_type or current_report_date or current_needs_review %}
                         <div class="col-12 mt-2 text-end">
                             <a href="{% url 'admin-requests' %}" class="btn btn-sm btn-outline-secondary px-3">
-                                <i class="bi bi-x-circle me-1"></i>Clear All Active Filters
+                                <i class="bi bi-x-circle me-1"></i>{% trans "Clear All Active Filters" %}
                             </a>
                         </div>
                         {% endif %}
@@ -202,28 +203,28 @@
 
             <div class="card dashboard-card">
                 <div class="card-header py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>Dispatched Manifest & Pipeline Streams</h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>{% trans "Dispatched Manifest & Pipeline Streams" %}</h6>
                     <div class="d-flex flex-wrap align-items-center gap-2">
                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportFilteredRequests()">
-                            <i class="bi bi-download me-1"></i>Export Filtered (CSV)
+                            <i class="bi bi-download me-1"></i>{% trans "Export Filtered (CSV)" %}
                         </button>
                     </div>
                 </div>
 
                 {# ===== BULK ACTION TOOLBAR — only visible once rows are checked ===== #}
                 <div id="bulk-toolbar" class="d-none align-items-center gap-2 px-3 py-2 border-bottom bulk-toolbar">
-                    <span class="fw-semibold small"><span id="bulk-selected-count">0</span> selected</span>
+                    <span class="fw-semibold small"><span id="bulk-selected-count">0</span> {% trans "selected" %}</span>
                     <button type="button" class="btn btn-sm btn-success" onclick="openBulkAssignModal()">
-                        <i class="bi bi-person-plus me-1"></i>Assign Driver
+                        <i class="bi bi-person-plus me-1"></i>{% trans "Assign Driver" %}
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-danger" onclick="bulkCancelSelected()">
-                        <i class="bi bi-slash-circle me-1"></i>Cancel Selected
+                        <i class="bi bi-slash-circle me-1"></i>{% trans "Cancel Selected" %}
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportSelectedRequests()">
-                        <i class="bi bi-download me-1"></i>Export Selected (CSV)
+                        <i class="bi bi-download me-1"></i>{% trans "Export Selected (CSV)" %}
                     </button>
                     <button type="button" class="btn btn-sm btn-link text-muted ms-auto" onclick="clearRequestSelection()">
-                        Clear selection
+                        {% trans "Clear selection" %}
                     </button>
                 </div>
 
@@ -235,17 +236,17 @@
                                     <th style="width: 2.5rem;">
                                         <input type="checkbox" class="form-check-input" id="select-all-requests" onchange="toggleSelectAllRequests(this)">
                                     </th>
-                                    <th># ID</th>
-                                    <th>Citizen User</th>
-                                    <th>Waste Vector Classification</th>
-                                    <th>Waste Photo</th>
-                                    <th>AI Severity</th>
-                                    <th>Geospatial Address Context</th>
-                                    <th>Status Sign</th>
-                                    <th>Submitted Date</th>
-                                    <th>Assigned Logistics Crew</th>
-                                    <th class="text-end pe-4">Pipeline Action Dispatch</th>
-                                    <th> Action Control </th>
+                                    <th>{% trans "# ID" %}</th>
+                                    <th>{% trans "Citizen User" %}</th>
+                                    <th>{% trans "Waste Vector Classification" %}</th>
+                                    <th>{% trans "Waste Photo" %}</th>
+                                    <th>{% trans "AI Severity" %}</th>
+                                    <th>{% trans "Geospatial Address Context" %}</th>
+                                    <th>{% trans "Status Sign" %}</th>
+                                    <th>{% trans "Submitted Date" %}</th>
+                                    <th>{% trans "Assigned Logistics Crew" %}</th>
+                                    <th class="text-end pe-4">{% trans "Pipeline Action Dispatch" %}</th>
+                                    <th> {% trans "Action Control" %} </th>
                                 </tr>
                             </thead>
                             <tbody id="requests-table-body">
@@ -259,7 +260,7 @@
                                     {% if req.user %}
                                     <td class="fw-semibold">{{ req.user.username }}</td>
                                     {% else %}
-                                    <td class="fw-semibold"><i class="bi bi-person-x me-1"></i> Guest</td>
+                                    <td class="fw-semibold"><i class="bi bi-person-x me-1"></i> {% trans "Guest" %}</td>
                                     {% endif %}
                                     <td>
                                         <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-10 px-2.5 py-1">
@@ -273,7 +274,7 @@
                                         {% if req.photo or extra %}
                                             <div class="photo-thumb-wrapper" onclick="openPhotoGallery({{ req.id }})">
                                                 <img src="{% if req.photo %}{{ req.photo.url }}{% else %}{{ extra.0.photo.url }}{% endif %}"
-                                                     alt="Waste Photo"
+                                                     alt="{% trans 'Waste Photo' %}"
                                                      class="rounded"
                                                      style="width: 60px; height: 60px; object-fit: cover; cursor: pointer;">
                                                 {% if req.photo and extra %}
@@ -288,7 +289,7 @@
                                                  data-photos='[{% if req.photo %}"{{ req.photo.url|escapejs }}"{% if extra %},{% endif %}{% endif %}{% for p in extra %}"{{ p.photo.url|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}]'>
                                             </div>
                                         {% else %}
-                                            <span class="text-muted small"><i class="bi bi-image me-1"></i>No Photo</span>
+                                            <span class="text-muted small"><i class="bi bi-image me-1"></i>{% trans "No Photo" %}</span>
                                         {% endif %}
                                         {% endwith %}
                                     </td>
@@ -307,30 +308,35 @@
                                                     {{ req.get_severity_display }}
                                                 </span>
                                                 {% if req.needs_manual_review %}
-                                                    <span class="review-flag text-warning" title="Low ML confidence ({{ req.ml_confidence }}%) — recommend manual verification">
+                                                    <span class="review-flag text-warning" title="{% blocktrans with confidence=req.ml_confidence %}Low ML confidence ({{ confidence }}%) — recommend manual verification{% endblocktrans %}">
                                                         <i class="bi bi-question-circle-fill"></i>
                                                     </span>
                                                 {% endif %}
                                             </div>
                                             {% if req.ml_confidence %}
-                                                <div class="text-muted" style="font-size: 0.68rem;">{{ req.ml_confidence }}% confidence</div>
+                                                {% comment %}
+                                                    The "%" sign is kept OUTSIDE the trans tag on purpose: Django escapes a
+                                                    literal "%" in a msgid to "%%" for its string-interpolation machinery, so
+                                                    a msgid starting with "%" never matches the catalog and stays English.
+                                                {% endcomment %}
+                                                <div class="text-muted" style="font-size: 0.68rem;">{{ req.ml_confidence }}% {% trans "confidence" %}</div>
                                             {% endif %}
                                             {# ===== REVIEW ACTIONS — only shown while needs_manual_review is True ===== #}
                                             {% if req.needs_manual_review %}
                                             <div class="d-flex gap-1 mt-1" id="review-actions-{{ req.id }}">
                                                 <button class="btn btn-outline-success py-0 px-1" style="font-size: 0.68rem;"
-                                                    onclick="resolveReview({{ req.id }}, 'approve', this)" title="Confirm this is real waste">
-                                                    <i class="bi bi-check-lg"></i> Approve
+                                                    onclick="resolveReview({{ req.id }}, 'approve', this)" title="{% trans 'Confirm this is real waste' %}">
+                                                    <i class="bi bi-check-lg"></i> {% trans "Approve" %}
                                                 </button>
                                                 <button class="btn btn-outline-danger py-0 px-1" style="font-size: 0.68rem;"
-                                                    onclick="resolveReview({{ req.id }}, 'reject', this)" title="Confirm this is NOT waste — cancels the request">
-                                                    <i class="bi bi-x-lg"></i> Reject
+                                                    onclick="resolveReview({{ req.id }}, 'reject', this)" title="{% trans 'Confirm this is NOT waste — cancels the request' %}">
+                                                    <i class="bi bi-x-lg"></i> {% trans "Reject" %}
                                                 </button>
                                             </div>
                                             {% endif %}
                                             {# ===== END REVIEW ACTIONS ===== #}
                                         {% else %}
-                                            <span class="text-muted small"><i class="bi bi-dash-circle me-1"></i>Not Scanned</span>
+                                            <span class="text-muted small"><i class="bi bi-dash-circle me-1"></i>{% trans "Not Scanned" %}</span>
                                         {% endif %}
                                     </td>
 
@@ -355,7 +361,7 @@
                                         {% if req.completion_flagged %}
                                         <span class="badge bg-danger text-white mt-1 d-inline-flex align-items-center gap-1 location-mismatch-badge"
                                               title="Driver was ~{{ req.completion_distance_meters|floatformat:0 }}m away from the reported pickup location when marking this completed. Consider verifying with the driver.">
-                                            <i class="bi bi-exclamation-triangle-fill"></i>Location Mismatch ({{ req.completion_distance_meters|floatformat:0 }}m)
+                                            <i class="bi bi-exclamation-triangle-fill"></i>{% trans "Location Mismatch" %}({{ req.completion_distance_meters|floatformat:0 }}m)
                                         </span>
                                         {% endif %}
                                         {# ===== END LOCATION MISMATCH FLAG ===== #}
@@ -367,13 +373,13 @@
                                             <div><i class="bi bi-person me-1 text-success"></i>{{ req.driver.user.username }}</div>
                                         {% else %}
                                             <div class="d-flex flex-column gap-1 align-items-start">
-                                                <span class="text-muted small italic"><i class="bi bi-exclamation-circle me-1"></i>Unassigned</span>
+                                                <span class="text-muted small italic"><i class="bi bi-exclamation-circle me-1"></i>{% trans "Unassigned" %}</span>
                                                 {% if req.status != 'completed' and req.status != 'cancelled' and not req.needs_manual_review %}
                                                 <button class="btn btn-sm btn-outline-success py-1 px-2" style="font-size: 0.75rem;" onclick="openAssignModal({{ req.id }})">
-                                                    <i class="bi bi-person-plus me-1"></i>Assign Driver
+                                                    <i class="bi bi-person-plus me-1"></i>{% trans "Assign Driver" %}
                                                 </button>
                                                 {% elif req.needs_manual_review %}
-                                                <span class="text-muted small" style="font-size: 0.7rem;"><i class="bi bi-hourglass-split me-1"></i>Awaiting Review</span>
+                                                <span class="text-muted small" style="font-size: 0.7rem;"><i class="bi bi-hourglass-split me-1"></i>{% trans "Awaiting Review" %}</span>
                                                 {% endif %}
                                             </div>
                                         {% endif %}
@@ -382,21 +388,21 @@
                                         <div class="d-inline-flex gap-2">
                                             {% if req.status == 'pending' %}
                                             <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="cancelRequest({{ req.id }}, this)">
-                                                <i class="bi bi-slash-circle me-1"></i>Cancel
+                                                <i class="bi bi-slash-circle me-1"></i>{% trans "Cancel" %}
                                             </button>
                                             {% else %}
                                             {% if req.status == 'completed' or req.status == 'cancelled' %}
-                                            <span class="text-muted small italic px-2">Lifecycle Locked</span>
+                                            <span class="text-muted small italic px-2">{% trans "Lifecycle Locked" %}</span>
                                             {% endif %}
                                             {% endif %}
                                         </div>
                                     </td>
                                     <td>
                                         {% if req.needs_manual_review %}
-                                        <span class="text-muted small" title="Resolve the AI review flag before deleting">—</span>
+                                        <span class="text-muted small" title="{% trans 'Resolve the AI review flag before deleting' %}">—</span>
                                         {% elif req.status == 'completed' or req.status == 'cancelled' or req.status == 'assigned' or req.status == 'in_progress' %}
                                         <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }}, this)">
-                                            <i class="bi bi-trash3"></i> Delete
+                                            <i class="bi bi-trash3"></i> {% trans "Delete" %}
                                         </button>
                                         {% else %}
                                         —
@@ -404,7 +410,7 @@
                                     </td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>
+                                <tr><td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>{% trans "No request manifests mapped inside this filtered vector block." %}</td></tr>
 
                                 {% endfor %}
                             </tbody>
@@ -420,13 +426,13 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-shield-plus me-2"></i>Dispatch Operator Node</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-shield-plus me-2"></i>{% trans "Dispatch Operator Node" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <input type="hidden" id="modal-request-id">
                 <div class="mb-2">
-                    <label class="form-label fw-semibold text-secondary">Select Active Field Driver</label>
+                    <label class="form-label fw-semibold text-secondary">{% trans "Select Active Field Driver" %}</label>
                     <select id="modal-driver-select" class="form-select form-select-lg" style="font-size: 0.95rem;">
                         {% for driver in drivers %}
                         <option value="{{ driver.id }}">{{ driver.user.username }} — [{{ driver.vehicle.plate_number|default:"No Asset Machine Linked" }}]</option>
@@ -435,8 +441,8 @@
                 </div>
             </div>
             <div class="modal-footer bg-surface-alt">
-                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success px-4" onclick="assignDriver(this)">Confirm Dispatch</button>
+                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button class="btn btn-success px-4" onclick="assignDriver(this)">{% trans "Confirm Dispatch" %}</button>
             </div>
         </div>
     </div>
@@ -447,16 +453,15 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-people-fill me-2"></i>Bulk Assign Driver</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-people-fill me-2"></i>{% trans "Bulk Assign Driver" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <p class="text-muted small mb-3">
-                    Assigning to <strong id="bulk-assign-count">0</strong> selected request(s).
-                    Requests already completed/cancelled, or still awaiting AI review, will be skipped automatically.
+                    {% trans "Assigning to" %} <strong id="bulk-assign-count">0</strong> {% trans "selected request(s). Requests already completed/cancelled, or still awaiting AI review, will be skipped automatically." %}
                 </p>
                 <div class="mb-2">
-                    <label class="form-label fw-semibold text-secondary">Select Active Field Driver</label>
+                    <label class="form-label fw-semibold text-secondary">{% trans "Select Active Field Driver" %}</label>
                     <select id="bulk-assign-driver-select" class="form-select form-select-lg" style="font-size: 0.95rem;">
                         {% for driver in drivers %}
                         <option value="{{ driver.id }}">{{ driver.user.username }} — [{{ driver.vehicle.plate_number|default:"No Asset Machine Linked" }}]</option>
@@ -465,8 +470,8 @@
                 </div>
             </div>
             <div class="modal-footer bg-surface-alt">
-                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success px-4" onclick="submitBulkAssign(this)">Confirm Bulk Dispatch</button>
+                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button class="btn btn-success px-4" onclick="submitBulkAssign(this)">{% trans "Confirm Bulk Dispatch" %}</button>
             </div>
         </div>
     </div>
@@ -478,7 +483,7 @@
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-images me-2"></i>Waste Photos</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-images me-2"></i>{% trans "Waste Photos" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-3">
@@ -501,7 +506,7 @@ const assignModalEl = document.getElementById('assignModal');
 function getAssignModal() {
     if (typeof bootstrap === 'undefined') {
         console.error('Bootstrap JS failed to load — modal cannot open.');
-        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        showToast(gettext('A page resource failed to load. Please refresh and try again.'), 'danger');
         return null;
     }
     return bootstrap.Modal.getOrCreateInstance(assignModalEl);
@@ -517,11 +522,11 @@ const STATUS_BADGE_CLASS = {
 };
 
 const STATUS_LABELS = {
-    completed: 'Completed',
-    pending: 'Pending',
-    in_progress: 'In Progress',
-    cancelled: 'Cancelled',
-    assigned: 'Assigned',
+    completed: gettext('Completed'),
+    pending: gettext('Pending'),
+    in_progress: gettext('In Progress'),
+    cancelled: gettext('Cancelled'),
+    assigned: gettext('Assigned'),
 };
 
 window.openAssignModal = function(requestId) {
@@ -541,7 +546,7 @@ window.assignDriver = async function(btn) {
     await withButtonBusy(eventButton(btn), 'Assigning...', async () => {
     const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
     if (data && data.id) {
-        showToast('Driver assigned successfully to the route sequence!', 'success');
+        showToast(gettext('Driver assigned successfully to the route sequence!'), 'success');
         const modal = getAssignModal();
         if (modal) modal.hide();
         applyRequestRowUpdate(requestId, {
@@ -554,7 +559,7 @@ window.assignDriver = async function(btn) {
             showDelete: true,
         });
     } else {
-        showToast('Failed to patch driver assignment parameter.', 'danger');
+        showToast(gettext('Failed to patch driver assignment parameter.'), 'danger');
     }
     });
 };
@@ -626,7 +631,7 @@ window.openBulkAssignModal = function() {
     const el = document.getElementById('bulkAssignModal');
     if (typeof bootstrap === 'undefined') {
         console.error('Bootstrap JS failed to load — modal cannot open.');
-        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        showToast(gettext('A page resource failed to load. Please refresh and try again.'), 'danger');
         return;
     }
     bootstrap.Modal.getOrCreateInstance(el).show();
@@ -658,7 +663,7 @@ window.submitBulkAssign = async function(btn) {
             });
             clearRequestSelection();
         } else {
-            showToast('Bulk assignment failed.', 'danger');
+            showToast(gettext('Bulk assignment failed.'), 'danger');
         }
     });
 };
@@ -666,7 +671,7 @@ window.submitBulkAssign = async function(btn) {
 window.bulkCancelSelected = async function() {
     const ids = getSelectedRequestIds();
     if (!ids.length) return;
-    if (!confirm(`Cancel ${ids.length} selected request(s)? Only pending requests will be affected.`)) return;
+    if (!confirm(interpolate(gettext('Cancel %(v0)s selected request(s)? Only pending requests will be affected.'), {v0: ids.length}, true))) return;
 
     await withButtonBusy(null, '', async () => {
         const data = await API.post('/api/waste-requests/bulk_cancel/', { ids });
@@ -686,7 +691,7 @@ window.bulkCancelSelected = async function() {
             });
             clearRequestSelection();
         } else {
-            showToast('Bulk cancel failed.', 'danger');
+            showToast(gettext('Bulk cancel failed.'), 'danger');
         }
     });
 };
@@ -713,11 +718,11 @@ window.exportFilteredRequests = async function() {
 };
 
 window.cancelRequest = async function(requestId, btn) {
-    if (!confirm('Are you absolutely sure you want to cancel this municipal request matrix?')) return;
+    if (!confirm(gettext('Are you absolutely sure you want to cancel this municipal request matrix?'))) return;
     await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
     const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
     if (data && data.id) {
-        showToast('Operational collection request has been cancelled.', 'success');
+        showToast(gettext('Operational collection request has been cancelled.'), 'success');
         applyRequestRowUpdate(requestId, {
             statusKey: 'cancelled',
             driverHtml: null, // driver cell jasтैको chha teसैं rahos
@@ -733,18 +738,18 @@ window.cancelRequest = async function(requestId, btn) {
         const assignBtn = driverCell ? driverCell.querySelector('button') : null;
         if (assignBtn) assignBtn.remove();
     } else {
-        showToast('Failed to drop request pipeline node state.', 'danger');
+        showToast(gettext('Failed to drop request pipeline node state.'), 'danger');
     }
     });
 };
 
 window.deleteRequest = async function(requestId, btn) {
-    if (!confirm("Are you sure you want to delete this request?")) return;
+    if (!confirm(gettext("Are you sure you want to delete this request?"))) return;
 
     await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {
         await API.delete(`/api/waste-requests/${requestId}/`);
-        showToast("Request deleted successfully.", "success");
+        showToast(gettext("Request deleted successfully."), "success");
         const row = document.getElementById(`request-row-${requestId}`);
         if (row) row.remove();
 
@@ -754,7 +759,7 @@ window.deleteRequest = async function(requestId, btn) {
         }
     } catch (err) {
         console.error(err);
-        showToast("Delete failed.", "danger");
+        showToast(gettext("Delete failed."), "danger");
     }
     });
 };
@@ -791,9 +796,9 @@ window.resolveReview = async function(requestId, decision, btn) {
                     const wrapper = driverCell.querySelector('.d-flex.flex-column');
                     if (wrapper) {
                         wrapper.innerHTML = `
-                            <span class="text-muted small italic"><i class="bi bi-exclamation-circle me-1"></i>Unassigned</span>
+                            <span class="text-muted small italic"><i class="bi bi-exclamation-circle me-1"></i>${gettext('Unassigned')}</span>
                             <button class="btn btn-sm btn-outline-success py-1 px-2" style="font-size: 0.75rem;" onclick="openAssignModal(${requestId})">
-                                <i class="bi bi-person-plus me-1"></i>Assign Driver
+                                <i class="bi bi-person-plus me-1"></i>${gettext('Assign Driver')}
                             </button>`;
                     }
                 }
@@ -815,7 +820,7 @@ window.resolveReview = async function(requestId, decision, btn) {
                 });
             }
         } else {
-            showToast('Failed to resolve review.', 'danger');
+            showToast(gettext('Failed to resolve review.'), 'danger');
         }
     });
 };
@@ -849,7 +854,7 @@ function applyRequestRowUpdate(requestId, { statusKey, driverHtml, actionHtml, s
     if (showDelete) {
         const controlCell = row.children[11];
         if (controlCell) {
-            controlCell.innerHTML = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${requestId}, this)"><i class="bi bi-trash3"></i> Delete</button>`;
+            controlCell.innerHTML = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${requestId}, this)"><i class="bi bi-trash3"></i> ${gettext('Delete')}</button>`;
         }
     }
 }
@@ -860,7 +865,7 @@ const photoGalleryModalEl = document.getElementById('photoGalleryModal');
 function getPhotoGalleryModal() {
     if (typeof bootstrap === 'undefined') {
         console.error('Bootstrap JS failed to load — modal cannot open.');
-        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        showToast(gettext('A page resource failed to load. Please refresh and try again.'), 'danger');
         return null;
     }
     return bootstrap.Modal.getOrCreateInstance(photoGalleryModalEl);

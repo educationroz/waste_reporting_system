@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Safha Sahar - Live Waste Reporting System</title>
+    <title>{% trans "Safha Sahar - Live Waste Reporting System" %}</title>
 
     <!-- Favicon & CSS Links -->
     <link rel="icon" type="image/png" href="{% static 'web_app/image/SafhaSahar.png' %}">
@@ -13,6 +13,31 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="{% static 'web_app/css/layout.css' %}?v=2" rel="stylesheet">
     <link href="{% static 'web_app/css/main.css' %}?v=2" rel="stylesheet">
+
+    <!--
+        JAVASCRIPT TRANSLATION CATALOG
+        Loads the compiled locale catalog for the active language and defines
+        the global gettext()/ngettext() helpers. Inline dashboard scripts wrap
+        their user-facing strings in gettext('...') so toasts, confirm()
+        prompts and JS-rebuilt table cells appear in Nepali too. The "trans"
+        template tag alone can't reach them, since it is evaluated when the
+        template renders, not when the script later builds the DOM.
+        Must load BEFORE any script that calls gettext().
+    -->
+    <script src="{% url 'javascript-catalog' %}"></script>
+    <script>
+        // Safety net: if the catalog request ever fails (offline, cache miss,
+        // service-worker hiccup), fall back to identity functions so a missing
+        // catalog degrades to plain English instead of throwing
+        // "gettext is not defined" and killing the whole inline script block.
+        window.gettext = window.gettext || function (s) { return s; };
+        window.ngettext = window.ngettext || function (s, p, n) { return n === 1 ? s : p; };
+        window.interpolate = window.interpolate || function (fmt, obj, named) {
+            return named
+                ? fmt.replace(/%\((\w+)\)s/g, function (m, k) { return String(obj[k]); })
+                : fmt.replace(/%s/g, function () { return String(obj.shift()); });
+        };
+    </script>
 
     <!-- HTMX + Head-Support Extension -->
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js"></script>
@@ -130,7 +155,7 @@
 <nav class="navbar navbar-light shadow-sm sticky-top" style="z-index: 1030;">
     <div class="container-fluid d-flex align-items-center flex-nowrap position-relative">
         <a class="navbar-brand notranslate d-flex align-items-center flex-shrink-1 me-2" href="/" translate="no" style="min-width:0;">
-            <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="Logo" width="40" height="40" class="d-inline-block align-text-top me-2 flex-shrink-0">
+            <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="{% trans 'Logo' %}" width="40" height="40" class="d-inline-block align-text-top me-2 flex-shrink-0">
             <span class="fw-semibold text-truncate" style="color: #25be27;">
                 <span class="d-none d-sm-inline">SafhaSahar</span>
                 
@@ -168,8 +193,18 @@
                         onchange="this.form.submit()" aria-label="{% trans 'Choose language' %}">
                     {% get_current_language as CURRENT_LANGUAGE %}
                     {% get_available_languages as AVAILABLE_LANGUAGES %}
-                    {% for lang_code, lang_name in AVAILABLE_LANGUAGES %}
-                        <option value="{{ lang_code }}" {% if lang_code == CURRENT_LANGUAGE %}selected{% endif %}>{{ lang_name }}</option>
+                    {% comment %}
+                        name_local = each language written in ITSELF ("English",
+                        "नेपाली") instead of translated into the active language.
+                        With the plain name, browsing in Nepali rendered the
+                        English option as "अंग्रेजी" — unreadable for exactly the
+                        person who needs it, someone who switched by accident and
+                        wants back. Endonyms keep both options recognisable in
+                        either language.
+                    {% endcomment %}
+                    {% get_language_info_list for AVAILABLE_LANGUAGES as languages %}
+                    {% for language in languages %}
+                        <option value="{{ language.code }}" {% if language.code == CURRENT_LANGUAGE %}selected{% endif %}>{{ language.name_local|capfirst }}</option>
                     {% endfor %}
                 </select>
             </form>
@@ -197,7 +232,7 @@
                         <span class="d-none d-lg-inline">{{ user.username }}</span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><span class="dropdown-item-text text-muted small">{{ user.role|capfirst }}</span></li>
+                        <li><span class="dropdown-item-text text-muted small">{{ user.get_role_display }}</span></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person-circle me-2"></i>{% trans 'View Profile' %}</a></li>
                         <li><hr class="dropdown-divider"></li>
@@ -252,7 +287,7 @@
 <!-- FOOTER -->
 <footer class="site-footer">
     <div class="text-center py-3 bg-light">
-        <small>&copy; Safha Sahar {% now "Y" %}. {% trans "All rights reserved." %} | RA Innovations</small>
+        <small>&copy; {% trans "Safha Sahar" %} {% now "Y" %}. {% trans "All rights reserved." %} | {% trans "RA Innovations" %}</small>
     </div>
 </footer>
 
@@ -424,7 +459,7 @@ document.addEventListener("DOMContentLoaded", function() {
             return true;
         } catch (e) {
             console.error('Download failed:', e);
-            if (typeof showToast === 'function') showToast('Network error during export.', 'danger');
+            if (typeof showToast === 'function') showToast(gettext('Network error during export.'), 'danger');
             return false;
         }
     };
@@ -723,7 +758,7 @@ if (!window.__ssAuthScriptLoaded) {
                 }
                 console.warn(label, event);
                 if (!window._notifReconnectWarned) {
-                    showToast('Connection lost — live updates paused', 'warning');
+                    showToast(gettext('Connection lost — live updates paused'), 'warning');
                     window._notifReconnectWarned = true;
                 }
                 scheduleNotifReconnect();
@@ -839,12 +874,12 @@ if (!window.__ssAuthScriptLoaded) {
     let _reloadTriggered = false;
     document.body.addEventListener('htmx:sendError', function(evt) {
         console.warn('htmx request failed to send:', evt.detail);
-        showToast('Request failed — please try again.', 'warning');
+        showToast(gettext('Request failed — please try again.'), 'warning');
     });
     document.body.addEventListener('htmx:responseError', function(evt) {
         if (evt.detail.xhr && evt.detail.xhr.status >= 500 && !_reloadTriggered) {
             _reloadTriggered = true;
-            showToast('Server error — reloading...', 'danger');
+            showToast(gettext('Server error — reloading...'), 'danger');
             setTimeout(() => window.location.reload(), 1000);
         }
     });

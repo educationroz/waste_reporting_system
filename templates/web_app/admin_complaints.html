@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Complaint Management{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Complaint Management" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -56,41 +57,41 @@
         <!-- MAIN CONTENT AREA -->
         <div class="content-col">
             <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
-                <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-megaphone text-success me-2"></i>Complaint Management</h2>
+                <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-megaphone text-success me-2"></i>{% trans "Complaint Management" %}</h2>
             </div>
 
             <div class="card dashboard-card">
                 <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
-                    <h6 class="mb-0 fw-bold">All Complaints</h6>
+                    <h6 class="mb-0 fw-bold">{% trans "All Complaints" %}</h6>
                     <div class="d-flex flex-wrap align-items-center gap-2">
                         <select id="status-filter" class="form-select form-select-sm w-auto" onchange="renderComplaints()">
-                            <option value="">All Statuses</option>
-                            <option value="pending">Pending</option>
-                            <option value="under_review">Under Review</option>
-                            <option value="completed">Completed</option>
+                            <option value="">{% trans "All Statuses" %}</option>
+                            <option value="pending">{% trans "Pending" %}</option>
+                            <option value="under_review">{% trans "Under Review" %}</option>
+                            <option value="completed">{% trans "Completed" %}</option>
                         </select>
                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportFilteredComplaints()">
-                            <i class="bi bi-download me-1"></i>Export (CSV)
+                            <i class="bi bi-download me-1"></i>{% trans "Export (CSV)" %}
                         </button>
                     </div>
                 </div>
 
                 {# ===== BULK ACTION TOOLBAR ===== #}
                 <div id="bulk-toolbar" class="d-none align-items-center gap-2 px-3 py-2 border-bottom bulk-toolbar">
-                    <span class="fw-semibold small"><span id="bulk-selected-count">0</span> selected</span>
+                    <span class="fw-semibold small"><span id="bulk-selected-count">0</span> {% trans "selected" %}</span>
                     <select id="bulk-status-select" class="form-select form-select-sm w-auto">
-                        <option value="pending">Pending</option>
-                        <option value="under_review">Under Review</option>
-                        <option value="completed">Completed</option>
+                        <option value="pending">{% trans "Pending" %}</option>
+                        <option value="under_review">{% trans "Under Review" %}</option>
+                        <option value="completed">{% trans "Completed" %}</option>
                     </select>
                     <button type="button" class="btn btn-sm btn-success" onclick="bulkUpdateComplaintStatus()">
-                        <i class="bi bi-check2-square me-1"></i>Apply Status
+                        <i class="bi bi-check2-square me-1"></i>{% trans "Apply Status" %}
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportSelectedComplaints()">
-                        <i class="bi bi-download me-1"></i>Export Selected (CSV)
+                        <i class="bi bi-download me-1"></i>{% trans "Export Selected (CSV)" %}
                     </button>
                     <button type="button" class="btn btn-sm btn-link text-muted ms-auto" onclick="clearComplaintSelection()">
-                        Clear selection
+                        {% trans "Clear selection" %}
                     </button>
                 </div>
 
@@ -102,17 +103,17 @@
                                     <input type="checkbox" class="form-check-input" id="select-all-complaints" onchange="toggleSelectAllComplaints(this)">
                                 </th>
                                 <th>ID</th>
-                                <th>User</th>
-                                <th>Type</th>
-                                <th>Description</th>
-                                <th>Photo</th>
-                                <th>Status</th>
-                                <th>Date</th>
-                                <th>Action</th>
+                                <th>{% trans "User" %}</th>
+                                <th>{% trans "Type" %}</th>
+                                <th>{% trans "Description" %}</th>
+                                <th>{% trans "Photo" %}</th>
+                                <th>{% trans "Status" %}</th>
+                                <th>{% trans "Date" %}</th>
+                                <th>{% trans "Action" %}</th>
                             </tr>
                         </thead>
                         <tbody id="complaint-table-body">
-                            <tr><td colspan="9" class="text-center text-muted py-4">Loading...</td></tr>
+                            <tr><td colspan="9" class="text-center text-muted py-4">{% trans "Loading..." %}</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -126,27 +127,27 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-clipboard-check me-2"></i>Review Complaint</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-clipboard-check me-2"></i>{% trans "Review Complaint" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <input type="hidden" id="review-complaint-id">
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Status</label>
+                    <label class="form-label fw-semibold">{% trans "Status" %}</label>
                     <select id="review-status" class="form-select">
-                        <option value="pending">Pending</option>
-                        <option value="under_review">Under Review</option>
-                        <option value="completed">Completed</option>
+                        <option value="pending">{% trans "Pending" %}</option>
+                        <option value="under_review">{% trans "Under Review" %}</option>
+                        <option value="completed">{% trans "Completed" %}</option>
                     </select>
                 </div>
                 <div class="mb-1">
-                    <label class="form-label fw-semibold">Admin Response (optional)</label>
+                    <label class="form-label fw-semibold">{% trans "Admin Response (optional)" %}</label>
                     <textarea id="review-response" class="form-control" rows="3" placeholder="Note visible to the complainant..."></textarea>
                 </div>
             </div>
             <div class="modal-footer bg-light">
-                <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success px-4" onclick="submitReview(this)">Save Update</button>
+                <button class="btn btn-light border px-4" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button class="btn btn-success px-4" onclick="submitReview(this)">{% trans "Save Update" %}</button>
             </div>
         </div>
     </div>
@@ -172,7 +173,7 @@
 
         if (typeof bootstrap === 'undefined') {
             console.error('Bootstrap JS failed to load — modal cannot open.');
-            showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+            showToast(gettext('A page resource failed to load. Please refresh and try again.'), 'danger');
             return null;
         }
 
@@ -232,7 +233,7 @@
             if (body) {
                 body.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">Unable to load complaints right now.</td></tr>';
             }
-            showToast('Unable to load complaints right now.', 'warning');
+            showToast(gettext('Unable to load complaints right now.'), 'warning');
         }
     }
 
@@ -262,9 +263,9 @@
                 <td>
                     <div class="d-flex gap-1">
                         <button class="btn btn-sm btn-outline-success" onclick="openReview(${escapeHtml(c.id)})">
-                            <i class="bi bi-clipboard-check"></i> Review
+                            <i class="bi bi-clipboard-check"></i> ${gettext('Review')}
                         </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteComplaint(${escapeHtml(c.id)}, this)" title="Delete complaint">
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteComplaint(${escapeHtml(c.id)}, this)" title="${gettext('Delete complaint')}">
                             <i class="bi bi-trash3"></i>
                         </button>
                     </div>
@@ -322,7 +323,7 @@
         const ids = getSelectedComplaintIds();
         if (!ids.length) return;
         const newStatus = document.getElementById('bulk-status-select').value;
-        if (!confirm(`Update ${ids.length} selected complaint(s) to "${newStatus}"?`)) return;
+        if (!confirm(interpolate(gettext('Update %(v0)s selected complaint(s) to "%(v1)s"?'), {v0: ids.length, v1: newStatus}, true))) return;
 
         // Track which of the selected ones were pending BEFORE the update,
         // so the sidebar/collapsed complaints badge count stays accurate —
@@ -343,7 +344,7 @@
                 clearComplaintSelection();
                 loadComplaints();
             } else {
-                showToast('Bulk status update failed.', 'danger');
+                showToast(gettext('Bulk status update failed.'), 'danger');
             }
         });
     };
@@ -383,7 +384,7 @@
         await withButtonBusy(eventButton(btn), 'Saving...', async () => {
         const data = await API.patch(`/api/complaints/${id}/update_status/`, { status, admin_response });
         if (data && data.id) {
-            showToast('Complaint updated.', 'success');
+            showToast(gettext('Complaint updated.'), 'success');
             const modal = getReviewModal();
             if (modal) modal.hide();
 
@@ -395,7 +396,7 @@
 
             loadComplaints();
         } else {
-            showToast('Failed to update complaint.', 'danger');
+            showToast(gettext('Failed to update complaint.'), 'danger');
         }
         });
     }
@@ -403,7 +404,7 @@
     // ── Delete Complaint ──────────────────────────────────────────────────────
     async function deleteComplaint(id, btn) {
 
-        if (!confirm('Delete this complaint permanently? This cannot be undone.')) return;
+        if (!confirm(gettext('Delete this complaint permanently? This cannot be undone.'))) return;
 
         const complaint = allComplaints.find(c => c.id == id);
         const wasPending = complaint && complaint.status === 'pending';
@@ -418,7 +419,7 @@
             });
 
             if (res.ok || res.status === 204) {
-                showToast('Complaint deleted.', 'success');
+                showToast(gettext('Complaint deleted.'), 'success');
 
                 allComplaints = allComplaints.filter(c => c.id != id);
                 if (wasPending) adjustComplaintsBadge(-1);
@@ -444,7 +445,7 @@
                 showToast(errMsg, 'danger');
             }
         } catch (e) {
-            showToast('Network error: ' + e.message, 'danger');
+            showToast(gettext('Network error: ') + e.message, 'danger');
         }
         });
     }
