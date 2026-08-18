@@ -18,6 +18,8 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.decorators.cache import cache_page
+from django.views.i18n import JavaScriptCatalog
 urlpatterns = [
     path('admin/', admin.site.urls),
 
@@ -33,6 +35,30 @@ urlpatterns = [
     # picks it up on the very next request. Powers the language switcher
     # in base.html; replaces the old googtrans localStorage/cookie hack.
     path('i18n/', include('django.conf.urls.i18n')),
+
+    # JavaScript translation catalog. A lot of user-facing text on the
+    # dashboards is produced by inline JS (showToast(...), status badges
+    # rebuilt after an AJAX update, confirm() prompts), which {% trans %}
+    # cannot reach because it only runs at template-render time. This view
+    # ships the same locale/<lang>/LC_MESSAGES catalog to the browser and
+    # defines a global gettext() there, so those strings translate too.
+    # Cached per-language because the catalog is static between deploys.
+    path(
+        'jsi18n/',
+        # No `packages` argument on purpose: this project's catalog lives in
+        # LOCALE_PATHS (locale/<lang>/LC_MESSAGES/django.po), not inside an
+        # installed app's own locale dir. Passing packages= would restrict the
+        # view to those apps' catalogs and drop every string we translated.
+        # domain='django' (not the 'djangojs' default): this project keeps a
+        # SINGLE catalog, locale/<lang>/LC_MESSAGES/django.po, shared by the
+        # templates and the inline scripts. Labels like "Completed" or
+        # "Available" appear in both, so one domain means one msgid and one
+        # translation instead of two copies that can drift apart.
+        cache_page(86400, key_prefix='jsi18n')(
+            JavaScriptCatalog.as_view(domain='django')
+        ),
+        name='javascript-catalog',
+    ),
 
     # web_app HTML pages (catch-all last)
     path('', include('web_app.urls')),

@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Admin Activity Logs{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Admin Activity Logs" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -139,8 +140,8 @@
             <!-- Header Strip Matrix -->
             <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold"><i class="bi bi-file-text text-info me-2"></i>Admin Activity Logs</h2>
-                    <p class="text-muted mb-0">System audit trail records tracking operations, record lifecycles, and configuration mappings.</p>
+                    <h2 class="mb-1 fw-bold"><i class="bi bi-file-text text-info me-2"></i>{% trans "Admin Activity Logs" %}</h2>
+                    <p class="text-muted mb-0">{% trans "System audit trail records tracking operations, record lifecycles, and configuration mappings." %}</p>
                 </div>
             </div>
 
@@ -149,7 +150,7 @@
                 <div class="col-12 col-md-4">
                     <div class="card metric-card border-0 bg-info bg-opacity-10 h-100">
                         <div class="card-body p-4">
-                            <div class="text-info fw-semibold small mb-1">Total System Log Entries</div>
+                            <div class="text-info fw-semibold small mb-1">{% trans "Total System Log Entries" %}</div>
                             <div class="display-6 fw-bold text-info">{{ total_logs }}</div>
                         </div>
                     </div>
@@ -159,10 +160,10 @@
             <!-- Query Filter Terminal Card -->
             <div class="card dashboard-card mb-4">
                 <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-funnel me-2 text-success"></i>Query Filter Terminal</h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-funnel me-2 text-success"></i>{% trans "Query Filter Terminal" %}</h6>
                     {% if current_action or current_operator %}
                     <a href="{% url 'admin-logs' %}" class="small text-danger text-decoration-none fw-semibold">
-                        <i class="bi bi-x-circle me-1"></i>Clear all filters
+                        <i class="bi bi-x-circle me-1"></i>{% trans "Clear all filters" %}
                     </a>
                     {% endif %}
                 </div>
@@ -170,12 +171,12 @@
                     <form method="get" class="row g-3" id="log-filter-form">
                         <!-- Quick one-click action-type pills — no dropdown, no extra click to open it -->
                         <div class="col-12">
-                            <label class="form-label small fw-semibold text-secondary d-block mb-2">Quick Filter by Action</label>
+                            <label class="form-label small fw-semibold text-secondary d-block mb-2">{% trans "Quick Filter by Action" %}</label>
                             <div class="d-flex flex-wrap gap-2">
                                 <button type="button"
                                         class="btn action-pill {% if not current_action %}active{% endif %}"
                                         data-value="">
-                                    <i class="bi bi-grid-3x3-gap-fill me-1"></i>All Actions
+                                    <i class="bi bi-grid-3x3-gap-fill me-1"></i>{% trans "All Actions" %}
                                 </button>
                                 {% for val, label in action_choices %}
                                 <button type="button"
@@ -190,21 +191,21 @@
 
                         <!-- Operator search: debounced auto-search + clear (×) + Enter/Search button still work -->
                         <div class="col-12">
-                            <label class="form-label small fw-semibold text-secondary">Search by Security Operator</label>
+                            <label class="form-label small fw-semibold text-secondary">{% trans "Search by Security Operator" %}</label>
                             <div class="input-group" id="operator-input-wrap">
                                 <span class="input-group-text border-end-0">
                                     <i class="bi bi-search text-muted"></i>
                                 </span>
                                 <input type="search" name="operator" id="operator-input"
                                        class="form-control border-start-0 ps-0"
-                                       placeholder="Type admin, driver, or user name — results update as you type"
+                                       placeholder="{% trans 'Type admin, driver, or user name — results update as you type' %}"
                                        value="{{ current_operator|default:'' }}"
                                        autocomplete="off">
-                                <button type="button" class="btn btn-outline-secondary btn-clear-operator" title="Clear search">
+                                <button type="button" class="btn btn-outline-secondary btn-clear-operator" title="{% trans 'Clear search' %}">
                                     <i class="bi bi-x-lg"></i>
                                 </button>
                                 <button class="btn btn-success px-4" type="submit">
-                                    <i class="bi bi-search me-1"></i>Search
+                                    <i class="bi bi-search me-1"></i>{% trans "Search" %}
                                 </button>
                             </div>
                         </div>
@@ -215,20 +216,20 @@
             <!-- System Logs Table Card Container -->
             <div class="card dashboard-card">
                 <div class="card-header">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>Real-time Audit Streams</h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>{% trans "Real-time Audit Streams" %}</h6>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Timestamp Node</th>
-                                    <th>Operator Node</th>
-                                    <th>Action Signature</th>
-                                    <th>DB Content Type</th>
-                                    <th>Structural Context Description</th>
-                                    <th>IP Address Vector</th>
-                                    <th class="text-end pe-4">Payload</th>
+                                    <th>{% trans "Timestamp Node" %}</th>
+                                    <th>{% trans "Operator Node" %}</th>
+                                    <th>{% trans "Action Signature" %}</th>
+                                    <th>{% trans "DB Content Type" %}</th>
+                                    <th>{% trans "Structural Context Description" %}</th>
+                                    <th>{% trans "IP Address Vector" %}</th>
+                                    <th class="text-end pe-4">{% trans "Payload" %}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -243,7 +244,7 @@
                                         {% if log.admin_user %}
                                             <span class="badge bg-primary bg-opacity-10 text-primary px-2 py-1fw-semibold">{{ log.admin_user.username }}</span>
                                         {% else %}
-                                            <span class="badge bg-dark bg-opacity-10 text-dark px-2 py-1 fw-semibold">SYSTEM CRON</span>
+                                            <span class="badge bg-dark bg-opacity-10 text-dark px-2 py-1 fw-semibold">{% trans "SYSTEM CRON" %}</span>
                                         {% endif %}
                                     </td>
                                     <td>
@@ -274,7 +275,7 @@
                                     </td>
                                     <td class="text-end pe-4">
                                         <span class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.8rem;">
-                                            <i class="bi bi-eye me-1"></i>View
+                                            <i class="bi bi-eye me-1"></i>{% trans "View" %}
                                         </span>
                                     </td>
                                 </tr>
@@ -284,8 +285,8 @@
                                         <div class="modal-content border-0 shadow">
                                             <div class="modal-header bg-dark text-white">
                                                 <div>
-                                                    <h5 class="modal-title fw-bold mb-1"><i class="bi bi-journal-text me-2"></i>Activity Details</h5>
-                                                    <div class="small text-white-50">Log #{{ log.id }} for {{ log.content_type }}</div>
+                                                    <h5 class="modal-title fw-bold mb-1"><i class="bi bi-journal-text me-2"></i>{% trans "Activity Details" %}</h5>
+                                                    <div class="small text-white-50">{% trans "Log #" %}{{ log.id }} {% trans "for" %} {{ log.content_type }}</div>
                                                 </div>
                                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                             </div>
@@ -293,59 +294,59 @@
                                                 <div class="row g-3">
                                                     <div class="col-md-6">
                                                         <div class="detail-box border rounded-3 p-3 h-100">
-                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">Timestamp</div>
+                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Timestamp" %}</div>
                                                             <div class="fw-semibold">{{ log.created_at|date:"d M Y H:i" }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
                                                         <div class="detail-box border rounded-3 p-3 h-100">
-                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">Operator</div>
-                                                            <div class="fw-semibold">{% if log.admin_user %}{{ log.admin_user.username }}{% else %}SYSTEM CRON{% endif %}</div>
+                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Operator" %}</div>
+                                                            <div class="fw-semibold">{% if log.admin_user %}{{ log.admin_user.username }}{% else %}{% trans "SYSTEM CRON" %}{% endif %}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
                                                         <div class="detail-box border rounded-3 p-3 h-100">
-                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">Action</div>
+                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Action" %}</div>
                                                             <div class="fw-semibold">{{ log.get_action_display }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
                                                         <div class="detail-box border rounded-3 p-3 h-100">
-                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">Content Type</div>
+                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Content Type" %}</div>
                                                             <div class="fw-semibold">{{ log.content_type }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-12">
                                                         <div class="detail-box border rounded-3 p-3">
-                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">Description</div>
+                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Description" %}</div>
                                                             <div class="fw-semibold">{{ log.object_description|default:"No description available." }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
                                                         <div class="detail-box border rounded-3 p-3 h-100">
-                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">Object ID</div>
+                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Object ID" %}</div>
                                                             <div class="fw-semibold">{{ log.object_id|default:"—" }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
                                                         <div class="detail-box border rounded-3 p-3 h-100">
-                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">IP Address</div>
+                                                            <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "IP Address" %}</div>
                                                             <div class="fw-semibold">{{ log.ip_address|default:"—" }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-12">
                                                         <div class="detail-box border rounded-3 p-3">
-                                                            <div class="small text-muted text-uppercase fw-semibold mb-2">User Agent</div>
+                                                            <div class="small text-muted text-uppercase fw-semibold mb-2">{% trans "User Agent" %}</div>
                                                             <div class="small text-break">{{ log.user_agent|default:"—" }}</div>
                                                         </div>
                                                     </div>
                                                     <div class="col-12">
                                                         <div class="detail-box border rounded-3 p-3">
-                                                            <div class="small text-muted text-uppercase fw-semibold mb-2">Change Payload</div>
+                                                            <div class="small text-muted text-uppercase fw-semibold mb-2">{% trans "Change Payload" %}</div>
                                                             {% if log.changes %}
                                                                 <pre class="mb-0"><code>{{ log.changes }}</code></pre>
                                                             {% else %}
-                                                                <div class="text-muted small">No change payload recorded for this activity.</div>
+                                                                <div class="text-muted small">{% trans "No change payload recorded for this activity." %}</div>
                                                             {% endif %}
                                                         </div>
                                                     </div>
@@ -358,7 +359,7 @@
                                 {% empty %}
                                 <tr>
                                     <td colspan="7" class="text-center py-5 text-muted">
-                                        <i class="bi bi-inbox fs-3 d-block mb-1"></i> No matching pipeline activity records found inside active indexing node.
+                                        <i class="bi bi-inbox fs-3 d-block mb-1"></i> {% trans "No matching pipeline activity records found inside active indexing node." %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -370,14 +371,14 @@
 
             <!-- Unified Core Pagination Navigation Matrix -->
             {% if is_paginated %}
-            <nav class="mt-4" aria-label="Page navigation">
+            <nav class="mt-4" aria-label="{% trans 'Page navigation' %}">
                 <ul class="pagination justify-content-center">
                     {% if page_obj.has_previous %}
                         <li class="page-item">
-                            <a class="page-link text-success" href="?page=1{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">First</a>
+                            <a class="page-link text-success" href="?page=1{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">{% trans "First" %}</a>
                         </li>
                         <li class="page-item">
-                            <a class="page-link text-success" href="?page={{ page_obj.previous_page_number }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">Previous</a>
+                            <a class="page-link text-success" href="?page={{ page_obj.previous_page_number }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">{% trans "Previous" %}</a>
                         </li>
                     {% endif %}
 
@@ -393,10 +394,10 @@
 
                     {% if page_obj.has_next %}
                         <li class="page-item">
-                            <a class="page-link text-success" href="?page={{ page_obj.next_page_number }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">Next</a>
+                            <a class="page-link text-success" href="?page={{ page_obj.next_page_number }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">{% trans "Next" %}</a>
                         </li>
                         <li class="page-item">
-                            <a class="page-link text-success" href="?page={{ page_obj.paginator.num_pages }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">Last</a>
+                            <a class="page-link text-success" href="?page={{ page_obj.paginator.num_pages }}{% if current_action %}&action={{ current_action }}{% endif %}{% if current_operator %}&operator={{ current_operator|urlencode }}{% endif %}">{% trans "Last" %}</a>
                         </li>
                     {% endif %}
                 </ul>

@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Home{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Home" %}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -174,13 +175,13 @@
              {% if not user.is_authenticated or user.role != 'user' %}style="max-width: 900px;"{% endif %}>
 
             {% if user.is_authenticated and user.role == 'user' %}
-            <h2 class="mb-4"><i class="bi bi-house text-success me-2"></i>Welcome, {{ user.first_name|default:user.username }}!</h2>
+            <h2 class="mb-4"><i class="bi bi-house text-success me-2"></i>{% trans "Welcome," %} {{ user.first_name|default:user.username }}!</h2>
 
             <div class="row g-3 mb-4">
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-warning bg-opacity-10 h-100">
                         <div class="card-body text-center">
-                            <div class="text-muted small">Pending</div>
+                            <div class="text-muted small">{% trans "Pending" %}</div>
                             <div class="fs-2 fw-bold text-warning" id="stat-pending-count">{{ pending_count }}</div>
                         </div>
                     </div>
@@ -188,7 +189,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-success bg-opacity-10 h-100">
                         <div class="card-body text-center">
-                            <div class="text-muted small">Completed</div>
+                            <div class="text-muted small">{% trans "Completed" %}</div>
                             <div class="fs-2 fw-bold text-success" id="stat-completed-count">{{ completed_count }}</div>
                         </div>
                     </div>
@@ -197,8 +198,8 @@
                     <div class="card border-0 bg-danger bg-opacity-10 h-100 d-flex align-items-center justify-content-center"
                          style="cursor:pointer" data-bs-toggle="modal" data-bs-target="#complaintModal">
                         <div class="card-body text-center py-3 w-100">
-                            <div class="text-danger small mb-1"><i class="bi bi-megaphone-fill me-1"></i>Have an issue?</div>
-                            <div class="fw-bold text-danger">File a Complaint</div>
+                            <div class="text-danger small mb-1"><i class="bi bi-megaphone-fill me-1"></i>{% trans "Have an issue?" %}</div>
+                            <div class="fw-bold text-danger">{% trans "File a Complaint" %}</div>
                         </div>
                     </div>
                 </div>
@@ -208,7 +209,7 @@
             <!-- New Request Card -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white fw-bold">
-                    <i class="bi bi-plus-circle text-success me-2"></i>New Pickup Request (Flags are 3km Around Your Location only)
+                    <i class="bi bi-plus-circle text-success me-2"></i>{% trans "New Pickup Request (Flags are 3km Around Your Location only)" %}
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
@@ -216,17 +217,17 @@
                         <!-- Photo Upload -->
                         <div class="col-12">
                             <label class="form-label fw-semibold">
-                                Garbage Photo(s)
-                                <span class="text-muted small fw-normal">— GPS location auto-extracted if available. All photos must be of the same location.</span>
+                                {% trans "Garbage Photo(s)" %}
+                                <span class="text-muted small fw-normal">{% trans "— GPS location auto-extracted if available. All photos must be of the same location." %}</span>
                             </label>
                             <div class="d-flex gap-2">
                                 <button type="button" class="btn btn-outline-success flex-fill"
                                     onclick="openCamera('garbage')">
-                                    <i class="bi bi-camera-fill me-1"></i>Take Photo
+                                    <i class="bi bi-camera-fill me-1"></i>{% trans "Take Photo" %}
                                 </button>
                                 <button type="button" class="btn btn-outline-secondary flex-fill"
                                     onclick="document.getElementById('garbage-photo-gallery').click()">
-                                    <i class="bi bi-images me-1"></i>Choose from Gallery
+                                    <i class="bi bi-images me-1"></i>{% trans "Choose from Gallery" %}
                                 </button>
                             </div>
                             <!-- Gallery input: multiple photo/file picker -->
@@ -243,16 +244,15 @@
                         <!-- Leaflet Map -->
                         <div class="col-12">
                             <label class="form-label fw-semibold">
-                                Location
-                                <span class="text-muted small fw-normal">— click map or drag pin to adjust</span>
+                                {% trans "Location" %}
+                                <span class="text-muted small fw-normal">{% trans "— click map or drag pin to adjust" %}</span>
                             </label>
                             <div id="map" style="height:300px; border-radius:8px; border:1px solid #dee2e6;"></div>
                             <div class="mt-1 small text-muted">
                                 <i class="bi bi-geo-alt me-1"></i>
-                                Lat: <span id="display-lat">detecting...</span> &nbsp;
-                                Lng: <span id="display-lng">detecting...</span>
+                                {% trans "Lat" %}: <span id="display-lat">{% trans "detecting..." %}</span> &nbsp; {% trans "Lng" %}: <span id="display-lng">{% trans "detecting..." %}</span>
                                 <span id="location-lock-note" class="text-success fw-semibold d-none ms-2">
-                                    <i class="bi bi-lock-fill"></i> Locked to photo GPS
+                                    <i class="bi bi-lock-fill"></i> {% trans "Locked to photo GPS" %}
                                 </span>
                             </div>
                         </div>
@@ -263,32 +263,32 @@
 
                         <!-- Form Fields -->
                         <div class="col-md-4">
-                            <label class="form-label">Waste Type</label>
-                            <select id="waste-type" class="form-select" data-bs-toggle="tooltip" data-bs-placement="top" title="Select the type of waste to be collected">
-                                <option value="general">General Waste</option>
-                                <option value="recyclable">Recyclable</option>
-                                <option value="organic">Organic</option>
-                                <option value="bulky">Bulky Item</option>
-                                <option value="hazardous">Hazardous</option>
+                            <label class="form-label">{% trans "Waste Type" %}</label>
+                            <select id="waste-type" class="form-select" data-bs-toggle="tooltip" data-bs-placement="top" title="{% trans 'Select the type of waste to be collected' %}">
+                                <option value="general">{% trans "General Waste" %}</option>
+                                <option value="recyclable">{% trans "Recyclable" %}</option>
+                                <option value="organic">{% trans "Organic" %}</option>
+                                <option value="bulky">{% trans "Bulky Item" %}</option>
+                                <option value="hazardous">{% trans "Hazardous" %}</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Pickup Address</label>
+                            <label class="form-label">{% trans "Pickup Address" %}</label>
                             <input type="text" id="pickup-address" class="form-control"
-                                placeholder="Enter your address">
+                                placeholder="{% trans 'Enter your address' %}">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Designated Drop-off Point</label>
+                            <label class="form-label">{% trans "Designated Drop-off Point" %}</label>
                             <!-- Manual dropdown हटाइयो — GPS location अनुसार सबैभन्दा नजिकको
                                  checkpoint auto-detect हुन्छ। 100m भित्र भए auto-assign हुन्छ,
                                  भन्दा टाढा भए recommend मात्र गरिन्छ (assign हुँदैन)। -->
                             <div class="form-control bg-light d-flex align-items-center" id="checkpoint-auto-display" style="min-height:38px;">
-                                <span class="text-muted small">Set your location to auto-detect nearest checkpoint...</span>
+                                <span class="text-muted small">{% trans "Set your location to auto-detect nearest checkpoint..." %}</span>
                             </div>
                             <input type="hidden" id="checkpoint-select" value="">
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Description (optional)</label>
+                            <label class="form-label">{% trans "Description (optional)" %}</label>
                             <textarea id="description" class="form-control" rows="2"
                                 placeholder="Describe the garbage..."></textarea>
                         </div>
@@ -296,35 +296,34 @@
                             {% if not user.is_authenticated %}
                             <div class="mb-3">
                                 <label class="form-label">
-                                    Email <span class="text-muted small fw-normal">(optional)</span>
+                                    {% trans "Email" %} <span class="text-muted small fw-normal">{% trans "(optional)" %}</span>
                                 </label>
                                 <input type="email" id="guest-email" class="form-control"
-                                    placeholder="you@example.com">
+                                    placeholder="{% trans 'you@example.com' %}">
                                 <div class="form-text">
-                                    We'll send you a link to claim this request later — a backup
-                                    in case you clear your browser data or switch devices before signing in.
+                                    {% trans "We'll send you a link to claim this request later — a backup in case you clear your browser data or switch devices before signing in." %}
                                 </div>
                             </div>
                             <div class="alert alert-light border small mb-2">
                                 <i class="bi bi-info-circle me-1"></i>
-                                Want to Track your requests and get notifications?
-                                <a href="{% url 'login' %}">Sign in</a> to track waste.
+                                {% trans "Want to Track your requests and get notifications?" %}
+                                <a href="{% url 'login' %}">{% trans "Sign in" %}</a> {% trans "to track waste." %}
                             </div>
                             <div class="alert alert-light border small mb-3">
                                 <i class="bi bi-info-circle me-1"></i>
-                                Any Complaints?
-                                <a href="{% url 'login' %}">Sign in</a> for complaints.
+                                {% trans "Any Complaints?" %}
+                                <a href="{% url 'login' %}">{% trans "Sign in" %}</a> {% trans "for complaints." %}
                             </div>
                             <div class="alert alert-light border small mb-3">
                                 <i class="bi bi-info-circle me-1"></i>
-                                Wrong Information?
-                                <a href="{% url 'login' %}">Sign in</a> to access Recycle Bin.
+                                {% trans "Wrong Information?" %}
+                                <a href="{% url 'login' %}">{% trans "Sign in" %}</a> {% trans "to access Recycle Bin." %}
                             </div>
 
                             {% endif %}
 
                             <button class="btn btn-success" id="submit-btn" onclick="submitRequest()">
-                                <span id="submit-text"><i class="bi bi-send me-2"></i>Submit Request</span>
+                                <span id="submit-text"><i class="bi bi-send me-2"></i>{% trans "Submit Request" %}</span>
                                 <span id="submit-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
                             </button>
                         </div>
@@ -337,21 +336,21 @@
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
                     <span class="fw-bold">
-                        <i class="bi bi-clock-history text-success me-2"></i>Recent Requests
+                        <i class="bi bi-clock-history text-success me-2"></i>{% trans "Recent Requests" %}
                     </span>
-                    <a href="{% url 'user-requests' %}" class="btn btn-sm btn-outline-success">View All</a>
+                    <a href="{% url 'user-requests' %}" class="btn btn-sm btn-outline-success">{% trans "View All" %}</a>
                 </div>
                 <div class="card-body p-0 table-responsive">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
                                 <th>#</th>
-                                <th>Type</th>
-                                <th>Status</th>
-                                <th>Driver</th>
-                                <th>Photo</th>
-                                <th>Date</th>
-                                <th>Actions</th>
+                                <th>{% trans "Type" %}</th>
+                                <th>{% trans "Status" %}</th>
+                                <th>{% trans "Driver" %}</th>
+                                <th>{% trans "Photo" %}</th>
+                                <th>{% trans "Date" %}</th>
+                                <th>{% trans "Actions" %}</th>
                             </tr>
                         </thead>
                         <tbody id="recent-requests-body">
@@ -373,7 +372,7 @@
                                 <td>
                                     {% if req.photo %}
                                     <a href="{{ req.photo.url }}" target="_blank">
-                                        <img src="{{ req.photo.url }}" alt="photo"
+                                        <img src="{{ req.photo.url }}" alt="{% trans 'photo' %}"
                                             style="height:36px;width:36px;object-fit:cover;border-radius:4px;">
                                     </a>
                                     {% else %}
@@ -384,11 +383,11 @@
                                 <td>
                                     {% if req.status == 'pending' %}
                                     <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }}, this)">
-                                        Cancel
+                                        {% trans "Cancel" %}
                                     </button>
                                     {% elif req.status == 'completed' or req.status == 'cancelled' or req.status == 'in_progress' %}
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }}, this)" title="Move to Recycle Bin">
-                                        <i class="bi bi-recycle"></i> Move to Bin
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }}, this)" title="{% trans 'Move to Recycle Bin' %}">
+                                        <i class="bi bi-recycle"></i> {% trans "Move to Bin" %}
                                     </button>
                                     {% else %}
                                     —
@@ -398,7 +397,7 @@
                             {% empty %}
                             <tr>
                                 <td colspan="7" class="text-center text-muted py-3">
-                                    No requests yet. Submit one above!
+                                    {% trans "No requests yet. Submit one above!" %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -417,69 +416,69 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-megaphone-fill me-2"></i>File a Complaint</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-megaphone-fill me-2"></i>{% trans "File a Complaint" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
 
-                <label class="form-label fw-semibold mb-2">What's the issue?</label>
+                <label class="form-label fw-semibold mb-2">{% trans "What's the issue?" %}</label>
                 <div class="row g-2 mb-3" id="complaint-type-group">
                     <div class="col-4">
                         <div class="complaint-type-option active" data-value="missed_pickup">
-                            <i class="bi bi-truck"></i>Missed Pickup
+                            <i class="bi bi-truck"></i>{% trans "Missed Pickup" %}
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="complaint-type-option" data-value="driver_behavior">
-                            <i class="bi bi-person-x"></i>Driver Behavior
+                            <i class="bi bi-person-x"></i>{% trans "Driver Behavior" %}
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="complaint-type-option" data-value="illegal_dumping">
-                            <i class="bi bi-exclamation-triangle"></i>Illegal Dumping
+                            <i class="bi bi-exclamation-triangle"></i>{% trans "Illegal Dumping" %}
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="complaint-type-option" data-value="overflowing_bin">
-                            <i class="bi bi-trash3"></i>Overflowing Bin
+                            <i class="bi bi-trash3"></i>{% trans "Overflowing Bin" %}
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="complaint-type-option" data-value="app_issue">
-                            <i class="bi bi-phone"></i>App Issue
+                            <i class="bi bi-phone"></i>{% trans "App Issue" %}
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="complaint-type-option" data-value="other">
-                            <i class="bi bi-three-dots"></i>Other
+                            <i class="bi bi-three-dots"></i>{% trans "Other" %}
                         </div>
                     </div>
                 </div>
                 <input type="hidden" id="complaint-type" value="missed_pickup">
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Description *</label>
+                    <label class="form-label fw-semibold">{% trans "Description *" %}</label>
                     <textarea id="complaint-description" class="form-control" rows="3"
                         placeholder="Describe your complaint in detail..."></textarea>
                 </div>
 
                 <div class="mb-2">
                     <label class="form-label fw-semibold">
-                        Attach Photo <span class="text-muted small fw-normal">(optional)</span>
+                        {% trans "Attach Photo" %} <span class="text-muted small fw-normal">{% trans "(optional)" %}</span>
                     </label>
                     <div class="d-flex gap-2 mb-2">
                         <button type="button" class="btn btn-outline-danger btn-sm flex-fill"
                             onclick="openCamera('complaint')">
-                            <i class="bi bi-camera-fill me-1"></i>Take Photo
+                            <i class="bi bi-camera-fill me-1"></i>{% trans "Take Photo" %}
                         </button>
                         <button type="button" class="btn btn-outline-secondary btn-sm flex-fill"
                             onclick="document.getElementById('complaint-photo').click()">
-                            <i class="bi bi-images me-1"></i>Choose from Gallery
+                            <i class="bi bi-images me-1"></i>{% trans "Choose from Gallery" %}
                         </button>
                     </div>
                     <div id="complaint-photo-drop" onclick="document.getElementById('complaint-photo').click()">
                         <i class="bi bi-camera fs-3 text-muted d-block mb-1"></i>
-                        <span class="small text-muted">Or click here to upload an image as evidence</span>
+                        <span class="small text-muted">{% trans "Or click here to upload an image as evidence" %}</span>
                     </div>
                     <input type="file" id="complaint-photo" class="d-none"
                         accept="image/*" onchange="handleComplaintPhotoUpload(this)">
@@ -487,7 +486,7 @@
 
                 <div class="d-none mt-2" id="complaint-photo-preview-section">
                     <div class="position-relative d-inline-block">
-                        <img id="complaint-photo-preview" src="" alt="Preview"
+                        <img id="complaint-photo-preview" src="" alt="{% trans 'Preview' %}"
                             class="img-thumbnail" style="max-height:160px">
                         <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 rounded-circle p-0"
                             style="width:22px;height:22px;line-height:1;" onclick="removeComplaintPhoto()">
@@ -497,9 +496,9 @@
                 </div>
             </div>
             <div class="modal-footer bg-light">
-                <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-light border px-4" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
                 <button class="btn btn-danger px-4" id="complaint-submit-btn" onclick="submitComplaint()">
-                    <span id="complaint-submit-text"><i class="bi bi-send me-1"></i>Submit Complaint</span>
+                    <span id="complaint-submit-text"><i class="bi bi-send me-1"></i>{% trans "Submit Complaint" %}</span>
                     <span id="complaint-submit-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
                 </button>
             </div>
@@ -512,7 +511,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow bg-dark">
             <div class="modal-header border-0">
-                <h5 class="modal-title fw-bold text-white"><i class="bi bi-camera-fill me-2"></i>Take Photo</h5>
+                <h5 class="modal-title fw-bold text-white"><i class="bi bi-camera-fill me-2"></i>{% trans "Take Photo" %}</h5>
                 <button type="button" class="btn-close btn-close-white" onclick="closeCamera()"></button>
             </div>
             <div class="modal-body p-0 position-relative">
@@ -520,15 +519,15 @@
                 <canvas id="camera-canvas" class="d-none"></canvas>
                 <div id="camera-error" class="d-none text-center text-white p-4">
                     <i class="bi bi-camera-video-off fs-1 d-block mb-2"></i>
-                    <p class="mb-2">Could not access the camera. Please allow camera permission, or use "Choose from Gallery" instead.</p>
+                    <p class="mb-2">{% trans 'Could not access the camera. Please allow camera permission, or use "Choose from Gallery" instead.' %}</p>
                 </div>
                 <!-- Live camera shot counter — garbage target मा मात्र देखिने, धेरै फोटो लिन सकिन्छ भन्ने संकेत -->
                 <div id="camera-shot-counter" class="d-none position-absolute top-0 start-0 m-2 badge bg-success">
-                    0 photo(s) taken
+                    {% trans "0 photo(s) taken" %}
                 </div>
             </div>
             <div class="modal-footer border-0 justify-content-center bg-dark pb-4">
-                <button type="button" class="btn btn-outline-light" id="camera-switch-btn" onclick="switchCamera()" title="Switch camera">
+                <button type="button" class="btn btn-outline-light" id="camera-switch-btn" onclick="switchCamera()" title="{% trans 'Switch camera' %}">
                     <i class="bi bi-arrow-repeat"></i>
                 </button>
                 <button type="button" class="btn btn-success btn-lg rounded-circle p-0" id="camera-shutter-btn"
@@ -536,7 +535,7 @@
                     <i class="bi bi-camera-fill fs-4"></i>
                 </button>
                 <button type="button" class="btn btn-outline-light" onclick="closeCamera()" id="camera-done-btn">
-                    Done
+                    {% trans "Done" %}
                 </button>
             </div>
         </div>
@@ -623,7 +622,7 @@ function ensureLeafletLoaded(onReady) {
 
     window._leafletLoadPromise.then(onReady).catch((error) => {
         console.error('Leaflet failed to load for home map:', error);
-        showToast('Map failed to load. Please refresh the page.', 'danger');
+        showToast(gettext('Map failed to load. Please refresh the page.'), 'danger');
     });
 }
 
@@ -796,7 +795,7 @@ function initMap(lat, lng) {
 
     map.on('click', function (e) {
         if (locationLockedByPhoto) {
-            showToast('Location is locked to the photo\'s GPS. Remove the photo to set a custom location.', 'warning');
+            showToast(gettext('Location is locked to the photo\'s GPS. Remove the photo to set a custom location.'), 'warning');
             return;
         }
         marker.setLatLng(e.latlng);
@@ -1027,7 +1026,7 @@ const cameraModalEl = document.getElementById('cameraModal');
 function getCameraModal() {
     if (typeof bootstrap === 'undefined') {
         console.error('Bootstrap JS failed to load — modal cannot open.');
-        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        showToast(gettext('A page resource failed to load. Please refresh and try again.'), 'danger');
         return null;
     }
     return bootstrap.Modal.getOrCreateInstance(cameraModalEl);
@@ -1082,7 +1081,7 @@ window.openCamera = async function(target) {
             () => {
                 liveCameraGPS = null;
                 if (target === 'garbage') {
-                    showToast('Please enable Location Services to take a garbage photo — this confirms where the garbage actually is.', 'danger');
+                    showToast(gettext('Please enable Location Services to take a garbage photo — this confirms where the garbage actually is.'), 'danger');
                     shutterBtn.disabled = true;
                     shutterBtn.title = 'Location required';
                 }
@@ -1090,7 +1089,7 @@ window.openCamera = async function(target) {
             { enableHighAccuracy: true, timeout: 8000 }
         );
     } else if (target === 'garbage') {
-        showToast('This browser does not support location detection — a garbage photo cannot be taken.', 'danger');
+        showToast(gettext('This browser does not support location detection — a garbage photo cannot be taken.'), 'danger');
         shutterBtn.disabled = true;
     }
 };
@@ -1148,7 +1147,7 @@ window.capturePhoto = function() {
     // Defense-in-depth: shutter already disabled until GPS locks for
     // 'garbage', but double-check here in case of any race.
     if (cameraTarget === 'garbage' && !liveCameraGPS) {
-        showToast('Waiting for location — please enable Location Services.', 'warning');
+        showToast(gettext('Waiting for location — please enable Location Services.'), 'warning');
         return;
     }
 
@@ -1206,7 +1205,7 @@ window.handlePhotoUpload = async function(input) {
 // नआएसम्म disable हुन्छ, तर यहाँ पनि defense-in-depth राखिएको छ)।
 function addGarbagePhoto(file, gps) {
     if (!gps) {
-        showToast('Location is required to take this photo. Please enable Location Services and try again.', 'danger');
+        showToast(gettext('Location is required to take this photo. Please enable Location Services and try again.'), 'danger');
         return;
     }
 
@@ -1222,7 +1221,7 @@ function addGarbagePhoto(file, gps) {
 
     const dist = distanceInMeters(firstPhotoGPS.lat, firstPhotoGPS.lng, gps.lat, gps.lng);
     if (dist > SAME_LOCATION_THRESHOLD_METERS) {
-        showToast(`This photo looks like it's from a different location (~${Math.round(dist)}m away). Please use a photo of the same location as the first one.`, 'danger');
+        showToast(interpolate(gettext('This photo looks like it\'s from a different location (~%(v0)sm away). Please use a photo of the same location as the first one.'), {v0: Math.round(dist)}, true), 'danger');
         return;
     }
 
@@ -1246,7 +1245,7 @@ async function addGarbagePhotoWithExif(file) {
     }
 
     if (!gps) {
-        showToast('This photo has no location data. Please turn ON Location Services on your phone and select or take the photo again.', 'danger');
+        showToast(gettext('This photo has no location data. Please turn ON Location Services on your phone and select or take the photo again.'), 'danger');
         return;
     }
 
@@ -1262,7 +1261,7 @@ async function addGarbagePhotoWithExif(file) {
 
     const dist = distanceInMeters(firstPhotoGPS.lat, firstPhotoGPS.lng, gps.lat, gps.lng);
     if (dist > SAME_LOCATION_THRESHOLD_METERS) {
-        showToast(`This photo looks like it's from a different location (~${Math.round(dist)}m away). Please use a photo of the same location as the first one.`, 'danger');
+        showToast(interpolate(gettext('This photo looks like it\'s from a different location (~%(v0)sm away). Please use a photo of the same location as the first one.'), {v0: Math.round(dist)}, true), 'danger');
         return;
     }
 
@@ -1288,7 +1287,7 @@ function renderPhotoThumbnails() {
     grid.innerHTML = photoFiles.map((item, idx) => `
         <div class="photo-thumb">
             <img src="${URL.createObjectURL(item.file)}" alt="photo ${idx + 1}">
-            <button type="button" class="thumb-remove-btn" onclick="removeGarbagePhoto(${idx})" title="Remove">
+            <button type="button" class="thumb-remove-btn" onclick="removeGarbagePhoto(${idx})" title="${gettext('Remove')}">
                 <i class="bi bi-x" style="font-size:0.85rem;"></i>
             </button>
             ${item.gps ? '<div class="thumb-gps-badge"><i class="bi bi-geo-alt-fill"></i> GPS</div>' : ''}
@@ -1403,11 +1402,11 @@ const HOME_STATUS_BADGE_CLASS = {
     assigned: 'bg-primary',
 };
 const HOME_STATUS_LABELS = {
-    completed: 'Completed',
-    pending: 'Pending',
-    in_progress: 'In Progress',
-    cancelled: 'Cancelled',
-    assigned: 'Assigned',
+    completed: gettext('Completed'),
+    pending: gettext('Pending'),
+    in_progress: gettext('In Progress'),
+    cancelled: gettext('Cancelled'),
+    assigned: gettext('Assigned'),
 };
 
 // Recent Requests table को row भित्र status badge + action button
@@ -1428,9 +1427,9 @@ function applyHomeRequestRowUpdate(requestId, newStatus) {
     const actionCell = row.children[6]; // Actions is 7th <td>, index 6
     if (actionCell) {
         if (newStatus === 'pending') {
-            actionCell.innerHTML = `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${requestId}, this)">Cancel</button>`;
+            actionCell.innerHTML = `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${requestId}, this)">${gettext('Cancel')}</button>`;
         } else if (newStatus === 'completed' || newStatus === 'cancelled' || newStatus === 'in_progress') {
-            actionCell.innerHTML = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${requestId}, this)" title="Move to Recycle Bin"><i class="bi bi-recycle"></i> Move to Bin</button>`;
+            actionCell.innerHTML = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${requestId}, this)" title="${gettext('Move to Recycle Bin')}"><i class="bi bi-recycle"></i> ${gettext('Move to Bin')}</button>`;
         } else {
             actionCell.innerHTML = '—';
         }
@@ -1449,13 +1448,13 @@ function insertHomeRequestRow(req) {
     const statusLabel = HOME_STATUS_LABELS[req.status] || req.status;
     const driverName = escapeHtml(req.driver && req.driver.user ? req.driver.user.username : '—');
     const photoCell = req.photo
-        ? `<a href="${escapeHtml(req.photo)}" target="_blank"><img src="${escapeHtml(req.photo)}" alt="photo" style="height:36px;width:36px;object-fit:cover;border-radius:4px;"></a>`
+        ? `<a href="${escapeHtml(req.photo)}" target="_blank"><img src="${escapeHtml(req.photo)}" alt="${gettext('photo')}" style="height:36px;width:36px;object-fit:cover;border-radius:4px;"></a>`
         : '<span class="text-muted small">—</span>';
     const dateStr = req.scheduled_date
         ? new Date(req.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
         : '—';
     const actionHtml = req.status === 'pending'
-        ? `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${req.id}, this)">Cancel</button>`
+        ? `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${req.id}, this)">${gettext('Cancel')}</button>`
         : '—';
 
     const rowHtml = `
@@ -1487,7 +1486,7 @@ window.submitRequest = async function() {
     const spinner  = document.getElementById('submit-spinner');
 
     if (!address) {
-        showToast('Please enter a pickup address.', 'warning');
+        showToast(gettext('Please enter a pickup address.'), 'warning');
         return;
     }
 
@@ -1520,7 +1519,7 @@ window.submitRequest = async function() {
             btn.disabled = false;
             text.innerHTML = '<i class="bi bi-send me-2"></i>Submit Request';
             spinner.classList.add('d-none');
-            showToast('Please enable location access to submit a request — we need your current GPS location to confirm you\'re near a checkpoint.', 'danger');
+            showToast(gettext('Please enable location access to submit a request — we need your current GPS location to confirm you\'re near a checkpoint.'), 'danger');
             return;
         }
     }
@@ -1547,9 +1546,9 @@ window.submitRequest = async function() {
 
         const nearest = findNearestCheckpoint(parseFloat(lat), parseFloat(lng));
         if (nearest) {
-            showToast(`You're ${Math.round(nearest.distance)}m away from the nearest checkpoint ("${nearest.checkpoint.name}"). Please go there — within ${CHECKPOINT_AUTO_ASSIGN_METERS}m — to submit your request.`, 'danger');
+            showToast(interpolate(gettext('You\'re %(v0)sm away from the nearest checkpoint ("%(v1)s"). Please go there — within %(v2)sm — to submit your request.'), {v0: Math.round(nearest.distance), v1: nearest.checkpoint.name, v2: CHECKPOINT_AUTO_ASSIGN_METERS}, true), 'danger');
         } else {
-            showToast('No checkpoint is configured nearby. A request cannot be submitted right now.', 'danger');
+            showToast(gettext('No checkpoint is configured nearby. A request cannot be submitted right now.'), 'danger');
         }
         return;
     }
@@ -1592,7 +1591,7 @@ window.submitRequest = async function() {
     // note above submitRequest(). Returns true if it queued successfully.
     async function tryQueueOffline() {
         if (hasPhotos) {
-            showToast('Photos can\'t be saved offline yet — remove the photo(s) to submit without one now, or wait until you\'re back online.', 'warning');
+            showToast(gettext('Photos can\'t be saved offline yet — remove the photo(s) to submit without one now, or wait until you\'re back online.'), 'warning');
             return false;
         }
 
@@ -1625,11 +1624,11 @@ window.submitRequest = async function() {
                 label: `Pickup request (${payload.waste_type})`,
             });
         } catch (e) {
-            showToast('Could not save offline — this device may not support offline storage.', 'danger');
+            showToast(gettext('Could not save offline — this device may not support offline storage.'), 'danger');
             return false;
         }
 
-        showToast('You\'re offline — saved and will submit automatically once you\'re back online.', 'info');
+        showToast(gettext('You\'re offline — saved and will submit automatically once you\'re back online.'), 'info');
         resetFormAfterSubmit();
 
         // We don't have a server-assigned id yet, so we can't insert a real
@@ -1705,7 +1704,7 @@ window.submitRequest = async function() {
         const data = await res.json();
 
         if (res.ok) {
-            showToast('Request submitted successfully!', 'success');
+            showToast(gettext('Request submitted successfully!'), 'success');
             resetFormAfterSubmit();
 
             // Reload नगरी: नयाँ request Recent Requests table मा थप्ने,
@@ -1718,7 +1717,7 @@ window.submitRequest = async function() {
             const errMsg = typeof data === 'object'
                 ? Object.entries(data).map(([k,v]) => `${k}: ${v}`).join(', ')
                 : JSON.stringify(data);
-            showToast('Error: ' + errMsg, 'danger');
+            showToast(gettext('Error: ') + errMsg, 'danger');
         }
     } catch (e) {
         // navigator.onLine said we were online but the request still
@@ -1726,7 +1725,7 @@ window.submitRequest = async function() {
         // patchy mobile data) — fall back to the offline queue.
         const queued = await tryQueueOffline();
         if (!queued) {
-            showToast('Network error: ' + e.message, 'danger');
+            showToast(gettext('Network error: ') + e.message, 'danger');
         }
     } finally {
         btn.disabled = false;
@@ -1737,23 +1736,23 @@ window.submitRequest = async function() {
 
 // ── Cancel Request ────────────────────────────────────────────────────────
 window.cancelRequest = async function(requestId, btn) {
-    if (!confirm('Cancel this request?')) return;
+    if (!confirm(gettext('Cancel this request?'))) return;
 
     await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
         const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
         if (data && data.id) {
-            showToast('Request cancelled.', 'success');
+            showToast(gettext('Request cancelled.'), 'success');
             applyHomeRequestRowUpdate(requestId, 'cancelled');
             bumpStat('stat-pending-count', -1);
         } else {
-            showToast('Failed to cancel request.', 'danger');
+            showToast(gettext('Failed to cancel request.'), 'danger');
         }
     });
 };
 
 // ── Move Request to Recycle Bin (soft-delete) ─────────────────────────────────
 window.deleteRequest = async function(requestId, btn) {
-    if (!confirm('Move this request to Recycle Bin? You can restore it later from there.')) return;
+    if (!confirm(gettext('Move this request to Recycle Bin? You can restore it later from there.'))) return;
 
     await withButtonBusy(eventButton(btn), 'Moving...', async () => {
     try {
@@ -1766,7 +1765,7 @@ window.deleteRequest = async function(requestId, btn) {
         });
 
         if (res.ok) {
-            showToast('Request moved to Recycle Bin.', 'success');
+            showToast(gettext('Request moved to Recycle Bin.'), 'success');
             const row = document.getElementById(`home-request-row-${requestId}`);
             if (row) row.remove();
 
@@ -1785,7 +1784,7 @@ window.deleteRequest = async function(requestId, btn) {
             showToast(errMsg, 'danger');
         }
     } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
+        showToast(gettext('Network error: ') + e.message, 'danger');
     }
     });
 };
@@ -1844,7 +1843,7 @@ window.submitComplaint = async function() {
     const spinner = document.getElementById('complaint-submit-spinner');
 
     if (!description) {
-        showToast('Please describe your complaint.', 'warning');
+        showToast(gettext('Please describe your complaint.'), 'warning');
         return;
     }
 
@@ -1871,17 +1870,17 @@ window.submitComplaint = async function() {
         const data = await res.json();
 
         if (res.ok) {
-            showToast('Complaint submitted successfully!', 'success');
+            showToast(gettext('Complaint submitted successfully!'), 'success');
             resetComplaintForm();
             bootstrap.Modal.getInstance(document.getElementById('complaintModal')).hide();
         } else {
             const errMsg = typeof data === 'object'
                 ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
                 : JSON.stringify(data);
-            showToast('Error: ' + errMsg, 'danger');
+            showToast(gettext('Error: ') + errMsg, 'danger');
         }
     } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
+        showToast(gettext('Network error: ') + e.message, 'danger');
     } finally {
         btn.disabled = false;
         text.innerHTML = '<i class="bi bi-send me-1"></i>Submit Complaint';
@@ -1924,7 +1923,7 @@ try {
         function notifyRequestSocketIssue(label, event) {
             console.warn(label, event);
             if (!requestReconnectWarned) {
-                showToast('Connection lost — live updates paused', 'warning');
+                showToast(gettext('Connection lost — live updates paused'), 'warning');
                 requestReconnectWarned = true;
             }
             scheduleRequestReconnect();
@@ -1933,7 +1932,7 @@ try {
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (data.type === 'request_update') {
-                showToast(`Request #${data.request_id} updated to: ${data.status}`, 'info');
+                showToast(interpolate(gettext('Request #%(v0)s updated to: %(v1)s'), {v0: data.request_id, v1: data.status}, true), 'info');
                 applyHomeRequestRowUpdate(data.request_id, data.status);
             }
         };
@@ -1976,7 +1975,7 @@ try {
         function notifyDriverSocketIssue(label, event) {
             console.warn(label, event);
             if (!driverReconnectWarned) {
-                showToast('Connection lost — live updates paused', 'warning');
+                showToast(gettext('Connection lost — live updates paused'), 'warning');
                 driverReconnectWarned = true;
             }
             scheduleDriverReconnect();
@@ -2029,7 +2028,7 @@ try {
     window._homeDriverWS = () => driverWS;
 } catch (e) {
     console.error('Failed to initialize home WebSockets:', e);
-    showToast('Live updates unavailable.', 'warning');
+    showToast(gettext('Live updates unavailable.'), 'warning');
 }
 {% endif %}
 

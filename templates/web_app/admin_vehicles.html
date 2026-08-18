@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Admin - Vehicles Management{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Admin - Vehicles Management" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -47,11 +48,11 @@
 
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold"><i class="bi bi-truck text-success me-2"></i>Vehicles Management</h2>
-                    <p class="text-muted mb-0">Track, configure, and maintain municipality sanitation fleet</p>
+                    <h2 class="mb-1 fw-bold"><i class="bi bi-truck text-success me-2"></i>{% trans "Vehicles Management" %}</h2>
+                    <p class="text-muted mb-0">{% trans "Track, configure, and maintain municipality sanitation fleet" %}</p>
                 </div>
                 <button class="btn btn-success px-4 py-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#addVehicleModal">
-                    <i class="bi bi-plus-lg me-2"></i>Add Vehicle
+                    <i class="bi bi-plus-lg me-2"></i>{% trans "Add Vehicle" %}
                 </button>
             </div>
 
@@ -61,12 +62,12 @@
                         <thead class="table-light text-secondary">
                             <tr>
                                 <th class="ps-4 py-3">#</th>
-                                <th class="py-3">Plate Number</th>
-                                <th class="py-3">Type</th>
-                                <th class="py-3">Capacity (kg)</th>
-                                <th class="py-3">Status</th>
-                                <th class="py-3">Assigned Driver</th>
-                                <th class="pe-4 py-3 text-end">Actions</th>
+                                <th class="py-3">{% trans "Plate Number" %}</th>
+                                <th class="py-3">{% trans "Type" %}</th>
+                                <th class="py-3">{% trans "Capacity (kg)" %}</th>
+                                <th class="py-3">{% trans "Status" %}</th>
+                                <th class="py-3">{% trans "Assigned Driver" %}</th>
+                                <th class="pe-4 py-3 text-end">{% trans "Actions" %}</th>
                             </tr>
                         </thead>
                         <tbody id="vehicles-tbody">
@@ -111,10 +112,10 @@
                                 </td>
                                 <td class="pe-4 text-end">
                                     <div class="btn-group btn-group-sm" role="group">
-                                        <button class="btn btn-outline-secondary rounded-start" data-bs-toggle="modal" data-bs-target="#editVehicleModal{{ vehicle.id }}" title="Edit Vehicle Configurations">
+                                        <button class="btn btn-outline-secondary rounded-start" data-bs-toggle="modal" data-bs-target="#editVehicleModal{{ vehicle.id }}" title="{% trans 'Edit Vehicle Configurations' %}">
                                             <i class="bi bi-pencil"></i>
                                         </button>
-                                        <button class="btn btn-outline-danger rounded-end" onclick="deleteVehicle({{ vehicle.id }}, this)" title="Delete Vehicle Info">
+                                        <button class="btn btn-outline-danger rounded-end" onclick="deleteVehicle({{ vehicle.id }}, this)" title="{% trans 'Delete Vehicle Info' %}">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </div>
@@ -125,18 +126,18 @@
                                 <div class="modal-dialog modal-dialog-centered">
                                     <div class="modal-content border-0 shadow">
                                         <div class="modal-header bg-dark text-white border-bottom-0">
-                                            <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2 text-success"></i>Edit Vehicle — {{ vehicle.plate_number }}</h5>
+                                            <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2 text-success"></i>{% trans "Edit Vehicle" %} — {{ vehicle.plate_number }}</h5>
                                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                         </div>
                                         <div class="modal-body p-4">
                                             <input type="hidden" id="edit-vehicle-id-{{ vehicle.id }}" value="{{ vehicle.id }}">
 
                                             <div class="mb-3">
-                                                <label class="form-label small fw-semibold text-secondary">Plate Number</label>
+                                                <label class="form-label small fw-semibold text-secondary">{% trans "Plate Number" %}</label>
                                                 <input type="text" class="form-control" id="edit-plate-{{ vehicle.id }}" value="{{ vehicle.plate_number }}">
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label small fw-semibold text-secondary">Vehicle Type</label>
+                                                <label class="form-label small fw-semibold text-secondary">{% trans "Vehicle Type" %}</label>
                                                 <select class="form-select" id="edit-type-{{ vehicle.id }}" onchange="toggleCustomType('edit', {{ vehicle.id }})">
                                                     {% for key, label in vehicle.TYPE_CHOICES %}
                                                     <option value="{{ key }}" {% if vehicle.vehicle_type == key %}selected{% endif %}>{{ label }}</option>
@@ -147,16 +148,16 @@
                                                     {% if vehicle.vehicle_type != 'truck' and vehicle.vehicle_type != 'van' and vehicle.vehicle_type != 'compactor' and vehicle.vehicle_type not in custom_vehicle_types %}
                                                     <option value="{{ vehicle.vehicle_type }}" selected>{{ vehicle.vehicle_type }}</option>
                                                     {% endif %}
-                                                    <option value="__custom__">+ Add New Type...</option>
+                                                    <option value="__custom__">{% trans "+ Add New Type..." %}</option>
                                                 </select>
-                                                <input type="text" class="form-control mt-2 d-none" id="edit-type-custom-{{ vehicle.id }}" placeholder="Enter new vehicle type">
+                                                <input type="text" class="form-control mt-2 d-none" id="edit-type-custom-{{ vehicle.id }}" placeholder="{% trans 'Enter new vehicle type' %}">
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label small fw-semibold text-secondary">Capacity (kg)</label>
+                                                <label class="form-label small fw-semibold text-secondary">{% trans "Capacity (kg)" %}</label>
                                                 <input type="number" class="form-control" id="edit-capacity-{{ vehicle.id }}" value="{{ vehicle.capacity_kg }}">
                                             </div>
                                             <div class="mb-0">
-                                                <label class="form-label small fw-semibold text-secondary">Operational Status</label>
+                                                <label class="form-label small fw-semibold text-secondary">{% trans "Operational Status" %}</label>
                                                 <select class="form-select" id="edit-status-{{ vehicle.id }}">
                                                     {% for key, label in vehicle.STATUS_CHOICES %}
                                                     <option value="{{ key }}" {% if vehicle.status == key %}selected{% endif %}>{{ label }}</option>
@@ -165,8 +166,8 @@
                                             </div>
                                         </div>
                                         <div class="modal-footer bg-surface-alt border-top-0">
-                                            <button class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                                            <button class="btn btn-success px-4" onclick="updateVehicle({{ vehicle.id }}, this)">Save Changes</button>
+                                            <button class="btn btn-secondary px-4" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                                            <button class="btn btn-success px-4" onclick="updateVehicle({{ vehicle.id }}, this)">{% trans "Save Changes" %}</button>
                                         </div>
                                     </div>
                                 </div>
@@ -175,7 +176,7 @@
                             <tr id="empty-row">
                                 <td colspan="7" class="text-center py-5 text-muted">
                                     <i class="bi bi-truck fs-2 mb-2 d-block text-secondary"></i>
-                                    <span class="fw-medium">No vehicles registered in the fleet infrastructure yet.</span>
+                                    <span class="fw-medium">{% trans "No vehicles registered in the fleet infrastructure yet." %}</span>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -189,44 +190,44 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-success text-white border-bottom-0">
-                <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2"></i>Add New Fleet Vehicle</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2"></i>{% trans "Add New Fleet Vehicle" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <div class="mb-3">
-                    <label class="form-label small fw-semibold text-secondary">Plate Number</label>
-                    <input type="text" class="form-control" id="add-plate" placeholder="e.g., BA 1 X XXXX">
+                    <label class="form-label small fw-semibold text-secondary">{% trans "Plate Number" %}</label>
+                    <input type="text" class="form-control" id="add-plate" placeholder="{% trans 'e.g., BA 1 X XXXX' %}">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label small fw-semibold text-secondary">Vehicle Type Classification</label>
+                    <label class="form-label small fw-semibold text-secondary">{% trans "Vehicle Type Classification" %}</label>
                     <select class="form-select" id="add-type" onchange="toggleCustomType('add')">
-                        <option value="truck">Garbage Truck</option>
-                        <option value="van">Van</option>
-                        <option value="compactor">Compactor</option>
+                        <option value="truck">{% trans "Garbage Truck" %}</option>
+                        <option value="van">{% trans "Van" %}</option>
+                        <option value="compactor">{% trans "Compactor" %}</option>
                         {% for custom_type in custom_vehicle_types %}
                         <option value="{{ custom_type }}">{{ custom_type }}</option>
                         {% endfor %}
-                        <option value="__custom__">+ Add New Type...</option>
+                        <option value="__custom__">{% trans "+ Add New Type..." %}</option>
                     </select>
-                    <input type="text" class="form-control mt-2 d-none" id="add-type-custom" placeholder="Enter new vehicle type">
+                    <input type="text" class="form-control mt-2 d-none" id="add-type-custom" placeholder="{% trans 'Enter new vehicle type' %}">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label small fw-semibold text-secondary">Volumetric Capacity (kg)</label>
+                    <label class="form-label small fw-semibold text-secondary">{% trans "Volumetric Capacity (kg)" %}</label>
                     <input type="number" class="form-control" id="add-capacity" placeholder="e.g., 1200">
                 </div>
                 <div class="mb-0">
-                    <label class="form-label small fw-semibold text-secondary">Initial Fleet Status</label>
+                    <label class="form-label small fw-semibold text-secondary">{% trans "Initial Fleet Status" %}</label>
                     <select class="form-select" id="add-status">
-                        <option value="available">Available</option>
-                        <option value="on_route">On Route</option>
-                        <option value="maintenance">Under Maintenance</option>
-                        <option value="inactive">Inactive</option>
+                        <option value="available">{% trans "Available" %}</option>
+                        <option value="on_route">{% trans "On Route" %}</option>
+                        <option value="maintenance">{% trans "Under Maintenance" %}</option>
+                        <option value="inactive">{% trans "Inactive" %}</option>
                     </select>
                 </div>
             </div>
             <div class="modal-footer bg-surface-alt border-top-0">
-                <button class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success px-4" onclick="addVehicle(this)">Add Vehicle</button>
+                <button class="btn btn-secondary px-4" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button class="btn btn-success px-4" onclick="addVehicle(this)">{% trans "Add Vehicle" %}</button>
             </div>
         </div>
     </div>
@@ -254,10 +255,10 @@ const VEHICLE_TYPE_LABELS = {
 };
 
 const STATUS_LABELS = {
-    available: 'Available',
-    on_route: 'On Route',
-    maintenance: 'Under Maintenance',
-    inactive: 'Inactive',
+    available: gettext('Available'),
+    on_route: gettext('On Route'),
+    maintenance: gettext('Under Maintenance'),
+    inactive: gettext('Inactive'),
 };
 
 const STATUS_BADGE_CLASSES = {
@@ -304,7 +305,7 @@ function getEmptyStateRowHtml() {
         <tr id="empty-row">
             <td colspan="7" class="text-center py-5 text-muted">
                 <i class="bi bi-truck fs-2 mb-2 d-block text-secondary"></i>
-                <span class="fw-medium">No vehicles registered in the fleet infrastructure yet.</span>
+                <span class="fw-medium">${gettext('No vehicles registered in the fleet infrastructure yet.')}</span>
             </td>
         </tr>
     `;
@@ -327,7 +328,7 @@ window.updateVehicle = async function(vehicleId, btn) {
     const vehicleType = resolveVehicleType('edit', vehicleId);
 
     if (!vehicleType) {
-        showToast('Please enter a vehicle type.', 'warning');
+        showToast(gettext('Please enter a vehicle type.'), 'warning');
         return;
     }
 
@@ -339,14 +340,14 @@ window.updateVehicle = async function(vehicleId, btn) {
     };
 
     if (!payload.plate_number || isNaN(payload.capacity_kg)) {
-        showToast('Plate number and capacity required.', 'warning');
+        showToast(gettext('Plate number and capacity required.'), 'warning');
         return;
     }
 
     await withButtonBusy(eventButton(btn), 'Saving...', async () => {
     const data = await API.patch(`/api/vehicles/${vehicleId}/`, payload);
     if (data && data.id) {
-        showToast('Vehicle updated!', 'success');
+        showToast(gettext('Vehicle updated!'), 'success');
 
         // Update the row's cells in place using the payload we just sent.
         // These use .textContent, which is injection-safe regardless of input.
@@ -376,21 +377,21 @@ window.updateVehicle = async function(vehicleId, btn) {
         const modal = bootstrap.Modal.getInstance(modalEl);
         if (modal) modal.hide();
     } else {
-        showToast('Update failed.', 'danger');
+        showToast(gettext('Update failed.'), 'danger');
     }
     });
 };
 
 // ---------- DELETE — reliable fetch status check + instant DOM row removal ----------
 window.deleteVehicle = async function(vehicleId, btn) {
-    if (!confirm('Delete this vehicle? This cannot be undone.')) return;
+    if (!confirm(gettext('Delete this vehicle? This cannot be undone.'))) return;
 
     await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {
         const data = await API.delete(`/api/vehicles/${vehicleId}/`);
 
         if (data && !data.error && !data.detail) {
-            showToast('Vehicle deleted.', 'success');
+            showToast(gettext('Vehicle deleted.'), 'success');
 
             const row = document.getElementById(`vehicle-row-${vehicleId}`);
             if (row) {
@@ -415,7 +416,7 @@ window.deleteVehicle = async function(vehicleId, btn) {
             showToast(errMsg, 'danger');
         }
     } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
+        showToast(gettext('Network error: ') + e.message, 'danger');
     }
     });
 };
@@ -425,7 +426,7 @@ window.addVehicle = async function(btn) {
     const vehicleType = resolveVehicleType('add');
 
     if (!vehicleType) {
-        showToast('Please enter a vehicle type.', 'warning');
+        showToast(gettext('Please enter a vehicle type.'), 'warning');
         return;
     }
 
@@ -437,14 +438,14 @@ window.addVehicle = async function(btn) {
     };
 
     if (!payload.plate_number || !payload.capacity_kg) {
-        showToast('Plate number and capacity required.', 'warning');
+        showToast(gettext('Plate number and capacity required.'), 'warning');
         return;
     }
 
     await withButtonBusy(eventButton(btn), 'Adding...', async () => {
     const data = await API.post('/api/vehicles/', payload);
     if (data && data.id) {
-        showToast('Vehicle added!', 'success');
+        showToast(gettext('Vehicle added!'), 'success');
 
         const tbody = document.getElementById('vehicles-tbody');
         const badgeClass = STATUS_BADGE_CLASSES[payload.status] || 'bg-secondary-subtle text-secondary border-secondary-subtle';
@@ -481,10 +482,10 @@ window.addVehicle = async function(btn) {
                 <td><span class="text-muted">—</span></td>
                 <td class="pe-4 text-end">
                     <div class="btn-group btn-group-sm" role="group">
-                        <button class="btn btn-outline-secondary rounded-start" disabled title="Refresh page to edit new vehicle">
+                        <button class="btn btn-outline-secondary rounded-start" disabled title="${gettext('Refresh page to edit new vehicle')}">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn btn-outline-danger rounded-end" onclick="deleteVehicle(${data.id}, this)" title="Delete Vehicle Info">
+                        <button class="btn btn-outline-danger rounded-end" onclick="deleteVehicle(${data.id}, this)" title="${gettext('Delete Vehicle Info')}">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
@@ -509,7 +510,7 @@ window.addVehicle = async function(btn) {
         const modal = bootstrap.Modal.getInstance(modalEl);
         if (modal) modal.hide();
     } else {
-        showToast('Failed to add vehicle.', 'danger');
+        showToast(gettext('Failed to add vehicle.'), 'danger');
     }
     });
 };
