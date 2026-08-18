@@ -131,6 +131,7 @@ else:  # SQLite (default for development)
         }
     }
 
+GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID', default='')
 # ─── Caching ───────────────────────────────────────────────────────────────────
 # Default: In-memory cache for development. Switch to Redis for production.
 CACHES = {
