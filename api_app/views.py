@@ -70,6 +70,8 @@ backup_logger = logging.getLogger('backup')  # same logger name as backup_utils.
 # Driver ले "Completed" mark गर्ने बेला उनको GPS pickup location भन्दा यो
 # थ्रेसहोल्ड (मिटरमा) भन्दा टाढा भए suspicious मानिन्छ — admin लाई flag देखाइन्छ।
 COMPLETION_DISTANCE_THRESHOLD_METERS = 500
+import csv
+from django.http import HttpResponse
 
 
 def _haversine_meters(lat1, lng1, lat2, lng2):
@@ -980,10 +982,11 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         """
         create (submitting a new pickup request) chai guest (login nagareko) lai pani
         khula rakhne.
-        assign_driver / update_status chai driver/admin le use garne action ho —
-        yaha IsOwnerOrAdmin apply garda driver "owner" nabhako le 403 aauthyo,
-        tesैle yi lai IsAuthenticated matra rakheर, role-check function bhitra nai
-        (already existing) garne.
+        assign_driver / update_status / bulk_assign_driver / bulk_cancel chai
+        driver/admin le use garne action ho — yaha IsOwnerOrAdmin apply garda
+        driver "owner" nabhako le 403 aauthyo, tesैle yi lai IsAuthenticated
+        matra rakheर, role-check function bhitra nai (already existing) garne.
+        bulk_export / resolve_review chai admin-only action ho.
         soft_delete / restore chai request ko malik (owner) le afैle Recycle Bin
         ma sarne / restore garne action ho, tesैle IsOwnerOrAdmin nai lagau —
         owner ra admin duवैले use garna paaun.
@@ -991,8 +994,10 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         """
         if self.action == 'create':
             return [AllowAny()]
-        if self.action in ('assign_driver', 'update_status'):
+        if self.action in ('assign_driver', 'update_status', 'bulk_assign_driver', 'bulk_cancel'):
             return [IsAuthenticated()]
+        if self.action in ('bulk_export', 'resolve_review'):
+            return [IsAuthenticated(), IsAdminUser()]
         return [IsAuthenticated(), IsOwnerOrAdmin()]
 
     def get_queryset(self):
@@ -1004,9 +1009,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             'driver__vehicle',
         ).prefetch_related('extra_photos')
 
-        # Anonymous user le create bahek arko kunai action hit garyo bhane
-        # (theoretically hunu hudaina kina ki get_permissions le block garcha),
-        # safety net ko lagi khali queryset return garne.
         if not user.is_authenticated:
             return base_qs.none()
 
@@ -1017,12 +1019,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         else:
             qs = base_qs.filter(user=user)
 
-        # Recycle Bin ma sareko (soft-deleted) request haru default LIST
-        # (dashboard/list) ma nadekhine. Detail-level actions (restore,
-        # soft_delete, destroy, retrieve, ...) ma chai yo filter LAGAUNE HOINA —
-        # natra get_object() le Recycle Bin ma bhaisakeko item nai "list" bhitra
-        # nadekheर 404 dinthyo (Restore / Delete Forever button haru fail huनु
-        # ko karan yehi thiyo).
         if self.action == 'list':
             include_deleted = self.request.query_params.get('include_deleted', '').lower() == 'true'
             only_deleted = self.request.query_params.get('deleted_only', '').lower() == 'true'
@@ -1037,14 +1033,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         return qs.order_by('-created_at')
 
     def create(self, request, *args, **kwargs):
-        """
-        FIX: previously the 'extra_photos' loop in perform_create() had no
-        cap at all — a request could attach any number of extra photos,
-        each one an unvalidated, uncompressed file write. Reject an
-        excessive count here, BEFORE serializer.save() runs, so a bad
-        request doesn't create a WasteRequest row (and run ML inference
-        on the primary photo) only to be rejected afterwards anyway.
-        """
         extra_files = request.FILES.getlist('extra_photos')
         max_extra = getattr(settings, 'MAX_EXTRA_PHOTOS', 5)
         if len(extra_files) > max_extra:
@@ -1059,21 +1047,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         user = self.request.user if self.request.user.is_authenticated else None
         waste_request = serializer.save(user=user)
 
-        # Frontend le 'extra_photos' key ma pahilo photo bahekका baँki sabai
-        # photo haru pathaउँछ — tiनीहरूलाई WasteRequestPhoto table ma save garne.
-        # GPS chai frontend le 'extra_photos_latitude' / 'extra_photos_longitude'
-        # array haru pathayo bhane (same index alignment), tyo pani save garne —
-        # natra photo_latitude/longitude sabै NULL nai rahanchha.
-        #
-        # FIX: previously these went straight into WasteRequestPhoto.objects.create()
-        # completely unvalidated — no size cap, no MIME sniff, no polyglot
-        # stripping, no compression. Only the PRIMARY photo went through the
-        # serializer's validate_photo() pipeline. Now every extra photo runs
-        # through the same validate_image_file -> sanitize_image ->
-        # compress_image pipeline before being saved. A single bad extra
-        # photo is skipped rather than failing the whole request, since the
-        # WasteRequest row (and primary photo) have already been validated
-        # and committed by this point.
         extra_files = self.request.FILES.getlist('extra_photos')
         extra_lats = self.request.POST.getlist('extra_photos_latitude')
         extra_lngs = self.request.POST.getlist('extra_photos_longitude')
@@ -1108,8 +1081,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 f'{user.username} submitted pickup request #{waste_request.id}{photo_note}'
             )
         elif waste_request.guest_email:
-            # Guest submission with an optional email given — send the
-            # backup claim link (see send_guest_claim_email docstring).
             try:
                 send_guest_claim_email(waste_request, self.request)
             except Exception:
@@ -1127,16 +1098,13 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         driver_id = request.data.get('driver_id')
         try:
             driver = Driver.objects.select_related('user').get(id=driver_id)
-        except Driver.DoesNotExist:
-            return Response({'error': 'Driver not found.'}, status=status.HTTP_404_NOT_FOUND)
+        except (Driver.DoesNotExist, ValueError, TypeError):
+            return Response({'error': 'Driver not found or invalid driver_id.'}, status=status.HTTP_404_NOT_FOUND)
 
         waste_request.driver = driver
         waste_request.status = 'assigned'
         waste_request.save(update_fields=['driver', 'status'])
 
-        # Everyone reporting this same spot is really one job, so hand the
-        # whole cluster to the same driver instead of dispatching several
-        # drivers to the same pile of waste.
         siblings = _same_location_siblings(waste_request)
         for sibling in siblings:
             sibling.driver = driver
@@ -1149,39 +1117,40 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             f'Assigned driver {driver.user.username} to request #{waste_request.id}{grouped_note}'
         )
 
-        # Notify the other reporters that their report is being handled too.
-        for sibling in siblings:
-            if sibling.user_id:
+        try:
+            for sibling in siblings:
+                if sibling.user_id:
+                    _create_notification(
+                        user=sibling.user,
+                        title='Driver Assigned',
+                        message=f'Driver {driver.user.username} has been assigned to your request.',
+                        notification_type='info',
+                        related_request=sibling,
+                    )
+
+            if waste_request.user_id:
                 _create_notification(
-                    user=sibling.user,
+                    user=waste_request.user,
                     title='Driver Assigned',
                     message=f'Driver {driver.user.username} has been assigned to your request.',
                     notification_type='info',
-                    related_request=sibling,
+                    related_request=waste_request,
                 )
 
-        # Notify user (guest/anonymous requests won't have a user to notify)
-        if waste_request.user_id:
-            _create_notification(
-                user=waste_request.user,
-                title='Driver Assigned',
-                message=f'Driver {driver.user.username} has been assigned to your request.',
+            _notify_driver(
+                driver,
+                title='New Pickup Assigned',
+                message=f'You have been assigned pickup request #{waste_request.id}'
+                        f'{" at " + waste_request.pickup_address if waste_request.pickup_address else ""}.',
                 notification_type='info',
                 related_request=waste_request,
             )
-
-        # Also notify the driver themselves — this is what makes the
-        # toast/badge show up on their dashboard when admin hands them a
-        # new pickup directly (as opposed to via generate_optimal below).
-        # This is the ESSENTIAL notification for the driver on this action.
-        _notify_driver(
-            driver,
-            title='New Pickup Assigned',
-            message=f'You have been assigned pickup request #{waste_request.id}'
-                    f'{" at " + waste_request.pickup_address if waste_request.pickup_address else ""}.',
-            notification_type='info',
-            related_request=waste_request,
-        )
+        except Exception:
+            logger.warning(
+                f'[ASSIGN_DRIVER] notification push failed for request={waste_request.id} '
+                f'— driver/status was already saved successfully, only the live '
+                f'toast/notification failed (e.g. channel layer unavailable).'
+            )
 
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
@@ -1192,7 +1161,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             return Response({'error': 'guest_tokens (list) is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         qs = WasteRequest.objects.filter(guest_token__in=tokens, user__isnull=True)
-        claimed_requests = list(qs)  # update() अघि instance haru चाहिन्छ (id र notification को लागि)
+        claimed_requests = list(qs)
         claimed_ids = [wr.id for wr in claimed_requests]
         claimed_count = qs.update(user=request.user)
 
@@ -1202,7 +1171,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 f'{request.user.username} claimed {claimed_count} guest request(s): {claimed_ids}'
             )
 
-            # ── User लाई notify गर्ने — यही हिस्सा हराएको थियो ──────────────
             for wr in claimed_requests:
                 _create_notification(
                     user=request.user,
@@ -1216,21 +1184,9 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             'claimed': claimed_count,
             'claimed_ids': claimed_ids,
         })
+
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def update_status(self, request, pk=None):
-        """
-        PATCH /api/waste-requests/{id}/update_status/ — driver/admin updates status.
-        Apawad (exception): request ko malik (owner) le aफnै 'pending' request lai
-        'cancelled' ma matra move garna paaucha — home.html/user_requests.html ko
-        "Cancel" button le yehi endpoint use garcha, tesैle purano role-check le
-        normal 'user' lai 403 dinthyo.
-
-        GPS ENFORCEMENT (new): new_status == 'completed' huda driver/admin le
-        latitude/longitude pathaunai parcha — natra hard-block, DB ma kehi
-        pani save hunna. Yo GPS lai pickup location sanga compare gareर
-        completion_flagged set garincha, jasले admin lai suspicious
-        (location mismatch) completion haru chinnu dincha.
-        """
         waste_request = self.get_object()
         user = request.user
         new_status = request.data.get('status')
@@ -1248,12 +1204,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         if new_status not in valid_statuses:
             return Response({'error': f'Invalid status. Choose: {valid_statuses}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # ── HARD BLOCK: GPS चाहिन्छ, नत्र "Completed" mark गर्न मिल्दैन ──────
-        # This applies to DRIVERS, who are meant to be standing at the pickup
-        # when they close a job — their GPS is the proof of that. Admins are
-        # doing back-office corrections from a desk (closing stale jobs,
-        # fixing a driver's mistake) and have no meaningful location to send,
-        # so requiring it from them would just block legitimate admin work.
         comp_lat = comp_lng = None
         if new_status == 'completed':
             raw_lat = request.data.get('latitude')
@@ -1279,19 +1229,14 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             waste_request.completed_at = timezone.now()
             update_fields.append('completed_at')
 
-            # Driver ले पठाएको वास्तविक GPS save गर्ने
             waste_request.completion_latitude = comp_lat
             waste_request.completion_longitude = comp_lng
             update_fields += ['completion_latitude', 'completion_longitude']
 
-            # Pickup location (लगभग जहाँ फोहोर रिपोर्ट भएको थियो) सँग तुलना गर्ने —
-            # latitude/longitude नभए photo_latitude/longitude fallback गर्ने
             pickup_lat = waste_request.latitude if waste_request.latitude is not None else waste_request.photo_latitude
             pickup_lng = waste_request.longitude if waste_request.longitude is not None else waste_request.photo_longitude
 
             if comp_lat is None or comp_lng is None:
-                # Admin desk-closure: no location to compare against, so there
-                # is nothing to flag.
                 waste_request.completion_distance_meters = None
                 waste_request.completion_flagged = False
                 update_fields += ['completion_distance_meters', 'completion_flagged']
@@ -1308,14 +1253,10 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                         f'reported pickup location by driver {user.username} — flagged for admin review.'
                     )
             else:
-                # Pickup को आफ्नै GPS छैन भने compare गर्न सकिँदैन — flag नगर्ने
                 waste_request.completion_distance_meters = None
                 waste_request.completion_flagged = False
                 update_fields += ['completion_distance_meters', 'completion_flagged']
 
-        # Owner le aफnै request cancel garyo bhane, seedhai Recycle Bin ma pani
-        # sarne — home/"My Requests" bata haraera Recycle Bin ma dekhincha,
-        # jahaँ bata pachi restore ya permanently delete garna milcha.
         if is_owner_self_cancel:
             waste_request.is_deleted = True
             waste_request.deleted_at = timezone.now()
@@ -1323,21 +1264,11 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
         waste_request.save(update_fields=update_fields)
 
-        # Bump the driver's lifetime trip counter the FIRST time a request
-        # becomes 'completed' (guarded by old_status != 'completed' so
-        # re-saving/re-triggering an already-completed request doesn't
-        # double-count it). This is what "Total Trips" on the driver
-        # dashboard reads from — without this it always stays at 0.
         if new_status == 'completed' and old_status != 'completed' and waste_request.driver_id:
             Driver.objects.filter(pk=waste_request.driver_id).update(
                 total_trips=F('total_trips') + 1
             )
 
-        # ── Close out the rest of the cluster ────────────────────────────────
-        # The driver cleared one physical spot, so every other open report of
-        # that same spot is done too. Doing this here means the other reporters
-        # get told, instead of being left with a report that stays "pending"
-        # forever against waste that no longer exists.
         completed_siblings = []
         if new_status == 'completed' and old_status != 'completed':
             for sibling in _same_location_siblings(waste_request):
@@ -1362,60 +1293,49 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                     f'{[s.id for s in completed_siblings]}'
                 )
 
-        # Log all status changes, including self-cancels, so users' own
-        # actions on their requests appear in the audit trail too.
         _log_admin_action(
             request, 'status_change', 'WasteRequest', waste_request,
             f'Request #{waste_request.id} status changed to {new_status} by {user.username}'
         )
 
-        # Guest/anonymous requests won't have a user to notify.
-        # On completion every reporter in the cluster hears about it — each
-        # against their OWN request, so the notification links somewhere
-        # meaningful for them rather than to a stranger's report.
-        if new_status == 'completed':
-            for closed in [waste_request] + completed_siblings:
-                if closed.user_id:
-                    _create_notification(
-                        user=closed.user,
-                        title='Report Completed',
-                        message=f'Your report #{closed.id} has been completed. Thank you!',
-                        notification_type='success',
-                        related_request=closed,
-                    )
-        elif waste_request.user_id:
-            _create_notification(
-                user=waste_request.user,
-                title='Request Status Updated',
-                message=f'Your request status changed to: {new_status}.',
-                notification_type='info',
-                related_request=waste_request,
-            )
+        try:
+            if new_status == 'completed':
+                for closed in [waste_request] + completed_siblings:
+                    if closed.user_id:
+                        _create_notification(
+                            user=closed.user,
+                            title='Report Completed',
+                            message=f'Your report #{closed.id} has been completed. Thank you!',
+                            notification_type='success',
+                            related_request=closed,
+                        )
+            elif waste_request.user_id:
+                _create_notification(
+                    user=waste_request.user,
+                    title='Request Status Updated',
+                    message=f'Your request status changed to: {new_status}.',
+                    notification_type='info',
+                    related_request=waste_request,
+                )
 
-        # If an admin (not the driver themselves) changes the status
-        # on a request that has an assigned driver, let that driver know
-        # too — e.g. admin marks something cancelled/reassigned on their
-        # behalf while they're out on the road. Essential for the driver
-        # so they don't keep working a job that's been pulled/changed.
-        if user.role == 'admin' and waste_request.driver_id:
-            _notify_driver(
-                waste_request.driver,
-                title='Request Status Changed',
-                message=f'Request #{waste_request.id} was updated to "{new_status}" by an admin.',
-                notification_type='info',
-                related_request=waste_request,
+            if user.role == 'admin' and waste_request.driver_id:
+                _notify_driver(
+                    waste_request.driver,
+                    title='Request Status Changed',
+                    message=f'Request #{waste_request.id} was updated to "{new_status}" by an admin.',
+                    notification_type='info',
+                    related_request=waste_request,
+                )
+        except Exception:
+            logger.warning(
+                f'[UPDATE_STATUS] notification push failed for request={waste_request.id} '
+                f'— status was already saved successfully.'
             )
 
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
     @action(detail=True, methods=['patch'])
     def soft_delete(self, request, pk=None):
-        """
-        PATCH /api/waste-requests/{id}/soft_delete/
-        Hard-delete nagari request lai Recycle Bin ma sarne.
-        get_object() le already IsOwnerOrAdmin check garisakeko huncha, so
-        yaha thap role-check chaहिदैन.
-        """
         waste_request = self.get_object()
         waste_request.is_deleted = True
         waste_request.deleted_at = timezone.now()
@@ -1424,13 +1344,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['patch'])
     def restore(self, request, pk=None):
-        """
-        PATCH /api/waste-requests/{id}/restore/
-        Recycle Bin bata request lai pheri saकिय (active) list ma फर्काउने.
-        Cancel garera bin ma aayeko request bhaye, restore garda status pani
-        'pending' ma farkincha — natra 'cancelled' nai rahera home/"My Requests"
-        ma active jasto dekhinthyo tara kaम nagarne huन्थ्यो.
-        """
         waste_request = self.get_object()
         update_fields = ['is_deleted', 'deleted_at']
         waste_request.is_deleted = False
@@ -1443,14 +1356,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def recycle_bin(self, request):
-        """
-        GET /api/waste-requests/recycle_bin/
-        Logged-in user (ya admin/driver) ko soft-deleted request haru list
-        garne — sidebar ko Recycle Bin badge (base.html) le yehi endpoint
-        fetch garcha count populate garna. Ownership scoping get_queryset()
-        sanga same rakheko (user/driver/admin), tara yaha 'list' action
-        haina, tesैle is_deleted=True lai explicitly filter garnu pareko.
-        """
         base_qs = WasteRequest.objects.select_related(
             'user', 'driver', 'driver__user', 'driver__vehicle',
         ).prefetch_related('extra_photos')
@@ -1466,7 +1371,199 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
 
+    # ────────────────────────────────────────────────────────────────────
+    # bulk_export — admin_requests.html को "Export Filtered/Selected (CSV)"
+    # button haru le call garne. Shared _write_csv_response() helper le
+    # BOM (Excel मा Nepali/देवनागरी text सही देखिन) र formula-injection
+    # guard (_csv_safe) दुवै handle गर्छ। _write_csv_response / _csv_safe
+    # र IsAdminUser माथि module-level मा already import/define भएको हुनुपर्छ।
+    # ────────────────────────────────────────────────────────────────────
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def bulk_export(self, request):
+        """
+        GET /api/waste-requests/bulk_export/
+        - ?ids=1,2,3                         -> ती specific IDs मात्र export
+        - ?status=&waste_type=&search=&report_date=&needs_review=
+                                              -> admin_requests.html को filter
+                                                 form जस्तै filter गरेर export
+        """
+        ids_param = request.query_params.get('ids')
+        qs = WasteRequest.objects.select_related('user', 'driver__user').order_by('-created_at')
 
+        if ids_param:
+            ids = [int(i) for i in ids_param.split(',') if i.strip().isdigit()]
+            qs = qs.filter(id__in=ids)
+        else:
+            status_filter = request.query_params.get('status')
+            waste_type_filter = request.query_params.get('waste_type')
+            search_query = request.query_params.get('search', '').strip()
+            report_date = request.query_params.get('report_date', '').strip()
+            needs_review = request.query_params.get('needs_review', '').strip().lower()
+
+            if status_filter:
+                qs = qs.filter(status=status_filter)
+            if waste_type_filter:
+                qs = qs.filter(waste_type=waste_type_filter)
+            if needs_review == 'true':
+                qs = qs.filter(needs_manual_review=True)
+            if search_query:
+                search_filters = (
+                    Q(user__username__icontains=search_query) |
+                    Q(pickup_address__icontains=search_query)
+                )
+                if search_query.isdigit():
+                    search_filters |= Q(id=int(search_query))
+                qs = qs.filter(search_filters)
+            if report_date:
+                qs = qs.filter(
+                    Q(created_at__date=report_date) | Q(scheduled_date__date=report_date)
+                )
+
+        header = ['ID', 'Status', 'Waste Type', 'Pickup Address', 'Citizen', 'Driver', 'Created At', 'Completed At']
+        rows = (
+            [
+                wr.id,
+                wr.get_status_display(),
+                wr.get_waste_type_display(),
+                wr.pickup_address or '',
+                wr.user.username if wr.user else 'Guest',
+                wr.driver.user.username if wr.driver and wr.driver.user else '',
+                wr.created_at.strftime('%Y-%m-%d %H:%M') if wr.created_at else '',
+                wr.completed_at.strftime('%Y-%m-%d %H:%M') if wr.completed_at else '',
+            ]
+            for wr in qs.iterator(chunk_size=500)
+        )
+        return _write_csv_response('waste_requests.csv', header, rows)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def bulk_assign_driver(self, request):
+        """POST /api/waste-requests/bulk_assign_driver/ — {ids: [...], driver_id: n}"""
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin only.'}, status=status.HTTP_403_FORBIDDEN)
+
+        ids = request.data.get('ids', [])
+        driver_id = request.data.get('driver_id')
+        if not ids or not isinstance(ids, list):
+            return Response({'error': 'ids (list) is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            driver = Driver.objects.select_related('user').get(id=driver_id)
+        except (Driver.DoesNotExist, ValueError, TypeError):
+            return Response({'error': 'Driver not found or invalid driver_id.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            clean_ids = [int(i) for i in ids]
+        except (TypeError, ValueError):
+            return Response({'error': 'ids must be a list of integers.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        eligible_qs = WasteRequest.objects.filter(
+            id__in=clean_ids, is_deleted=False, needs_manual_review=False,
+        ).exclude(status__in=['completed', 'cancelled'])
+        found_ids = list(eligible_qs.values_list('id', flat=True))
+        missing_ids = [i for i in clean_ids if not WasteRequest.objects.filter(id=i).exists()]
+        ineligible_ids = [i for i in clean_ids if i not in found_ids and i not in missing_ids]
+
+        updated = eligible_qs.update(driver=driver, status='assigned')
+
+        try:
+            for wr in WasteRequest.objects.filter(id__in=found_ids).select_related('user'):
+                if wr.user_id:
+                    _create_notification(
+                        user=wr.user,
+                        title='Driver Assigned',
+                        message=f'Driver {driver.user.username} has been assigned to your request.',
+                        notification_type='info',
+                        related_request=wr,
+                    )
+            if updated:
+                _notify_driver(
+                    driver,
+                    title='New Pickups Assigned',
+                    message=f'You have been assigned {updated} new pickup request(s).',
+                    notification_type='info',
+                )
+        except Exception:
+            logger.warning('[BULK_ASSIGN_DRIVER] notification push failed, DB update already committed.')
+
+        _log_admin_action(
+            request, 'assign', 'WasteRequest', None,
+            f'Bulk-assigned driver {driver.user.username} to {updated} request(s): {found_ids}'
+        )
+
+        return Response({
+            'updated': updated,
+            'updated_ids': found_ids,
+            'missing_ids': missing_ids,
+            'ineligible_ids': ineligible_ids,
+        })
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def bulk_cancel(self, request):
+        """POST /api/waste-requests/bulk_cancel/ — {ids: [...]}"""
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin only.'}, status=status.HTTP_403_FORBIDDEN)
+
+        ids = request.data.get('ids', [])
+        if not ids or not isinstance(ids, list):
+            return Response({'error': 'ids (list) is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            clean_ids = [int(i) for i in ids]
+        except (TypeError, ValueError):
+            return Response({'error': 'ids must be a list of integers.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = WasteRequest.objects.filter(id__in=clean_ids, status='pending', is_deleted=False)
+        found_ids = list(qs.values_list('id', flat=True))
+        missing_ids = [i for i in clean_ids if i not in found_ids]
+        updated = qs.update(status='cancelled')
+
+        _log_admin_action(
+            request, 'status_change', 'WasteRequest', None,
+            f'Bulk-cancelled {updated} request(s): {found_ids}'
+        )
+        return Response({
+            'updated': updated,
+            'updated_ids': found_ids,
+            'missing_ids': missing_ids,
+        })
+
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def resolve_review(self, request, pk=None):
+        """PATCH /api/waste-requests/{id}/resolve_review/ — {decision: 'approve'|'reject'}"""
+        waste_request = self.get_object()
+        decision = request.data.get('decision')
+        if decision not in ('approve', 'reject'):
+            return Response({'error': "decision must be 'approve' or 'reject'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        waste_request.needs_manual_review = False
+        update_fields = ['needs_manual_review']
+
+        if decision == 'reject':
+            waste_request.status = 'cancelled'
+            update_fields.append('status')
+
+        waste_request.save(update_fields=update_fields)
+
+        _log_admin_action(
+            request, 'status_change', 'WasteRequest', waste_request,
+            f'Manual review resolved as "{decision}" for request #{waste_request.id} by {request.user.username}'
+        )
+
+        if decision == 'reject' and waste_request.user_id:
+            try:
+                _create_notification(
+                    user=waste_request.user,
+                    title='Request Cancelled',
+                    message=f'Your request #{waste_request.id} was reviewed and cancelled — the photo did not '
+                            f'appear to show reportable waste.',
+                    notification_type='warning',
+                    related_request=waste_request,
+                )
+            except Exception:
+                logger.warning(f'[RESOLVE_REVIEW] notification push failed for request={waste_request.id}.')
+
+        return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
+    
 class RouteViewSet(viewsets.ModelViewSet):
     """Route planning and management. Admin only for write."""
     queryset = Route.objects.select_related('driver__user', 'vehicle').prefetch_related(
@@ -1737,7 +1834,6 @@ class RouteViewSet(viewsets.ModelViewSet):
             'route_data': route_data,
         }, status=status.HTTP_201_CREATED)
 
-
 class ScheduleViewSet(viewsets.ModelViewSet):
     """Recurring collection schedules. Admin manages, all read."""
     queryset = Schedule.objects.select_related('driver__user', 'vehicle').all()
@@ -1746,6 +1842,14 @@ class ScheduleViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['zone_name', 'frequency', 'driver__user__username']
 
+    def get_permissions(self):
+        # bulk_export chai admin-only — IsAdminOrReadOnly le GET lai
+        # kunai pani authenticated user lai khula rakhchha, tara CSV
+        # export chai sensitive/bulk data ho tesैle strictly admin matra.
+        if self.action == 'bulk_export':
+            return [IsAuthenticated(), IsAdminUser()]
+        return super().get_permissions()
+
     def perform_create(self, serializer):
         schedule = serializer.save()
         _log_admin_action(self.request, 'create', 'Schedule', schedule, f'Created schedule for {schedule.zone_name}')
@@ -1753,13 +1857,16 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         # Let the assigned driver know they've got a new recurring
         # zone schedule — essential info for planning their week.
         if schedule.driver_id:
-            _notify_driver(
-                schedule.driver,
-                title='New Zone Schedule Assigned',
-                message=f'You have been assigned to the "{schedule.zone_name}" collection '
-                        f'schedule ({schedule.get_frequency_display()}).',
-                notification_type='info',
-            )
+            try:
+                _notify_driver(
+                    schedule.driver,
+                    title='New Zone Schedule Assigned',
+                    message=f'You have been assigned to the "{schedule.zone_name}" collection '
+                            f'schedule ({schedule.get_frequency_display()}).',
+                    notification_type='info',
+                )
+            except Exception:
+                logger.warning(f'[SCHEDULE CREATE] notification push failed for schedule={schedule.id}.')
 
     def perform_update(self, serializer):
         schedule = serializer.save()
@@ -1768,17 +1875,57 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         # Same as above, for edits (e.g. day/frequency changed, or a
         # driver newly assigned via the edit flow rather than at creation).
         if schedule.driver_id:
-            _notify_driver(
-                schedule.driver,
-                title='Zone Schedule Updated',
-                message=f'Your collection schedule for "{schedule.zone_name}" has been updated.',
-                notification_type='info',
-            )
+            try:
+                _notify_driver(
+                    schedule.driver,
+                    title='Zone Schedule Updated',
+                    message=f'Your collection schedule for "{schedule.zone_name}" has been updated.',
+                    notification_type='info',
+                )
+            except Exception:
+                logger.warning(f'[SCHEDULE UPDATE] notification push failed for schedule={schedule.id}.')
 
     def perform_destroy(self, instance):
         _log_admin_action(self.request, 'delete', 'Schedule', instance, f'Removed schedule for {instance.zone_name}')
         instance.delete()
 
+    # ────────────────────────────────────────────────────────────────────
+    # NEW: bulk_export — admin_schedules.html को "Export (CSV)" button ले
+    # call garne. Pahile यो action bilkulai thiyeन, tesैle 404 aairakheko
+    # thiyo (screenshot ma dekhieko jasто).
+    # ────────────────────────────────────────────────────────────────────
+    @action(detail=False, methods=['get'])
+    def bulk_export(self, request):
+        """
+        GET /api/schedules/bulk_export/
+        - ?ids=1,2,3    -> ती specific IDs मात्र export
+        - ?driver_id=    -> optional, specific driver को schedule मात्र
+        """
+        ids_param = request.query_params.get('ids')
+        qs = Schedule.objects.select_related('driver__user', 'vehicle').order_by('zone_name')
+
+        if ids_param:
+            ids = [int(i) for i in ids_param.split(',') if i.strip().isdigit()]
+            qs = qs.filter(id__in=ids)
+        else:
+            driver_id = request.query_params.get('driver_id')
+            if driver_id and driver_id.isdigit():
+                qs = qs.filter(driver_id=int(driver_id))
+
+        header = ['ID', 'Zone Name', 'Day', 'Frequency', 'Driver', 'Vehicle', 'Active']
+        rows = (
+            [
+                sch.id,
+                sch.zone_name,
+                sch.get_day_display() if hasattr(sch, 'get_day_display') else getattr(sch, 'day', ''),
+                sch.get_frequency_display(),
+                sch.driver.user.username if sch.driver and sch.driver.user else '',
+                sch.vehicle.plate_number if sch.vehicle else '',
+                'Yes' if getattr(sch, 'is_active', True) else 'No',
+            ]
+            for sch in qs.iterator(chunk_size=500)
+        )
+        return _write_csv_response('schedules.csv', header, rows)
 
 class NotificationViewSet(viewsets.ModelViewSet):
     """
@@ -1858,13 +2005,48 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
         _log_admin_action(self.request, 'delete', 'SystemSettings', instance, f'Deleted setting {instance.key}')
         instance.delete()
 
+ 
+def _csv_safe(value):
+    """
+    Formula-injection guard: Excel/Sheets ले CSV खोल्दा '=', '+', '-', '@'
+    बाट सुरु हुने cell लाई formula ठान्छ (e.g. someone typing
+    '=HYPERLINK(...)' into pickup_address/description). Leading apostrophe
+    थपेर त्यसलाई plain text बनाइदिन्छ।
+    """
+    if value is None:
+        return ''
+    s = str(value)
+    if s and s[0] in ('=', '+', '-', '@'):
+        return "'" + s
+    return s
+ 
+ 
+def _write_csv_response(filename, header, rows):
+    """
+    Shared CSV writer:
+    - UTF-8 BOM (utf-8-sig) थप्छ ताकि Excel ले नेपाली/देवनागरी अक्षर सही
+      देखाओस् (BOM नभए Excel मा mojibake/अस्पष्ट अक्षर देखिन्छ).
+    - हरेक cell value _csv_safe() बाट पास गरिन्छ (formula-injection guard).
+    - `rows` कुनै पनि iterable हुन सक्छ — ठूलो queryset भए .iterator()
+      pass गर्नुहोस्, memory मा सबै load नगरियोस्।
+    """
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response.write('\ufeff')  # BOM
+    writer = csv.writer(response)
+    writer.writerow(header)
+    for row in rows:
+        writer.writerow([_csv_safe(v) for v in row])
+    return response
+ 
 
 class ComplaintViewSet(viewsets.ModelViewSet):
     """
     User complaints.
     - Regular users: create + view/edit their own complaints only.
     - Admins: full access, plus the update_status action to move a
-      complaint through pending -> under_review -> completed.
+      complaint through pending -> under_review -> completed, and
+      bulk_export to download the filtered/complete list as CSV.
     """
     serializer_class = ComplaintSerializer
     permission_classes = [IsAuthenticated]
@@ -1872,24 +2054,26 @@ class ComplaintViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['subject', 'description', 'status', 'user__username']
     ordering_fields = ['created_at', 'status']
-
+ 
     def get_permissions(self):
         if self.action == 'update_status':
             return [IsAuthenticated(), IsAdminUser()]
+        if self.action == 'bulk_export':
+            return [IsAuthenticated(), IsAdminUser()]
         return [IsAuthenticated(), IsOwnerOrAdmin()]
-
+ 
     def get_queryset(self):
         user = self.request.user
         qs = Complaint.objects.select_related('user')
-
+ 
         if user.role != 'admin':
             qs = qs.filter(user=user)
-
+ 
         status_filter = self.request.query_params.get('status')
         if status_filter:
             qs = qs.filter(status=status_filter)
         return qs.order_by('-created_at')
-
+ 
     def perform_create(self, serializer):
         complaint = serializer.save(user=self.request.user)
         _log_admin_action(
@@ -1903,7 +2087,7 @@ class ComplaintViewSet(viewsets.ModelViewSet):
             message=f'{self.request.user.username} filed a complaint: "{complaint.subject}".',
             notification_type='warning',
         )
-
+ 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
     def update_status(self, request, pk=None):
         """PATCH /api/complaints/{id}/update_status/ — admin updates complaint status."""
@@ -1912,23 +2096,67 @@ class ComplaintViewSet(viewsets.ModelViewSet):
         valid_statuses = [s[0] for s in Complaint.STATUS_CHOICES]
         if new_status not in valid_statuses:
             return Response({'error': f'Invalid status. Choose: {valid_statuses}'}, status=status.HTTP_400_BAD_REQUEST)
-
+ 
         complaint.status = new_status
         update_fields = ['status']
         if 'admin_response' in request.data:
             complaint.admin_response = request.data['admin_response']
             update_fields.append('admin_response')
         complaint.save(update_fields=update_fields)
-
+ 
         _log_admin_action(
             request, 'status_change', 'Complaint', complaint,
             f'Complaint #{complaint.id} status changed to {new_status}'
         )
-
-        _create_notification(
-            user=complaint.user,
-            title='Complaint Status Updated',
-            message=f'Your complaint "{complaint.subject}" status changed to: {complaint.get_status_display()}.',
-            notification_type='success' if new_status == 'completed' else 'info',
-        )
+ 
+        # FIX: notification push wrapped so a channel-layer/notification
+        # hiccup can never turn an already-saved status change into a 500
+        # for the admin (same pattern applied to WasteRequestViewSet).
+        try:
+            _create_notification(
+                user=complaint.user,
+                title='Complaint Status Updated',
+                message=f'Your complaint "{complaint.subject}" status changed to: {complaint.get_status_display()}.',
+                notification_type='success' if new_status == 'completed' else 'info',
+            )
+        except Exception:
+            logger.warning(f'[COMPLAINT UPDATE_STATUS] notification push failed for complaint={complaint.id}.')
+ 
         return Response(ComplaintSerializer(complaint, context={'request': request}).data)
+ 
+    # ────────────────────────────────────────────────────────────────────
+    # NEW: bulk_export — admin_complaints.html को "Export (CSV)" button ले
+    # call garne. Pahile यो action bilkulai thiyeन, tesैle 404 aairakheko
+    # thiyo (screenshot ma dekhieko jasто).
+    # ────────────────────────────────────────────────────────────────────
+    @action(detail=False, methods=['get'])
+    def bulk_export(self, request):
+        """
+        GET /api/complaints/bulk_export/
+        - ?ids=1,2,3   -> ती specific IDs मात्र export
+        - ?status=      -> admin_complaints.html को status filter जस्तै
+        Admin ले सबै complaints export गर्न पाउँछ; गैर-admin (यदि यो
+        endpoint कहिल्यै regular user बाट hit भयो भने) आफ्ना मात्र पाउँछ —
+        get_queryset() ले पहिल्यै त्यो scoping गरिसकेको छ।
+        """
+        ids_param = request.query_params.get('ids')
+        qs = self.get_queryset()  # already role-scoped + status-filtered from query params
+ 
+        if ids_param:
+            ids = [int(i) for i in ids_param.split(',') if i.strip().isdigit()]
+            qs = qs.filter(id__in=ids)
+ 
+        header = ['ID', 'User', 'Type', 'Description', 'Status', 'Admin Response', 'Date']
+        rows = (
+            [
+                c.id,
+                c.user.username if c.user else 'Unknown',
+                c.get_complaint_type_display(),
+                c.description or '',
+                c.get_status_display(),
+                c.admin_response or '',
+                c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '',
+            ]
+            for c in qs.iterator(chunk_size=500)
+        )
+        return _write_csv_response('complaints.csv', header, rows)
