@@ -1080,14 +1080,6 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 self.request, 'create', 'WasteRequest', waste_request,
                 f'{user.username} submitted pickup request #{waste_request.id}{photo_note}'
             )
-        elif waste_request.guest_email:
-            try:
-                send_guest_claim_email(waste_request, self.request)
-            except Exception:
-                logger.warning(
-                    f'[GUEST CLAIM EMAIL] failed to send for request={waste_request.id} '
-                    f'— guest_token claiming via localStorage is unaffected.'
-                )
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def assign_driver(self, request, pk=None):
