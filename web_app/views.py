@@ -1,13 +1,48 @@
+import os
+
 from django.contrib.auth import get_user_model, logout as django_logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.cache import cache
+from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
+from django.views import View
 from django.views.generic import ListView, TemplateView
-
+from django.conf import settings
 from api_app.models import Driver, Notification, Route, Schedule, Vehicle, WasteRequest, Complaint
 
 User = get_user_model()
+
+
+# ─── Service Worker ─────────────────────────────────────────────────────────
+
+class ServiceWorkerView(View):
+    """Serves /sw.js from the app root (not /static/sw.js) so its default
+    scope covers the whole app — every page under '/', not just static
+    assets. Reads the file straight off disk rather than through the
+    staticfiles storage/finders, so this keeps working in production
+    regardless of whether collectstatic/whitenoise has fingerprinted or
+    moved the file — /sw.js always serves the current committed source.
+    """
+
+    def get(self, request, *args, **kwargs):
+        sw_file_path = os.path.join(
+            settings.BASE_DIR, 'web_app', 'static', 'web_app', 'sw.js'
+        )
+        try:
+            with open(sw_file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except FileNotFoundError:
+            return HttpResponse('', status=404, content_type='application/javascript')
+
+        response = HttpResponse(content, content_type='application/javascript')
+        # Not strictly required when served from root, but harmless and
+        # future-proofs against ever moving this behind a prefixed path.
+        response['Service-Worker-Allowed'] = '/'
+        # Browsers already re-check sw.js on every navigation per spec, but
+        # some intermediary caches/CDNs don't know that — be explicit.
+        response['Cache-Control'] = 'no-cache'
+        return response
 
 
 # ─── Public / Auth Pages ───────────────────────────────────────────────────────
@@ -146,7 +181,15 @@ class LoginPageView(TemplateView):
         if request.user.is_authenticated:
             return redirect_by_role(request.user)
         return super().dispatch(request, *args, **kwargs)
-
+    
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        # login.html's GSI init reads {{ GOOGLE_CLIENT_ID }}. Without this the
+        # template renders an EMPTY client_id, and Google answers with
+        # "The given origin is not allowed for the given client ID".
+        ctx['GOOGLE_CLIENT_ID'] = getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '')
+        return ctx  
+     
 class ProfilePageView(LoginRequiredMixin, TemplateView):
     """Renders the logged-in user's profile page. Data comes straight from
     request.user (no extra queries needed) — editing (phone/address/photo)
