@@ -574,9 +574,9 @@ const SAME_LOCATION_THRESHOLD_METERS = 150;
 
 // ── Auto-assign nearest checkpoint ──────────────────────────────────────────
 
-const CHECKPOINT_AUTO_ASSIGN_METERS = 200;
+const CHECKPOINT_AUTO_ASSIGN_METERS = 300;
 
-const NEARBY_CHECKPOINT_DISPLAY_RADIUS_METERS = 2000;
+const NEARBY_CHECKPOINT_DISPLAY_RADIUS_METERS = 3000;
 
 if (!document.body.dataset._leafletCleanupBound) {
     document.body.addEventListener('htmx:beforeSwap', () => {
@@ -1011,15 +1011,15 @@ function renderDriverMarkers(drivers) {
 
 async function loadDriverMarkers() {
     try {
-        const data = await API.get('/api/drivers/');
-        if (!data) return;
+        const res = await fetch('/api/drivers/');
+        if (!res.ok) return;
+        const data = await res.json();
         const drivers = Array.isArray(data) ? data : (data.results || []);
         renderDriverMarkers(drivers);
     } catch (e) {
         console.warn('Driver marker load failed:', e);
     }
 }
-
 
 // ── Live Camera Modal (getUserMedia) ─────────────────────────────────────────
 const cameraModalEl = document.getElementById('cameraModal');
