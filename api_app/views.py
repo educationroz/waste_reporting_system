@@ -607,6 +607,42 @@ class DriverViewSet(viewsets.ModelViewSet):
         driver = serializer.save()
         _log_admin_action(self.request, 'update', 'Driver', driver, f'Updated driver {driver.user.username}')
 
+    # 👇 ADD THIS
+    @action(
+        detail=False,
+        methods=['get'],
+        permission_classes=[AllowAny],
+        url_path='public-locations',
+    )
+    def public_locations(self, request):
+        """
+        GET /api/drivers/public-locations/
+
+        Public read-only driver location data for the Home map.
+        """
+
+        drivers = (
+            Driver.objects
+            .select_related('user')
+            .filter(
+                current_latitude__isnull=False,
+                current_longitude__isnull=False,
+            )
+            .order_by('id')
+        )
+
+        data = [
+            {
+                'id': driver.id,
+                'driver_name': driver.user.username,
+                'current_latitude': str(driver.current_latitude),
+                'current_longitude': str(driver.current_longitude),
+            }
+            for driver in drivers
+        ]
+
+        return Response(data)
+
     def destroy(self, request, *args, **kwargs):
         """Delete the driver profile and the linked auth user together."""
         driver = self.get_object()
@@ -791,6 +827,100 @@ class CheckpointViewSet(viewsets.ModelViewSet):
             notification_type='warning',
         )
         instance.delete()
+
+    @action(detail=False, methods=['post'])
+    def bulk_create(self, request):
+        """
+        POST /api/checkpoints/bulk_create/
+
+        Save multiple pending checkpoints in ONE request
+        and ONE database transaction.
+        """
+
+        if request.user.role != 'admin':
+            return Response(
+                {'error': 'Admin only.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        items = request.data.get('checkpoints', [])
+
+        if not isinstance(items, list) or not items:
+            return Response(
+                {'error': 'checkpoints must be a non-empty list.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(
+            data=items,
+            many=True
+        )
+
+        serializer.is_valid(raise_exception=True)
+
+        created = []
+        deduped = []
+
+        with transaction.atomic():
+
+            for data in serializer.validated_data:
+
+                name = data.get('name')
+                lat = data.get('latitude')
+                lng = data.get('longitude')
+
+                # Same dedupe logic used by normal create
+                tol = Decimal('0.000001')
+
+                existing = (
+                    Checkpoint.objects
+                    .filter(
+                        name=name,
+                        latitude__gte=lat - tol,
+                        latitude__lte=lat + tol,
+                        longitude__gte=lng - tol,
+                        longitude__lte=lng + tol,
+                    )
+                    .order_by('-created_at')
+                    .first()
+                )
+
+                if existing:
+                    deduped.append(existing.id)
+                    continue
+
+                checkpoint = Checkpoint.objects.create(
+                    **data
+                )
+
+                created.append(checkpoint)
+
+            if created:
+                _log_admin_action(
+                    request,
+                    'create',
+                    'Checkpoint',
+                    None,
+                    f'Bulk-created {len(created)} checkpoint(s).'
+                )
+
+        # One notification instead of one notification per checkpoint
+        if created:
+            _notify_all_users(
+                title='Checkpoints Added',
+                message=f'{len(created)} new checkpoint(s) are now available on the map.',
+                notification_type='info',
+            )
+
+        return Response(
+            {
+                'created_count': len(created),
+                'deduped_count': len(deduped),
+                'created_ids': [checkpoint.id for checkpoint in created],
+                'deduped_ids': deduped,
+            },
+            status=status.HTTP_201_CREATED
+        )
 
     @action(detail=False, methods=['post'])
     def bulk_delete(self, request):
