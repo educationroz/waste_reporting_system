@@ -574,9 +574,9 @@ const SAME_LOCATION_THRESHOLD_METERS = 150;
 
 // ── Auto-assign nearest checkpoint ──────────────────────────────────────────
 
-const CHECKPOINT_AUTO_ASSIGN_METERS = 300;
+const CHECKPOINT_AUTO_ASSIGN_METERS = 200;
 
-const NEARBY_CHECKPOINT_DISPLAY_RADIUS_METERS = 3000;
+const NEARBY_CHECKPOINT_DISPLAY_RADIUS_METERS = 2000;
 
 if (!document.body.dataset._leafletCleanupBound) {
     document.body.addEventListener('htmx:beforeSwap', () => {
@@ -780,7 +780,7 @@ function initMap(lat, lng) {
     // loadCheckpoints() below re-renders again using the now-existing layer).
     // Sabai checkpoint hoina, यही lat/lng bata najik ka matra देखाउने।
     renderNearbyCheckpointMarkers(lat, lng);
-    loadDriverMarkers();
+    startPublicDriverLocationRefresh();
 
     marker = L.marker([lat, lng], { draggable: !locationLockedByPhoto })
         .addTo(map)
@@ -980,7 +980,7 @@ function renderDriverMarkers(drivers) {
 
         nextIds.add(driver.id);
 
-        const name = driver.user?.username || driver.user_detail?.username || `Driver #${driver.id}`;
+        const name = driver.driver_name || `Driver #${driver.id}`;
         const popupHtml = `<strong>🚛 ${name}</strong><br>Live driver location`;
         const icon = L.divIcon({
             className: 'driver-marker-icon',
@@ -1011,14 +1011,37 @@ function renderDriverMarkers(drivers) {
 
 async function loadDriverMarkers() {
     try {
-        const res = await fetch('/api/drivers/');
-        if (!res.ok) return;
-        const data = await res.json();
-        const drivers = Array.isArray(data) ? data : (data.results || []);
-        renderDriverMarkers(drivers);
+        const res = await fetch('/api/drivers/public-locations/');
+
+        if (!res.ok) {
+            console.warn('Public driver locations failed:', res.status);
+            return;
+        }
+
+        const drivers = await res.json();
+
+        renderDriverMarkers(
+            Array.isArray(drivers) ? drivers : []
+        );
     } catch (e) {
         console.warn('Driver marker load failed:', e);
     }
+}
+
+let driverLocationRefreshTimer = null;
+
+function startPublicDriverLocationRefresh() {
+    if (driverLocationRefreshTimer) {
+        clearInterval(driverLocationRefreshTimer);
+    }
+
+    // Load immediately
+    loadDriverMarkers();
+
+    // Refresh every 5 seconds
+    driverLocationRefreshTimer = setInterval(() => {
+        loadDriverMarkers();
+    }, 5000);
 }
 
 // ── Live Camera Modal (getUserMedia) ─────────────────────────────────────────

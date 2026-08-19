@@ -24,13 +24,13 @@
 
   #depot-map,
   #checkpoint-map {
-    border: 1px solid var(--border-color) !important;
+      border: 1px solid var(--border-color) !important;
+  }
 
-    .pending-checkpoint-icon {
+  .pending-checkpoint-icon {
       background: transparent !important;
       border: none !important;
       box-shadow: none !important;
-    }
   }
 </style>
 {% endblock %} {% block content %}
@@ -922,76 +922,29 @@
     //    municipal area — not just "within N meters of the depot" — so grid
     //    generation doesn't drop pins in rivers, forest, or hillside outside town.
     const POKHARA_BOUNDARY = [
-      [28.32749, 84.02078],
-      [28.34105, 84.00476],
-      [28.32805, 83.99061],
-      [28.32746, 83.96883],
-      [28.31112, 83.96167],
-      [28.2926, 83.93472],
-      [28.30134, 83.92599],
-      [28.29149, 83.91023],
-      [28.29717, 83.88678],
-      [28.28219, 83.8781],
-      [28.2764, 83.88576],
-      [28.25642, 83.88306],
-      [28.26656, 83.86117],
-      [28.26244, 83.84762],
-      [28.26522, 83.83842],
-      [28.22837, 83.80045],
-      [28.20986, 83.81882],
-      [28.21416, 83.82625],
-      [28.21185, 83.83988],
-      [28.19385, 83.85811],
-      [28.1975, 83.87313],
-      [28.1921, 83.8804],
-      [28.19442, 83.89294],
-      [28.17775, 83.90682],
-      [28.16831, 83.92563],
-      [28.16044, 83.92925],
-      [28.15141, 83.92543],
-      [28.144, 83.93214],
-      [28.13893, 83.9635],
-      [28.143, 83.98234],
-      [28.13121, 84.00414],
-      [28.12128, 84.00106],
-      [28.11043, 84.01679],
-      [28.106, 84.01453],
-      [28.10546, 84.02869],
-      [28.09624, 84.02996],
-      [28.09988, 84.03257],
-      [28.09451, 84.04422],
-      [28.09109, 84.04004],
-      [28.08329, 84.05196],
-      [28.08782, 84.06104],
-      [28.07753, 84.07178],
-      [28.10754, 84.10088],
-      [28.11034, 84.10784],
-      [28.10601, 84.11576],
-      [28.11589, 84.13003],
-      [28.12309, 84.12366],
-      [28.13101, 84.1256],
-      [28.1352, 84.11251],
-      [28.14452, 84.11293],
-      [28.16125, 84.12085],
-      [28.17547, 84.14665],
-      [28.18827, 84.14377],
-      [28.19137, 84.1499],
-      [28.19875, 84.14488],
-      [28.20307, 84.12924],
-      [28.20899, 84.12983],
-      [28.21136, 84.11083],
-      [28.22138, 84.10896],
-      [28.22376, 84.0999],
-      [28.21947, 84.08875],
-      [28.21219, 84.08501],
-      [28.20941, 84.07223],
-      [28.2114, 84.06953],
-      [28.21483, 84.08411],
-      [28.22084, 84.06427],
-      [28.21837, 84.05407],
-      [28.25968, 84.0648],
-      [28.28017, 84.06331],
-      [28.30036, 84.0336],
+      [28.32749, 84.02078], [28.34105, 84.00476], [28.32805, 83.99061],
+      [28.32746, 83.96883], [28.31112, 83.96167], [28.2926, 83.93472],
+      [28.30134, 83.92599], [28.29149, 83.91023], [28.29717, 83.88678],
+      [28.28219, 83.8781], [28.2764, 83.88576], [28.25642, 83.88306],
+      [28.26656, 83.86117], [28.26244, 83.84762], [28.26522, 83.83842],
+      [28.22837, 83.80045], [28.20986, 83.81882], [28.21416, 83.82625],
+      [28.21185, 83.83988], [28.19385, 83.85811], [28.1975, 83.87313],
+      [28.1921, 83.8804], [28.19442, 83.89294], [28.17775, 83.90682],
+      [28.16831, 83.92563], [28.16044, 83.92925], [28.15141, 83.92543],
+      [28.144, 83.93214], [28.13893, 83.9635], [28.143, 83.98234],
+      [28.13121, 84.00414], [28.12128, 84.00106], [28.11043, 84.01679],
+      [28.106, 84.01453], [28.10546, 84.02869], [28.09624, 84.02996],
+      [28.09988, 84.03257], [28.09451, 84.04422], [28.09109, 84.04004],
+      [28.08329, 84.05196], [28.08782, 84.06104], [28.07753, 84.07178],
+      [28.10754, 84.10088], [28.11034, 84.10784], [28.10601, 84.11576],
+      [28.12309, 84.12366], [28.13101, 84.1256], [28.1352, 84.11251],
+      [28.14452, 84.11293], [28.16125, 84.12085], [28.17547, 84.14665],
+      [28.18827, 84.14377], [28.19137, 84.1499], [28.19875, 84.14488],
+      [28.20307, 84.12924], [28.20899, 84.12983], [28.21136, 84.11083],
+      [28.22138, 84.10896], [28.22376, 84.0999], [28.21947, 84.08875],
+      [28.21219, 84.08501], [28.20941, 84.07223], [28.2114, 84.06953],
+      [28.21483, 84.08411], [28.22084, 84.06427], [28.21837, 84.05407],
+      [28.25968, 84.0648], [28.28017, 84.06331], [28.30036, 84.0336],
       [28.32749, 84.02078],
     ];
 
@@ -1006,13 +959,13 @@
         i < POKHARA_BOUNDARY.length;
         j = i++
       ) {
-        const yi = POKHARA_BOUNDARY[i][0],
-          xi = POKHARA_BOUNDARY[i][1];
-        const yj = POKHARA_BOUNDARY[j][0],
-          xj = POKHARA_BOUNDARY[j][1];
+        const yi = POKHARA_BOUNDARY[i][0], xi = POKHARA_BOUNDARY[i][1];
+        const yj = POKHARA_BOUNDARY[j][0], xj = POKHARA_BOUNDARY[j][1];
+
         const intersects =
           yi > lat !== yj > lat &&
           lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+
         if (intersects) inside = !inside;
       }
       return inside;
@@ -1034,9 +987,12 @@
 
     let depotMap = null;
     let depotMarker = null;
+
     let checkpointMap = null;
     let checkpointMarker = null;
+
     let editingCheckpointId = null;
+
     const DEFAULT_LAT = 28.2096;
     const DEFAULT_LNG = 83.9856;
 
@@ -1046,6 +1002,16 @@
 
     let savedCheckpointsLayer = null;
     let markerRegistry = {};
+
+    // Saved checkpoint flags are locked by default.
+    // A saved flag becomes draggable ONLY after Edit is clicked.
+    let activeSavedCheckpointEditId = null;
+
+    // FIX: dedupe concurrent loadCheckpoints() calls (e.g. tab's shown.bs.tab
+    // listener and editCheckpoint() firing near-simultaneously) so a
+    // marker that was just put into edit mode doesn't get clobbered by a
+    // second render that runs a moment later.
+    let checkpointsLoadInFlight = null;
 
     if (!document.body.dataset._leafletCleanupBound) {
       document.body.addEventListener("htmx:beforeSwap", () => {
@@ -1060,10 +1026,12 @@
         depotMarker = null;
         checkpointMarker = null;
         editingCheckpointId = null;
+        activeSavedCheckpointEditId = null;
         pendingCheckpointsLayer = null;
         pendingCheckpoints = [];
         savedCheckpointsLayer = null;
         markerRegistry = {};
+        checkpointsLoadInFlight = null;
       });
       document.body.dataset._leafletCleanupBound = "1";
     }
@@ -1073,12 +1041,10 @@
         onReady();
         return;
       }
-
       if (window._settingsLeafletLoadPromise) {
         window._settingsLeafletLoadPromise.then(onReady).catch(() => {});
         return;
       }
-
       window._settingsLeafletLoadPromise = new Promise((resolve, reject) => {
         const existing = document.querySelector(
           'script[data-leaflet-loader="admin-settings"]',
@@ -1088,7 +1054,6 @@
           existing.addEventListener("error", reject, { once: true });
           return;
         }
-
         const script = document.createElement("script");
         script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
         script.async = true;
@@ -1135,10 +1100,10 @@
         ensureLeafletLoaded(initDepotMap);
         return;
       }
-
       if (depotMap) return;
 
       depotMap = L.map("depot-map").setView([DEFAULT_LAT, DEFAULT_LNG], 14);
+
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap contributors",
         maxZoom: 19,
@@ -1180,10 +1145,12 @@
         const res = await fetch("/api/system-settings/depot_location/", {
           headers: { Authorization: `Bearer ${getToken()}` },
         });
+
         if (res.ok) {
           const data = await res.json();
           const lat = data.value.latitude;
           const lng = data.value.longitude;
+
           moveDepotMarker(lat, lng);
           showDepotStatus(
             `Depot fixed at ${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`,
@@ -1195,20 +1162,14 @@
     }
 
     async function saveDepotLocation() {
-      const lat = round6(
-        parseFloat(document.getElementById("depot_lat").value),
-      );
-      const lng = round6(
-        parseFloat(document.getElementById("depot_lng").value),
-      );
+      const lat = round6(parseFloat(document.getElementById("depot_lat").value));
+      const lng = round6(parseFloat(document.getElementById("depot_lng").value));
 
       if (isNaN(lat) || isNaN(lng)) {
-        showToast(
-          "Please enter valid coordinates or click the map.",
-          "warning",
-        );
+        showToast("Please enter valid coordinates or click the map.", "warning");
         return;
       }
+
       if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
         showToast(
           "Coordinates out of range. Lat: -90 to 90, Lng: -180 to 180.",
@@ -1216,6 +1177,7 @@
         );
         return;
       }
+
       if (!isInsidePokhara(lat, lng)) {
         showToast(
           "That point looks like it is outside Pokhara Metropolitan City. Please pick a depot location inside the municipal boundary (shown shaded on the map).",
@@ -1279,7 +1241,9 @@
         showToast("GPS not available in your browser.", "warning");
         return;
       }
+
       showToast("Getting GPS location...", "info");
+
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const lat = pos.coords.latitude;
@@ -1307,13 +1271,13 @@
         ensureLeafletLoaded(initCheckpointMap);
         return;
       }
-
       if (checkpointMap) return;
 
       checkpointMap = L.map("checkpoint-map").setView(
         [DEFAULT_LAT, DEFAULT_LNG],
         14,
       );
+
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap contributors",
         maxZoom: 19,
@@ -1321,23 +1285,51 @@
 
       drawPokharaBoundary(checkpointMap);
 
+      // This marker is for creating a NEW checkpoint.
+      // Existing saved flags below remain locked until Edit is clicked.
       checkpointMarker = L.marker([DEFAULT_LAT, DEFAULT_LNG], {
         draggable: true,
       })
         .addTo(checkpointMap)
-        .bindPopup(
-          "<strong>🏁 New Checkpoint Location</strong><br>Drag to adjust",
-        )
+        .bindPopup("<strong>🏁 New Checkpoint Location</strong><br>Drag to adjust")
         .openPopup();
 
       checkpointMarker.on("dragend", function () {
         const pos = checkpointMarker.getLatLng();
+
+        if (!isInsidePokhara(pos.lat, pos.lng)) {
+          showCheckpointStatus(
+            "🚫 You cannot place a checkpoint outside Pokhara Metropolitan City.",
+            "danger",
+          );
+
+          checkpointMarker.setLatLng([
+            parseFloat(document.getElementById("checkpoint_lat").value) ||
+              DEFAULT_LAT,
+            parseFloat(document.getElementById("checkpoint_lng").value) ||
+              DEFAULT_LNG,
+          ]);
+
+          return;
+        }
+
         setCheckpointInputs(pos.lat, pos.lng);
       });
 
       checkpointMap.on("click", function (e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+
+        if (!isInsidePokhara(lat, lng)) {
+          showCheckpointStatus(
+            "🚫 Checkpoint must be inside Pokhara Metropolitan City.",
+            "danger",
+          );
+          return;
+        }
+
         checkpointMarker.setLatLng(e.latlng);
-        setCheckpointInputs(e.latlng.lat, e.latlng.lng);
+        setCheckpointInputs(lat, lng);
       });
 
       savedCheckpointsLayer = L.layerGroup().addTo(checkpointMap);
@@ -1359,13 +1351,26 @@
     }
 
     function resetCheckpointForm() {
+      // If a saved flag was being edited, cancel that edit cleanly first.
+      if (activeSavedCheckpointEditId !== null) {
+        const activeMarker = markerRegistry[activeSavedCheckpointEditId];
+        if (activeMarker) {
+          cancelSavedCheckpointMarkerEdit(activeMarker);
+        }
+      }
+
+      activeSavedCheckpointEditId = null;
       editingCheckpointId = null;
+
       document.getElementById("checkpoint_name").value = "";
       document.getElementById("checkpoint_description").value = "";
+
       setCheckpointInputs(DEFAULT_LAT, DEFAULT_LNG);
+
       if (checkpointMarker) {
-        moveCheckpointMarker(DEFAULT_LAT, DEFAULT_LNG);
+        checkpointMarker.setLatLng([DEFAULT_LAT, DEFAULT_LNG]);
       }
+
       hideCheckpointStatus();
     }
 
@@ -1389,6 +1394,7 @@
       while (url && guard < 200) {
         guard++;
         let raw;
+
         if (typeof API !== "undefined" && url === "/api/checkpoints/") {
           raw = await API.get(url);
         } else {
@@ -1408,33 +1414,52 @@
       return checkpoints;
     }
 
+    // FIX: dedupe concurrent calls. If a load is already running, every
+    // caller (tab's shown.bs.tab listener, editCheckpoint(), etc.) awaits
+    // the SAME promise instead of kicking off a second render that could
+    // clobber a marker that was just switched into edit mode.
     async function loadCheckpoints() {
-      // Show a skeleton immediately so the tab doesn't sit on the plain
-      // "Loading checkpoints..." text while fetchAllCheckpoints() (which
-      // can be multiple paginated requests) is still in flight.
+      if (checkpointsLoadInFlight) {
+        return checkpointsLoadInFlight;
+      }
+
       const tbody = document.getElementById("checkpoint-table-body");
+
       if (tbody && typeof renderSkeletonRows === "function") {
         renderSkeletonRows(
           tbody,
-          [{ width: "20px" }, { width: "55%" }, { width: "70%" }, { width: "40%" }, { width: "80%" }],
+          [
+            { width: "20px" },
+            { width: "55%" },
+            { width: "70%" },
+            { width: "40%" },
+            { width: "80%" },
+          ],
           4,
         );
       }
-      try {
-        const checkpoints = await fetchAllCheckpoints();
-        renderCheckpointTable(checkpoints);
-        renderCheckpointMapMarkers(checkpoints);
-      } catch (e) {
-        console.error("Checkpoint load failed:", e);
-        document.getElementById("checkpoint-table-body").innerHTML =
-          '<tr><td colspan="5" class="text-danger text-center py-3">Unable to load checkpoints.</td></tr>';
-      }
+
+      checkpointsLoadInFlight = (async () => {
+        try {
+          const checkpoints = await fetchAllCheckpoints();
+          renderCheckpointTable(checkpoints);
+          renderCheckpointMapMarkers(checkpoints);
+        } catch (e) {
+          console.error("Checkpoint load failed:", e);
+          document.getElementById("checkpoint-table-body").innerHTML =
+            '<tr><td colspan="5" class="text-danger text-center py-3">Unable to load checkpoints.</td></tr>';
+        } finally {
+          checkpointsLoadInFlight = null;
+        }
+      })();
+
+      return checkpointsLoadInFlight;
     }
 
     function renderCheckpointTable(checkpoints) {
       const tbody = document.getElementById("checkpoint-table-body");
-
       const selectAll = document.getElementById("selectAllCheckpoints");
+
       if (selectAll) {
         selectAll.checked = false;
         selectAll.indeterminate = false;
@@ -1442,11 +1467,11 @@
 
       if (!checkpoints.length) {
         tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="text-muted text-center py-3">
-                    No checkpoints configured.
-                </td>
-            </tr>
+          <tr>
+            <td colspan="5" class="text-muted text-center py-3">
+              No checkpoints configured.
+            </td>
+          </tr>
         `;
         updateBulkDeleteButton();
         return;
@@ -1455,74 +1480,205 @@
       tbody.innerHTML = checkpoints
         .map(
           (ch) => `
-        <tr>
+          <tr>
             <td class="text-center">
-                <input
-                    type="checkbox"
-                    class="form-check-input checkpoint-select"
-                    value="${escapeHtml(ch.id)}"
-                    onchange="updateBulkDeleteButton()"
-                >
+              <input
+                type="checkbox"
+                class="form-check-input checkpoint-select"
+                value="${escapeHtml(ch.id)}"
+                onchange="updateBulkDeleteButton()"
+              >
             </td>
-
             <td>${escapeHtml(ch.name)}</td>
-
             <td>
-                ${escapeHtml(parseFloat(ch.latitude).toFixed(6))},
-                ${escapeHtml(parseFloat(ch.longitude).toFixed(6))}
+              ${escapeHtml(parseFloat(ch.latitude).toFixed(6))},
+              ${escapeHtml(parseFloat(ch.longitude).toFixed(6))}
             </td>
-
+            <td>${ch.is_active ? "Active" : "Inactive"}</td>
             <td>
-                ${ch.is_active ? "Active" : "Inactive"}
+              <button
+                class="btn btn-sm btn-outline-primary me-1"
+                onclick="editCheckpoint(${escapeHtml(ch.id)})"
+              >
+                Edit
+              </button>
+              <button
+                class="btn btn-sm btn-outline-danger"
+                onclick="deleteCheckpoint(${escapeHtml(ch.id)})"
+              >
+                Delete
+              </button>
             </td>
-
-            <td>
-                <button
-                    class="btn btn-sm btn-outline-primary me-1"
-                    onclick="editCheckpoint(${escapeHtml(ch.id)})">
-                    Edit
-                </button>
-
-                <button
-                    class="btn btn-sm btn-outline-danger"
-                    onclick="deleteCheckpoint(${escapeHtml(ch.id)})">
-                    Delete
-                </button>
-            </td>
-        </tr>
-    `,
+          </tr>
+        `,
         )
         .join("");
 
       updateBulkDeleteButton();
     }
 
-    function buildSavedCheckpointPopup(ch, pendingLat, pendingLng) {
+    // Scroll directly to the map when Edit is clicked.
+    function scrollToCheckpointMap() {
+      const mapElement = document.getElementById("checkpoint-map");
+      if (!mapElement) return;
+
+      mapElement.style.scrollMarginTop = "95px";
+      mapElement.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+        inline: "nearest",
+      });
+    }
+
+    // Lock every saved flag except the one currently being edited.
+    function lockAllSavedCheckpointMarkers(exceptId = null) {
+      Object.keys(markerRegistry).forEach((markerId) => {
+        const marker = markerRegistry[markerId];
+        if (!marker) return;
+
+        if (String(markerId) !== String(exceptId)) {
+          cancelSavedCheckpointMarkerEdit(marker);
+          marker.setOpacity(0.65);
+        }
+      });
+    }
+
+    function enableSavedCheckpointMarkerEdit(marker, checkpoint) {
+      if (!marker || !checkpoint) {
+        return;
+      }
+
+      const lat = parseFloat(checkpoint.latitude);
+      const lng = parseFloat(checkpoint.longitude);
+
+      if (isNaN(lat) || isNaN(lng)) {
+        return;
+      }
+
+      lockAllSavedCheckpointMarkers(checkpoint.id);
+
+      activeSavedCheckpointEditId = checkpoint.id;
+
+      marker._editEnabled = true;
+
+      // This is the permanent saved position before the user starts dragging.
+      marker._savedLat = lat;
+      marker._savedLng = lng;
+
+      delete marker._pendingLat;
+      delete marker._pendingLng;
+
+      marker._keepPositionOnClose = false;
+
+      marker.dragging.enable();
+      marker.setOpacity(1);
+      marker.setZIndexOffset(1000);
+
+      // isEditing = true so the popup clearly shows the flag is unlocked.
+      marker.setPopupContent(
+        buildSavedCheckpointPopup(checkpoint, undefined, undefined, true),
+      );
+
+      marker.openPopup();
+    }
+
+    // Cancel edit / X button.
+    function cancelSavedCheckpointMarkerEdit(marker) {
+      if (!marker) return;
+
+      const hasOriginal =
+        marker._savedLat !== undefined && marker._savedLng !== undefined;
+
+      // If it was dragged but not saved, return it to the original saved position.
+      if (hasOriginal && marker._pendingLat !== undefined) {
+        marker.setLatLng([marker._savedLat, marker._savedLng]);
+      }
+
+      delete marker._pendingLat;
+      delete marker._pendingLng;
+
+      marker._editEnabled = false;
+      marker._keepPositionOnClose = false;
+
+      marker.dragging.disable();
+      marker.setOpacity(1);
+      marker.setZIndexOffset(0);
+
+      if (
+        activeSavedCheckpointEditId !== null &&
+        String(activeSavedCheckpointEditId) === String(marker._checkpointId)
+      ) {
+        activeSavedCheckpointEditId = null;
+      }
+    }
+
+    // isEditing param: when true, shows an unlocked/edit-mode hint and hides
+    // the "Edit" button (you're already editing it — no need to click Edit again).
+    function buildSavedCheckpointPopup(
+      ch,
+      pendingLat,
+      pendingLng,
+      isEditing = false,
+    ) {
       const hasPending = pendingLat !== undefined && pendingLng !== undefined;
+
       const coordsText = hasPending
         ? `${pendingLat.toFixed(6)}, ${pendingLng.toFixed(6)} (unsaved)`
         : `${parseFloat(ch.latitude).toFixed(6)}, ${parseFloat(ch.longitude).toFixed(6)}`;
 
       return `
         <div style="min-width:190px;">
-            <strong>🚩 ${escapeHtml(ch.name)}</strong><br>
-            <span class="text-muted small">${escapeHtml(coordsText)}</span>
-            <div class="d-flex flex-wrap gap-1 mt-2">
-                ${hasPending ? `<button class="btn btn-sm btn-success py-0 px-2" onclick="saveMovedCheckpoint(${ch.id})">Save Position</button>` : ""}
-                <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="editCheckpoint(${ch.id})">Edit</button>
-                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteCheckpoint(${ch.id})">Delete</button>
-            </div>
+          <strong>🚩 ${escapeHtml(ch.name)}</strong>
+          <br>
+          <span class="text-muted small">${escapeHtml(coordsText)}</span>
+          ${
+            isEditing
+              ? `<div class="small text-primary mt-1">
+                   <i class="bi bi-unlock-fill me-1"></i>Editing — drag the flag to move it
+                 </div>`
+              : ""
+          }
+          <div class="d-flex flex-wrap gap-1 mt-2">
+            ${
+              hasPending
+                ? `
+                  <button
+                    class="btn btn-sm btn-success py-0 px-2"
+                    onclick="saveMovedCheckpoint(${ch.id})"
+                  >
+                    Save Position
+                  </button>
+                `
+                : ""
+            }
+            ${
+              !isEditing
+                ? `
+                  <button
+                    class="btn btn-sm btn-outline-primary py-0 px-2"
+                    onclick="editCheckpoint(${ch.id})"
+                  >
+                    Edit
+                  </button>
+                `
+                : ""
+            }
+            <button
+              class="btn btn-sm btn-outline-danger py-0 px-2"
+              onclick="deleteCheckpoint(${ch.id})"
+            >
+              Delete
+            </button>
+          </div>
         </div>
-    `;
+      `;
     }
 
     function toggleSelectAllCheckpoints(checkbox) {
       const checkboxes = document.querySelectorAll(".checkpoint-select");
-
       checkboxes.forEach((cb) => {
         cb.checked = checkbox.checked;
       });
-
       updateBulkDeleteButton();
     }
 
@@ -1530,7 +1686,6 @@
       const checkboxes = Array.from(
         document.querySelectorAll(".checkpoint-select"),
       );
-
       const selected = checkboxes.filter((cb) => cb.checked);
 
       const deleteBtn = document.getElementById("bulkDeleteCheckpointsBtn");
@@ -1538,7 +1693,6 @@
 
       if (deleteBtn) {
         deleteBtn.disabled = selected.length === 0;
-
         deleteBtn.innerHTML =
           selected.length > 0
             ? `<i class="bi bi-trash me-1"></i> Delete Selected (${selected.length})`
@@ -1562,13 +1716,10 @@
       }
     }
 
-    // Delete selected checkpoints — sends all ids in a single bulk_delete
-    // request instead of one-by-one, avoiding per-checkpoint throttling (429).
     async function deleteSelectedCheckpoints() {
       const selectedCheckboxes = Array.from(
         document.querySelectorAll(".checkpoint-select:checked"),
       );
-
       const ids = selectedCheckboxes.map((cb) => cb.value);
 
       if (!ids.length) {
@@ -1580,8 +1731,7 @@
       }
 
       const confirmed = confirm(
-        `Are you sure you want to delete ${ids.length} selected checkpoint(s)?\n\n` +
-          `This action cannot be undone.`,
+        `Are you sure you want to delete ${ids.length} selected checkpoint(s)?\n\nThis action cannot be undone.`,
       );
 
       if (!confirmed) return;
@@ -1590,8 +1740,7 @@
 
       if (deleteBtn) {
         deleteBtn.disabled = true;
-        deleteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>
-             Deleting...`;
+        deleteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Deleting...`;
       }
 
       try {
@@ -1610,6 +1759,7 @@
         }
 
         const data = await res.json();
+
         if (data.missing_ids && data.missing_ids.length) {
           showCheckpointStatus(
             `${data.deleted} checkpoint(s) deleted. ${data.missing_ids.length} were already gone.`,
@@ -1633,11 +1783,14 @@
         updateBulkDeleteButton();
       }
     }
+
     function renderCheckpointMapMarkers(checkpoints) {
       if (!checkpointMap) return;
+
       if (!savedCheckpointsLayer) {
         savedCheckpointsLayer = L.layerGroup().addTo(checkpointMap);
       }
+
       savedCheckpointsLayer.clearLayers();
       markerRegistry = {};
 
@@ -1648,11 +1801,16 @@
       checkpoints.forEach((ch) => {
         const lat = parseFloat(ch.latitude);
         const lng = parseFloat(ch.longitude);
-        if (isNaN(lat) || isNaN(lng)) return;
+
+        if (isNaN(lat) || isNaN(lng)) {
+          return;
+        }
+
         bounds.push([lat, lng]);
 
         const marker = L.marker([lat, lng], {
-          draggable: true,
+          // IMPORTANT: saved flags are LOCKED by default.
+          draggable: false,
           icon: L.divIcon({
             className: "saved-checkpoint-icon",
             html: '<span style="font-size:1rem;">🚩</span>',
@@ -1661,29 +1819,114 @@
           }),
         }).addTo(savedCheckpointsLayer);
 
+        marker._checkpointId = ch.id;
+        marker._savedLat = lat;
+        marker._savedLng = lng;
+        marker._editEnabled = false;
+
+        delete marker._pendingLat;
+        delete marker._pendingLng;
+
         marker.bindPopup(buildSavedCheckpointPopup(ch));
+
+        // Extra safety: a flag cannot be dragged unless Edit was clicked.
+        marker.on("dragstart", function () {
+          if (!marker._editEnabled) {
+            marker.dragging.disable();
+            marker.setLatLng([marker._savedLat, marker._savedLng]);
+            return;
+          }
+
+          marker._savedLat = parseFloat(marker._savedLat);
+          marker._savedLng = parseFloat(marker._savedLng);
+        });
 
         marker.on("dragend", function () {
           const pos = marker.getLatLng();
+
+          if (!marker._editEnabled) {
+            marker.setLatLng([marker._savedLat, marker._savedLng]);
+            return;
+          }
+
+          if (!isInsidePokhara(pos.lat, pos.lng)) {
+            showToast(
+              "That spot is outside Pokhara Metropolitan City — choose a location inside the shaded boundary.",
+              "warning",
+            );
+
+            marker.setLatLng([marker._savedLat, marker._savedLng]);
+
+            delete marker._pendingLat;
+            delete marker._pendingLng;
+
+            // Still in edit mode after a rejected drag → keep isEditing = true.
+            marker.setPopupContent(
+              buildSavedCheckpointPopup(ch, undefined, undefined, true),
+            );
+
+            marker.openPopup();
+            return;
+          }
+
           marker._pendingLat = pos.lat;
           marker._pendingLng = pos.lng;
+
+          // Keep form coordinates synchronized with the dragged saved flag.
+          setCheckpointInputs(pos.lat, pos.lng);
+
           marker.setPopupContent(
-            buildSavedCheckpointPopup(ch, pos.lat, pos.lng),
+            buildSavedCheckpointPopup(ch, pos.lat, pos.lng, true),
           );
+
           marker.openPopup();
+        });
+
+        // X / close = CANCEL.
+        // If the flag was dragged but not saved, return it to the last saved position.
+        // Also lock it again after closing.
+        marker.on("popupclose", function () {
+          if (marker._keepPositionOnClose) {
+            marker._keepPositionOnClose = false;
+            return;
+          }
+
+          if (marker._editEnabled) {
+            cancelSavedCheckpointMarkerEdit(marker);
+          }
         });
 
         markerRegistry[ch.id] = marker;
       });
 
-      if (bounds.length) {
+      // FIX: if a checkpoint is currently under active edit, this re-render
+      // (e.g. triggered by the tab's own shown.bs.tab listener racing with
+      // editCheckpoint()) would otherwise silently lock it back down. Detect
+      // that and immediately put the fresh marker back into edit mode so
+      // dragging keeps working regardless of render timing.
+      if (activeSavedCheckpointEditId !== null) {
+        const activeCheckpoint = checkpoints.find(
+          (c) => String(c.id) === String(activeSavedCheckpointEditId),
+        );
+        const activeMarker = markerRegistry[activeSavedCheckpointEditId];
+
+        if (activeCheckpoint && activeMarker) {
+          enableSavedCheckpointMarkerEdit(activeMarker, activeCheckpoint);
+        }
+      }
+
+      // Don't jump the map away from an active edit.
+      if (bounds.length && activeSavedCheckpointEditId === null) {
         checkpointMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
       }
     }
 
     async function saveMovedCheckpoint(id) {
       const marker = markerRegistry[id];
-      if (!marker || marker._pendingLat === undefined) return;
+
+      if (!marker || !marker._editEnabled || marker._pendingLat === undefined) {
+        return;
+      }
 
       const lat = round6(marker._pendingLat);
       const lng = round6(marker._pendingLng);
@@ -1708,15 +1951,37 @@
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(
-            err.detail || "Failed to update checkpoint position.",
-          );
+          throw new Error(err.detail || "Failed to update checkpoint position.");
         }
 
-        showToast("Checkpoint position updated.", "success");
+        // The dragged position is now the NEW permanent position.
+        marker._savedLat = lat;
+        marker._savedLng = lng;
+        marker._keepPositionOnClose = true;
+
         delete marker._pendingLat;
         delete marker._pendingLng;
-        loadCheckpoints();
+
+        marker._editEnabled = false;
+        marker.dragging.disable();
+        marker.setLatLng([lat, lng]);
+        marker.setOpacity(1);
+        marker.setZIndexOffset(0);
+
+        activeSavedCheckpointEditId = null;
+        editingCheckpointId = null;
+
+        showToast("Checkpoint position updated and saved.", "success");
+
+        await loadCheckpoints();
+
+        if (checkpointMap) {
+          checkpointMap.invalidateSize();
+          checkpointMap.setView(
+            [lat, lng],
+            Math.max(checkpointMap.getZoom(), 16),
+          );
+        }
       } catch (e) {
         showToast(
           e.message || "Failed to update checkpoint position.",
@@ -1732,18 +1997,21 @@
       const description = document
         .getElementById("checkpoint_description")
         .value.trim();
+
       const lat = round6(
         parseFloat(document.getElementById("checkpoint_lat").value),
       );
       const lng = round6(
         parseFloat(document.getElementById("checkpoint_lng").value),
       );
+
       const btn = document.getElementById("checkpoint-save-btn");
 
       if (!name) {
         showCheckpointStatus("Please enter a checkpoint name.", "danger");
         return;
       }
+
       if (isNaN(lat) || isNaN(lng)) {
         showCheckpointStatus(
           "Please select a valid checkpoint location.",
@@ -1751,6 +2019,7 @@
         );
         return;
       }
+
       if (!isInsidePokhara(lat, lng)) {
         showCheckpointStatus(
           "This point falls outside Pokhara Metropolitan City (river/forest/hillside area). Pick a spot inside the shaded boundary on the map.",
@@ -1764,6 +2033,8 @@
         '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
       window._savingCheckpoint = true;
 
+      const idBeingEdited = editingCheckpointId;
+
       const payload = {
         name,
         description,
@@ -1772,10 +2043,10 @@
         is_active: true,
       };
 
-      const url = editingCheckpointId
-        ? `/api/checkpoints/${editingCheckpointId}/`
+      const url = idBeingEdited
+        ? `/api/checkpoints/${idBeingEdited}/`
         : "/api/checkpoints/";
-      const method = editingCheckpointId ? "PATCH" : "POST";
+      const method = idBeingEdited ? "PATCH" : "POST";
 
       try {
         const res = await fetch(url, {
@@ -1793,19 +2064,48 @@
         }
 
         const checkpoint = await res.json();
-        if (checkpoint.deduped) {
-          showCheckpointStatus(
-            `Checkpoint already exists — using existing checkpoint (ID ${checkpoint.existing_checkpoint_id}).`,
-            "info",
-          );
-          editingCheckpointId = checkpoint.existing_checkpoint_id;
-        } else {
-          showCheckpointStatus(
-            `Checkpoint ${editingCheckpointId ? "updated" : "created"} successfully.`,
-          );
-          editingCheckpointId = checkpoint.id;
+        const savedId = checkpoint.deduped
+          ? checkpoint.existing_checkpoint_id
+          : checkpoint.id;
+
+        showCheckpointStatus(
+          checkpoint.deduped
+            ? `Checkpoint already exists — using existing checkpoint (ID ${savedId}).`
+            : `Checkpoint ${idBeingEdited ? "updated" : "created"} successfully.`,
+          checkpoint.deduped ? "info" : "success",
+        );
+
+        // Existing checkpoint edit: make the new coordinates permanent
+        // and lock the flag again.
+        if (idBeingEdited !== null && markerRegistry[idBeingEdited]) {
+          const marker = markerRegistry[idBeingEdited];
+
+          marker._savedLat = lat;
+          marker._savedLng = lng;
+          marker._keepPositionOnClose = true;
+
+          delete marker._pendingLat;
+          delete marker._pendingLng;
+
+          marker._editEnabled = false;
+          marker.dragging.disable();
+          marker.setLatLng([lat, lng]);
+          marker.setOpacity(1);
+          marker.setZIndexOffset(0);
         }
-        loadCheckpoints();
+
+        activeSavedCheckpointEditId = null;
+        editingCheckpointId = savedId;
+
+        await loadCheckpoints();
+
+        if (checkpointMap && idBeingEdited !== null) {
+          checkpointMap.invalidateSize();
+          checkpointMap.setView(
+            [lat, lng],
+            Math.max(checkpointMap.getZoom(), 16),
+          );
+        }
       } catch (e) {
         showCheckpointStatus(
           e.message || "Failed to save checkpoint.",
@@ -1825,17 +2125,93 @@
           typeof API !== "undefined"
             ? await API.get(`/api/checkpoints/${id}/`)
             : await (await fetch(`/api/checkpoints/${id}/`)).json();
+
+        const lat = parseFloat(checkpoint.latitude);
+        const lng = parseFloat(checkpoint.longitude);
+
+        if (isNaN(lat) || isNaN(lng)) {
+          throw new Error("This checkpoint has invalid coordinates.");
+        }
+
         editingCheckpointId = checkpoint.id;
-        document.getElementById("checkpoint_name").value = checkpoint.name;
-        document.getElementById("checkpoint_description").value =
-          checkpoint.description || "";
-        if (!checkpointMap) initCheckpointMap();
-        moveCheckpointMarker(
-          parseFloat(checkpoint.latitude),
-          parseFloat(checkpoint.longitude),
+
+        // FIX: mark this checkpoint as "wants edit mode" up-front, before
+        // any tab-show/loadCheckpoints races can happen. renderCheckpointMapMarkers()
+        // will now honor this on every render, not just the first one.
+        activeSavedCheckpointEditId = checkpoint.id;
+
+        // 1. Open Checkpoints tab.
+        const checkpointTab = document.getElementById("checkpoint-tab");
+        if (checkpointTab) {
+          const tab = bootstrap.Tab.getOrCreateInstance(checkpointTab);
+          tab.show();
+        }
+
+        // 2. Make sure map exists.
+        if (!checkpointMap) {
+          initCheckpointMap();
+        }
+
+        // 3. Wait for Bootstrap tab/map to become visible.
+        await new Promise((resolve) => setTimeout(resolve, 150));
+
+        if (checkpointMap) {
+          checkpointMap.invalidateSize();
+        }
+
+        // Automatically scroll page to map.
+        scrollToCheckpointMap();
+
+        // Always reload so we're working with a fresh marker set and the
+        // self-healing edit-mode logic in renderCheckpointMapMarkers() runs.
+        await loadCheckpoints();
+
+        // Give Bootstrap/Leaflet one frame after scroll before centering.
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+
+        if (checkpointMap) {
+          checkpointMap.invalidateSize();
+          checkpointMap.setView([lat, lng], 16, { animate: true });
+        }
+
+        // 4. Fill edit form.
+        const nameInput = document.getElementById("checkpoint_name");
+        const descriptionInput = document.getElementById(
+          "checkpoint_description",
         );
-        showCheckpointStatus(`Editing checkpoint ${checkpoint.name}.`);
+
+        if (nameInput) {
+          nameInput.value = checkpoint.name || "";
+        }
+
+        if (descriptionInput) {
+          descriptionInput.value = checkpoint.description || "";
+        }
+
+        setCheckpointInputs(lat, lng);
+
+        // 5. Unlock ONLY this flag. All other flags remain locked.
+        // (renderCheckpointMapMarkers already re-applied edit mode via
+        // activeSavedCheckpointEditId, but we call it again here in case
+        // loadCheckpoints() resolved before the tab/map was fully ready.)
+        const marker = markerRegistry[checkpoint.id];
+
+        if (marker) {
+          enableSavedCheckpointMarkerEdit(marker, checkpoint);
+          marker.setLatLng([lat, lng]);
+          marker.openPopup();
+        } else {
+          showCheckpointStatus(
+            `Editing "${checkpoint.name}". The checkpoint flag is locked because its map marker could not be loaded yet.`,
+            "warning",
+          );
+        }
+
+        showCheckpointStatus(
+          `Editing "${checkpoint.name}". Drag the 🚩 only while editing, then click Save Position or Save Checkpoint. Closing the popup without saving cancels the move.`,
+        );
       } catch (e) {
+        console.error(e);
         showCheckpointStatus(
           e.message || "Unable to edit checkpoint.",
           "danger",
@@ -1849,13 +2225,17 @@
       try {
         const res = await fetch(`/api/checkpoints/${id}/`, {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-          },
+          headers: { Authorization: `Bearer ${getToken()}` },
         });
+
         if (!res.ok) throw new Error("Delete failed");
+
         showCheckpointStatus("Checkpoint deleted.", "success");
-        if (editingCheckpointId === id) resetCheckpointForm();
+
+        if (editingCheckpointId === id) {
+          resetCheckpointForm();
+        }
+
         loadCheckpoints();
       } catch (e) {
         showCheckpointStatus(
@@ -1870,7 +2250,9 @@
         showCheckpointStatus("GPS not available in your browser.", "danger");
         return;
       }
+
       showCheckpointStatus("Getting GPS location...", "success");
+
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           moveCheckpointMarker(pos.coords.latitude, pos.coords.longitude);
@@ -1890,26 +2272,35 @@
     function distanceInMeters(lat1, lng1, lat2, lng2) {
       const R = 6371000;
       const toRad = (d) => (d * Math.PI) / 180;
+
       const dLat = toRad(lat2 - lat1);
       const dLng = toRad(lng2 - lng1);
+
       const a =
         Math.sin(dLat / 2) ** 2 +
         Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     async function getDepotCenter() {
       const latInput = document.getElementById("depot_lat");
       const lngInput = document.getElementById("depot_lng");
+
       if (latInput && lngInput && latInput.value && lngInput.value) {
         const lat = parseFloat(latInput.value);
         const lng = parseFloat(lngInput.value);
-        if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+
+        if (!isNaN(lat) && !isNaN(lng)) {
+          return { lat, lng };
+        }
       }
+
       try {
         const res = await fetch("/api/system-settings/depot_location/", {
           headers: { Authorization: `Bearer ${getToken()}` },
         });
+
         if (res.ok) {
           const data = await res.json();
           return {
@@ -1920,27 +2311,33 @@
       } catch (e) {
         console.warn("Depot location fetch failed, using default:", e);
       }
+
       return { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
     }
 
     function toggleAutoGeneratePanel() {
       const panel = document.getElementById("auto-generate-panel");
       if (!panel) return;
+
       const opening = panel.classList.contains("d-none");
       panel.classList.toggle("d-none");
+
       if (opening && !checkpointMap) {
         initCheckpointMap();
       }
     }
 
     function maxDistanceToBoundary(centerLat, centerLng) {
-    let maxDist = 0;
-    POKHARA_BOUNDARY.forEach(([lat, lng]) => {
+      let maxDist = 0;
+
+      POKHARA_BOUNDARY.forEach(([lat, lng]) => {
         const d = distanceInMeters(centerLat, centerLng, lat, lng);
         if (d > maxDist) maxDist = d;
-    });
-    return Math.ceil(maxDist * 1.05);
+      });
+
+      return Math.ceil(maxDist * 1.05);
     }
+
     async function generateCheckpointGrid() {
       if (!checkpointMap) initCheckpointMap();
 
@@ -1949,6 +2346,7 @@
           parseFloat(document.getElementById("auto_gen_spacing").value) || 800;
         const radius =
           parseFloat(document.getElementById("auto_gen_radius").value) || 8000;
+
         const center = await getDepotCenter();
 
         if (!isInsidePokhara(center.lat, center.lng)) {
@@ -1966,16 +2364,19 @@
 
         const latSpacing = spacing / 111320;
         const steps = Math.ceil(radius / spacing);
+
         let count = 0;
         let skippedOutside = 0;
 
         for (let i = -steps; i <= steps; i++) {
           for (let j = -steps; j <= steps; j++) {
             if (i === 0 && j === 0) continue;
+
             const rawLat = center.lat + i * latSpacing;
             const lngSpacing =
               spacing / (111320 * Math.cos((rawLat * Math.PI) / 180));
             const rawLng = center.lng + j * lngSpacing;
+
             const lat = round6(rawLat);
             const lng = round6(rawLng);
 
@@ -1992,10 +2393,15 @@
           }
         }
 
-        checkpointMap.setView([center.lat, center.lng], count > 300 ? 11 : 14);
+        checkpointMap.setView(
+          [center.lat, center.lng],
+          count > 300 ? 11 : 14,
+        );
+
         renderPendingList();
 
         const summaryEl = document.getElementById("auto-generate-summary");
+
         if (summaryEl) {
           summaryEl.textContent =
             skippedOutside > 0
@@ -2020,21 +2426,24 @@
     }
 
     async function coverFullMetroArea() {
-    const center = await getDepotCenter();
-    const requiredRadius = maxDistanceToBoundary(center.lat, center.lng);
+      const center = await getDepotCenter();
+      const requiredRadius = maxDistanceToBoundary(center.lat, center.lng);
 
-    document.getElementById("auto_gen_spacing").value = 600;
-    document.getElementById("auto_gen_radius").value = requiredRadius;
+      document.getElementById("auto_gen_spacing").value = 600;
+      document.getElementById("auto_gen_radius").value = requiredRadius;
 
-    const panel = document.getElementById("auto-generate-panel");
-    if (panel && panel.classList.contains("d-none")) {
+      const panel = document.getElementById("auto-generate-panel");
+
+      if (panel && panel.classList.contains("d-none")) {
         panel.classList.remove("d-none");
-    }
-    await generateCheckpointGrid();
+      }
+
+      await generateCheckpointGrid();
     }
 
     function addPendingCheckpoint(lat, lng, name) {
       const id = "pending-" + ++pendingIdCounter;
+
       const marker = L.marker([lat, lng], {
         draggable: true,
         icon: L.divIcon({
@@ -2049,12 +2458,33 @@
 
       marker.on("dragend", function () {
         const pos = marker.getLatLng();
-        const item = pendingCheckpoints.find((p) => p.id === id);
-        if (item) {
-          item.lat = round6(pos.lat);
-          item.lng = round6(pos.lng);
-          renderPendingList();
+        const newLat = round6(pos.lat);
+        const newLng = round6(pos.lng);
+
+        if (!isInsidePokhara(newLat, newLng)) {
+          showToast(
+            "🚫 This checkpoint cannot be placed outside Pokhara Metropolitan City.",
+            "warning",
+          );
+
+          marker.setLatLng([lat, lng]);
+          return;
         }
+
+        const item = pendingCheckpoints.find((p) => p.id === id);
+
+        if (item) {
+          item.lat = newLat;
+          item.lng = newLng;
+        }
+
+        marker._pendingLat = newLat;
+        marker._pendingLng = newLng;
+
+        marker.setPopupContent(name);
+        marker.openPopup();
+
+        renderPendingList();
       });
 
       pendingCheckpoints.push({ id, lat, lng, name, marker });
@@ -2063,55 +2493,89 @@
     function renderPendingList() {
       const container = document.getElementById("pending-checkpoints-list");
       const saveAllRow = document.getElementById("pending-save-all-row");
+
       if (!container) return;
 
       if (!pendingCheckpoints.length) {
         container.innerHTML = "";
-        if (saveAllRow) saveAllRow.classList.add("d-none");
+
+        if (saveAllRow) {
+          saveAllRow.classList.add("d-none");
+        }
+
         return;
       }
 
-      if (saveAllRow) saveAllRow.classList.remove("d-none");
+      if (saveAllRow) {
+        saveAllRow.classList.remove("d-none");
+      }
 
       container.innerHTML = `
         <div class="table-responsive">
-            <table class="table table-sm table-bordered align-middle mb-0">
-                <thead class="table-light text-secondary small">
+          <table class="table table-sm table-bordered align-middle mb-0">
+            <thead class="table-light text-secondary small">
+              <tr>
+                <th>Name</th>
+                <th>Coordinates</th>
+                <th style="width:140px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="small">
+              ${pendingCheckpoints
+                .map(
+                  (p) => `
                     <tr>
-                        <th>Name</th>
-                        <th>Coordinates</th>
-                        <th style="width:140px;">Actions</th>
+                      <td>
+                        <input
+                          type="text"
+                          class="form-control form-control-sm pending-name-input"
+                          data-id="${p.id}"
+                          value="${escapeHtml(p.name)}"
+                        >
+                      </td>
+                      <td>
+                        ${p.lat.toFixed(6)},
+                        ${p.lng.toFixed(6)}
+                        ${
+                          !isInsidePokhara(p.lat, p.lng)
+                            ? ' <span class="text-danger">(outside!)</span>'
+                            : ""
+                        }
+                      </td>
+                      <td>
+                        <button
+                          class="btn btn-sm btn-success py-0 px-2"
+                          onclick="savePendingCheckpoint('${p.id}')"
+                        >
+                          Save
+                        </button>
+                        <button
+                          class="btn btn-sm btn-outline-danger py-0 px-2"
+                          onclick="removePendingCheckpoint('${p.id}')"
+                        >
+                          Remove
+                        </button>
+                      </td>
                     </tr>
-                </thead>
-                <tbody class="small">
-                    ${pendingCheckpoints
-                      .map(
-                        (p) => `
-                        <tr>
-                            <td>
-                                <input type="text" class="form-control form-control-sm pending-name-input"
-                                    data-id="${p.id}" value="${escapeHtml(p.name)}">
-                            </td>
-                            <td>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}${!isInsidePokhara(p.lat, p.lng) ? ' <span class="text-danger">(outside!)</span>' : ""}</td>
-                            <td>
-                                <button class="btn btn-sm btn-success py-0 px-2" onclick="savePendingCheckpoint('${p.id}')">Save</button>
-                                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="removePendingCheckpoint('${p.id}')">Remove</button>
-                            </td>
-                        </tr>
-                    `,
-                      )
-                      .join("")}
-                </tbody>
-            </table>
+                  `,
+                )
+                .join("")}
+            </tbody>
+          </table>
         </div>
-    `;
+      `;
 
       container.querySelectorAll(".pending-name-input").forEach((input) => {
         input.addEventListener("change", function () {
-          const item = pendingCheckpoints.find((p) => p.id === this.dataset.id);
+          const item = pendingCheckpoints.find(
+            (p) => p.id === this.dataset.id,
+          );
+
           if (item) {
             item.name = this.value;
-            if (item.marker) item.marker.setPopupContent(this.value);
+            if (item.marker) {
+              item.marker.setPopupContent(this.value);
+            }
           }
         });
       });
@@ -2123,6 +2587,7 @@
 
     async function postCheckpointWithRetry(payload, { maxRetries = 2 } = {}) {
       let attempt = 0;
+
       while (true) {
         const res = await fetch("/api/checkpoints/", {
           method: "POST",
@@ -2133,42 +2598,56 @@
           body: JSON.stringify(payload),
         });
 
-        if (res.status !== 429) return res;
+        if (res.status !== 429) {
+          return res;
+        }
 
         attempt++;
-        if (attempt > maxRetries) return res;
+
+        if (attempt > maxRetries) {
+          return res;
+        }
 
         const retryAfterHeader = parseFloat(res.headers.get("Retry-After"));
+
         const waitMs = !isNaN(retryAfterHeader)
           ? retryAfterHeader * 1000
           : Math.min(1000 * 2 ** attempt, 8000);
+
         await sleep(waitMs);
       }
     }
 
     async function savePendingCheckpoint(id, { silent = false } = {}) {
       const item = pendingCheckpoints.find((p) => p.id === id);
-      if (!item) return { ok: false, name: null };
+
+      if (!item) {
+        return { ok: false, name: null };
+      }
 
       const nameInput = document.querySelector(
         `.pending-name-input[data-id="${id}"]`,
       );
+
       const name = nameInput ? nameInput.value.trim() : item.name;
+
       if (!name) {
-        if (!silent)
+        if (!silent) {
           showToast(
             "Please give this checkpoint a name before saving.",
             "warning",
           );
+        }
         return { ok: false, name };
       }
 
       if (!isInsidePokhara(item.lat, item.lng)) {
-        if (!silent)
+        if (!silent) {
           showToast(
             `"${name}" is outside Pokhara Metropolitan City — drag it inside the shaded boundary before saving.`,
             "warning",
           );
+        }
         return { ok: false, name };
       }
 
@@ -2185,10 +2664,16 @@
           if (res.status === 429) {
             const msg =
               "Server is rate-limiting requests (429) — still failing after retries.";
-            if (!silent) showToast(msg, "danger");
+
+            if (!silent) {
+              showToast(msg, "danger");
+            }
+
             return { ok: false, name, error: msg, rateLimited: true };
           }
+
           const err = await res.json().catch(() => ({}));
+
           const fieldError =
             err.detail ||
             (err && typeof err === "object"
@@ -2199,6 +2684,7 @@
                   )
                   .join(" | ")
               : null);
+
           throw new Error(fieldError || "Failed to save checkpoint.");
         }
 
@@ -2212,7 +2698,9 @@
             );
             loadCheckpoints();
           }
+
           removePendingCheckpoint(id);
+
           return {
             ok: true,
             name,
@@ -2225,22 +2713,30 @@
           showToast(`"${name}" saved as a checkpoint.`, "success");
           loadCheckpoints();
         }
+
         removePendingCheckpoint(id);
+
         return { ok: true, name };
       } catch (e) {
-        if (!silent)
+        if (!silent) {
           showToast(e.message || "Failed to save checkpoint.", "danger");
+        }
+
         return { ok: false, name, error: e.message };
       }
     }
 
     function removePendingCheckpoint(id) {
       const idx = pendingCheckpoints.findIndex((p) => p.id === id);
+
       if (idx === -1) return;
+
       const [item] = pendingCheckpoints.splice(idx, 1);
+
       if (item.marker && pendingCheckpointsLayer) {
         pendingCheckpointsLayer.removeLayer(item.marker);
       }
+
       renderPendingList();
     }
 
@@ -2251,99 +2747,94 @@
 
     async function saveAllPendingCheckpoints() {
       const btn = document.querySelector("#pending-save-all-row button");
-      const outside = pendingCheckpoints.filter(
+
+      if (!pendingCheckpoints.length) {
+        showToast("No pending checkpoints to save.", "info");
+        return;
+      }
+
+      const invalid = pendingCheckpoints.filter(
         (p) => !isInsidePokhara(p.lat, p.lng),
       );
-      if (outside.length) {
+
+      if (invalid.length) {
         showToast(
-          `${outside.length} pending checkpoint(s) are outside the Pokhara boundary — drag them inside first, they'll be skipped otherwise.`,
+          `${invalid.length} checkpoint(s) are outside Pokhara. Move them inside the boundary first.`,
           "warning",
         );
+        return;
       }
-      const ids = pendingCheckpoints
-        .filter((p) => isInsidePokhara(p.lat, p.lng))
-        .map((p) => p.id);
-      if (!ids.length) return;
 
-      if (ids.length > 150) {
-        showToast(
-          `${ids.length} checkpoints pending — that's a lot for one save run and may take a while if the server rate-limits. Consider a wider spacing next time to generate fewer points.`,
-          "info",
+      const payload = pendingCheckpoints.map((p) => {
+        const nameInput = document.querySelector(
+          `.pending-name-input[data-id="${p.id}"]`,
         );
+
+        const name = nameInput ? nameInput.value.trim() : p.name;
+
+        return {
+          name,
+          description: "Auto-generated checkpoint",
+          latitude: round6(p.lat),
+          longitude: round6(p.lng),
+          is_active: true,
+        };
+      });
+
+      const unnamed = payload.filter((p) => !p.name);
+
+      if (unnamed.length) {
+        showToast("Every checkpoint must have a name.", "warning");
+        return;
       }
 
       if (btn) {
         btn.disabled = true;
-        btn.dataset._originalHtml = btn.innerHTML;
+        btn.dataset.originalHtml = btn.innerHTML;
+        btn.innerHTML =
+          '<span class="spinner-border spinner-border-sm me-1"></span>' +
+          `Saving ${payload.length} checkpoints...`;
       }
 
-      let saved = 0;
-      let deduped = 0;
-      let rateLimitHits = 0;
-      let cleanStreak = 0;
-      let delay = SAVE_ALL_BASE_DELAY_MS;
-      const failed = [];
+      try {
+        const res = await fetch("/api/checkpoints/bulk_create/", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ checkpoints: payload }),
+        });
 
-      for (let i = 0; i < ids.length; i++) {
-        if (btn)
-          btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Saving ${i + 1}/${ids.length}${rateLimitHits ? " (slowed — server busy)" : ""}...`;
+        const data = await res.json().catch(() => ({}));
 
-        const result = await savePendingCheckpoint(ids[i], { silent: true });
-        if (result.ok) {
-          if (result.deduped) {
-            deduped++;
-          } else {
-            saved++;
-          }
-          cleanStreak++;
-          if (
-            cleanStreak >= SAVE_ALL_RECOVERY_STREAK &&
-            delay > SAVE_ALL_BASE_DELAY_MS
-          ) {
-            delay = Math.max(
-              SAVE_ALL_BASE_DELAY_MS,
-              delay / SAVE_ALL_BACKOFF_MULTIPLIER,
-            );
-            cleanStreak = 0;
-          }
-        } else {
-          if (result.rateLimited) {
-            rateLimitHits++;
-            cleanStreak = 0;
-            delay = Math.min(
-              SAVE_ALL_MAX_DELAY_MS,
-              delay * SAVE_ALL_BACKOFF_MULTIPLIER,
-            );
-          } else if (result.name) {
-            failed.push(result.name);
-          }
+        if (!res.ok) {
+          throw new Error(
+            data.detail || data.error || "Failed to save checkpoints.",
+          );
         }
 
-        if (i < ids.length - 1) await sleep(delay);
-      }
+        const savedCount = Number(data.created_count || 0);
+        const dedupedCount = Number(data.deduped_count || 0);
 
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML =
-          btn.dataset._originalHtml ||
-          '<i class="bi bi-check2-all me-1"></i>Save All Pending Checkpoints';
-      }
+        clearPendingCheckpoints();
+        await loadCheckpoints();
 
-      if (saved) loadCheckpoints();
-
-      const stillPending = pendingCheckpoints.length;
-      if (rateLimitHits && stillPending) {
         showToast(
-          `Saved ${saved} checkpoint(s), but the server kept rate-limiting requests (${rateLimitHits} time(s)) — ${stillPending} still pending. Click "Save All" again in a minute to continue, or save smaller batches at a time.`,
-          "warning",
+          `Done! ${savedCount} checkpoint(s) saved` +
+            (dedupedCount ? `, ${dedupedCount} duplicate(s) skipped.` : "."),
+          "success",
         );
-      } else if (failed.length) {
-        showToast(
-          `Saved ${saved} checkpoint(s). ${failed.length} failed: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? "..." : ""}. You can retry those individually.`,
-          failed.length === ids.length ? "danger" : "warning",
-        );
-      } else {
-        showToast(`All ${saved} checkpoint(s) saved successfully.`, "success");
+      } catch (e) {
+        console.error("Bulk checkpoint save failed:", e);
+        showToast(e.message || "Failed to save checkpoints.", "danger");
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML =
+            btn.dataset.originalHtml ||
+            '<i class="bi bi-check2-all me-1"></i>Save All Pending Checkpoints';
+        }
       }
     }
 
@@ -2351,23 +2842,34 @@
       if (pendingCheckpointsLayer) {
         pendingCheckpointsLayer.clearLayers();
       }
+
       pendingCheckpoints = [];
+
       renderPendingList();
+
       const summaryEl = document.getElementById("auto-generate-summary");
-      if (summaryEl) summaryEl.textContent = "";
+
+      if (summaryEl) {
+        summaryEl.textContent = "";
+      }
     }
 
     // ── Database Backup / Restore ──────────────────────────────────────────────
+
     async function loadBackupFiles() {
       const tableBody = document.getElementById("backup-table-body");
+
       if (!tableBody) return;
 
-      // Same idea as loadCheckpoints(): swap the static "Loading backups..."
-      // text for a shimmer immediately, before the authFetch resolves.
       if (typeof renderSkeletonRows === "function") {
         renderSkeletonRows(
           tableBody,
-          [{ width: "60%" }, { width: "35%" }, { width: "50%" }, { width: "45%" }],
+          [
+            { width: "60%" },
+            { width: "35%" },
+            { width: "50%" },
+            { width: "45%" },
+          ],
           3,
         );
       }
@@ -2380,6 +2882,7 @@
         }
 
         const backups = await res.json();
+
         if (!backups.length) {
           tableBody.innerHTML =
             '<tr><td colspan="4" class="text-muted text-center py-3">No backups have been created yet.</td></tr>';
@@ -2389,16 +2892,26 @@
         tableBody.innerHTML = backups
           .map(
             (backup) => `
-            <tr>
-                <td><code>${backup.file_name}</code></td>
-                <td>${formatBytes(backup.size_bytes)}</td>
-                <td>${new Date(backup.created_at).toLocaleString()}</td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="downloadBackup('${backup.file_name}')">Download</button>
-                    <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteBackup('${backup.file_name}')">Delete</button>
-                </td>
-            </tr>
-        `,
+                <tr>
+                  <td><code>${backup.file_name}</code></td>
+                  <td>${formatBytes(backup.size_bytes)}</td>
+                  <td>${new Date(backup.created_at).toLocaleString()}</td>
+                  <td>
+                    <button
+                      class="btn btn-sm btn-outline-primary py-0 px-2"
+                      onclick="downloadBackup('${backup.file_name}')"
+                    >
+                      Download
+                    </button>
+                    <button
+                      class="btn btn-sm btn-outline-danger py-0 px-2"
+                      onclick="deleteBackup('${backup.file_name}')"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              `,
           )
           .join("");
       } catch (e) {
@@ -2420,11 +2933,14 @@
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
+
         link.href = url;
         link.download = fileName;
+
         document.body.appendChild(link);
         link.click();
         link.remove();
+
         window.URL.revokeObjectURL(url);
       } catch (e) {
         showToast(e.message, "danger");
@@ -2433,17 +2949,22 @@
 
     function formatBytes(bytes) {
       if (!bytes) return "0 Bytes";
+
       const units = ["Bytes", "KB", "MB", "GB"];
+
       const unitsIndex = Math.min(
         Math.floor(Math.log(bytes) / Math.log(1024)),
         units.length - 1,
       );
+
       const value = bytes / Math.pow(1024, unitsIndex);
+
       return `${value.toFixed(2)} ${units[unitsIndex]}`;
     }
 
     async function createBackup() {
       const btn = document.getElementById("backup-create-btn");
+
       if (!btn) return;
 
       btn.disabled = true;
@@ -2455,13 +2976,18 @@
           method: "POST",
         });
 
-        if (!res) throw new Error("Unable to create backup.");
+        if (!res) {
+          throw new Error("Unable to create backup.");
+        }
+
         const data = await res.json();
+
         if (!res.ok) {
           throw new Error(data.error || "Unable to create backup.");
         }
 
         showToast(`Backup created: ${data.file_name}`, "success");
+
         await loadBackupFiles();
       } catch (e) {
         showToast(e.message, "danger");
@@ -2475,18 +3001,21 @@
       try {
         const res = await authFetch(
           `/api/database-backups/delete/?file_name=${encodeURIComponent(fileName)}`,
-          {
-            method: "DELETE",
-          },
+          { method: "DELETE" },
         );
 
-        if (!res) throw new Error("Unable to delete backup.");
+        if (!res) {
+          throw new Error("Unable to delete backup.");
+        }
+
         const data = await res.json();
+
         if (!res.ok) {
           throw new Error(data.error || "Unable to delete backup.");
         }
 
         showToast(data.message, "success");
+
         await loadBackupFiles();
       } catch (e) {
         showToast(e.message, "danger");
@@ -2497,18 +3026,29 @@
 
     function deleteBackup(fileName) {
       pendingDeleteBackupFileName = fileName;
+
       document.getElementById("deleteBackupFileNameLabel").textContent =
         fileName;
 
       const modalEl = document.getElementById("deleteBackupConfirmModal");
+
       bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
     (function bindDeleteBackupConfirm() {
-      const submitBtn = document.getElementById("deleteBackupConfirmSubmitBtn");
-      if (!submitBtn || submitBtn.dataset._bound) return;
+      const submitBtn = document.getElementById(
+        "deleteBackupConfirmSubmitBtn",
+      );
+
+      if (!submitBtn || submitBtn.dataset._bound) {
+        return;
+      }
+
       submitBtn.addEventListener("click", async () => {
-        if (!pendingDeleteBackupFileName) return;
+        if (!pendingDeleteBackupFileName) {
+          return;
+        }
+
         const fileName = pendingDeleteBackupFileName;
         pendingDeleteBackupFileName = null;
 
@@ -2517,6 +3057,7 @@
 
         await performBackupDelete(fileName);
       });
+
       submitBtn.dataset._bound = "1";
     })();
 
@@ -2524,6 +3065,7 @@
       if (!file) return;
 
       const formData = new FormData();
+
       formData.append("backup_file", file);
       formData.append("confirm", "true");
       formData.append("admin_password", adminPassword);
@@ -2536,13 +3078,18 @@
           body: formData,
         });
 
-        if (!res) throw new Error("Unable to restore backup.");
+        if (!res) {
+          throw new Error("Unable to restore backup.");
+        }
+
         const data = await res.json();
+
         if (!res.ok) {
           throw new Error(data.error || "Unable to restore backup.");
         }
 
         showToast(data.message + " You may need to sign in again.", "success");
+
         await loadBackupFiles();
       } catch (e) {
         showToast(e.message, "danger");
@@ -2567,9 +3114,11 @@
         fileInput.addEventListener("change", (event) => {
           const file = event.target.files?.[0];
           event.target.value = "";
+
           if (!file) return;
 
           pendingRestoreFile = file;
+
           document.getElementById("restoreFileNameLabel").textContent =
             file.name;
           document.getElementById("restore_admin_password").value = "";
@@ -2579,26 +3128,34 @@
         });
 
         const submitBtn = document.getElementById("restoreConfirmSubmitBtn");
+
         if (submitBtn && !submitBtn.dataset._bound) {
           submitBtn.addEventListener("click", async () => {
             const passwordInput = document.getElementById(
               "restore_admin_password",
             );
             const password = passwordInput.value;
+
             if (!password) {
               passwordInput.focus();
               return;
             }
-            if (!pendingRestoreFile) return;
+
+            if (!pendingRestoreFile) {
+              return;
+            }
 
             const modalEl = document.getElementById("restoreConfirmModal");
             bootstrap.Modal.getOrCreateInstance(modalEl).hide();
 
             const file = pendingRestoreFile;
             pendingRestoreFile = null;
+
             await restoreBackup(file, password);
+
             passwordInput.value = "";
           });
+
           submitBtn.dataset._bound = "1";
         }
 
@@ -2613,13 +3170,14 @@
 
     document.body.addEventListener("htmx:afterSwap", function (evt) {
       const btn = document.getElementById("backup-create-btn");
+
       if (btn && !btn.dataset._backupBound) {
         attachBackupHandlers();
         loadBackupFiles();
       }
     });
 
-    // ── Add Setting Node Async Trigger — reload nagari modal band + form reset ──
+    // ── Add Setting Node Async Trigger ──
     async function addSetting() {
       const key = document.getElementById("setting_key").value.trim();
       const value = document.getElementById("setting_value").value.trim();
@@ -2645,9 +3203,11 @@
 
         if (res.ok) {
           showToast("Setting added successfully!", "success");
+
           bootstrap.Modal.getInstance(
             document.getElementById("addSettingModal"),
           ).hide();
+
           document.getElementById("addSettingForm").reset();
         } else {
           const err = await res.json();
@@ -2658,6 +3218,7 @@
       }
     }
 
+    // Global functions used by inline HTML onclick handlers.
     window.saveDepotLocation = saveDepotLocation;
     window.useMyGPS = useMyGPS;
     window.initCheckpointMap = initCheckpointMap;
