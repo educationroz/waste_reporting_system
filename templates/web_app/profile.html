@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}My Profile{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "My Profile" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -71,7 +72,7 @@
                     "Identifier 'API' has already been declared".
                 -->
                 <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary px-3">
-                    <i class="bi bi-arrow-left me-1"></i>Back
+                    <i class="bi bi-arrow-left me-1"></i>{% trans "Back" %}
                 </a>
             </div>
 
@@ -81,17 +82,17 @@
                     <div class="profile-pic-wrapper">
                         <img id="profile-pic-preview"
                              src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}https://ui-avatars.com/api/?name={{ user.username|urlencode }}&background=049b09&color=fff&size=128{% endif %}"
-                             alt="Profile Picture">
-                        <label for="profile-pic-input" class="profile-pic-edit-btn btn btn-success p-0" title="Change photo">
+                             alt="{% trans 'Profile Picture' %}">
+                        <label for="profile-pic-input" class="profile-pic-edit-btn btn btn-success p-0" title="{% trans 'Change photo' %}">
                             <i class="bi bi-camera-fill"></i>
                         </label>
                         <input type="file" id="profile-pic-input" accept="image/*" class="d-none">
                     </div>
                     <h4 class="fw-bold mt-3 mb-0">{{ user.username }}</h4>
-                    <span class="badge bg-success bg-opacity-10 text-success px-3 py-1 mt-1">{{ user.role|capfirst }}</span>
+                    <span class="badge bg-success bg-opacity-10 text-success px-3 py-1 mt-1">{{ user.get_role_display }}</span>
                     {% if user.is_verified %}
                         <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-1 mt-1 ms-1">
-                            <i class="bi bi-patch-check-fill me-1"></i>Verified
+                            <i class="bi bi-patch-check-fill me-1"></i>{% trans "Verified" %}
                         </span>
                     {% endif %}
                 </div>
@@ -99,24 +100,24 @@
                 <form id="profile-form" hx-boost="false">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-secondary">Username</label>
+                            <label class="form-label small fw-semibold text-secondary">{% trans "Username" %}</label>
                             <input type="text" class="form-control" value="{{ user.username }}" disabled>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-secondary">Email</label>
+                            <label class="form-label small fw-semibold text-secondary">{% trans "Email" %}</label>
                             <input type="email" class="form-control" value="{{ user.email }}" disabled>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-secondary">Phone Number</label>
+                            <label class="form-label small fw-semibold text-secondary">{% trans "Phone Number" %}</label>
                             <input type="text" id="profile-phone" name="phone" class="form-control"
-                                   value="{{ user.phone|default:'' }}" placeholder="e.g. 98XXXXXXXX">
+                                   value="{{ user.phone|default:'' }}" placeholder="{% trans 'e.g. 98XXXXXXXX' %}">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-secondary">Member Since</label>
+                            <label class="form-label small fw-semibold text-secondary">{% trans "Member Since" %}</label>
                             <input type="text" class="form-control" value="{{ user.created_at|date:'d M Y' }}" disabled>
                         </div>
                         <div class="col-12">
-                            <label class="form-label small fw-semibold text-secondary">Address</label>
+                            <label class="form-label small fw-semibold text-secondary">{% trans "Address" %}</label>
                             <textarea id="profile-address" name="address" class="form-control" rows="3"
                                       placeholder="Your pickup / mailing address">{{ user.address|default:'' }}</textarea>
                         </div>
@@ -124,7 +125,7 @@
 
                     <div class="d-flex justify-content-end mt-4">
                         <button type="submit" id="profile-save-btn" class="btn btn-success px-4">
-                            <i class="bi bi-check-lg me-1"></i>Save Changes
+                            <i class="bi bi-check-lg me-1"></i>{% trans "Save Changes" %}
                         </button>
                     </div>
                 </form>
@@ -187,7 +188,7 @@ function safaSaharGoBack() {
                 });
 
                 if (res && res.ok) {
-                    showToast('Profile updated successfully!', 'success');
+                    showToast(gettext('Profile updated successfully!'), 'success');
 
                     // Update the navbar (top-right) avatar right away, without
                     // a page refresh. Prefer the fresh URL the server returns;
@@ -206,11 +207,11 @@ function safaSaharGoBack() {
                         window.updateNavbarAvatar(newPicUrl || picPreview.src);
                     }
                 } else {
-                    showToast('Failed to update profile.', 'danger');
+                    showToast(gettext('Failed to update profile.'), 'danger');
                 }
             } catch (err) {
                 console.error('Profile update failed:', err);
-                showToast('Failed to update profile.', 'danger');
+                showToast(gettext('Failed to update profile.'), 'danger');
             }
         });
     });

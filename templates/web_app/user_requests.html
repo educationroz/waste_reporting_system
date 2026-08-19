@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}My Requests{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "My Requests" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -26,7 +27,7 @@
         <!-- ── २. मुख्य सामाग्री (Main Content Area) ── -->
         <div class="content-col">
 
-            <h2 class="mb-4"><i class="bi bi-clipboard text-success me-2"></i>My Requests</h2>
+            <h2 class="mb-4"><i class="bi bi-clipboard text-success me-2"></i>{% trans "My Requests" %}</h2>
 
             <!-- Requests Table -->
             <div class="card shadow-sm">
@@ -36,12 +37,12 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>
-                                    <th>Waste Type</th>
-                                    <th>Status</th>
-                                    <th>Driver</th>
-                                    <th>Photo</th>
-                                    <th>Scheduled</th>
-                                    <th>Actions</th>
+                                    <th>{% trans "Waste Type" %}</th>
+                                    <th>{% trans "Status" %}</th>
+                                    <th>{% trans "Driver" %}</th>
+                                    <th>{% trans "Photo" %}</th>
+                                    <th>{% trans "Scheduled" %}</th>
+                                    <th>{% trans "Actions" %}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -63,7 +64,7 @@
                                     <td>
                                         {% if req.photo %}
                                         <a href="{{ req.photo.url }}" target="_blank">
-                                            <img src="{{ req.photo.url }}" alt="photo"
+                                            <img src="{{ req.photo.url }}" alt="{% trans 'photo' %}"
                                                 style="height:48px;width:48px;object-fit:cover;border-radius:4px;">
                                         </a>
                                         {% else %}
@@ -74,11 +75,11 @@
                                     <td>
                                         {% if req.status == 'pending' %}
                                         <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }}, this)">
-                                            Cancel
+                                            {% trans "Cancel" %}
                                         </button>
                                         {% elif req.status == 'completed' or req.status == 'cancelled' %}
                                         <button class="btn btn-sm btn-outline-danger" onclick="deleteRequest({{ req.id }}, this)">
-                                            <i class="bi bi-trash3"></i> Delete
+                                            <i class="bi bi-trash3"></i> {% trans "Delete" %}
                                         </button>
                                         {% else %}
                                         —
@@ -86,7 +87,7 @@
                                     </td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="7" class="text-center text-muted py-3">You haven't submitted any requests yet.</td></tr>
+                                <tr><td colspan="7" class="text-center text-muted py-3">{% trans "You haven't submitted any requests yet." %}</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -106,27 +107,27 @@
         const tbody = document.querySelector('table tbody');
         if (!tbody) return;
         if (!tbody.querySelector('tr[id^="request-row-"]')) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">You haven't submitted any requests yet.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">${gettext('You haven\'t submitted any requests yet.')}</td></tr>`;
         }
     }
 
     window.cancelRequest = async function(requestId, btn) {
-        if (!confirm('Cancel this request?')) return;
+        if (!confirm(gettext('Cancel this request?'))) return;
         await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
             const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
             if (data && data.id) {
-                showToast('Request cancelled and moved to Recycle Bin.', 'success');
+                showToast(gettext('Request cancelled and moved to Recycle Bin.'), 'success');
                 const row = document.getElementById(`request-row-${requestId}`);
                 if (row) row.remove();
                 showEmptyStateIfNeeded();
             } else {
-                showToast('Failed to cancel request.', 'danger');
+                showToast(gettext('Failed to cancel request.'), 'danger');
             }
         });
     };
 
     window.deleteRequest = async function(requestId, btn) {
-        if (!confirm('Permanently delete this request? This cannot be undone.')) return;
+        if (!confirm(gettext('Permanently delete this request? This cannot be undone.'))) return;
 
         await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
         try {
@@ -138,7 +139,7 @@
             });
 
             if (res.ok) {
-                showToast('Request deleted.', 'success');
+                showToast(gettext('Request deleted.'), 'success');
                 const row = document.getElementById(`request-row-${requestId}`);
                 if (row) row.remove();
                 showEmptyStateIfNeeded();
@@ -153,7 +154,7 @@
                 showToast(errMsg, 'danger');
             }
         } catch (e) {
-            showToast('Network error: ' + e.message, 'danger');
+            showToast(gettext('Network error: ') + e.message, 'danger');
         }
         });
     };

@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Notifications{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Notifications" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -68,12 +69,12 @@
         <div class="content-col">
             <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-bell text-success me-2"></i>System Notifications</h2>
-                    <p class="text-muted mb-0">Monitor real-time system alerts, operations, and audit triggers</p>
+                    <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-bell text-success me-2"></i>{% trans "System Notifications" %}</h2>
+                    <p class="text-muted mb-0">{% trans "Monitor real-time system alerts, operations, and audit triggers" %}</p>
                 </div>
                 {% if notifications %}
                 <button class="btn btn-outline-success px-3 py-2 fw-semibold btn-sm rounded-2" onclick="markAllRead(this)">
-                    <i class="bi bi-check-all me-1"></i>Mark All Read
+                    <i class="bi bi-check-all me-1"></i>{% trans "Mark All Read" %}
                 </button>
                 {% endif %}
             </div>
@@ -83,7 +84,7 @@
                     {% for notif in notifications %}
                     <div class="list-group-item notif-item {% if not notif.is_read %}unread-style{% endif %}"
                         id="notif-{{ notif.id }}"
-                        {% if not notif.is_read %}onclick="markOneRead({{ notif.id }})" title="Click to mark as read"{% endif %}>
+                        {% if not notif.is_read %}onclick="markOneRead({{ notif.id }})" title="{% trans 'Click to mark as read' %}"{% endif %}>
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
                                 <span class="badge rounded-pill px-2 py-1 me-2
@@ -95,23 +96,23 @@
                                 </span>
                                 <strong class="text-dark fs-6">{{ notif.title }}</strong>
                                 {% if not notif.is_read %}
-                                <span class="badge bg-primary ms-1 unread-tag">New</span>
+                                <span class="badge bg-primary ms-1 unread-tag">{% trans "New" %}</span>
                                 {% endif %}
                             </div>
-                            <small class="text-muted fw-medium">{{ notif.created_at|timesince }} ago</small>
+                            <small class="text-muted fw-medium">{{ notif.created_at|timesince }} {% trans "ago" %}</small>
                         </div>
                         <p class="mb-0 mt-2 text-secondary" style="font-size: 0.9rem;">{{ notif.message }}</p>
 
                         {% if notif.related_request %}
                         <div class="mt-2">
-                            <span class="badge bg-light text-secondary border rounded-1">Request #{{ notif.related_request.id }}</span>
+                            <span class="badge bg-light text-secondary border rounded-1">{% trans "Request #" %}{{ notif.related_request.id }}</span>
                         </div>
                         {% endif %}
                     </div>
                     {% empty %}
                     <div class="text-center py-5 text-muted">
                         <i class="bi bi-bell-slash fs-1 d-block mb-2 text-secondary"></i>
-                        <span class="fw-medium">No system notifications found at this time.</span>
+                        <span class="fw-medium">{% trans "No system notifications found at this time." %}</span>
                     </div>
                     {% endfor %}
                 </div>
@@ -121,11 +122,11 @@
             <nav class="mt-4">
                 <ul class="pagination justify-content-center m-0">
                     {% if page_obj.has_previous %}
-                    <li class="page-item"><a class="page-link shadow-none" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
+                    <li class="page-item"><a class="page-link shadow-none" href="?page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a></li>
                     {% endif %}
                     <li class="page-item disabled"><span class="page-link text-dark fw-medium">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
                     {% if page_obj.has_next %}
-                    <li class="page-item"><a class="page-link shadow-none" href="?page={{ page_obj.next_page_number }}">Next</a></li>
+                    <li class="page-item"><a class="page-link shadow-none" href="?page={{ page_obj.next_page_number }}">{% trans "Next" %}</a></li>
                     {% endif %}
                 </ul>
             </nav>
@@ -156,7 +157,7 @@
             }
             decrementMainBadge();
         } else {
-            showToast('Failed to mark as read.', 'danger');
+            showToast(gettext('Failed to mark as read.'), 'danger');
         }
         } finally {
             _markingRead.delete(notifId);
@@ -195,9 +196,9 @@
         try {
             const data = await API.patch('/api/notifications/mark_all_read/', {});
             if (data && (data.message || data.success)) {
-                showToast('All notifications marked as read.', 'success');
+                showToast(gettext('All notifications marked as read.'), 'success');
             } else {
-                showToast('Failed to update server data.', 'danger');
+                showToast(gettext('Failed to update server data.'), 'danger');
                 unreadItems.forEach(el => {
                     el.classList.add('unread-style');
                     el.setAttribute('onclick', `markOneRead(${el.id.replace('notif-', '')})`);
@@ -206,7 +207,7 @@
             }
         } catch (error) {
             console.error("Error marking notifications:", error);
-            showToast('Something went wrong. Please try again.', 'danger');
+            showToast(gettext('Something went wrong. Please try again.'), 'danger');
         }
         });
     };
