@@ -107,11 +107,27 @@ using them.
 `current_guest_token`. These are **not credentials** — the guest tokens are
 opaque handles for anonymous submissions — so they were intentionally left.
 
-## Pre-existing issues found, not fixed here
+## Pre-existing issues — now resolved
 
-1. `WasteRequestSerializer` lists `guest_email`, which is not a model field →
-   `ImproperlyConfigured` on any request-serialising endpoint. **Already fixed
-   on `main`** in commit `44a5bde`; this branch predates it. Merge `main` and
-   it resolves.
-2. `templates/web_app/profile.html` has one inline `<script>` that fails
-   `node --check` on the pristine base commit too.
+1. `WasteRequestSerializer` listed `guest_email`, which is not a model field →
+   `ImproperlyConfigured` on any request-serialising endpoint. Fixed on `main`
+   in `44a5bde`; **resolved on this branch by merging `main`**.
+2. `templates/web_app/profile.html` contained a literal `<script>` inside an
+   HTML comment. Browsers end the enclosing script at that token, so the
+   comment truncated the block. **Fixed** by removing the angle brackets from
+   the comment text. All 235 rendered inline JS blocks now parse cleanly.
+
+## Deployment notes
+
+`manage.py check --deploy` reports two warnings, both understood:
+
+- **W009 (`SECRET_KEY`)** — comes from the throwaway sandbox `.env`. Set a
+  long random `SECRET_KEY` in the real environment; no code change needed.
+- **W019 (`X_FRAME_OPTIONS` not `DENY`)** — intentional. The driver-licence
+  preview uses same-origin `<embed src="...">`, which Chrome/Safari treat as
+  framing, so `DENY` would blank it. `SAMEORIGIN` plus CSP
+  `frame-ancestors 'self'` gives equivalent clickjacking protection.
+
+Before going live, also confirm `DEBUG=False` (this turns on
+`SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE` and `CSRF_COOKIE_SECURE`, which
+are already wired up conditionally).
