@@ -38,16 +38,26 @@ CDN_HOSTS = (
     'https://accounts.google.com',
 )
 
-_TILE_HOSTS = (
-    'https://*.tile.openstreetmap.org',
-    'https://*.basemaps.cartocdn.com',
-    'https://unpkg.com',
+# Third-party HTTP APIs the app genuinely calls with fetch()/XHR. These MUST
+# be in connect-src or the browser blocks the request outright.
+#
+#   nominatim  — reverse geocoding: turns the photo's GPS pin into a street
+#                address and auto-fills "Pickup Address" on the home form.
+#                Blocking it left the field empty and the report unsubmittable.
+#   osrm       — road routing for the driver dashboard and route planning.
+#
+# Keep this list tight: connect-src is what stops injected JS exfiltrating
+# data, so every entry here is somewhere an attacker could POST to.
+MAP_API_HOSTS = (
+    'https://nominatim.openstreetmap.org',
+    'https://router.project-osrm.org',
 )
 
 
 def _policy(is_secure: bool) -> str:
     ws_scheme = 'wss:' if is_secure else 'ws: wss:'
     cdns = ' '.join(CDN_HOSTS)
+    map_apis = ' '.join(MAP_API_HOSTS)
     directives = [
         "default-src 'self'",
         # See module docstring: 'unsafe-inline' is required by the existing
@@ -55,9 +65,10 @@ def _policy(is_secure: bool) -> str:
         f"script-src 'self' 'unsafe-inline' {cdns}",
         f"style-src 'self' 'unsafe-inline' {cdns} https://fonts.googleapis.com",
         "font-src 'self' data: https://fonts.gstatic.com " + cdns,
+        # Map tiles are <img> loads; https: already covers every tile server.
         "img-src 'self' data: blob: https:",
         # The important one: where injected JS is allowed to send data.
-        f"connect-src 'self' {ws_scheme} {cdns}",
+        f"connect-src 'self' {ws_scheme} {cdns} {map_apis}",
         "frame-src 'self' https://accounts.google.com",
         "frame-ancestors 'self'",
         "form-action 'self'",

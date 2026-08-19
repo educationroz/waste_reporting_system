@@ -45,12 +45,12 @@ msgstr ""
 "%(v0)s बाँकी चेकपोइन्ट पोखराको सीमा बाहिर छन् — पहिले भित्र तान्नुहोस्, नत्र"
 " ती छाडिनेछन्।"
 
-#: templates/web_app/route_planning.html:547
+#: templates/web_app/route_planning.html:542
 msgid "%(v0)s request(s) selected."
 msgstr "%(v0)s अनुरोध छानियो।"
 
 #: templates/web_app/admin_drivers.html:283
-#: templates/web_app/admin_drivers.html:607
+#: templates/web_app/admin_drivers.html:583
 msgid "(PDF only, max 5MB)"
 msgstr "(PDF मात्र, बढीमा 5MB)"
 
@@ -74,9 +74,9 @@ msgstr "० फोटो खिचिएको"
 #: templates/web_app/admin_complaints.html:176
 #: templates/web_app/admin_dashboard.html:473
 #: templates/web_app/admin_dashboard.html:482
-#: templates/web_app/admin_requests.html:507
-#: templates/web_app/admin_requests.html:632
-#: templates/web_app/admin_requests.html:866 templates/web_app/home.html:1029
+#: templates/web_app/admin_requests.html:509
+#: templates/web_app/admin_requests.html:634
+#: templates/web_app/admin_requests.html:868 templates/web_app/home.html:1039
 msgid "A page resource failed to load. Please refresh and try again."
 msgstr "पृष्ठको स्रोत लोड हुन सकेन। कृपया रिफ्रेस गरेर फेरि प्रयास गर्नुहोस्।"
 
@@ -197,7 +197,7 @@ msgstr "सवारी थप्नुहोस्"
 
 #: templates/web_app/admin_drivers.html:243
 #: templates/web_app/admin_drivers.html:388
-#: templates/web_app/admin_drivers.html:580
+#: templates/web_app/admin_drivers.html:556
 #: templates/web_app/driver_dashboard.html:228
 #: templates/web_app/profile.html:120
 msgid "Address"
@@ -251,15 +251,15 @@ msgstr "प्रशासक सेटिङ"
 msgid "Admin Users Management"
 msgstr "प्रशासक प्रयोगकर्ता व्यवस्थापन"
 
-#: templates/web_app/admin_users.html:513
+#: templates/web_app/admin_users.html:514
 msgid "Admin user created successfully!"
 msgstr "प्रशासक प्रयोगकर्ता सफलतापूर्वक सिर्जना भयो!"
 
-#: templates/web_app/admin_users.html:613
+#: templates/web_app/admin_users.html:616
 msgid "Admin user removed successfully!"
 msgstr "प्रशासक प्रयोगकर्ता सफलतापूर्वक हटाइयो!"
 
-#: templates/web_app/admin_users.html:578
+#: templates/web_app/admin_users.html:580
 msgid "Admin user updated successfully!"
 msgstr "प्रशासक प्रयोगकर्ता सफलतापूर्वक अद्यावधिक भयो!"
 
@@ -317,7 +317,7 @@ msgstr ""
 msgid "All notifications marked as read."
 msgstr "सबै सूचना पढिएको चिन्ह लगाइयो।"
 
-#: templates/web_app/base.html:290
+#: templates/web_app/base.html:308
 msgid "All rights reserved."
 msgstr "सर्वाधिकार सुरक्षित।"
 
@@ -345,7 +345,7 @@ msgstr "एप समस्या"
 msgid "Apply Status"
 msgstr "स्थिति लागू गर्नुहोस्"
 
-#: templates/web_app/admin_requests.html:327
+#: templates/web_app/admin_requests.html:329
 msgid "Approve"
 msgstr "स्वीकृत गर्नुहोस्"
 
@@ -353,7 +353,7 @@ msgstr "स्वीकृत गर्नुहोस्"
 msgid "Are you absolute sure to remove this admin?"
 msgstr "के तपाईं यो प्रशासकलाई हटाउन निश्चित हुनुहुन्छ?"
 
-#: templates/web_app/admin_requests.html:719
+#: templates/web_app/admin_requests.html:721
 msgid ""
 "Are you absolutely sure you want to cancel this municipal request matrix?"
 msgstr "के तपाईं यो अनुरोध रद्द गर्न निश्चित हुनुहुन्छ?"
@@ -372,11 +372,11 @@ msgstr "के तपाईं छानिएका %(v1)s तालिका %
 msgid "Are you sure you want to delete %(v0)s selected checkpoint(s)?\\n\\n"
 msgstr "के तपाईं छानिएका %(v0)s चेकपोइन्ट मेट्न निश्चित हुनुहुन्छ?\\n\\n"
 
-#: templates/web_app/admin_requests.html:745
+#: templates/web_app/admin_requests.html:747
 msgid "Are you sure you want to delete this request?"
 msgstr "के तपाईं यो अनुरोध मेट्न निश्चित हुनुहुन्छ?"
 
-#: templates/web_app/admin_drivers.html:809
+#: templates/web_app/admin_drivers.html:785
 msgid "Are you sure you want to remove this driver from the system?"
 msgstr "के तपाईं यो चालकलाई प्रणालीबाट हटाउन निश्चित हुनुहुन्छ?"
 
@@ -401,20 +401,20 @@ msgid "Assign Crew Dispatch"
 msgstr "टोली परिचालन तोक्नुहोस्"
 
 #: templates/web_app/admin_requests.html:218
-#: templates/web_app/admin_requests.html:377
-#: templates/web_app/admin_requests.html:799
+#: templates/web_app/admin_requests.html:379
+#: templates/web_app/admin_requests.html:801
 msgid "Assign Driver"
 msgstr "चालक तोक्नुहोस्"
 
 #: templates/web_app/admin_drivers.html:196
-#: templates/web_app/admin_drivers.html:537
+#: templates/web_app/admin_drivers.html:513
 msgid "Assign Vehicle"
 msgstr "सवारी तोक्नुहोस्"
 
 #: api_app/models.py:164 templates/web_app/admin_dashboard.html:214
-#: templates/web_app/admin_requests.html:527
+#: templates/web_app/admin_requests.html:529
 #: templates/web_app/driver_dashboard.html:187
-#: templates/web_app/home.html:1409
+#: templates/web_app/home.html:1388
 msgid "Assigned"
 msgstr "तोकिएको"
 
@@ -436,16 +436,16 @@ msgid "Assigned Tasks"
 msgstr "तोकिएका कार्यहरू"
 
 #: templates/web_app/admin_drivers.html:253
-#: templates/web_app/admin_drivers.html:589
+#: templates/web_app/admin_drivers.html:565
 msgid "Assigned Vehicle"
 msgstr "तोकिएको सवारी"
 
-#: templates/web_app/admin_requests.html:459
+#: templates/web_app/admin_requests.html:461
 msgid "Assigning to"
 msgstr "यसलाई तोक्दै"
 
 #: templates/web_app/admin_drivers.html:247
-#: templates/web_app/admin_drivers.html:583
+#: templates/web_app/admin_drivers.html:559
 msgid "Assignment"
 msgstr "जिम्मेवारी"
 
@@ -465,23 +465,23 @@ msgstr "डिपो वरिपरि चेकपोइन्ट स्वत
 msgid "Auto-Generate Route (All Pending Reports)"
 msgstr "मार्ग स्वतः बनाउनुहोस् (सबै बाँकी रिपोर्ट)"
 
-#: templates/web_app/admin_drivers.html:742
+#: templates/web_app/admin_drivers.html:718
 msgid "Availability successfully updated!"
 msgstr "उपलब्धता सफलतापूर्वक अद्यावधिक भयो!"
 
 #: api_app/models.py:9 templates/web_app/admin_dashboard.html:383
 #: templates/web_app/admin_drivers.html:181
 #: templates/web_app/admin_drivers.html:223
-#: templates/web_app/admin_drivers.html:508
-#: templates/web_app/admin_drivers.html:756
+#: templates/web_app/admin_drivers.html:484
+#: templates/web_app/admin_drivers.html:732
 #: templates/web_app/admin_vehicles.html:221
 #: templates/web_app/admin_vehicles.html:258
 #: templates/web_app/driver_dashboard.html:146
-#: templates/web_app/driver_dashboard.html:617
+#: templates/web_app/driver_dashboard.html:609
 msgid "Available"
 msgstr "उपलब्ध"
 
-#: templates/web_app/admin_requests.html:380
+#: templates/web_app/admin_requests.html:382
 msgid "Awaiting Review"
 msgstr "समीक्षा प्रतीक्षामा"
 
@@ -517,7 +517,7 @@ msgstr "पाक्षिक"
 msgid "Bi-Weekly Loop"
 msgstr "पाक्षिक चक्र"
 
-#: templates/web_app/admin_requests.html:454
+#: templates/web_app/admin_requests.html:456
 msgid "Bulk Assign Driver"
 msgstr "समूहमा चालक तोक्नुहोस्"
 
@@ -525,11 +525,11 @@ msgstr "समूहमा चालक तोक्नुहोस्"
 msgid "Bulk activation update failed."
 msgstr "समूहगत सक्रियता अद्यावधिक असफल भयो।"
 
-#: templates/web_app/admin_requests.html:664
+#: templates/web_app/admin_requests.html:666
 msgid "Bulk assignment failed."
 msgstr "समूहगत बाँडफाँट असफल भयो।"
 
-#: templates/web_app/admin_requests.html:692
+#: templates/web_app/admin_requests.html:694
 msgid "Bulk cancel failed."
 msgstr "समूहगत रद्द असफल भयो।"
 
@@ -547,10 +547,10 @@ msgstr "ठूला सामग्री"
 
 #: templates/web_app/admin_drivers.html:181
 #: templates/web_app/admin_drivers.html:223
-#: templates/web_app/admin_drivers.html:508
-#: templates/web_app/admin_drivers.html:756
+#: templates/web_app/admin_drivers.html:484
+#: templates/web_app/admin_drivers.html:732
 #: templates/web_app/driver_dashboard.html:146
-#: templates/web_app/driver_dashboard.html:617
+#: templates/web_app/driver_dashboard.html:609
 msgid "Busy"
 msgstr "व्यस्त"
 
@@ -566,23 +566,23 @@ msgstr "पात्रो सेटअप"
 #: templates/web_app/admin_dashboard.html:300
 #: templates/web_app/admin_drivers.html:327
 #: templates/web_app/admin_drivers.html:402
-#: templates/web_app/admin_drivers.html:647
-#: templates/web_app/admin_requests.html:389
-#: templates/web_app/admin_requests.html:442
-#: templates/web_app/admin_requests.html:471
+#: templates/web_app/admin_drivers.html:623
+#: templates/web_app/admin_requests.html:391
+#: templates/web_app/admin_requests.html:444
+#: templates/web_app/admin_requests.html:473
 #: templates/web_app/admin_schedules.html:261
 #: templates/web_app/admin_settings.html:884
 #: templates/web_app/admin_users.html:211
 #: templates/web_app/admin_users.html:260
 #: templates/web_app/admin_vehicles.html:169
-#: templates/web_app/admin_vehicles.html:229 templates/web_app/home.html:1430
-#: templates/web_app/home.html:1457 templates/web_app/home.html:386
+#: templates/web_app/admin_vehicles.html:229 templates/web_app/home.html:1409
+#: templates/web_app/home.html:1436 templates/web_app/home.html:386
 #: templates/web_app/home.html:499 templates/web_app/route_planning.html:258
 #: templates/web_app/user_requests.html:78
 msgid "Cancel"
 msgstr "रद्द गर्नुहोस्"
 
-#: templates/web_app/admin_requests.html:672
+#: templates/web_app/admin_requests.html:674
 msgid ""
 "Cancel %(v0)s selected request(s)? Only pending requests will be affected."
 msgstr ""
@@ -592,14 +592,14 @@ msgstr ""
 msgid "Cancel Selected"
 msgstr "छानिएका रद्द गर्नुहोस्"
 
-#: templates/web_app/admin_dashboard.html:517 templates/web_app/home.html:1739
+#: templates/web_app/admin_dashboard.html:517 templates/web_app/home.html:1715
 #: templates/web_app/user_requests.html:115
 msgid "Cancel this request?"
 msgstr "यो अनुरोध रद्द गर्ने?"
 
 #: api_app/models.py:167 api_app/models.py:329
 #: templates/web_app/admin_dashboard.html:217
-#: templates/web_app/admin_requests.html:526 templates/web_app/home.html:1408
+#: templates/web_app/admin_requests.html:528 templates/web_app/home.html:1387
 msgid "Cancelled"
 msgstr "रद्द गरिएको"
 
@@ -620,7 +620,7 @@ msgstr "परिवर्तन विवरण"
 msgid "Change photo"
 msgstr "फोटो बदल्नुहोस्"
 
-#: templates/web_app/driver_dashboard.html:610
+#: templates/web_app/driver_dashboard.html:602
 msgid "Changed to %(v0)s"
 msgstr "%(v0)s मा बदलियो"
 
@@ -640,7 +640,7 @@ msgstr "चेकपोइन्टहरू"
 msgid "Choose from Gallery"
 msgstr "ग्यालरीबाट छान्नुहोस्"
 
-#: templates/web_app/base.html:193
+#: templates/web_app/base.html:211
 msgid "Choose language"
 msgstr "भाषा छान्नुहोस्"
 
@@ -696,7 +696,7 @@ msgstr ""
 "त्यसपछि पपअपबाट सुरक्षित, सम्पादन वा मेट्नुहोस्।"
 
 #: templates/web_app/admin_drivers.html:287
-#: templates/web_app/admin_drivers.html:611
+#: templates/web_app/admin_drivers.html:587
 msgid "Click to choose a PDF file"
 msgstr "PDF फाइल छान्न क्लिक गर्नुहोस्"
 
@@ -709,7 +709,7 @@ msgid "Client"
 msgstr "ग्राहक"
 
 #: templates/web_app/admin_drivers.html:298
-#: templates/web_app/admin_drivers.html:622
+#: templates/web_app/admin_drivers.html:598
 msgid "Close"
 msgstr "बन्द गर्नुहोस्"
 
@@ -730,11 +730,11 @@ msgstr "कम्प्याक्टर"
 msgid "Complaint Management"
 msgstr "गुनासो व्यवस्थापन"
 
-#: templates/web_app/admin_complaints.html:422
+#: templates/web_app/admin_complaints.html:423
 msgid "Complaint deleted."
 msgstr "गुनासो मेटियो।"
 
-#: templates/web_app/home.html:1873
+#: templates/web_app/home.html:1851
 msgid "Complaint submitted successfully!"
 msgstr "गुनासो सफलतापूर्वक पेस भयो!"
 
@@ -751,7 +751,7 @@ msgstr "गुनासाहरू"
 #: templates/web_app/admin_complaints.html:71
 #: templates/web_app/admin_complaints.html:85
 #: templates/web_app/admin_dashboard.html:216
-#: templates/web_app/admin_requests.html:523 templates/web_app/home.html:1405
+#: templates/web_app/admin_requests.html:525 templates/web_app/home.html:1384
 #: templates/web_app/home.html:192
 msgid "Completed"
 msgstr "सम्पन्न"
@@ -786,12 +786,12 @@ msgstr "प्रणालीभरका सेटिङ र मापदण्
 msgid "Configured Operational Route Intervals"
 msgstr "निर्धारित मार्ग अन्तराल"
 
-#: templates/web_app/admin_requests.html:472
+#: templates/web_app/admin_requests.html:474
 msgid "Confirm Bulk Dispatch"
 msgstr "समूह परिचालन पुष्टि गर्नुहोस्"
 
 #: templates/web_app/admin_dashboard.html:421
-#: templates/web_app/admin_requests.html:443
+#: templates/web_app/admin_requests.html:445
 msgid "Confirm Dispatch"
 msgstr "परिचालन पुष्टि गर्नुहोस्"
 
@@ -807,27 +807,27 @@ msgstr "पासवर्ड पुष्टि गर्नुहोस्"
 msgid "Confirm Password *"
 msgstr "पासवर्ड पुष्टि गर्नुहोस् *"
 
-#: templates/web_app/admin_requests.html:330
+#: templates/web_app/admin_requests.html:332
 msgid "Confirm this is NOT waste — cancels the request"
 msgstr "यो फोहोर होइन भनी पुष्टि गर्नुहोस् — अनुरोध रद्द हुन्छ"
 
-#: templates/web_app/admin_requests.html:326
+#: templates/web_app/admin_requests.html:328
 msgid "Confirm this is real waste"
 msgstr "यो साँच्चै फोहोर हो भनी पुष्टि गर्नुहोस्"
 
-#: web_app/views.py:667
+#: web_app/views.py:672
 msgid "Connected"
 msgstr "जडान भएको"
 
-#: templates/web_app/base.html:761 templates/web_app/driver_dashboard.html:364
-#: templates/web_app/driver_dashboard.html:434
-#: templates/web_app/home.html:1926 templates/web_app/home.html:1978
-#: templates/web_app/route_planning.html:742
+#: templates/web_app/base.html:694 templates/web_app/driver_dashboard.html:355
+#: templates/web_app/driver_dashboard.html:425
+#: templates/web_app/home.html:1897 templates/web_app/home.html:1944
+#: templates/web_app/route_planning.html:730
 msgid "Connection lost — live updates paused"
 msgstr "जडान टुट्यो — प्रत्यक्ष अद्यावधिक रोकियो"
 
 #: templates/web_app/admin_drivers.html:229
-#: templates/web_app/admin_drivers.html:566
+#: templates/web_app/admin_drivers.html:542
 msgid "Contact"
 msgstr "सम्पर्क"
 
@@ -853,7 +853,11 @@ msgstr ""
 "क्यामेरा खोल्न सकिएन। कृपया क्यामेरा अनुमति दिनुहोस्, वा \"ग्यालरीबाट "
 "छान्नुहोस्\" प्रयोग गर्नुहोस्।"
 
-#: templates/web_app/driver_dashboard.html:424
+#: templates/web_app/home.html:857
+msgid "Could not detect address — please type it"
+msgstr "ठेगाना पत्ता लगाउन सकिएन — कृपया टाइप गर्नुहोस्"
+
+#: templates/web_app/driver_dashboard.html:415
 msgid "Could not get GPS location."
 msgstr "जीपीएस स्थान प्राप्त गर्न सकिएन।"
 
@@ -863,7 +867,7 @@ msgstr ""
 "जीपीएस स्थान प्राप्त गर्न सकिएन। स्थान पहुँच दिनुहोस् र फेरि प्रयास "
 "गर्नुहोस्।"
 
-#: templates/web_app/home.html:1627
+#: templates/web_app/home.html:1606
 msgid "Could not save offline — this device may not support offline storage."
 msgstr ""
 "अफलाइन सुरक्षित गर्न सकिएन — यस उपकरणले अफलाइन भण्डारण समर्थन नगर्न सक्छ।"
@@ -969,8 +973,8 @@ msgid "Default Timezone"
 msgstr "पूर्वनिर्धारित समय क्षेत्र"
 
 #: api_app/models.py:462 templates/web_app/admin_dashboard.html:304
-#: templates/web_app/admin_requests.html:403
-#: templates/web_app/admin_requests.html:855
+#: templates/web_app/admin_requests.html:405
+#: templates/web_app/admin_requests.html:857
 #: templates/web_app/admin_settings.html:1471
 #: templates/web_app/admin_settings.html:1495
 #: templates/web_app/admin_settings.html:2380
@@ -995,7 +999,7 @@ msgstr "सवारी विवरण मेट्नुहोस्"
 msgid "Delete complaint"
 msgstr "गुनासो मेट्नुहोस्"
 
-#: templates/web_app/admin_requests.html:760
+#: templates/web_app/admin_requests.html:762
 msgid "Delete failed."
 msgstr "मेट्न सकिएन।"
 
@@ -1054,7 +1058,11 @@ msgstr "तोकिएका चेकपोइन्टहरू"
 msgid "Designated Drop-off Point"
 msgstr "तोकिएको बुझाउने ठाउँ"
 
-#: templates/web_app/admin_requests.html:427
+#: templates/web_app/home.html:831 templates/web_app/home.html:861
+msgid "Detecting address..."
+msgstr "ठेगाना पत्ता लगाउँदै..."
+
+#: templates/web_app/admin_requests.html:429
 msgid "Dispatch Operator Node"
 msgstr "सञ्चालक परिचालन"
 
@@ -1066,7 +1074,7 @@ msgstr "परिचालित सूची तथा प्रवाह"
 msgid "Display name for the system"
 msgstr "प्रणालीमा देखिने नाम"
 
-#: templates/web_app/route_planning.html:620
+#: templates/web_app/route_planning.html:615
 msgid "Distance from previous:"
 msgstr "अघिल्लोबाट दूरी:"
 
@@ -1075,7 +1083,7 @@ msgid "Don't have an account?"
 msgstr "खाता छैन?"
 
 #: templates/web_app/driver_dashboard.html:249
-#: templates/web_app/driver_dashboard.html:479 templates/web_app/home.html:538
+#: templates/web_app/driver_dashboard.html:470 templates/web_app/home.html:538
 msgid "Done"
 msgstr "सम्पन्न"
 
@@ -1103,15 +1111,15 @@ msgid "Driver Dashboard"
 msgstr "चालक ड्यासबोर्ड"
 
 #: templates/web_app/admin_drivers.html:210
-#: templates/web_app/admin_drivers.html:552
+#: templates/web_app/admin_drivers.html:528
 msgid "Driver Profile"
 msgstr "चालक प्रोफाइल"
 
-#: templates/web_app/admin_requests.html:547
+#: templates/web_app/admin_requests.html:549
 msgid "Driver assigned successfully to the route sequence!"
 msgstr "मार्गमा चालक सफलतापूर्वक तोकियो!"
 
-#: templates/web_app/admin_drivers.html:703
+#: templates/web_app/admin_drivers.html:679
 msgid "Driver created successfully!"
 msgstr "चालक सफलतापूर्वक सिर्जना भयो!"
 
@@ -1119,7 +1127,7 @@ msgstr "चालक सफलतापूर्वक सिर्जना भ
 msgid "Driver dispatch successfully configured!"
 msgstr "चालक परिचालन सफलतापूर्वक मिलाइयो!"
 
-#: templates/web_app/admin_drivers.html:827
+#: templates/web_app/admin_drivers.html:804
 msgid "Driver removed successfully."
 msgstr "चालक सफलतापूर्वक हटाइयो।"
 
@@ -1136,7 +1144,7 @@ msgid "Drivers Registry"
 msgstr "चालक दर्ता"
 
 #: templates/web_app/admin_drivers.html:263
-#: templates/web_app/admin_drivers.html:598
+#: templates/web_app/admin_drivers.html:574
 msgid "Driving License Document"
 msgstr "सवारी इजाजतपत्र कागजात"
 
@@ -1168,7 +1176,7 @@ msgstr "सवारी विवरण सम्पादन"
 
 #: templates/web_app/admin_drivers.html:235
 #: templates/web_app/admin_drivers.html:380
-#: templates/web_app/admin_drivers.html:572
+#: templates/web_app/admin_drivers.html:548
 #: templates/web_app/admin_users.html:234
 #: templates/web_app/admin_users.html:89
 #: templates/web_app/forgot_password.html:21 templates/web_app/home.html:299
@@ -1192,7 +1200,7 @@ msgstr "इमेल कन्फिगरेसन"
 msgid "Email Node"
 msgstr "इमेल"
 
-#: templates/web_app/recycle_bin.html:237
+#: templates/web_app/recycle_bin.html:240
 msgid "Emptied with %(v0)s item(s) failing to delete."
 msgstr "खाली गरियो, तर %(v0)s वस्तु मेट्न सकिएन।"
 
@@ -1204,7 +1212,7 @@ msgstr "खाली"
 msgid "Empty Bin"
 msgstr "बिन खाली गर्नुहोस्"
 
-#: templates/web_app/driver_dashboard.html:431
+#: templates/web_app/driver_dashboard.html:422
 msgid "Enter coordinates."
 msgstr "निर्देशांक लेख्नुहोस्।"
 
@@ -1229,7 +1237,7 @@ msgstr "पासवर्ड लेख्नुहोस्"
 msgid "Enter username"
 msgstr "प्रयोगकर्ता नाम लेख्नुहोस्"
 
-#: templates/web_app/home.html:278
+#: templates/web_app/home.html:278 templates/web_app/home.html:862
 msgid "Enter your address"
 msgstr "आफ्नो ठेगाना लेख्नुहोस्"
 
@@ -1237,18 +1245,18 @@ msgstr "आफ्नो ठेगाना लेख्नुहोस्"
 msgid "Enter your email and we'll send you a reset link."
 msgstr "आफ्नो इमेल लेख्नुहोस्, हामी रिसेट लिंक पठाउनेछौँ।"
 
-#: templates/web_app/admin_users.html:526
+#: templates/web_app/admin_users.html:527
 msgid "Error creating admin user:"
 msgstr "प्रशासक प्रयोगकर्ता सिर्जना गर्दा त्रुटि:"
 
-#: templates/web_app/admin_users.html:597
+#: templates/web_app/admin_users.html:599
 msgid "Error updating admin user:"
 msgstr "प्रशासक प्रयोगकर्ता अद्यावधिक गर्दा त्रुटि:"
 
 #: templates/web_app/admin_settings.html:2636
-#: templates/web_app/admin_users.html:523
-#: templates/web_app/admin_users.html:594 templates/web_app/home.html:1720
-#: templates/web_app/home.html:1880 templates/web_app/route_planning.html:583
+#: templates/web_app/admin_users.html:524
+#: templates/web_app/admin_users.html:596 templates/web_app/home.html:1696
+#: templates/web_app/home.html:1858 templates/web_app/route_planning.html:578
 msgid "Error:"
 msgstr "त्रुटि:"
 
@@ -1287,12 +1295,12 @@ msgstr "सम्पूर्ण डाटा ब्याकअप फाइल
 msgid "Failed to add vehicle."
 msgstr "सवारी थप्न सकिएन।"
 
-#: templates/web_app/admin_dashboard.html:524 templates/web_app/home.html:1748
+#: templates/web_app/admin_dashboard.html:524 templates/web_app/home.html:1724
 #: templates/web_app/user_requests.html:124
 msgid "Failed to cancel request."
 msgstr "अनुरोध रद्द गर्न सकिएन।"
 
-#: templates/web_app/admin_drivers.html:734
+#: templates/web_app/admin_drivers.html:710
 msgid "Failed to create driver:"
 msgstr "चालक सिर्जना गर्न सकिएन:"
 
@@ -1300,11 +1308,11 @@ msgstr "चालक सिर्जना गर्न सकिएन:"
 msgid "Failed to deploy driver node."
 msgstr "चालक परिचालन गर्न सकिएन।"
 
-#: templates/web_app/admin_requests.html:739
+#: templates/web_app/admin_requests.html:741
 msgid "Failed to drop request pipeline node state."
 msgstr "अनुरोधको स्थिति हटाउन सकिएन।"
 
-#: templates/web_app/route_planning.html:514
+#: templates/web_app/route_planning.html:509
 msgid "Failed to load requests. Are you logged in?"
 msgstr "अनुरोधहरू लोड गर्न सकिएन। के तपाईं लगइन हुनुहुन्छ?"
 
@@ -1312,7 +1320,7 @@ msgstr "अनुरोधहरू लोड गर्न सकिएन। �
 msgid "Failed to mark as read."
 msgstr "पढिएको चिन्ह लगाउन सकिएन।"
 
-#: templates/web_app/admin_requests.html:560
+#: templates/web_app/admin_requests.html:562
 msgid "Failed to patch driver assignment parameter."
 msgstr "चालक बाँडफाँट अद्यावधिक गर्न सकिएन।"
 
@@ -1320,15 +1328,15 @@ msgstr "चालक बाँडफाँट अद्यावधिक गर
 msgid "Failed to patch systemic active lifecycle flag."
 msgstr "सक्रिय स्थिति अद्यावधिक गर्न सकिएन।"
 
-#: templates/web_app/recycle_bin.html:197
+#: templates/web_app/recycle_bin.html:199
 msgid "Failed to permanently delete request."
 msgstr "अनुरोध सधैँका लागि मेट्न सकिएन।"
 
-#: templates/web_app/admin_requests.html:821
+#: templates/web_app/admin_requests.html:823
 msgid "Failed to resolve review."
 msgstr "समीक्षा टुंग्याउन सकिएन।"
 
-#: templates/web_app/recycle_bin.html:172
+#: templates/web_app/recycle_bin.html:173
 msgid "Failed to restore request."
 msgstr "अनुरोध पुनर्स्थापना गर्न सकिएन।"
 
@@ -1336,11 +1344,11 @@ msgstr "अनुरोध पुनर्स्थापना गर्न स
 msgid "Failed to save:"
 msgstr "सुरक्षित गर्न सकिएन:"
 
-#: templates/web_app/route_planning.html:706
+#: templates/web_app/route_planning.html:701
 msgid "Failed to start route."
 msgstr "मार्ग सुरु गर्न सकिएन।"
 
-#: templates/web_app/driver_dashboard.html:627
+#: templates/web_app/driver_dashboard.html:619
 msgid "Failed to update availability."
 msgstr "उपलब्धता अद्यावधिक गर्न सकिएन।"
 
@@ -1356,7 +1364,7 @@ msgstr "प्रोफाइल अद्यावधिक गर्न सक
 msgid "Failed to update server data."
 msgstr "सर्भरको डाटा अद्यावधिक गर्न सकिएन।"
 
-#: templates/web_app/admin_drivers.html:781
+#: templates/web_app/admin_drivers.html:757
 msgid "Failed to write asset mapping parameters."
 msgstr "सवारी बाँडफाँट लेख्न सकिएन।"
 
@@ -1364,7 +1372,7 @@ msgstr "सवारी बाँडफाँट लेख्न सकिएन
 msgid "File a Complaint"
 msgstr "गुनासो दर्ता गर्नुहोस्"
 
-#: templates/web_app/admin_drivers.html:881
+#: templates/web_app/admin_drivers.html:858
 msgid "File too large (%(v0)sMB). Max is 5MB."
 msgstr "फाइल धेरै ठूलो छ (%(v0)sMB)। अधिकतम 5MB हो।"
 
@@ -1439,7 +1447,7 @@ msgstr "पूर्ण अभिलेख"
 msgid "Full Name"
 msgstr "पूरा नाम"
 
-#: templates/web_app/driver_dashboard.html:549
+#: templates/web_app/driver_dashboard.html:540
 msgid "GPS is not supported on this device. Cannot mark as completed."
 msgstr "यस उपकरणमा जीपीएस छैन। सम्पन्न चिन्ह लगाउन सकिँदैन।"
 
@@ -1451,7 +1459,7 @@ msgstr "जीपीएस स्थान लिइयो! पुष्टि �
 msgid "GPS not available in your browser."
 msgstr "तपाईंको ब्राउजरमा जीपीएस उपलब्ध छैन।"
 
-#: templates/web_app/driver_dashboard.html:418
+#: templates/web_app/driver_dashboard.html:409
 msgid "GPS not supported."
 msgstr "जीपीएस समर्थित छैन।"
 
@@ -1491,7 +1499,7 @@ msgstr "भौगोलिक ठेगाना विवरण"
 msgid "Getting GPS location..."
 msgstr "जीपीएस स्थान लिँदै..."
 
-#: templates/web_app/driver_dashboard.html:553
+#: templates/web_app/driver_dashboard.html:544
 msgid "Getting your location, please wait..."
 msgstr "तपाईंको स्थान लिँदै, कृपया पर्खनुहोस्..."
 
@@ -1531,7 +1539,7 @@ msgid "IP Address Vector"
 msgstr "आईपी ठेगाना"
 
 #: templates/web_app/admin_drivers.html:229
-#: templates/web_app/admin_drivers.html:566
+#: templates/web_app/admin_drivers.html:542
 msgid "Identity"
 msgstr "परिचय"
 
@@ -1545,10 +1553,10 @@ msgstr "पहिले सुरक्षित गरिएको ब्या
 
 #: api_app/models.py:165 templates/web_app/admin_dashboard.html:166
 #: templates/web_app/admin_dashboard.html:215
-#: templates/web_app/admin_requests.html:525
+#: templates/web_app/admin_requests.html:527
 #: templates/web_app/driver_dashboard.html:188
-#: templates/web_app/driver_dashboard.html:471
-#: templates/web_app/home.html:1407
+#: templates/web_app/driver_dashboard.html:462
+#: templates/web_app/home.html:1386
 msgid "In Progress"
 msgstr "प्रगतिमा"
 
@@ -1599,7 +1607,7 @@ msgid "Leave blank to keep current password"
 msgstr "पासवर्ड नबदल्ने भए खाली छाड्नुहोस्"
 
 #: templates/web_app/admin_drivers.html:249
-#: templates/web_app/admin_drivers.html:585
+#: templates/web_app/admin_drivers.html:561
 msgid "License Number"
 msgstr "इजाजतपत्र नम्बर"
 
@@ -1607,16 +1615,16 @@ msgstr "इजाजतपत्र नम्बर"
 msgid "License Permittance"
 msgstr "इजाजतपत्र"
 
-#: templates/web_app/admin_drivers.html:928
+#: templates/web_app/admin_drivers.html:906
 msgid "License document uploaded successfully!"
 msgstr "इजाजतपत्र कागजात सफलतापूर्वक अपलोड भयो!"
 
-#: templates/web_app/admin_requests.html:393
+#: templates/web_app/admin_requests.html:395
 msgid "Lifecycle Locked"
 msgstr "स्थिति बन्द"
 
 #: templates/web_app/admin_drivers.html:309
-#: templates/web_app/admin_drivers.html:634
+#: templates/web_app/admin_drivers.html:610
 msgid "Link Fleet Asset"
 msgstr "सवारी साधन जोड्नुहोस्"
 
@@ -1628,7 +1636,7 @@ msgstr "प्रत्यक्ष सवारी परिचालन"
 msgid "Live pipeline updates for ongoing municipality requests."
 msgstr "चालु नगरपालिका अनुरोधहरूको प्रत्यक्ष अद्यावधिक।"
 
-#: templates/web_app/home.html:2031
+#: templates/web_app/home.html:1997
 msgid "Live updates unavailable."
 msgstr "प्रत्यक्ष अद्यावधिक उपलब्ध छैन।"
 
@@ -1660,11 +1668,11 @@ msgstr "लोड हुँदैछ..."
 msgid "Location"
 msgstr "स्थान"
 
-#: templates/web_app/admin_requests.html:362
+#: templates/web_app/admin_requests.html:364
 msgid "Location Mismatch"
 msgstr "स्थान मेल खाएन"
 
-#: templates/web_app/driver_dashboard.html:565
+#: templates/web_app/driver_dashboard.html:556
 msgid ""
 "Location access is required to mark this job as completed. Please enable "
 "GPS/location permission and try again."
@@ -1678,7 +1686,7 @@ msgid ""
 "location."
 msgstr "स्थान फोटोको जीपीएसमा बाँधिएको छ। आफ्नो स्थान राख्न फोटो हटाउनुहोस्।"
 
-#: templates/web_app/home.html:1208
+#: templates/web_app/home.html:1218
 msgid ""
 "Location is required to take this photo. Please enable Location Services and"
 " try again."
@@ -1686,7 +1694,7 @@ msgstr ""
 "यो फोटो खिच्न स्थान आवश्यक छ। कृपया लोकेसन सेवा सक्रिय गरी फेरि प्रयास "
 "गर्नुहोस्।"
 
-#: templates/web_app/driver_dashboard.html:444
+#: templates/web_app/driver_dashboard.html:435
 msgid "Location updated!"
 msgstr "स्थान अद्यावधिक भयो!"
 
@@ -1710,7 +1718,7 @@ msgstr "लगइन"
 msgid "Login — Waste Collection"
 msgstr "लगइन — फोहोर संकलन"
 
-#: templates/web_app/base.html:158 templates/web_app/forgot_password.html:12
+#: templates/web_app/base.html:176 templates/web_app/forgot_password.html:12
 #: templates/web_app/login.html:12 templates/web_app/register.html:12
 #: templates/web_app/reset_password.html:12
 msgid "Logo"
@@ -1718,7 +1726,7 @@ msgstr "लोगो"
 
 #: templates/partials/sidebar_admin.html:42
 #: templates/partials/sidebar_driver.html:10
-#: templates/partials/sidebar_user.html:18 templates/web_app/base.html:239
+#: templates/partials/sidebar_user.html:18 templates/web_app/base.html:257
 msgid "Logout"
 msgstr "लगआउट"
 
@@ -1766,7 +1774,7 @@ msgid "Map Zone Routing Calendar"
 msgstr "क्षेत्रगत मार्ग पात्रो"
 
 #: templates/web_app/admin_settings.html:1085
-#: templates/web_app/driver_dashboard.html:733 templates/web_app/home.html:625
+#: templates/web_app/driver_dashboard.html:728 templates/web_app/home.html:625
 #: templates/web_app/route_planning.html:336
 msgid "Map failed to load. Please refresh the page."
 msgstr "नक्सा लोड हुन सकेन। कृपया पृष्ठ रिफ्रेस गर्नुहोस्।"
@@ -1816,19 +1824,19 @@ msgstr "मासिक"
 msgid "Monthly Mapping"
 msgstr "मासिक"
 
-#: templates/web_app/base.html:167
+#: templates/web_app/base.html:185
 msgid "More options"
 msgstr "थप विकल्पहरू"
 
-#: templates/web_app/home.html:1755
+#: templates/web_app/home.html:1731
 msgid "Move this request to Recycle Bin? You can restore it later from there."
 msgstr "यो अनुरोध रिसाइकल बिनमा पठाउने? पछि त्यहाँबाट फिर्ता ल्याउन सकिन्छ।"
 
-#: templates/web_app/home.html:1432 templates/web_app/home.html:390
+#: templates/web_app/home.html:1411 templates/web_app/home.html:390
 msgid "Move to Bin"
 msgstr "बिनमा पठाउनुहोस्"
 
-#: templates/web_app/home.html:1432 templates/web_app/home.html:389
+#: templates/web_app/home.html:1411 templates/web_app/home.html:389
 msgid "Move to Recycle Bin"
 msgstr "रिसाइकल बिनमा पठाउनुहोस्"
 
@@ -1867,7 +1875,7 @@ msgstr "नाम"
 msgid "Name / Contact Node"
 msgstr "नाम / सम्पर्क"
 
-#: templates/web_app/admin_schedules.html:477
+#: templates/web_app/admin_schedules.html:478
 msgid "Naya pipeline schedule successfully created!"
 msgstr "नयाँ तालिका सफलतापूर्वक सिर्जना भयो!"
 
@@ -1875,27 +1883,27 @@ msgstr "नयाँ तालिका सफलतापूर्वक सि
 msgid "Needs Review"
 msgstr "समीक्षा आवश्यक"
 
-#: templates/web_app/base.html:462
+#: templates/web_app/base.html:480
 msgid "Network error during export."
 msgstr "निर्यात गर्दा नेटवर्क त्रुटि।"
 
-#: templates/web_app/admin_complaints.html:448
-#: templates/web_app/admin_dashboard.html:558
-#: templates/web_app/admin_drivers.html:853
-#: templates/web_app/admin_drivers.html:945
-#: templates/web_app/admin_schedules.html:447
+#: templates/web_app/admin_complaints.html:449
+#: templates/web_app/admin_dashboard.html:559
+#: templates/web_app/admin_drivers.html:830
+#: templates/web_app/admin_drivers.html:923
+#: templates/web_app/admin_schedules.html:448
 #: templates/web_app/admin_settings.html:2639
-#: templates/web_app/admin_users.html:645
+#: templates/web_app/admin_users.html:648
 #: templates/web_app/admin_vehicles.html:419
-#: templates/web_app/driver_dashboard.html:599
-#: templates/web_app/home.html:1728 templates/web_app/home.html:1787
-#: templates/web_app/home.html:1883 templates/web_app/recycle_bin.html:175
-#: templates/web_app/recycle_bin.html:200
-#: templates/web_app/user_requests.html:157
+#: templates/web_app/driver_dashboard.html:591
+#: templates/web_app/home.html:1704 templates/web_app/home.html:1764
+#: templates/web_app/home.html:1861 templates/web_app/recycle_bin.html:176
+#: templates/web_app/recycle_bin.html:202
+#: templates/web_app/user_requests.html:158
 msgid "Network error:"
 msgstr "नेटवर्क त्रुटि:"
 
-#: templates/web_app/admin_schedules.html:486
+#: templates/web_app/admin_schedules.html:487
 msgid "Network fault or schema reject during insertion."
 msgstr "प्रविष्टि गर्दा नेटवर्क वा ढाँचा त्रुटि।"
 
@@ -1916,7 +1924,7 @@ msgstr "नयाँ पासवर्ड"
 msgid "New Pickup Request (Flags are 3km Around Your Location only)"
 msgstr "नयाँ संकलन अनुरोध (झण्डाहरू तपाईंको स्थानको ३ कि.मि. भित्र मात्र)"
 
-#: templates/web_app/driver_dashboard.html:374
+#: templates/web_app/driver_dashboard.html:365
 msgid "New route generated: %(v0)s stops, %(v1)s km"
 msgstr "नयाँ मार्ग बनाइयो: %(v0)s रोकावट, %(v1)s कि.मि."
 
@@ -1926,7 +1934,7 @@ msgid "Next"
 msgstr "अर्को"
 
 #: templates/web_app/admin_drivers.html:176
-#: templates/web_app/admin_drivers.html:506
+#: templates/web_app/admin_drivers.html:482
 msgid "No Asset Linked"
 msgstr "कुनै सवारी जोडिएको छैन"
 
@@ -1964,7 +1972,7 @@ msgstr "कुनै अनुरोध तोकिएको छैन।"
 msgid "No change payload recorded for this activity."
 msgstr "यस गतिविधिको कुनै परिवर्तन विवरण छैन।"
 
-#: templates/web_app/home.html:1551
+#: templates/web_app/home.html:1530
 msgid ""
 "No checkpoint is configured nearby. A request cannot be submitted right now."
 msgstr "नजिक कुनै चेकपोइन्ट छैन। अहिले अनुरोध पेस गर्न सकिँदैन।"
@@ -2002,7 +2010,7 @@ msgid "No fleet dispatch lines open currently."
 msgstr "हाल कुनै सवारी परिचालन खुला छैन।"
 
 #: templates/web_app/admin_drivers.html:276
-#: templates/web_app/admin_drivers.html:602
+#: templates/web_app/admin_drivers.html:578
 msgid "No license document uploaded yet."
 msgstr "अहिलेसम्म इजाजतपत्र कागजात अपलोड गरिएको छैन।"
 
@@ -2015,7 +2023,7 @@ msgstr "मिल्दो कुनै गतिविधि अभिलेख
 msgid "No recent lifecycle status events."
 msgstr "हालै कुनै स्थिति परिवर्तन भएको छैन।"
 
-#: templates/web_app/admin_requests.html:411
+#: templates/web_app/admin_requests.html:413
 msgid "No request manifests mapped inside this filtered vector block."
 msgstr "यो फिल्टरमा कुनै अनुरोध भेटिएन।"
 
@@ -2027,12 +2035,12 @@ msgstr "यहाँ अहिलेसम्म कुनै अनुरोध
 msgid "No requests yet. Submit one above!"
 msgstr "अहिलेसम्म कुनै अनुरोध छैन। माथिबाट पेस गर्नुहोस्!"
 
-#: templates/web_app/route_planning.html:695
+#: templates/web_app/route_planning.html:690
 msgid "No route to start. Generate one first."
 msgstr "सुरु गर्न मार्ग छैन। पहिले बनाउनुहोस्।"
 
 #: templates/web_app/admin_users.html:163
-#: templates/web_app/admin_users.html:628
+#: templates/web_app/admin_users.html:631
 msgid "No system administrators registered yet."
 msgstr "अहिलेसम्म कुनै प्रशासक दर्ता गरिएको छैन।"
 
@@ -2053,7 +2061,7 @@ msgstr "अहिलेसम्म कुनै सवारी दर्ता
 msgid "None (De-allocate System Asset)"
 msgstr "कुनै पनि होइन (सवारी हटाउनुहोस्)"
 
-#: templates/web_app/admin_requests.html:337
+#: templates/web_app/admin_requests.html:339
 msgid "Not Scanned"
 msgstr "स्क्यान नगरिएको"
 
@@ -2094,12 +2102,12 @@ msgstr "वस्तु आईडी"
 msgid "On Route"
 msgstr "मार्गमा"
 
-#: templates/web_app/admin_drivers.html:872
+#: templates/web_app/admin_drivers.html:849
 msgid "Only PDF files are accepted for the license document."
 msgstr "इजाजतपत्र कागजातका लागि PDF फाइल मात्र स्वीकार्य छ।"
 
 #: templates/web_app/admin_drivers.html:269
-#: templates/web_app/admin_drivers.html:961
+#: templates/web_app/admin_drivers.html:939
 msgid "Open Full PDF in New Tab"
 msgstr "नयाँ ट्याबमा पूरा PDF खोल्नुहोस्"
 
@@ -2107,11 +2115,11 @@ msgstr "नयाँ ट्याबमा पूरा PDF खोल्नु�
 msgid "Operational Status"
 msgstr "सञ्चालन स्थिति"
 
-#: templates/web_app/admin_requests.html:723
+#: templates/web_app/admin_requests.html:725
 msgid "Operational collection request has been cancelled."
 msgstr "संकलन अनुरोध रद्द गरियो।"
 
-#: templates/web_app/admin_schedules.html:424
+#: templates/web_app/admin_schedules.html:425
 msgid "Operational route sequence entry successfully dropped."
 msgstr "मार्ग प्रविष्टि सफलतापूर्वक हटाइयो।"
 
@@ -2176,7 +2184,7 @@ msgstr "पासवर्ड *"
 msgid "Password Security"
 msgstr "पासवर्ड सुरक्षा"
 
-#: templates/web_app/admin_drivers.html:674
+#: templates/web_app/admin_drivers.html:650
 msgid "Passwords do not match."
 msgstr "पासवर्ड मिलेन।"
 
@@ -2189,9 +2197,9 @@ msgstr "विवरण"
 #: templates/web_app/admin_complaints.html:69
 #: templates/web_app/admin_complaints.html:83
 #: templates/web_app/admin_dashboard.html:213
-#: templates/web_app/admin_requests.html:524
+#: templates/web_app/admin_requests.html:526
 #: templates/web_app/driver_dashboard.html:186
-#: templates/web_app/home.html:1406 templates/web_app/home.html:184
+#: templates/web_app/home.html:1385 templates/web_app/home.html:184
 msgid "Pending"
 msgstr "प्रतीक्षारत"
 
@@ -2200,7 +2208,7 @@ msgid "Pending Sync"
 msgstr "प्रतीक्षारत सिंक"
 
 #: templates/web_app/admin_drivers.html:247
-#: templates/web_app/admin_drivers.html:583
+#: templates/web_app/admin_drivers.html:559
 msgid "Performance"
 msgstr "कार्यसम्पादन"
 
@@ -2208,13 +2216,13 @@ msgstr "कार्यसम्पादन"
 msgid "Permanently delete %(v0)s selected schedule(s)? This cannot be undone."
 msgstr "छानिएका %(v0)s तालिका सधैँका लागि मेट्ने? यो फिर्ता गर्न सकिँदैन।"
 
-#: templates/web_app/recycle_bin.html:209
+#: templates/web_app/recycle_bin.html:211
 msgid ""
 "Permanently delete ALL items in the Recycle Bin? This cannot be undone."
 msgstr "रिसाइकल बिनका सबै वस्तु सधैँका लागि मेट्ने? यो फिर्ता गर्न सकिँदैन।"
 
 #: templates/web_app/admin_dashboard.html:530
-#: templates/web_app/recycle_bin.html:181
+#: templates/web_app/recycle_bin.html:182
 #: templates/web_app/user_requests.html:130
 msgid "Permanently delete this request? This cannot be undone."
 msgstr "यो अनुरोध सधैँका लागि मेट्ने? यो फिर्ता गर्न सकिँदैन।"
@@ -2225,7 +2233,7 @@ msgstr "अनुमति परिवर्तन"
 
 #: templates/web_app/admin_drivers.html:239
 #: templates/web_app/admin_drivers.html:384
-#: templates/web_app/admin_drivers.html:576 templates/web_app/register.html:38
+#: templates/web_app/admin_drivers.html:552 templates/web_app/register.html:38
 msgid "Phone"
 msgstr "फोन"
 
@@ -2240,7 +2248,7 @@ msgstr "फोन नम्बर"
 msgid "Photo"
 msgstr "फोटो"
 
-#: templates/web_app/home.html:1594
+#: templates/web_app/home.html:1573
 msgid ""
 "Photos can't be saved offline yet — remove the photo(s) to submit without "
 "one now, or wait until you're back online."
@@ -2280,15 +2288,15 @@ msgstr "नम्बर प्लेट"
 msgid "Plate number and capacity required."
 msgstr "नम्बर प्लेट र क्षमता आवश्यक छ।"
 
-#: templates/web_app/admin_drivers.html:896
+#: templates/web_app/admin_drivers.html:873
 msgid "Please choose a PDF file first."
 msgstr "कृपया पहिले PDF फाइल छान्नुहोस्।"
 
-#: templates/web_app/home.html:1846
+#: templates/web_app/home.html:1823
 msgid "Please describe your complaint."
 msgstr "कृपया आफ्नो गुनासो लेख्नुहोस्।"
 
-#: templates/web_app/home.html:1084
+#: templates/web_app/home.html:1094
 msgid ""
 "Please enable Location Services to take a garbage photo — this confirms "
 "where the garbage actually is."
@@ -2296,7 +2304,7 @@ msgstr ""
 "फोहोरको फोटो खिच्न लोकेसन सेवा सक्रिय गर्नुहोस् — यसले फोहोर कहाँ छ भन्ने "
 "पुष्टि गर्छ।"
 
-#: templates/web_app/home.html:1522
+#: templates/web_app/home.html:1501
 msgid ""
 "Please enable location access to submit a request — we need your current GPS"
 " location to confirm you're near a checkpoint."
@@ -2304,7 +2312,7 @@ msgstr ""
 "अनुरोध पेस गर्न स्थान पहुँच दिनुहोस् — चेकपोइन्ट नजिक हुनुहुन्छ भनी पुष्टि "
 "गर्न जीपीएस चाहिन्छ।"
 
-#: templates/web_app/home.html:1489
+#: templates/web_app/home.html:1468
 msgid "Please enter a pickup address."
 msgstr "कृपया संकलन ठेगाना लेख्नुहोस्।"
 
@@ -2325,7 +2333,7 @@ msgstr "कृपया सबै आवश्यक विवरण भर्�
 msgid "Please fill in key and value."
 msgstr "कृपया कुञ्जी र मान भर्नुहोस्।"
 
-#: templates/web_app/admin_drivers.html:669
+#: templates/web_app/admin_drivers.html:645
 msgid "Please fill in username, email, and both password fields."
 msgstr "कृपया प्रयोगकर्ता नाम, इमेल र दुवै पासवर्ड भर्नुहोस्।"
 
@@ -2333,11 +2341,11 @@ msgstr "कृपया प्रयोगकर्ता नाम, इमे�
 msgid "Please give this checkpoint a name before saving."
 msgstr "सुरक्षित गर्नुअघि यो चेकपोइन्टको नाम राख्नुहोस्।"
 
-#: templates/web_app/route_planning.html:557
+#: templates/web_app/route_planning.html:552
 msgid "Please select a driver."
 msgstr "कृपया चालक छान्नुहोस्।"
 
-#: templates/web_app/route_planning.html:561
+#: templates/web_app/route_planning.html:556
 msgid "Please select at least one waste request, or use Auto-Generate."
 msgstr "कृपया कम्तीमा एउटा अनुरोध छान्नुहोस्, वा स्वतः बनाउनुहोस्।"
 
@@ -2358,7 +2366,7 @@ msgstr "अघिल्लो"
 msgid "Primary Fleet Operator (Optional)"
 msgstr "मुख्य चालक (वैकल्पिक)"
 
-#: templates/web_app/base.html:227
+#: templates/web_app/base.html:245
 msgid "Profile"
 msgstr "प्रोफाइल"
 
@@ -2379,7 +2387,7 @@ msgid "Provision a new profile to staff pool and allocate vehicle resources."
 msgstr "नयाँ चालक प्रोफाइल बनाई सवारी साधन तोक्नुहोस्।"
 
 #: templates/web_app/admin_schedules.html:186
-#: templates/web_app/admin_schedules.html:543
+#: templates/web_app/admin_schedules.html:544
 msgid "Purge"
 msgstr "सफा गर्नुहोस्"
 
@@ -2405,7 +2413,7 @@ msgstr ""
 "छिटो विकल्प: डिपो वरिपरि ठूलो ग्रिड बनाउँछ, तर पोखरा महानगरपालिकाको "
 "सीमाभित्रै सीमित रहन्छ, जसले सम्पूर्ण नगरपालिका समेट्छ।"
 
-#: templates/web_app/base.html:290
+#: templates/web_app/base.html:308
 msgid "RA Innovations"
 msgstr ""
 
@@ -2454,7 +2462,7 @@ msgstr "पुन:प्रयोगयोग्य"
 msgid "Recycle Bin"
 msgstr "रिसाइकल बिन"
 
-#: templates/web_app/recycle_bin.html:235
+#: templates/web_app/recycle_bin.html:238
 msgid "Recycle Bin emptied."
 msgstr "रिसाइकल बिन खाली गरियो।"
 
@@ -2475,7 +2483,7 @@ msgstr "नक्सा रिफ्रेस गर्नुहोस्"
 msgid "Refresh page to edit new vehicle"
 msgstr "नयाँ सवारी सम्पादन गर्न पृष्ठ रिफ्रेस गर्नुहोस्"
 
-#: templates/web_app/base.html:244 templates/web_app/login.html:50
+#: templates/web_app/base.html:262 templates/web_app/login.html:50
 msgid "Register"
 msgstr "दर्ता गर्नुहोस्"
 
@@ -2504,7 +2512,7 @@ msgstr "दर्ता कार्यहरू"
 msgid "Regular User"
 msgstr "सामान्य प्रयोगकर्ता"
 
-#: templates/web_app/admin_requests.html:331
+#: templates/web_app/admin_requests.html:333
 msgid "Reject"
 msgstr "अस्वीकार गर्नुहोस्"
 
@@ -2513,7 +2521,7 @@ msgid "Remembered your password?"
 msgstr "पासवर्ड सम्झनुभयो?"
 
 #: templates/web_app/admin_drivers.html:199
-#: templates/web_app/admin_drivers.html:540 templates/web_app/home.html:1290
+#: templates/web_app/admin_drivers.html:516 templates/web_app/home.html:1300
 msgid "Remove"
 msgstr "हटाउनुहोस्"
 
@@ -2534,7 +2542,7 @@ msgstr "रिपोर्ट गरिएका स्थानहरू"
 msgid "Request #"
 msgstr "अनुरोध #"
 
-#: templates/web_app/home.html:1935
+#: templates/web_app/home.html:1906
 msgid "Request #%(v0)s updated to: %(v1)s"
 msgstr "अनुरोध #%(v0)s को स्थिति: %(v1)s"
 
@@ -2546,36 +2554,36 @@ msgstr "अनुरोध अभिलेख #"
 msgid "Request cancelled and moved to Recycle Bin."
 msgstr "अनुरोध रद्द गरी रिसाइकल बिनमा पठाइयो।"
 
-#: templates/web_app/admin_dashboard.html:521 templates/web_app/home.html:1744
+#: templates/web_app/admin_dashboard.html:521 templates/web_app/home.html:1720
 msgid "Request cancelled."
 msgstr "अनुरोध रद्द गरियो।"
 
-#: templates/web_app/admin_requests.html:750
+#: templates/web_app/admin_requests.html:752
 msgid "Request deleted successfully."
 msgstr "अनुरोध सफलतापूर्वक मेटियो।"
 
-#: templates/web_app/admin_dashboard.html:542
-#: templates/web_app/user_requests.html:142
+#: templates/web_app/admin_dashboard.html:543
+#: templates/web_app/user_requests.html:143
 msgid "Request deleted."
 msgstr "अनुरोध मेटियो।"
 
-#: templates/web_app/base.html:877
+#: templates/web_app/base.html:807
 msgid "Request failed — please try again."
 msgstr "अनुरोध असफल भयो — कृपया फेरि प्रयास गर्नुहोस्।"
 
-#: templates/web_app/home.html:1768
+#: templates/web_app/home.html:1745
 msgid "Request moved to Recycle Bin."
 msgstr "अनुरोध रिसाइकल बिनमा पठाइयो।"
 
-#: templates/web_app/recycle_bin.html:193
+#: templates/web_app/recycle_bin.html:195
 msgid "Request permanently deleted."
 msgstr "अनुरोध सधैँका लागि मेटियो।"
 
-#: templates/web_app/recycle_bin.html:168
+#: templates/web_app/recycle_bin.html:169
 msgid "Request restored."
 msgstr "अनुरोध पुनर्स्थापना गरियो।"
 
-#: templates/web_app/home.html:1707
+#: templates/web_app/home.html:1683
 msgid "Request submitted successfully!"
 msgstr "अनुरोध सफलतापूर्वक पेस भयो!"
 
@@ -2587,7 +2595,7 @@ msgstr "अनुरोध व्यवस्थापन"
 msgid "Requests past scheduled date need immediate attention"
 msgstr "तालिका मिति नाघेका अनुरोधहरूलाई तुरुन्त ध्यान दिनुपर्छ"
 
-#: templates/web_app/admin_schedules.html:470
+#: templates/web_app/admin_schedules.html:471
 msgid ""
 "Required baseline keys (Zone parameters, weekday vector, frequency) are "
 "unassigned."
@@ -2602,7 +2610,7 @@ msgstr "पासवर्ड रिसेट गर्नुहोस्"
 msgid "Reset Password — Waste Collection"
 msgstr "पासवर्ड रिसेट — फोहोर संकलन"
 
-#: templates/web_app/admin_requests.html:400
+#: templates/web_app/admin_requests.html:402
 msgid "Resolve the AI review flag before deleting"
 msgstr "मेट्नुअघि एआई समीक्षा टुंग्याउनुहोस्"
 
@@ -2654,11 +2662,11 @@ msgstr "मार्ग योजना - फोहोर रिपोर्ट�
 msgid "Route Summary"
 msgstr "मार्ग सारांश"
 
-#: templates/web_app/route_planning.html:581
+#: templates/web_app/route_planning.html:576
 msgid "Route generated successfully!"
 msgstr "मार्ग सफलतापूर्वक बनाइयो!"
 
-#: templates/web_app/route_planning.html:704
+#: templates/web_app/route_planning.html:699
 msgid "Route started!"
 msgstr "मार्ग सुरु भयो!"
 
@@ -2666,7 +2674,7 @@ msgstr "मार्ग सुरु भयो!"
 msgid "Route stop"
 msgstr "मार्ग रोकावट"
 
-#: templates/web_app/route_planning.html:751
+#: templates/web_app/route_planning.html:739
 msgid "Route updated in real-time!"
 msgstr "मार्ग वास्तविक समयमा अद्यावधिक भयो!"
 
@@ -2682,7 +2690,7 @@ msgstr "SMTP सर्भर"
 msgid "SYSTEM CRON"
 msgstr "प्रणाली क्रोन"
 
-#: templates/web_app/base.html:290
+#: templates/web_app/base.html:308
 msgid "Safha Sahar"
 msgstr "सफा सहर"
 
@@ -2778,8 +2786,8 @@ msgstr "क्षेत्रको नाम"
 msgid "Security Admins"
 msgstr "सुरक्षा प्रशासकहरू"
 
-#: templates/web_app/admin_requests.html:433
-#: templates/web_app/admin_requests.html:462
+#: templates/web_app/admin_requests.html:435
+#: templates/web_app/admin_requests.html:464
 msgid "Select Active Field Driver"
 msgstr "सक्रिय फिल्ड चालक छान्नुहोस्"
 
@@ -2827,7 +2835,7 @@ msgstr "रिसेट लिंक पठाउनुहोस्"
 msgid "Sensitive (hide value in logs)"
 msgstr "संवेदनशील (अभिलेखमा लुकाउनुहोस्)"
 
-#: templates/web_app/base.html:882
+#: templates/web_app/base.html:812
 msgid "Server error — reloading..."
 msgstr "सर्भर त्रुटि — पुनः लोड हुँदैछ..."
 
@@ -2863,7 +2871,7 @@ msgstr "सेटिङ मान"
 msgid "Setting added successfully!"
 msgstr "सेटिङ सफलतापूर्वक थपियो!"
 
-#: templates/web_app/base.html:243 templates/web_app/login.html:13
+#: templates/web_app/base.html:261 templates/web_app/login.html:13
 #: templates/web_app/login.html:33
 msgid "Sign In"
 msgstr "साइन इन"
@@ -2932,11 +2940,11 @@ msgstr "स्थिति चिन्ह"
 msgid "Status compiled to"
 msgstr "स्थिति यसमा परिवर्तन"
 
-#: templates/web_app/driver_dashboard.html:583
+#: templates/web_app/driver_dashboard.html:575
 msgid "Status updated to %(v0)s"
 msgstr "स्थिति %(v0)s मा अद्यावधिक भयो"
 
-#: templates/web_app/route_planning.html:619
+#: templates/web_app/route_planning.html:614
 msgid "Stop"
 msgstr "रोकावट"
 
@@ -3034,13 +3042,13 @@ msgstr "निम्न खाताहरूमा"
 msgid "This Month"
 msgstr "यो महिना"
 
-#: templates/web_app/home.html:1092
+#: templates/web_app/home.html:1102
 msgid ""
 "This browser does not support location detection — a garbage photo cannot be"
 " taken."
 msgstr "यो ब्राउजरले स्थान पत्ता लगाउन सक्दैन — फोहोरको फोटो खिच्न सकिँदैन।"
 
-#: templates/web_app/home.html:1248
+#: templates/web_app/home.html:1258
 msgid ""
 "This photo has no location data. Please turn ON Location Services on your "
 "phone and select or take the photo again."
@@ -3048,7 +3056,7 @@ msgstr ""
 "यो फोटोमा स्थान जानकारी छैन। कृपया फोनमा लोकेसन सेवा खोलेर फेरि फोटो "
 "छान्नुहोस् वा खिच्नुहोस्।"
 
-#: templates/web_app/home.html:1224 templates/web_app/home.html:1264
+#: templates/web_app/home.html:1234 templates/web_app/home.html:1274
 msgid ""
 "This photo looks like it's from a different location (~%(v0)sm away). Please"
 " use a photo of the same location as the first one."
@@ -3073,11 +3081,11 @@ msgstr "समय"
 msgid "Toggle"
 msgstr "बदल्नुहोस्"
 
-#: templates/web_app/base.html:175
+#: templates/web_app/base.html:193
 msgid "Toggle dark/light theme"
 msgstr "डार्क/लाइट थिम बदल्नुहोस्"
 
-#: templates/web_app/base.html:175
+#: templates/web_app/base.html:193
 msgid "Toggle theme"
 msgstr "थिम बदल्नुहोस्"
 
@@ -3108,7 +3116,7 @@ msgstr "कुल प्रणाली अभिलेख"
 
 #: templates/web_app/admin_drivers.html:158
 #: templates/web_app/admin_drivers.html:257
-#: templates/web_app/admin_drivers.html:593
+#: templates/web_app/admin_drivers.html:569
 #: templates/web_app/driver_dashboard.html:125
 msgid "Total Trips"
 msgstr "कुल यात्रा"
@@ -3152,8 +3160,8 @@ msgid "Unable to load complaints right now."
 msgstr "अहिले गुनासाहरू लोड गर्न सकिएन।"
 
 #: templates/web_app/admin_dashboard.html:293
-#: templates/web_app/admin_requests.html:374
-#: templates/web_app/admin_requests.html:797
+#: templates/web_app/admin_requests.html:376
+#: templates/web_app/admin_requests.html:799
 msgid "Unassigned"
 msgstr "नतोकिएको"
 
@@ -3181,7 +3189,7 @@ msgid "Update"
 msgstr "अद्यावधिक गर्नुहोस्"
 
 #: templates/web_app/admin_drivers.html:328
-#: templates/web_app/admin_drivers.html:648
+#: templates/web_app/admin_drivers.html:624
 msgid "Update Allocation"
 msgstr "बाँडफाँट अद्यावधिक गर्नुहोस्"
 
@@ -3189,7 +3197,7 @@ msgstr "बाँडफाँट अद्यावधिक गर्नुह�
 msgid "Update My Location"
 msgstr "मेरो स्थान अद्यावधिक गर्नुहोस्"
 
-#: templates/web_app/admin_drivers.html:745
+#: templates/web_app/admin_drivers.html:721
 msgid "Update failed inside DB cluster."
 msgstr "डाटाबेसमा अद्यावधिक असफल भयो।"
 
@@ -3202,16 +3210,16 @@ msgid "Updated"
 msgstr "अद्यावधिक"
 
 #: templates/web_app/admin_drivers.html:292
-#: templates/web_app/admin_drivers.html:616
+#: templates/web_app/admin_drivers.html:592
 msgid "Upload Document"
 msgstr "कागजात अपलोड गर्नुहोस्"
 
-#: templates/web_app/admin_drivers.html:940
+#: templates/web_app/admin_drivers.html:918
 msgid "Upload failed:"
 msgstr "अपलोड असफल:"
 
 #: templates/web_app/admin_drivers.html:282
-#: templates/web_app/admin_drivers.html:606
+#: templates/web_app/admin_drivers.html:582
 msgid "Upload license document"
 msgstr "इजाजतपत्र कागजात अपलोड गर्नुहोस्"
 
@@ -3239,7 +3247,7 @@ msgstr "प्रयोगकर्ता एजेन्ट"
 
 #: templates/web_app/admin_drivers.html:231
 #: templates/web_app/admin_drivers.html:376
-#: templates/web_app/admin_drivers.html:568
+#: templates/web_app/admin_drivers.html:544
 #: templates/web_app/admin_users.html:186
 #: templates/web_app/admin_users.html:230
 #: templates/web_app/admin_users.html:90 templates/web_app/login.html:20
@@ -3251,7 +3259,7 @@ msgstr "प्रयोगकर्ता नाम"
 msgid "Username *"
 msgstr "प्रयोगकर्ता नाम *"
 
-#: templates/web_app/admin_users.html:548
+#: templates/web_app/admin_users.html:549
 msgid "Username and email are required."
 msgstr "प्रयोगकर्ता नाम र इमेल आवश्यक छ।"
 
@@ -3283,7 +3291,7 @@ msgstr "सवारी वर्गीकरण"
 msgid "Vehicle added!"
 msgstr "सवारी थपियो!"
 
-#: templates/web_app/admin_drivers.html:775
+#: templates/web_app/admin_drivers.html:751
 msgid "Vehicle asset allocation verified!"
 msgstr "सवारी बाँडफाँट प्रमाणित भयो!"
 
@@ -3316,7 +3324,7 @@ msgid "View All"
 msgstr "सबै हेर्नुहोस्"
 
 #: templates/web_app/admin_drivers.html:188
-#: templates/web_app/admin_drivers.html:530 templates/web_app/base.html:237
+#: templates/web_app/admin_drivers.html:506 templates/web_app/base.html:255
 msgid "View Profile"
 msgstr "प्रोफाइल हेर्नुहोस्"
 
@@ -3324,7 +3332,7 @@ msgstr "प्रोफाइल हेर्नुहोस्"
 msgid "Volumetric Capacity (kg)"
 msgstr "क्षमता (के.जी.)"
 
-#: templates/web_app/home.html:1150
+#: templates/web_app/home.html:1160
 msgid "Waiting for location — please enable Location Services."
 msgstr "स्थान पर्खँदै — कृपया लोकेसन सेवा सक्रिय गर्नुहोस्।"
 
@@ -3349,7 +3357,7 @@ msgstr "फोहोरको विवरण"
 msgid "Waste Photo"
 msgstr "फोहोरको फोटो"
 
-#: templates/web_app/admin_requests.html:484
+#: templates/web_app/admin_requests.html:486
 msgid "Waste Photos"
 msgstr "फोहोरका फोटोहरू"
 
@@ -3408,15 +3416,15 @@ msgstr "तपाईंले आफ्नै सुपर प्रशासक
 msgid "You haven't submitted any requests yet."
 msgstr "तपाईंले अहिलेसम्म कुनै अनुरोध पेस गर्नुभएको छैन।"
 
-#: templates/web_app/home.html:1631
+#: templates/web_app/home.html:1610
 msgid ""
 "You're offline — saved and will submit automatically once you're back "
 "online."
 msgstr ""
 "तपाईं अफलाइन हुनुहुन्छ — सुरक्षित गरियो, अनलाइन हुनासाथ स्वतः पेस हुनेछ।"
 
-#: templates/web_app/admin_drivers.html:814
-#: templates/web_app/admin_drivers.html:907
+#: templates/web_app/admin_drivers.html:790
+#: templates/web_app/admin_drivers.html:884
 msgid "Your session has expired. Please log in again."
 msgstr "तपाईंको सत्र समाप्त भयो। कृपया फेरि लगइन गर्नुहोस्।"
 
@@ -3440,7 +3448,7 @@ msgstr "अघि"
 msgid "completed job(s)"
 msgstr "सम्पन्न काम"
 
-#: templates/web_app/admin_requests.html:320
+#: templates/web_app/admin_requests.html:322
 msgid "confidence"
 msgstr "विश्वसनीयता"
 
@@ -3526,8 +3534,8 @@ msgstr ""
 "विवरण वा इजाजतपत्र थप्नुहोस्"
 
 #: templates/web_app/driver_dashboard.html:287
-#: templates/web_app/driver_dashboard.html:506
-#: templates/web_app/home.html:1451 templates/web_app/home.html:375
+#: templates/web_app/driver_dashboard.html:497
+#: templates/web_app/home.html:1430 templates/web_app/home.html:375
 #: templates/web_app/recycle_bin.html:72
 #: templates/web_app/user_requests.html:67
 msgid "photo"
@@ -3539,7 +3547,7 @@ msgstr "फोटो"
 msgid "selected"
 msgstr "छानिएको"
 
-#: templates/web_app/admin_requests.html:459
+#: templates/web_app/admin_requests.html:461
 msgid ""
 "selected request(s). Requests already completed/cancelled, or still awaiting"
 " AI review, will be skipped automatically."
