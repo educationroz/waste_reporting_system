@@ -25,13 +25,13 @@
 
   #depot-map,
   #checkpoint-map {
-      border: 1px solid var(--border-color) !important;
-  }
+    border: 1px solid var(--border-color) !important;
 
-  .pending-checkpoint-icon {
+    .pending-checkpoint-icon {
       background: transparent !important;
       border: none !important;
       box-shadow: none !important;
+    }
   }
 </style>
 {% endblock %} {% block content %}
@@ -1183,6 +1183,7 @@
 
       let res = await fetch("/api/system-settings/depot_location/", {
         method: "PATCH",
+        credentials: "same-origin",
         headers: {
           'X-CSRFToken': getCookie('csrftoken'),
           "Content-Type": "application/json",
@@ -1193,6 +1194,7 @@
       if (res.status === 404) {
         res = await fetch("/api/system-settings/", {
           method: "POST",
+          credentials: "same-origin",
           headers: {
             'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
@@ -1694,6 +1696,7 @@
       try {
         const res = await fetch("/api/checkpoints/bulk_delete/", {
           method: "POST",
+          credentials: "same-origin",
           headers: {
             'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
@@ -1756,14 +1759,22 @@
 
         bounds.push([lat, lng]);
 
+        // DRAG FIX: the icon box used to be 15x15 with iconAnchor [15,15]
+        // while the glyph itself rendered at ~16px (font-size:1rem). Two
+        // problems: the emoji overflowed its own box, and an anchor equal to
+        // the full width/height pushed that box entirely up-and-left of the
+        // real position. Leaflet only listens for drags on the box, so the
+        // flag you could see was NOT the flag you could grab — dragging
+        // appeared broken. Box is now larger than the glyph, and the anchor
+        // is the flagpole foot (centre-x, bottom-y).
         const marker = L.marker([lat, lng], {
-          // IMPORTANT: saved flags are LOCKED by default.
-          draggable: false,
+          draggable: true,
           icon: L.divIcon({
             className: "saved-checkpoint-icon",
-            html: '<span style="font-size:1rem;">🚩</span>',
-            iconSize: [15, 15],
-            iconAnchor: [15, 15],
+            html: '<span style="font-size:1rem;line-height:1;">🚩</span>',
+            iconSize: [24, 24],
+            iconAnchor: [12, 24],
+            popupAnchor: [0, -22],
           }),
         }).addTo(savedCheckpointsLayer);
 
@@ -1890,6 +1901,7 @@
       try {
         const res = await fetch(`/api/checkpoints/${id}/`, {
           method: "PATCH",
+          credentials: "same-origin",
           headers: {
             'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
@@ -2169,6 +2181,7 @@
       try {
         const res = await fetch(`/api/checkpoints/${id}/`, {
           method: "DELETE",
+          credentials: "same-origin",
           headers: {
             Authorization: `Bearer ${getToken()}`,
           },
@@ -2515,6 +2528,7 @@
       while (true) {
         const res = await fetch("/api/checkpoints/", {
           method: "POST",
+          credentials: "same-origin",
           headers: {
             'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
@@ -3120,6 +3134,7 @@
       try {
         const res = await fetch("/api/system-settings/", {
           method: "POST",
+          credentials: "same-origin",
           headers: {
             'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
