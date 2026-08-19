@@ -631,6 +631,9 @@ window.toggleAvailability = async function() {
      - A dashed/road line connecting the stops belonging to this
        driver's current active/planned Route.
      - The driver's own last-known position.
+     - Only the checkpoint(s) tied to this driver's own active
+       requests' dropoff_checkpoint — not every checkpoint in the
+       system.
    Refreshes on: manual button click, a 30s interval, and any
    'route_update' broadcast on the driver_locations WebSocket.
    ========================================================== */
@@ -914,11 +917,21 @@ window.loadMapData = async function() {
 
     const allRequests = extractList(requestsData);
     const routes = extractList(routesData);
-    const checkpoints = extractList(checkpointsData);
 
     // ── Only active work goes on the map — completed/cancelled requests
     // are dropped here so finished pins don't keep showing green forever.
     const requests = allRequests.filter(req => ACTIVE_MAP_STATUSES.includes(req.status));
+
+    // FIX: only show checkpoint(s) tied to THIS driver's own active
+    // requests' dropoff_checkpoint — not every checkpoint in the system.
+    // dropoff_checkpoint on a WasteRequest is a nested object
+    // (CheckpointSerializer), not a bare id, so pull .id off it.
+    const relevantCheckpointIds = new Set(
+        requests
+            .map(req => req.dropoff_checkpoint && req.dropoff_checkpoint.id)
+            .filter(Boolean)
+    );
+    const checkpoints = extractList(checkpointsData).filter(cp => relevantCheckpointIds.has(cp.id));
 
     requestMarkersLayer.clearLayers();
     checkpointsLayer.clearLayers();
