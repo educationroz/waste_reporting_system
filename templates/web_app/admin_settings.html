@@ -26,12 +26,33 @@
   #depot-map,
   #checkpoint-map {
     border: 1px solid var(--border-color) !important;
+  }
 
-    .pending-checkpoint-icon {
-      background: transparent !important;
-      border: none !important;
-      box-shadow: none !important;
-    }
+  /* These were previously nested inside the #depot-map rule, which only works
+     in browsers with CSS nesting and silently did nothing elsewhere — the
+     divIcon kept Leaflet's default white box. Now top-level so both flag
+     types render as a bare glyph. */
+  .pending-checkpoint-icon,
+  .saved-checkpoint-icon {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    /* Make the whole icon box a grab target and centre the glyph in it, so
+       what you see is what you can drag. */
+    display: flex !important;
+    align-items: flex-end;
+    justify-content: center;
+    cursor: grab;
+  }
+
+  .saved-checkpoint-icon:active,
+  .pending-checkpoint-icon:active {
+    cursor: grabbing;
+  }
+
+  /* Leaflet adds this class to the marker being dragged. */
+  .leaflet-marker-draggable.leaflet-drag-target {
+    cursor: grabbing;
   }
 </style>
 {% endblock %} {% block content %}
@@ -1218,6 +1239,7 @@
 
       let res = await fetch("/api/system-settings/depot_location/", {
         method: "PATCH",
+        credentials: "same-origin",
         headers: {
           'X-CSRFToken': getCookie('csrftoken'),
           "Content-Type": "application/json",
@@ -1228,6 +1250,7 @@
       if (res.status === 404) {
         res = await fetch("/api/system-settings/", {
           method: "POST",
+          credentials: "same-origin",
           headers: {
             'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
@@ -1579,6 +1602,7 @@
       try {
         const res = await fetch("/api/checkpoints/bulk_delete/", {
           method: "POST",
+          credentials: "same-origin",
           headers: {
             'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
@@ -1633,13 +1657,23 @@
         if (isNaN(lat) || isNaN(lng)) return;
         bounds.push([lat, lng]);
 
+        // DRAG FIX: the icon box used to be 15x15 with iconAnchor [15,15]
+        // while the glyph itself rendered at ~16px (font-size:1rem). Two
+        // problems: the emoji overflowed its own box, and an anchor equal to
+        // the full width/height pushed that box entirely up-and-left of the
+        // real position. Leaflet only listens for drags on the box, so the
+        // flag you could see was NOT the flag you could grab — dragging
+        // appeared broken. Box is now larger than the glyph, and the anchor
+        // is the flagpole foot (centre-x, bottom-y).
         const marker = L.marker([lat, lng], {
           draggable: true,
+          autoPan: true,
           icon: L.divIcon({
             className: "saved-checkpoint-icon",
-            html: '<span style="font-size:1rem;">🚩</span>',
-            iconSize: [15, 15],
-            iconAnchor: [15, 15],
+            html: '<span style="font-size:1rem;line-height:1;">🚩</span>',
+            iconSize: [24, 24],
+            iconAnchor: [12, 24],
+            popupAnchor: [0, -22],
           }),
         }).addTo(savedCheckpointsLayer);
 
@@ -1681,6 +1715,7 @@
       try {
         const res = await fetch(`/api/checkpoints/${id}/`, {
           method: "PATCH",
+          credentials: "same-origin",
           headers: {
             'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
@@ -1831,6 +1866,7 @@
       try {
         const res = await fetch(`/api/checkpoints/${id}/`, {
           method: "DELETE",
+          credentials: "same-origin",
           headers: {
             'X-CSRFToken': getCookie('csrftoken'),
           },
@@ -2108,6 +2144,7 @@
       while (true) {
         const res = await fetch("/api/checkpoints/", {
           method: "POST",
+          credentials: "same-origin",
           headers: {
             'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
@@ -2618,6 +2655,7 @@
       try {
         const res = await fetch("/api/system-settings/", {
           method: "POST",
+          credentials: "same-origin",
           headers: {
             'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
