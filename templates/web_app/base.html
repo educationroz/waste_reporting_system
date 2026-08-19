@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Safha Sahar - Live Waste Reporting System</title>
+    <title>{% trans "Safha Sahar - Live Waste Reporting System" %}</title>
 
     <!-- Favicon & CSS Links -->
     <link rel="icon" type="image/png" href="{% static 'web_app/image/SafhaSahar.png' %}">
@@ -13,6 +13,31 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="{% static 'web_app/css/layout.css' %}?v=2" rel="stylesheet">
     <link href="{% static 'web_app/css/main.css' %}?v=2" rel="stylesheet">
+
+    <!--
+        JAVASCRIPT TRANSLATION CATALOG
+        Loads the compiled locale catalog for the active language and defines
+        the global gettext()/ngettext() helpers. Inline dashboard scripts wrap
+        their user-facing strings in gettext('...') so toasts, confirm()
+        prompts and JS-rebuilt table cells appear in Nepali too. The "trans"
+        template tag alone can't reach them, since it is evaluated when the
+        template renders, not when the script later builds the DOM.
+        Must load BEFORE any script that calls gettext().
+    -->
+    <script src="{% url 'javascript-catalog' %}"></script>
+    <script>
+        // Safety net: if the catalog request ever fails (offline, cache miss,
+        // service-worker hiccup), fall back to identity functions so a missing
+        // catalog degrades to plain English instead of throwing
+        // "gettext is not defined" and killing the whole inline script block.
+        window.gettext = window.gettext || function (s) { return s; };
+        window.ngettext = window.ngettext || function (s, p, n) { return n === 1 ? s : p; };
+        window.interpolate = window.interpolate || function (fmt, obj, named) {
+            return named
+                ? fmt.replace(/%\((\w+)\)s/g, function (m, k) { return String(obj[k]); })
+                : fmt.replace(/%s/g, function () { return String(obj.shift()); });
+        };
+    </script>
 
     <!-- HTMX + Head-Support Extension -->
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js"></script>
@@ -40,6 +65,24 @@
         }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/ext/head-support.js"></script>
+
+    <!-- SECURITY: global CSRF helpers.
+         Auth is cookie-based (HttpOnly session cookie) rather than a JWT in
+         localStorage, so every unsafe request must carry the CSRF token.
+         Defined here, before any page script, so all templates can use it. -->
+    <script>
+        window.getCookie = function getCookie(name) {
+            const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return m ? decodeURIComponent(m.pop()) : '';
+        };
+        window.csrfHeaders = function csrfHeaders(method, extra) {
+            const headers = Object.assign({}, extra || {});
+            if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(method || 'GET')) {
+                headers['X-CSRFToken'] = window.getCookie('csrftoken');
+            }
+            return headers;
+        };
+    </script>
 
     <!-- Theme Early-Initialization -->
     <script>
@@ -130,7 +173,7 @@
 <nav class="navbar navbar-light shadow-sm sticky-top" style="z-index: 1030;">
     <div class="container-fluid d-flex align-items-center flex-nowrap position-relative">
         <a class="navbar-brand notranslate d-flex align-items-center flex-shrink-1 me-2" href="/" translate="no" style="min-width:0;">
-            <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="Logo" width="40" height="40" class="d-inline-block align-text-top me-2 flex-shrink-0">
+            <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="{% trans 'Logo' %}" width="40" height="40" class="d-inline-block align-text-top me-2 flex-shrink-0">
             <span class="fw-semibold text-truncate" style="color: #25be27;">
                 <span class="d-none d-sm-inline">SafhaSahar</span>
                 
@@ -168,8 +211,18 @@
                         onchange="this.form.submit()" aria-label="{% trans 'Choose language' %}">
                     {% get_current_language as CURRENT_LANGUAGE %}
                     {% get_available_languages as AVAILABLE_LANGUAGES %}
-                    {% for lang_code, lang_name in AVAILABLE_LANGUAGES %}
-                        <option value="{{ lang_code }}" {% if lang_code == CURRENT_LANGUAGE %}selected{% endif %}>{{ lang_name }}</option>
+                    {% comment %}
+                        name_local = each language written in ITSELF ("English",
+                        "नेपाली") instead of translated into the active language.
+                        With the plain name, browsing in Nepali rendered the
+                        English option as "अंग्रेजी" — unreadable for exactly the
+                        person who needs it, someone who switched by accident and
+                        wants back. Endonyms keep both options recognisable in
+                        either language.
+                    {% endcomment %}
+                    {% get_language_info_list for AVAILABLE_LANGUAGES as languages %}
+                    {% for language in languages %}
+                        <option value="{{ language.code }}" {% if language.code == CURRENT_LANGUAGE %}selected{% endif %}>{{ language.name_local|capfirst }}</option>
                     {% endfor %}
                 </select>
             </form>
@@ -197,7 +250,7 @@
                         <span class="d-none d-lg-inline">{{ user.username }}</span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><span class="dropdown-item-text text-muted small">{{ user.role|capfirst }}</span></li>
+                        <li><span class="dropdown-item-text text-muted small">{{ user.get_role_display }}</span></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person-circle me-2"></i>{% trans 'View Profile' %}</a></li>
                         <li><hr class="dropdown-divider"></li>
@@ -252,7 +305,7 @@
 <!-- FOOTER -->
 <footer class="site-footer">
     <div class="text-center py-3 bg-light">
-        <small>&copy; Safha Sahar {% now "Y" %}. {% trans "All rights reserved." %} | RA Innovations</small>
+        <small>&copy; {% trans "Safha Sahar" %} {% now "Y" %}. {% trans "All rights reserved." %} | {% trans "RA Innovations" %}</small>
     </div>
 </footer>
 
@@ -388,10 +441,10 @@ document.addEventListener("DOMContentLoaded", function() {
     };
 
     // Shared CSV/file download helper for every "bulk_export" endpoint
-    // (requests, complaints, schedules). A plain <a href> can't carry the
-    // JWT Bearer token these API endpoints require, so we fetch the file
-    // through authFetch (which already handles the refresh-and-retry
-    // dance) and turn the response into a Blob download instead.
+    // (requests, complaints, schedules). Goes through authFetch so the
+    // session cookie rides along, then turns the response into a Blob
+    // download. (A plain <a href> would also send the cookie, but this path
+    // lets us surface API error bodies as toasts instead of navigating.)
     window.downloadFile = async function downloadFile(url, fallbackFilename) {
         if (typeof authFetch !== 'function') {
             console.error('authFetch not available — is the user authenticated?');
@@ -424,7 +477,7 @@ document.addEventListener("DOMContentLoaded", function() {
             return true;
         } catch (e) {
             console.error('Download failed:', e);
-            if (typeof showToast === 'function') showToast('Network error during export.', 'danger');
+            if (typeof showToast === 'function') showToast(gettext('Network error during export.'), 'danger');
             return false;
         }
     };
@@ -453,86 +506,37 @@ if (!window.__ssAuthScriptLoaded) {
     };
     window.API = API;
 
-    function getToken() { return localStorage.getItem('access_token'); }
+    // ─── SECURITY: cookie-session auth, no tokens in localStorage ────────
+    // The JWT access/refresh pair used to live in localStorage, which meant
+    // any XSS anywhere on the site could read and exfiltrate it (localStorage
+    // has no HttpOnly equivalent). Every browser request below now rides on
+    // the Django session cookie, which IS HttpOnly and therefore invisible to
+    // injected JS. Unsafe verbs carry the CSRF token, which is what makes
+    // cookie auth safe against cross-site abuse.
+    const getCookie = window.getCookie;
+    const csrfHeaders = window.csrfHeaders;
 
-    function isJwtExpired(token, skewSeconds = 30) {
-        if (!token) return true;
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-            if (!payload.exp) return true;
-            return (payload.exp * 1000) <= (Date.now() + skewSeconds * 1000);
-        } catch (e) {
-            return true;
-        }
-    }
-
-    async function getFreshAccessTokenForSockets() {
-        const access = localStorage.getItem('access_token');
-        if (!access) return null;
-        if (!isJwtExpired(access)) return access;
-
-        const refresh = localStorage.getItem('refresh_token');
-        if (!refresh) return null;
-
-        try {
-            const refreshRes = await fetch('/auth/token/refresh/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refresh }),
-            });
-
-            if (!refreshRes.ok) return null;
-
-            const refreshData = await refreshRes.json();
-            if (!refreshData || !refreshData.access) return null;
-            localStorage.setItem('access_token', refreshData.access);
-            return refreshData.access;
-        } catch (e) {
-            console.error('Failed to refresh access token for WebSocket reconnect:', e);
-            return null;
-        }
-    }
+    // Kept so legacy callers that still probe for "am I logged in?" work.
+    // Server-rendered: this block only renders for authenticated users.
+    function getToken() { return true; }
 
     async function apiFetch(method, url, data = null) {
-        let token = localStorage.getItem('access_token');
-
-        const makeRequest = (t) => {
-            const opts = {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${t}`,
-                },
-            };
-            if (data) opts.body = JSON.stringify(data);
-            return fetch(url, opts);
+        const opts = {
+            method,
+            credentials: 'same-origin',
+            headers: csrfHeaders(method, { 'Content-Type': 'application/json' }),
         };
+        if (data) opts.body = JSON.stringify(data);
 
-        let res = await makeRequest(token);
+        const res = await fetch(url, opts);
 
-        if (res.status === 401) {
-            const refresh = localStorage.getItem('refresh_token');
-            if (!refresh) { logout(); return null; }
-
-            const refreshRes = await fetch('/auth/token/refresh/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refresh }),
-            });
-
-            if (refreshRes.ok) {
-                const refreshData = await refreshRes.json();
-                localStorage.setItem('access_token', refreshData.access);
-                res = await makeRequest(refreshData.access);
-            } else {
-                logout();
-                return null;
-            }
+        if (res.status === 401 || res.status === 403) {
+            // Session expired or was invalidated server-side.
+            if (res.status === 401) { logout(); return null; }
         }
 
         const text = await res.text();
         if (!text) return {};
-
         try {
             return JSON.parse(text);
         } catch (e) {
@@ -541,64 +545,32 @@ if (!window.__ssAuthScriptLoaded) {
     }
 
     window.authFetch = async function authFetch(url, options = {}) {
-        let token = localStorage.getItem('access_token');
-
-        const makeRequest = (t) => {
-            const headers = Object.assign({}, options.headers || {}, {
-                'Authorization': `Bearer ${t}`,
-            });
-            return fetch(url, Object.assign({}, options, { headers }));
-        };
-
-        let res = await makeRequest(token);
-
-        if (res.status === 401) {
-            const refresh = localStorage.getItem('refresh_token');
-            if (!refresh) { logout(); return null; }
-
-            const refreshRes = await fetch('/auth/token/refresh/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refresh }),
-            });
-
-            if (refreshRes.ok) {
-                const refreshData = await refreshRes.json();
-                localStorage.setItem('access_token', refreshData.access);
-                res = await makeRequest(refreshData.access);
-            } else {
-                logout();
-                return null;
-            }
-        }
-
+        const method = (options && options.method) || 'GET';
+        const merged = Object.assign({}, options, {
+            credentials: 'same-origin',
+            headers: csrfHeaders(method, options.headers),
+        });
+        const res = await fetch(url, merged);
+        if (res.status === 401) { logout(); return null; }
         return res;
     };
 
     window.logout = async function logout() {
-        const refresh = localStorage.getItem('refresh_token');
-        if (refresh) {
-            try {
-                await fetch('/auth/logout/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${getToken()}`,
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({ refresh }),
-                });
-            } catch (e) {
-                console.error('Logout API call failed:', e);
-            }
+        try {
+            await fetch('/auth/logout/', {
+                method: 'POST',
+                headers: csrfHeaders('POST', { 'Content-Type': 'application/json' }),
+                credentials: 'same-origin',
+                body: '{}',
+            });
+        } catch (e) {
+            console.error('Logout API call failed:', e);
         }
         if (window._notifSocket) {
             try { window._notifSocket.close(); } catch (e) {
                 console.error('Failed to close notification socket:', e);
             }
         }
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
         window.location.href = '/logout/';
     };
 
@@ -682,14 +654,10 @@ if (!window.__ssAuthScriptLoaded) {
     async function connectNotifSocket() {
         try {
             const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-            const token = await getFreshAccessTokenForSockets();
-            if (!token) {
-                if (localStorage.getItem('refresh_token')) logout();
-                return;
-            }
-            const wsURL = token
-                ? `${protocol}${location.host}/ws/notifications/?token=${encodeURIComponent(token)}`
-                : `${protocol}${location.host}/ws/notifications/`;
+            // No ?token= — the handshake sends the HttpOnly session cookie,
+            // so the credential never touches JS or the URL (and so never
+            // lands in access logs or Referer headers).
+            const wsURL = `${protocol}${location.host}/ws/notifications/`;
             const notifSocket = new WebSocket(wsURL);
             window._notifSocket = notifSocket;
             window._notifReconnectAttempt = 0;
@@ -723,7 +691,7 @@ if (!window.__ssAuthScriptLoaded) {
                 }
                 console.warn(label, event);
                 if (!window._notifReconnectWarned) {
-                    showToast('Connection lost — live updates paused', 'warning');
+                    showToast(gettext('Connection lost — live updates paused'), 'warning');
                     window._notifReconnectWarned = true;
                 }
                 scheduleNotifReconnect();
@@ -756,9 +724,8 @@ if (!window.__ssAuthScriptLoaded) {
     connectNotifSocket();
 
     document.addEventListener('DOMContentLoaded', () => {
-        const token = localStorage.getItem('access_token');
-        if (!token) return;
-
+        // This whole block only renders for authenticated users, so the
+        // old localStorage token check is redundant now.
         refreshNotifBadge();
         refreshRecycleBinBadge();
         refreshComplaintsBadge();
@@ -770,8 +737,6 @@ if (!window.__ssAuthScriptLoaded) {
     });
 
     document.body.addEventListener('htmx:afterSwap', function() {
-        const token = localStorage.getItem('access_token');
-        if (!token) return;
         refreshNotifBadge();
         refreshRecycleBinBadge();
         refreshComplaintsBadge();
@@ -839,12 +804,12 @@ if (!window.__ssAuthScriptLoaded) {
     let _reloadTriggered = false;
     document.body.addEventListener('htmx:sendError', function(evt) {
         console.warn('htmx request failed to send:', evt.detail);
-        showToast('Request failed — please try again.', 'warning');
+        showToast(gettext('Request failed — please try again.'), 'warning');
     });
     document.body.addEventListener('htmx:responseError', function(evt) {
         if (evt.detail.xhr && evt.detail.xhr.status >= 500 && !_reloadTriggered) {
             _reloadTriggered = true;
-            showToast('Server error — reloading...', 'danger');
+            showToast(gettext('Server error — reloading...'), 'danger');
             setTimeout(() => window.location.reload(), 1000);
         }
     });

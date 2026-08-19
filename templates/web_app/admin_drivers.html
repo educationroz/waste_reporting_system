@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Admin - Drivers Management{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Admin - Drivers Management" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -131,18 +132,18 @@
             <!-- Header Strip Matrix -->
             <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold"><i class="bi bi-person-badge text-success me-2"></i>Drivers Management</h2>
-                    <p class="text-muted mb-0">Monitor active field staff registry, verify logistics permits, and allocate municipal vehicle fleets.</p>
+                    <h2 class="mb-1 fw-bold"><i class="bi bi-person-badge text-success me-2"></i>{% trans "Drivers Management" %}</h2>
+                    <p class="text-muted mb-0">{% trans "Monitor active field staff registry, verify logistics permits, and allocate municipal vehicle fleets." %}</p>
                 </div>
                 <button type="button" class="btn btn-success fw-semibold px-4" data-bs-toggle="modal" data-bs-target="#addDriverModal">
-                    <i class="bi bi-person-plus me-2"></i>Add Driver
+                    <i class="bi bi-person-plus me-2"></i>{% trans "Add Driver" %}
                 </button>
             </div>
 
             <!-- Drivers Primary Records Card -->
             <div class="card dashboard-card">
                 <div class="card-header py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>Verified Active Roster</h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>{% trans "Verified Active Roster" %}</h6>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -150,12 +151,12 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>
-                                    <th>Name / Contact Node</th>
-                                    <th>License Permittance</th>
-                                    <th>Allocated Machinery</th>
-                                    <th>Status Check</th>
-                                    <th>Total Trips</th>
-                                    <th class="text-end pe-4">Action Control</th>
+                                    <th>{% trans "Name / Contact Node" %}</th>
+                                    <th>{% trans "License Permittance" %}</th>
+                                    <th>{% trans "Allocated Machinery" %}</th>
+                                    <th>{% trans "Status Check" %}</th>
+                                    <th>{% trans "Total Trips" %}</th>
+                                    <th class="text-end pe-4">{% trans "Action Control" %}</th>
                                 </tr>
                             </thead>
                             <tbody id="drivers-table-body">
@@ -170,32 +171,32 @@
                                     <td>
                                         {% if driver.vehicle %}
                                             <div class="fw-semibold"><i class="bi bi-truck me-1 text-success"></i>{{ driver.vehicle.plate_number }}</div>
-                                            <div class="small text-muted" style="font-size: 0.8rem;">{{ driver.vehicle.type }} ({{ driver.vehicle.capacity_kg }}kg)</div>
+                                            <div class="small text-muted" style="font-size: 0.8rem;">{{ driver.vehicle.type }} ({{ driver.vehicle.capacity_kg }}{% trans "kg)" %}</div>
                                         {% else %}
-                                            <span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>No Asset Linked</span>
+                                            <span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>{% trans "No Asset Linked" %}</span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         <span class="badge {% if driver.is_available %}bg-success bg-opacity-10 text-success{% else %}bg-secondary bg-opacity-10 text-secondary{% endif %} px-3 rounded-pill">
-                                            {% if driver.is_available %}Available{% else %}Busy{% endif %}
+                                            {% if driver.is_available %}{% trans "Available" %}{% else %}{% trans "Busy" %}{% endif %}
                                         </span>
                                     </td>
                                     <td class="fw-semibold font-monospace">{{ driver.total_trips }}</td>
                                     <td class="text-end pe-4">
                                         <div class="d-inline-flex gap-2">
                                             <button class="btn btn-sm btn-outline-secondary py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#profileModal{{ driver.id }}">
-                                                <i class="bi bi-person-vcard me-1"></i>View Profile
+                                                <i class="bi bi-person-vcard me-1"></i>{% trans "View Profile" %}
                                             </button>
                                             <button class="btn btn-sm btn-outline-{% if driver.is_available %}secondary{% else %}success{% endif %} py-1 px-3" style="font-size: 0.82rem;"
                                                 onclick="toggleAvailability({{ driver.id }}, {{ driver.is_available|yesno:'true,false' }})">
-                                                {% if driver.is_available %}<i class="bi bi-dash-circle me-1"></i>Set Busy{% else %}<i class="bi bi-check-circle me-1"></i>Set Available{% endif %}
+                                                {% if driver.is_available %}<i class="bi bi-dash-circle me-1"></i>{% trans "Set Busy" %}{% else %}<i class="bi bi-check-circle me-1"></i>{% trans "Set Available" %}{% endif %}
                                             </button>
 
                                             <button class="btn btn-sm btn-outline-primary py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#assignVehicleModal{{ driver.id }}">
-                                                <i class="bi bi-link-45deg me-1"></i>Assign Vehicle
+                                                <i class="bi bi-link-45deg me-1"></i>{% trans "Assign Vehicle" %}
                                             </button>
                                             <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="removeDriver({{ driver.id }}, this)">
-                                                <i class="bi bi-trash me-1"></i>Remove
+                                                <i class="bi bi-trash me-1"></i>{% trans "Remove" %}
                                             </button>
                                         </div>
                                     </td>
@@ -206,7 +207,7 @@
                                     <div class="modal-dialog modal-dialog-centered modal-lg">
                                         <div class="modal-content border-0 shadow">
                                             <div class="modal-header bg-dark text-white border-bottom-0">
-                                                <h5 class="modal-title fw-bold"><i class="bi bi-person-vcard me-2"></i>Driver Profile</h5>
+                                                <h5 class="modal-title fw-bold"><i class="bi bi-person-vcard me-2"></i>{% trans "Driver Profile" %}</h5>
                                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                             </div>
                                             <div class="modal-body p-4">
@@ -216,85 +217,85 @@
                                                     </div>
                                                     <div>
                                                         <div class="fs-5 fw-bold">{{ driver.user.get_full_name|default:driver.user.username }}</div>
-                                                        <div class="text-muted small">Driver #{{ driver.id }} &middot; Registered {{ driver.created_at|date:"d M Y" }}</div>
+                                                        <div class="text-muted small">{% trans "Driver #" %}{{ driver.id }} &middot; {% trans "Registered" %} {{ driver.created_at|date:"d M Y" }}</div>
                                                     </div>
                                                     <span class="badge {% if driver.is_available %}bg-success bg-opacity-10 text-success{% else %}bg-secondary bg-opacity-10 text-secondary{% endif %} px-3 rounded-pill ms-auto">
-                                                        {% if driver.is_available %}Available{% else %}Busy{% endif %}
+                                                        {% if driver.is_available %}{% trans "Available" %}{% else %}{% trans "Busy" %}{% endif %}
                                                     </span>
                                                 </div>
 
                                                 <div class="row g-4">
                                                     <div class="col-md-6">
-                                                        <h6 class="fw-bold text-secondary small text-uppercase mb-2">Contact &amp; Identity</h6>
+                                                        <h6 class="fw-bold text-secondary small text-uppercase mb-2">{% trans "Contact" %} &amp; {% trans "Identity" %}</h6>
                                                         <div class="profile-detail-row">
-                                                            <span class="profile-detail-label">Username</span>
+                                                            <span class="profile-detail-label">{% trans "Username" %}</span>
                                                             <span class="profile-detail-value">{{ driver.user.username }}</span>
                                                         </div>
                                                         <div class="profile-detail-row">
-                                                            <span class="profile-detail-label">Email</span>
+                                                            <span class="profile-detail-label">{% trans "Email" %}</span>
                                                             <span class="profile-detail-value">{{ driver.user.email|default:"—" }}</span>
                                                         </div>
                                                         <div class="profile-detail-row">
-                                                            <span class="profile-detail-label">Phone</span>
+                                                            <span class="profile-detail-label">{% trans "Phone" %}</span>
                                                             <span class="profile-detail-value">{{ driver.user.phone|default:"—" }}</span>
                                                         </div>
                                                         <div class="profile-detail-row">
-                                                            <span class="profile-detail-label">Address</span>
+                                                            <span class="profile-detail-label">{% trans "Address" %}</span>
                                                             <span class="profile-detail-value">{{ driver.user.address|default:"—" }}</span>
                                                         </div>
 
-                                                        <h6 class="fw-bold text-secondary small text-uppercase mb-2 mt-4">Assignment &amp; Performance</h6>
+                                                        <h6 class="fw-bold text-secondary small text-uppercase mb-2 mt-4">{% trans "Assignment" %} &amp; {% trans "Performance" %}</h6>
                                                         <div class="profile-detail-row">
-                                                            <span class="profile-detail-label">License Number</span>
+                                                            <span class="profile-detail-label">{% trans "License Number" %}</span>
                                                             <span class="profile-detail-value font-monospace">{{ driver.license_number|default:"—" }}</span>
                                                         </div>
                                                         <div class="profile-detail-row">
-                                                            <span class="profile-detail-label">Assigned Vehicle</span>
+                                                            <span class="profile-detail-label">{% trans "Assigned Vehicle" %}</span>
                                                             <span class="profile-detail-value">{{ driver.vehicle.plate_number|default:"Not assigned" }}</span>
                                                         </div>
                                                         <div class="profile-detail-row">
-                                                            <span class="profile-detail-label">Total Trips</span>
+                                                            <span class="profile-detail-label">{% trans "Total Trips" %}</span>
                                                             <span class="profile-detail-value">{{ driver.total_trips }}</span>
                                                         </div>
                                                     </div>
 
                                                     <div class="col-md-6">
-                                                        <h6 class="fw-bold text-secondary small text-uppercase mb-2">Driving License Document</h6>
+                                                        <h6 class="fw-bold text-secondary small text-uppercase mb-2">{% trans "Driving License Document" %}</h6>
 
                                                         <div id="license-doc-area-{{ driver.id }}">
                                                         {% if driver.license_document %}
                                                         <div class="mb-2">
                                                             <a href="{{ driver.license_document.url }}" target="_blank" class="btn btn-sm btn-outline-success w-100 mb-2">
-                                                                <i class="bi bi-file-earmark-pdf me-1"></i>Open Full PDF in New Tab
+                                                                <i class="bi bi-file-earmark-pdf me-1"></i>{% trans "Open Full PDF in New Tab" %}
                                                             </a>
                                                             <embed src="{{ driver.license_document.url }}" type="application/pdf" class="license-pdf-frame">
                                                         </div>
                                                         {% else %}
                                                         <div class="text-center text-muted py-4 rounded-3 mb-3" style="background: var(--bg-surface-alt);">
                                                             <i class="bi bi-file-earmark-x fs-2 d-block mb-1"></i>
-                                                            <span class="small">No license document uploaded yet.</span>
+                                                            <span class="small">{% trans "No license document uploaded yet." %}</span>
                                                         </div>
                                                         {% endif %}
                                                         </div>
 
                                                         <label class="form-label small fw-semibold text-secondary mt-2" id="license-upload-label-{{ driver.id }}">
-                                                            {% if driver.license_document %}Replace document{% else %}Upload license document{% endif %}
-                                                            <span class="text-muted fw-normal">(PDF only, max 5MB)</span>
+                                                            {% if driver.license_document %}{% trans "Replace document" %}{% else %}{% trans "Upload license document" %}{% endif %}
+                                                            <span class="text-muted fw-normal">{% trans "(PDF only, max 5MB)" %}</span>
                                                         </label>
                                                         <div class="license-upload-zone" onclick="document.getElementById('license-file-{{ driver.id }}').click()">
                                                             <i class="bi bi-cloud-arrow-up fs-4 text-muted d-block mb-1"></i>
-                                                            <span class="small text-muted" id="license-file-label-{{ driver.id }}">Click to choose a PDF file</span>
+                                                            <span class="small text-muted" id="license-file-label-{{ driver.id }}">{% trans "Click to choose a PDF file" %}</span>
                                                         </div>
                                                         <input type="file" id="license-file-{{ driver.id }}" class="d-none" accept="application/pdf"
                                                             onchange="handleLicenseFileSelect({{ driver.id }}, this)">
                                                         <button type="button" class="btn btn-success w-100 mt-2" id="license-upload-btn-{{ driver.id }}" onclick="uploadLicense({{ driver.id }})" disabled>
-                                                            <i class="bi bi-upload me-1"></i>Upload Document
+                                                            <i class="bi bi-upload me-1"></i>{% trans "Upload Document" %}
                                                         </button>
                                                     </div>
                                                 </div>
                                             </div>
                                             <div class="modal-footer bg-surface-alt border-top-0">
-                                                <button class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+                                                <button class="btn btn-secondary px-4" data-bs-dismiss="modal">{% trans "Close" %}</button>
                                             </div>
                                         </div>
                                     </div>
@@ -305,33 +306,33 @@
                                     <div class="modal-dialog modal-dialog-centered">
                                         <div class="modal-content border-0 shadow">
                                             <div class="modal-header bg-success text-white">
-                                                <h5 class="modal-title fw-bold"><i class="bi bi-truck me-2"></i>Link Fleet Asset</h5>
+                                                <h5 class="modal-title fw-bold"><i class="bi bi-truck me-2"></i>{% trans "Link Fleet Asset" %}</h5>
                                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                             </div>
                                             <div class="modal-body p-4">
                                                 <input type="hidden" id="assign-vehicle-driver-id" value="{{ driver.id }}">
                                                 <div class="mb-2">
-                                                    <label class="form-label fw-semibold text-secondary">Select Vehicle for {{ driver.user.username }}</label>
+                                                    <label class="form-label fw-semibold text-secondary">{% trans "Select Vehicle for" %} {{ driver.user.username }}</label>
                                                     <select class="form-select form-select-lg" style="font-size: 0.95rem;" id="assign-vehicle-select-{{driver.id}}">
-                                                        <option value="">None (De-allocate System Asset)</option>
+                                                        <option value="">{% trans "None (De-allocate System Asset)" %}</option>
                                                         {% for vehicle in vehicles %}
                                                         <option value="{{ vehicle.id }}" {% if vehicle == driver.vehicle %}selected{% endif %}>
-                                                            {{ vehicle.plate_number }} — {{ vehicle.type }} ({{ vehicle.capacity_kg }}kg, {{ vehicle.get_status_display }})
+                                                            {{ vehicle.plate_number }} — {{ vehicle.type }} ({{ vehicle.capacity_kg }}{% trans "kg," %} {{ vehicle.get_status_display }})
                                                         </option>
                                                         {% endfor %}
                                                     </select>
                                                 </div>
                                             </div>
                                             <div class="modal-footer bg-surface-alt">
-                                                <button class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                                                <button class="btn btn-success px-4" onclick="assignVehicle({{ driver.id }}, this)">Update Allocation</button>
+                                                <button class="btn btn-secondary px-4" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                                                <button class="btn btn-success px-4" onclick="assignVehicle({{ driver.id }}, this)">{% trans "Update Allocation" %}</button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
                                 {% empty %}
-                                <tr><td colspan="7" class="text-center text-muted py-5">No drivers registered in this sector cluster yet. Create a user with role 'driver' first.</td></tr>
+                                <tr><td colspan="7" class="text-center text-muted py-5">{% trans "No drivers registered in this sector cluster yet. Create a user with role 'driver' first." %}</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -343,10 +344,10 @@
             {% if users_no_driver %}
             <div class="card dashboard-card border border-warning border-opacity-20 mt-4">
                 <div class="card-header bg-warning bg-opacity-10 py-3">
-                    <h6 class="mb-0 fw-bold text-warning-emphasis"><i class="bi bi-exclamation-triangle-fill me-2"></i>Profile Lifecycle Warning (Unmapped Personnel)</h6>
+                    <h6 class="mb-0 fw-bold text-warning-emphasis"><i class="bi bi-exclamation-triangle-fill me-2"></i>{% trans "Profile Lifecycle Warning (Unmapped Personnel)" %}</h6>
                 </div>
                 <div class="card-body">
-                    <p class="small text-secondary mb-3">The following accounts are tagged with a <code>driver</code> permission token, but structural identity rows are missing inside the primary driver tables. Grant them metadata vectors or fleet licenses immediately to resolve routing pipeline integrity warnings:</p>
+                    <p class="small text-secondary mb-3">{% trans "The following accounts are tagged with a" %} <code>{% trans "driver" %}</code> {% trans "permission token, but structural identity rows are missing inside the primary driver tables. Grant them metadata vectors or fleet licenses immediately to resolve routing pipeline integrity warnings" %}:</p>
                     <div class="p-3 rounded-3 border-start border-warning border-3" style="background: var(--bg-surface-alt);">
                         <ul class="mb-0 gap-1 d-flex flex-column" style="font-size: 0.88rem;">
                             {% for u in users_no_driver %}
@@ -366,40 +367,40 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-success text-white border-bottom-0">
-                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Add Driver</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>{% trans "Add Driver" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <form id="addDriverForm">
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Username</label>
-                        <input type="text" class="form-control" id="driver_username" placeholder="Enter driver username" required>
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Username" %}</label>
+                        <input type="text" class="form-control" id="driver_username" placeholder="{% trans 'Enter driver username' %}" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Email</label>
-                        <input type="email" class="form-control" id="driver_email" placeholder="driver@municipality.org" required>
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Email" %}</label>
+                        <input type="email" class="form-control" id="driver_email" placeholder="{% trans 'driver@municipality.org' %}" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Phone</label>
-                        <input type="text" class="form-control" id="driver_phone" placeholder="Optional phone number">
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Phone" %}</label>
+                        <input type="text" class="form-control" id="driver_phone" placeholder="{% trans 'Optional phone number' %}">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Address</label>
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Address" %}</label>
                         <textarea class="form-control" id="driver_address" rows="3" placeholder="Optional address"></textarea>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Password</label>
-                        <input type="password" class="form-control" id="driver_password" placeholder="Create password" required>
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Password" %}</label>
+                        <input type="password" class="form-control" id="driver_password" placeholder="{% trans 'Create password' %}" required>
                     </div>
                     <div class="mb-0">
-                        <label class="form-label small fw-semibold text-secondary">Confirm Password</label>
-                        <input type="password" class="form-control" id="driver_password2" placeholder="Re-enter password" required>
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Confirm Password" %}</label>
+                        <input type="password" class="form-control" id="driver_password2" placeholder="{% trans 'Re-enter password' %}" required>
                     </div>
                 </form>
             </div>
             <div class="modal-footer bg-surface-alt border-top-0">
-                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success px-4" onclick="addDriver(this)">Create Driver</button>
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button type="button" class="btn btn-success px-4" onclick="addDriver(this)">{% trans "Create Driver" %}</button>
             </div>
         </div>
     </div>
@@ -447,36 +448,12 @@
         return cookieValue;
     }
 
+    // SECURITY: auth is the HttpOnly session cookie now, so there is no
+    // token for JS to fetch, validate or refresh. Kept as a shim (returns a
+    // truthy sentinel) so the existing `if (!token) ...expired...` guards at
+    // the call sites below keep their shape.
     async function getValidAccessToken() {
-        let access = localStorage.getItem('access_token');
-        const refresh = localStorage.getItem('refresh_token');
-        if (!access) return null;
-
-        const probe = await fetch('/api/notifications/unread/', {
-            headers: { 'Authorization': `Bearer ${access}` }
-        });
-
-        if (probe.status !== 401) {
-            return access;
-        }
-
-        if (!refresh) return null;
-
-        const refreshRes = await fetch('/auth/token/refresh/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh }),
-        });
-
-        if (refreshRes.ok) {
-            const data = await refreshRes.json();
-            localStorage.setItem('access_token', data.access);
-            return data.access;
-        }
-
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        return null;
+        return 'cookie-session';
     }
 
     function buildVehicleOptionsHtml(selectedVehicleId) {
@@ -502,9 +479,9 @@
         const vehicleCell = driver.vehicle
             ? `<div class="fw-semibold text-dark"><i class="bi bi-truck me-1 text-success"></i>${escapeHtml(driver.vehicle.plate_number)}</div>
                <div class="small text-muted" style="font-size: 0.8rem;">${escapeHtml(driver.vehicle.type)} (${escapeHtml(String(driver.vehicle.capacity_kg))}kg)</div>`
-            : `<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>No Asset Linked</span>`;
+            : `<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>${gettext('No Asset Linked')}</span>`;
         const statusBadgeClass = driver.is_available ? 'bg-success bg-opacity-10 text-success' : 'bg-secondary bg-opacity-10 text-secondary';
-        const statusLabel = driver.is_available ? 'Available' : 'Busy';
+        const statusLabel = driver.is_available ? gettext('Available') : gettext('Busy');
         const toggleBtnLabel = driver.is_available
             ? '<i class="bi bi-dash-circle me-1"></i>Set Busy'
             : '<i class="bi bi-check-circle me-1"></i>Set Available';
@@ -526,17 +503,17 @@
                 <td class="text-end pe-4">
                     <div class="d-inline-flex gap-2">
                         <button class="btn btn-sm btn-outline-dark py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#profileModal${driver.id}">
-                            <i class="bi bi-person-vcard me-1"></i>View Profile
+                            <i class="bi bi-person-vcard me-1"></i>${gettext('View Profile')}
                         </button>
                         <button class="btn btn-sm btn-outline-${driver.is_available ? 'secondary' : 'success'} py-1 px-3" style="font-size: 0.82rem;"
                             onclick="toggleAvailability(${driver.id}, ${driver.is_available ? 'true' : 'false'})">
                             ${toggleBtnLabel}
                         </button>
                         <button class="btn btn-sm btn-outline-primary py-1 px-3" style="font-size: 0.82rem;" data-bs-toggle="modal" data-bs-target="#assignVehicleModal${driver.id}">
-                            <i class="bi bi-link-45deg me-1"></i>Assign Vehicle
+                            <i class="bi bi-link-45deg me-1"></i>${gettext('Assign Vehicle')}
                         </button>
                         <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 0.82rem;" onclick="removeDriver(${driver.id}, this)">
-                            <i class="bi bi-trash me-1"></i>Remove
+                            <i class="bi bi-trash me-1"></i>${gettext('Remove')}
                         </button>
                     </div>
                 </td>
@@ -548,7 +525,7 @@
                 <div class="modal-dialog modal-dialog-centered modal-lg">
                     <div class="modal-content border-0 shadow">
                         <div class="modal-header bg-dark text-white border-bottom-0">
-                            <h5 class="modal-title fw-bold"><i class="bi bi-person-vcard me-2"></i>Driver Profile</h5>
+                            <h5 class="modal-title fw-bold"><i class="bi bi-person-vcard me-2"></i>${gettext('Driver Profile')}</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body p-4">
@@ -562,63 +539,63 @@
                             </div>
                             <div class="row g-4">
                                 <div class="col-md-6">
-                                    <h6 class="fw-bold text-secondary small text-uppercase mb-2">Contact &amp; Identity</h6>
+                                    <h6 class="fw-bold text-secondary small text-uppercase mb-2">${gettext('Contact')} &amp; ${gettext('Identity')}</h6>
                                     <div class="profile-detail-row">
-                                        <span class="profile-detail-label">Username</span>
+                                        <span class="profile-detail-label">${gettext('Username')}</span>
                                         <span class="profile-detail-value">${username}</span>
                                     </div>
                                     <div class="profile-detail-row">
-                                        <span class="profile-detail-label">Email</span>
+                                        <span class="profile-detail-label">${gettext('Email')}</span>
                                         <span class="profile-detail-value">${email || '—'}</span>
                                     </div>
                                     <div class="profile-detail-row">
-                                        <span class="profile-detail-label">Phone</span>
+                                        <span class="profile-detail-label">${gettext('Phone')}</span>
                                         <span class="profile-detail-value">${phone}</span>
                                     </div>
                                     <div class="profile-detail-row">
-                                        <span class="profile-detail-label">Address</span>
+                                        <span class="profile-detail-label">${gettext('Address')}</span>
                                         <span class="profile-detail-value">${address}</span>
                                     </div>
-                                    <h6 class="fw-bold text-secondary small text-uppercase mb-2 mt-4">Assignment &amp; Performance</h6>
+                                    <h6 class="fw-bold text-secondary small text-uppercase mb-2 mt-4">${gettext('Assignment')} &amp; ${gettext('Performance')}</h6>
                                     <div class="profile-detail-row">
-                                        <span class="profile-detail-label">License Number</span>
+                                        <span class="profile-detail-label">${gettext('License Number')}</span>
                                         <span class="profile-detail-value font-monospace">${licenseNumber}</span>
                                     </div>
                                     <div class="profile-detail-row">
-                                        <span class="profile-detail-label">Assigned Vehicle</span>
+                                        <span class="profile-detail-label">${gettext('Assigned Vehicle')}</span>
                                         <span class="profile-detail-value">${driver.vehicle ? escapeHtml(driver.vehicle.plate_number) : 'Not assigned'}</span>
                                     </div>
                                     <div class="profile-detail-row">
-                                        <span class="profile-detail-label">Total Trips</span>
+                                        <span class="profile-detail-label">${gettext('Total Trips')}</span>
                                         <span class="profile-detail-value">${driver.total_trips || 0}</span>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <h6 class="fw-bold text-secondary small text-uppercase mb-2">Driving License Document</h6>
+                                    <h6 class="fw-bold text-secondary small text-uppercase mb-2">${gettext('Driving License Document')}</h6>
                                     <div id="license-doc-area-${driver.id}">
                                         <div class="text-center text-muted py-4 bg-light rounded-3 mb-3">
                                             <i class="bi bi-file-earmark-x fs-2 d-block mb-1"></i>
-                                            <span class="small">No license document uploaded yet.</span>
+                                            <span class="small">${gettext('No license document uploaded yet.')}</span>
                                         </div>
                                     </div>
                                     <label class="form-label small fw-semibold text-secondary mt-2" id="license-upload-label-${driver.id}">
-                                        Upload license document
-                                        <span class="text-muted fw-normal">(PDF only, max 5MB)</span>
+                                        ${gettext('Upload license document')}
+                                        <span class="text-muted fw-normal">${gettext('(PDF only, max 5MB)')}</span>
                                     </label>
                                     <div class="license-upload-zone" onclick="document.getElementById('license-file-${driver.id}').click()">
                                         <i class="bi bi-cloud-arrow-up fs-4 text-muted d-block mb-1"></i>
-                                        <span class="small text-muted" id="license-file-label-${driver.id}">Click to choose a PDF file</span>
+                                        <span class="small text-muted" id="license-file-label-${driver.id}">${gettext('Click to choose a PDF file')}</span>
                                     </div>
                                     <input type="file" id="license-file-${driver.id}" class="d-none" accept="application/pdf"
                                         onchange="handleLicenseFileSelect(${driver.id}, this)">
                                     <button type="button" class="btn btn-success w-100 mt-2" id="license-upload-btn-${driver.id}" onclick="uploadLicense(${driver.id})" disabled>
-                                        <i class="bi bi-upload me-1"></i>Upload Document
+                                        <i class="bi bi-upload me-1"></i>${gettext('Upload Document')}
                                     </button>
                                 </div>
                             </div>
                         </div>
                         <div class="modal-footer bg-light border-top-0">
-                            <button class="btn btn-light border px-4" data-bs-dismiss="modal">Close</button>
+                            <button class="btn btn-light border px-4" data-bs-dismiss="modal">${gettext('Close')}</button>
                         </div>
                     </div>
                 </div>
@@ -630,7 +607,7 @@
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content border-0 shadow">
                         <div class="modal-header bg-success text-white">
-                            <h5 class="modal-title fw-bold"><i class="bi bi-truck me-2"></i>Link Fleet Asset</h5>
+                            <h5 class="modal-title fw-bold"><i class="bi bi-truck me-2"></i>${gettext('Link Fleet Asset')}</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body p-4">
@@ -643,8 +620,8 @@
                             </div>
                         </div>
                         <div class="modal-footer bg-light">
-                            <button class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
-                            <button class="btn btn-success px-4" onclick="assignVehicle(${driver.id}, this)">Update Allocation</button>
+                            <button class="btn btn-light border px-4" data-bs-dismiss="modal">${gettext('Cancel')}</button>
+                            <button class="btn btn-success px-4" onclick="assignVehicle(${driver.id}, this)">${gettext('Update Allocation')}</button>
                         </div>
                     </div>
                 </div>
@@ -665,12 +642,12 @@
         const password2 = document.getElementById('driver_password2').value;
 
         if (!username || !email || !password || !password2) {
-            showToast('Please fill in username, email, and both password fields.', 'warning');
+            showToast(gettext('Please fill in username, email, and both password fields.'), 'warning');
             return;
         }
 
         if (password !== password2) {
-            showToast('Passwords do not match.', 'warning');
+            showToast(gettext('Passwords do not match.'), 'warning');
             return;
         }
 
@@ -699,14 +676,14 @@
                 throw new Error(data?.message || data?.detail || JSON.stringify(data));
             }
 
-            showToast('Driver created successfully!', 'success');
+            showToast(gettext('Driver created successfully!'), 'success');
             bootstrap.Modal.getInstance(document.getElementById('addDriverModal')).hide();
             document.getElementById('addDriverForm').reset();
 
             const token = await getValidAccessToken();
             if (token) {
                 const searchRes = await fetch(`/api/drivers/?search=${encodeURIComponent(username)}`, {
-                    headers: { 'Authorization': `Bearer ${token}` },
+                    credentials: 'same-origin',
                 });
                 if (searchRes.ok) {
                     const searchData = await searchRes.json();
@@ -730,7 +707,7 @@
 
             setTimeout(() => location.reload(), 900);
         } catch (e) {
-            showToast('Failed to create driver: ' + e.message, 'danger');
+            showToast(gettext('Failed to create driver: ') + e.message, 'danger');
         }
         });
     };
@@ -738,10 +715,10 @@
     window.toggleAvailability = async function(driverId, currentlyAvailable) {
         const data = await API.patch(`/api/drivers/${driverId}/`, { is_available: !currentlyAvailable });
         if (data && data.id) {
-            showToast('Availability successfully updated!', 'success');
+            showToast(gettext('Availability successfully updated!'), 'success');
             updateDriverRowAvailability(driverId, data.is_available);
         } else {
-            showToast('Update failed inside DB cluster.', 'danger');
+            showToast(gettext('Update failed inside DB cluster.'), 'danger');
         }
     };
 
@@ -752,7 +729,7 @@
         const statusBadge = row.querySelector('td:nth-child(5) .badge');
         if (statusBadge) {
             statusBadge.className = `badge ${isAvailable ? 'bg-success bg-opacity-10 text-success' : 'bg-secondary bg-opacity-10 text-secondary'} px-3 rounded-pill`;
-            statusBadge.textContent = isAvailable ? 'Available' : 'Busy';
+            statusBadge.textContent = isAvailable ? gettext('Available') : gettext('Busy');
         }
 
         const toggleBtn = row.querySelector('button[onclick^="toggleAvailability"]');
@@ -771,13 +748,13 @@
         await withButtonBusy(eventButton(btn), 'Updating...', async () => {
         const data = await API.patch(`/api/drivers/${driverId}/`, { vehicle: vehicleId || null });
         if (data && data.id) {
-            showToast('Vehicle asset allocation verified!', 'success');
+            showToast(gettext('Vehicle asset allocation verified!'), 'success');
             const modalEl = document.getElementById(`assignVehicleModal${driverId}`);
             const modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
             updateDriverRowVehicle(driverId, vehicleSelect);
         } else {
-            showToast('Failed to write asset mapping parameters.', 'danger');
+            showToast(gettext('Failed to write asset mapping parameters.'), 'danger');
         }
         });
     };
@@ -805,25 +782,26 @@
     }
 
     window.removeDriver = async function(driverId, btn) {
-        if (!confirm('Are you sure you want to remove this driver from the system?')) return;
+        if (!confirm(gettext('Are you sure you want to remove this driver from the system?'))) return;
 
         await withButtonBusy(eventButton(btn), 'Removing...', async () => {
         const token = await getValidAccessToken();
         if (!token) {
-            showToast('Your session has expired. Please log in again.', 'danger');
+            showToast(gettext('Your session has expired. Please log in again.'), 'danger');
             return;
         }
 
         try {
             const res = await fetch(`/api/drivers/${driverId}/`, {
                 method: 'DELETE',
+                credentials: 'same-origin',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'X-CSRFToken': getCookie('csrftoken'),
                 },
             });
 
             if (res.ok || res.status === 204) {
-                showToast('Driver removed successfully.', 'success');
+                showToast(gettext('Driver removed successfully.'), 'success');
                 const row = document.getElementById(`driver-row-${driverId}`);
                 if (row) row.remove();
 
@@ -849,7 +827,7 @@
                 showToast(errMsg, 'danger');
             }
         } catch (e) {
-            showToast('Network error: ' + e.message, 'danger');
+            showToast(gettext('Network error: ') + e.message, 'danger');
         }
         });
     };
@@ -868,7 +846,7 @@
         }
 
         if (file.type !== 'application/pdf') {
-            showToast('Only PDF files are accepted for the license document.', 'warning');
+            showToast(gettext('Only PDF files are accepted for the license document.'), 'warning');
             input.value = '';
             pendingLicenseFiles[driverId] = null;
             uploadBtn.disabled = true;
@@ -877,7 +855,7 @@
 
         const MAX_SIZE = 5 * 1024 * 1024;
         if (file.size > MAX_SIZE) {
-            showToast(`File too large (${(file.size / (1024*1024)).toFixed(2)}MB). Max is 5MB.`, 'warning');
+            showToast(interpolate(gettext('File too large (%(v0)sMB). Max is 5MB.'), {v0: (file.size / (1024*1024)).toFixed(2)}, true), 'warning');
             input.value = '';
             pendingLicenseFiles[driverId] = null;
             uploadBtn.disabled = true;
@@ -892,7 +870,7 @@
     window.uploadLicense = async function(driverId) {
         const file = pendingLicenseFiles[driverId];
         if (!file) {
-            showToast('Please choose a PDF file first.', 'warning');
+            showToast(gettext('Please choose a PDF file first.'), 'warning');
             return;
         }
 
@@ -903,7 +881,7 @@
 
         const token = await getValidAccessToken();
         if (!token) {
-            showToast('Your session has expired. Please log in again.', 'danger');
+            showToast(gettext('Your session has expired. Please log in again.'), 'danger');
             btn.disabled = false;
             btn.innerHTML = originalHtml;
             return;
@@ -915,8 +893,9 @@
         try {
             const res = await fetch(`/api/drivers/${driverId}/`, {
                 method: 'PATCH',
+                credentials: 'same-origin',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'X-CSRFToken': getCookie('csrftoken'),
                 },
                 body: formData,
             });
@@ -924,7 +903,7 @@
             const data = await res.json();
 
             if (res.ok && data.id) {
-                showToast('License document uploaded successfully!', 'success');
+                showToast(gettext('License document uploaded successfully!'), 'success');
                 updateLicenseDocSection(driverId, data.license_document);
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
@@ -936,12 +915,12 @@
                 const errMsg = typeof data === 'object'
                     ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
                     : String(data);
-                showToast('Upload failed: ' + errMsg, 'danger');
+                showToast(gettext('Upload failed: ') + errMsg, 'danger');
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
             }
         } catch (e) {
-            showToast('Network error: ' + e.message, 'danger');
+            showToast(gettext('Network error: ') + e.message, 'danger');
             btn.disabled = false;
             btn.innerHTML = originalHtml;
         }
@@ -957,7 +936,7 @@
         area.innerHTML = `
             <div class="mb-2">
                 <a href="${safeUrl}" target="_blank" class="btn btn-sm btn-outline-success w-100 mb-2">
-                    <i class="bi bi-file-earmark-pdf me-1"></i>Open Full PDF in New Tab
+                    <i class="bi bi-file-earmark-pdf me-1"></i>${gettext('Open Full PDF in New Tab')}
                 </a>
                 <embed src="${safeUrl}" type="application/pdf" class="license-pdf-frame">
             </div>

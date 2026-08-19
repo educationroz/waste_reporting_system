@@ -6,6 +6,7 @@ from django.core.cache import cache
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from django.views import View
 from django.views.generic import ListView, TemplateView
 from django.conf import settings
@@ -292,35 +293,41 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
         ctx['drivers'] = Driver.objects.select_related('user', 'vehicle').all()
         ctx['now'] = timezone.now()
         
-        # System alerts
+        # System alerts.
+        # Titles embed a count, so they use a gettext format string with a
+        # named placeholder rather than an f-string — an f-string is
+        # evaluated before gettext ever sees it, which would leave the
+        # sentence untranslatable. Messages use gettext() directly.
         ctx['system_alerts'] = []
         if ctx['overdue_requests'] > 0:
             ctx['system_alerts'].append({
                 'type': 'danger',
                 'icon': 'exclamation-triangle',
-                'title': f'{ctx["overdue_requests"]} Overdue Requests',
-                'message': 'Requests past scheduled date need immediate attention',
+                'title': _('%(count)s Overdue Requests') % {
+                    'count': ctx['overdue_requests']},
+                'message': _('Requests past scheduled date need immediate attention'),
             })
         if ctx['pending_requests'] > 5:
             ctx['system_alerts'].append({
                 'type': 'warning',
                 'icon': 'clock-history',
-                'title': f'{ctx["pending_requests"]} Pending Requests',
-                'message': 'Multiple requests awaiting driver assignment',
+                'title': _('%(count)s Pending Requests') % {
+                    'count': ctx['pending_requests']},
+                'message': _('Multiple requests awaiting driver assignment'),
             })
         if ctx['active_drivers'] == 0:
             ctx['system_alerts'].append({
                 'type': 'danger',
                 'icon': 'exclamation-circle',
-                'title': 'No Available Drivers',
-                'message': 'All drivers are currently busy',
+                'title': _('No Available Drivers'),
+                'message': _('All drivers are currently busy'),
             })
         if ctx['available_vehicles'] == 0:
             ctx['system_alerts'].append({
                 'type': 'warning',
                 'icon': 'exclamation-circle',
-                'title': 'No Available Vehicles',
-                'message': 'All vehicles are currently in use or maintenance',
+                'title': _('No Available Vehicles'),
+                'message': _('All vehicles are currently in use or maintenance'),
             })
         
         return ctx
@@ -515,7 +522,12 @@ class DriverDashboardView(LoginRequiredMixin, TemplateView):
             completed_at__year=now.year,
             completed_at__month=now.month,
         ).count()
-        ctx['current_month_label'] = now.strftime('%B %Y')
+        # Pass the datetime itself, not strftime('%B %Y'): strftime resolves
+        # month names from the OS C locale, which is not affected by Django's
+        # active language, so the label stayed "August 2026" in Nepali. The
+        # template formats it with the |date filter instead, which IS
+        # language-aware and renders the localized month name.
+        ctx['current_month_date'] = now
 
         ctx['completed_history'] = (
             WasteRequest.objects.filter(driver=driver, status='completed')
@@ -657,7 +669,7 @@ class AdminSettingsView(LoginRequiredMixin, TemplateView):
             'total_drivers': Driver.objects.count(),
             'total_vehicles': Vehicle.objects.count(),
             'total_routes': Route.objects.count(),
-            'database_status': 'Connected',
+            'database_status': _('Connected'),
         }
         return ctx
 

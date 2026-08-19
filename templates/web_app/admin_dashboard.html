@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Admin Dashboard{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Admin Dashboard" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -79,15 +80,15 @@
             <!-- Header Section -->
             <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold"><i class="bi bi-grid-1x2-fill text-success me-2"></i>Admin Management Console</h2>
+                    <h2 class="mb-1 fw-bold"><i class="bi bi-grid-1x2-fill text-success me-2"></i>{% trans "Admin Management Console" %}</h2>
                     <p class="text-muted mb-0">
-                        Active Session: <span class="fw-semibold">{{ request.user.username }}</span>
+                        {% trans "Active Session" %}: <span class="fw-semibold">{{ request.user.username }}</span>
                         <span class="badge bg-success bg-opacity-10 text-success ms-2 text-uppercase font-monospace" style="font-size: 0.75rem;">{{ admin_role }}</span>
                     </p>
                 </div>
                 <div class="text-md-end bg-surface p-2 px-3 border rounded-3 shadow-xs">
-                    <div class="small text-muted"><i class="bi bi-clock me-1"></i>Updated: {{ now|date:"d M Y H:i" }}</div>
-                    <div class="fw-semibold text-success small mt-1">Users Matrix: {{ total_users }} total | {{ total_admin_users }} admins</div>
+                    <div class="small text-muted"><i class="bi bi-clock me-1"></i>{% trans "Updated" %}: {{ now|date:"d M Y H:i" }}</div>
+                    <div class="fw-semibold text-success small mt-1">{% trans "Users Matrix" %}: {{ total_users }} {% trans "total" %} | {{ total_admin_users }} {% trans "admins" %}</div>
                 </div>
             </div>
 
@@ -108,16 +109,16 @@
             <!-- Quick Action Toolbar -->
             <div class="d-flex flex-wrap gap-2 mb-4 bg-surface p-2 rounded-3 border">
                 <button class="btn btn-success btn-sm px-3 rounded-2" data-bs-toggle="modal" data-bs-target="#quickAddModal">
-                    <i class="bi bi-plus-circle me-1"></i>Action Terminal
+                    <i class="bi bi-plus-circle me-1"></i>{% trans "Action Terminal" %}
                 </button>
                 <a href="{% url 'admin-drivers' %}" class="btn btn-sm border px-3 bg-surface-alt text-secondary">
-                    <i class="bi bi-person-plus text-info me-1"></i>Drivers Registry
+                    <i class="bi bi-person-plus text-info me-1"></i>{% trans "Drivers Registry" %}
                 </a>
                 <a href="{% url 'admin-vehicles' %}" class="btn btn-sm border px-3 bg-surface-alt text-secondary">
-                    <i class="bi bi-truck text-primary me-1"></i>Fleet Terminal
+                    <i class="bi bi-truck text-primary me-1"></i>{% trans "Fleet Terminal" %}
                 </a>
                 <a href="{% url 'admin-schedules' %}" class="btn btn-sm border px-3 bg-surface-alt text-secondary">
-                    <i class="bi bi-calendar-week text-warning me-1"></i>Calendar Setup
+                    <i class="bi bi-calendar-week text-warning me-1"></i>{% trans "Calendar Setup" %}
                 </a>
             </div>
 
@@ -126,7 +127,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card metric-card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}'">
                         <div class="card-body p-4">
-                            <div class="text-success fw-semibold small mb-1">Total Requests</div>
+                            <div class="text-success fw-semibold small mb-1">{% trans "Total Requests" %}</div>
                             <div class="display-6 fw-bold text-success">{{ total_requests }}</div>
                         </div>
                     </div>
@@ -134,7 +135,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card metric-card border-0 bg-warning bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=pending'">
                         <div class="card-body p-4">
-                            <div class="text-warning fw-semibold small mb-1">Pending Sync</div>
+                            <div class="text-warning fw-semibold small mb-1">{% trans "Pending Sync" %}</div>
                             <div class="display-6 fw-bold text-warning">{{ pending_requests }}</div>
                         </div>
                     </div>
@@ -142,7 +143,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card metric-card border-0 bg-danger bg-opacity-10 h-100 cursor-pointer">
                         <div class="card-body p-4">
-                            <div class="text-danger fw-semibold small mb-1">Overdue Alerts</div>
+                            <div class="text-danger fw-semibold small mb-1">{% trans "Overdue Alerts" %}</div>
                             <div class="display-6 fw-bold text-danger">{{ overdue_requests }}</div>
                         </div>
                     </div>
@@ -150,7 +151,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card metric-card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=assigned'">
                         <div class="card-body p-4">
-                            <div class="text-info fw-semibold small mb-1">Assigned Tasks</div>
+                            <div class="text-info fw-semibold small mb-1">{% trans "Assigned Tasks" %}</div>
                             <div class="display-6 fw-bold text-info">{{ assigned_requests_count }}</div>
                         </div>
                     </div>
@@ -162,7 +163,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card metric-card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=in_progress'">
                         <div class="card-body p-4">
-                            <div class="text-primary fw-semibold small mb-1">In Progress</div>
+                            <div class="text-primary fw-semibold small mb-1">{% trans "In Progress" %}</div>
                             <div class="display-6 fw-bold text-primary">{{ in_progress_requests_count }}</div>
                         </div>
                     </div>
@@ -170,7 +171,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card metric-card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=completed'">
                         <div class="card-body p-4">
-                            <div class="text-success fw-semibold small mb-1">Completed Jobs</div>
+                            <div class="text-success fw-semibold small mb-1">{% trans "Completed Jobs" %}</div>
                             <div class="display-6 fw-bold text-success">{{ completed_requests_count }}</div>
                         </div>
                     </div>
@@ -178,7 +179,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card metric-card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-drivers' %}'">
                         <div class="card-body p-4">
-                            <div class="text-info fw-semibold small mb-1">Active Drivers</div>
+                            <div class="text-info fw-semibold small mb-1">{% trans "Active Drivers" %}</div>
                             <div class="display-6 fw-bold text-info">{{ active_drivers }}<span class="fs-5 text-secondary fw-normal">/{{ total_drivers }}</span></div>
                         </div>
                     </div>
@@ -186,7 +187,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card metric-card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-vehicles' %}'">
                         <div class="card-body p-4">
-                            <div class="text-primary fw-semibold small mb-1">Fleet Available</div>
+                            <div class="text-primary fw-semibold small mb-1">{% trans "Fleet Available" %}</div>
                             <div class="display-6 fw-bold text-primary">{{ available_vehicles }}<span class="fs-5 text-secondaryfw-normal">/{{ total_vehicles }}</span></div>
                         </div>
                     </div>
@@ -199,26 +200,26 @@
                     <!-- Query Filter Card -->
                     <div class="card dashboard-card mb-4">
                         <div class="card-header">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-search me-2 text-success"></i>Query Filter Terminal</h6>
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-search me-2 text-success"></i>{% trans "Query Filter Terminal" %}</h6>
                         </div>
                         <div class="card-body">
                             <div class="row g-2">
                                 <div class="col-md-6">
-                                    <input type="text" class="form-control" placeholder="Search request ID or user log tags..." id="search-box">
+                                    <input type="text" class="form-control" placeholder="{% trans 'Search request ID or user log tags...' %}" id="search-box">
                                 </div>
                                 <div class="col-md-3">
                                     <select class="form-select" id="filter-status">
-                                        <option value="">All Statuses</option>
-                                        <option value="pending">Pending</option>
-                                        <option value="assigned">Assigned</option>
-                                        <option value="in_progress">In Progress</option>
-                                        <option value="completed">Completed</option>
-                                        <option value="cancelled">Cancelled</option>
+                                        <option value="">{% trans "All Statuses" %}</option>
+                                        <option value="pending">{% trans "Pending" %}</option>
+                                        <option value="assigned">{% trans "Assigned" %}</option>
+                                        <option value="in_progress">{% trans "In Progress" %}</option>
+                                        <option value="completed">{% trans "Completed" %}</option>
+                                        <option value="cancelled">{% trans "Cancelled" %}</option>
                                     </select>
                                 </div>
                                 <div class="col-md-3">
                                     <button class="btn btn-success w-100" onclick="applyFilters()">
-                                        <i class="bi bi-funnel me-1"></i>Execute Filter
+                                        <i class="bi bi-funnel me-1"></i>{% trans "Execute Filter" %}
                                     </button>
                                 </div>
                             </div>
@@ -229,17 +230,17 @@
                     <div class="card dashboard-card mb-4">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>Recent Log Streams</h6>
-                                <div class="small text-muted" style="font-size: 0.8rem;">Live pipeline updates for ongoing municipality requests.</div>
+                                <h6 class="mb-0 fw-bold"><i class="bi bi-layers-half me-2 text-success"></i>{% trans "Recent Log Streams" %}</h6>
+                                <div class="small text-muted" style="font-size: 0.8rem;">{% trans "Live pipeline updates for ongoing municipality requests." %}</div>
                             </div>
-                            <a href="{% url 'admin-requests' %}" class="btn btn-sm btn-outline-success px-3">Full Logs</a>
+                            <a href="{% url 'admin-requests' %}" class="btn btn-sm btn-outline-success px-3">{% trans "Full Logs" %}</a>
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0 align-middle">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>ID</th><th>Client</th><th>Waste Context</th><th>AI Severity</th><th>Status Check</th><th>Assigned Driver</th><th>Date</th><th>Action Control</th>
+                                            <th>ID</th><th>{% trans "Client" %}</th><th>{% trans "Waste Context" %}</th><th>{% trans "AI Severity" %}</th><th>{% trans "Status Check" %}</th><th>{% trans "Assigned Driver" %}</th><th>{% trans "Date" %}</th><th>{% trans "Action Control" %}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -249,7 +250,7 @@
                                             {% if req.user %}
                                             <td>{{ req.user.username }}</td>
                                             {% else %}
-                                            <td><span class="badge bg-secondary bg-opacity-10 text-secondary border"><i class="bi bi-person-x me-1"></i>Guest</span></td>
+                                            <td><span class="badge bg-secondary bg-opacity-10 text-secondary border"><i class="bi bi-person-x me-1"></i>{% trans "Guest" %}</span></td>
                                             {% endif %}
                                             <td>
                                                 <span class="badge bg-secondary bg-opacity-10 text-secondary border px-2.5 py-1">
@@ -281,7 +282,7 @@
                                                 {% if req.completion_flagged %}
                                                 <span class="badge bg-danger text-white mt-1 d-inline-flex align-items-center gap-1 location-mismatch-badge"
                                                       title="Driver was ~{{ req.completion_distance_meters|floatformat:0 }}m away from the reported pickup location when marking this completed.">
-                                                    <i class="bi bi-exclamation-triangle-fill"></i>{{ req.completion_distance_meters|floatformat:0 }}m off
+                                                    <i class="bi bi-exclamation-triangle-fill"></i>{{ req.completion_distance_meters|floatformat:0 }}{% trans "m off" %}
                                                 </span>
                                                 {% endif %}
                                             </td>
@@ -289,18 +290,18 @@
                                                 {% if req.driver %}
                                                     <span><i class="bi bi-person me-1"></i>{{ req.driver.user.username }}</span>
                                                 {% else %}
-                                                    <span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>Unassigned</span>
+                                                    <span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>{% trans "Unassigned" %}</span>
                                                 {% endif %}
                                             </td>
                                             <td class="small text-muted">{{ req.scheduled_date|date:"d M Y" }}</td>
                                             <td>
                                                 {% if req.status == 'pending' %}
                                                 <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }}, this)">
-                                                    Cancel
+                                                    {% trans "Cancel" %}
                                                 </button>
                                                 {% elif req.status == 'completed' or req.status == 'cancelled' or req.status == 'assigned' or req.status == 'in_progress' %}
                                                 <button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest({{ req.id }}, this)">
-                                                    <i class="bi bi-trash3"></i> Delete
+                                                    <i class="bi bi-trash3"></i> {% trans "Delete" %}
                                                 </button>
                                                 {% else %}
                                                 —
@@ -308,7 +309,7 @@
                                             </td>
                                         </tr>
                                         {% empty %}
-                                        <tr><td colspan="8" class="text-center text-muted py-4">No requests reported in this pipeline node yet.</td></tr>
+                                        <tr><td colspan="8" class="text-center text-muted py-4">{% trans "No requests reported in this pipeline node yet." %}</td></tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>
@@ -319,19 +320,19 @@
                     <!-- Audit Trail -->
                     <div class="card dashboard-card">
                         <div class="card-header">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-arrow-repeat me-2 text-success"></i>State Transition Audit Trail</h6>
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-arrow-repeat me-2 text-success"></i>{% trans "State Transition Audit Trail" %}</h6>
                         </div>
                         <div class="list-group list-group-flush">
                             {% for req in recent_status_changes %}
                             <div class="list-group-item d-flex justify-content-between align-items-center p-3 bg-surface">
                                 <div>
-                                    <div class="fw-semibold">Request Record #{{ req.id }} — <span class="text-muted">{% if req.user %}{{ req.user.username }}{% else %}<i class="bi bi-person-x"></i> Guest{% endif %}</span></div>
-                                    <div class="small text-secondary mt-1">Status compiled to <strong>{{ req.get_status_display }}</strong> on {{ req.updated_at|date:"d M Y H:i" }}</div>
+                                    <div class="fw-semibold">{% trans "Request Record #" %}{{ req.id }} — <span class="text-muted">{% if req.user %}{{ req.user.username }}{% else %}<i class="bi bi-person-x"></i> {% trans "Guest" %}{% endif %}</span></div>
+                                    <div class="small text-secondary mt-1">{% trans "Status compiled to" %} <strong>{{ req.get_status_display }}</strong> {% trans "on" %} {{ req.updated_at|date:"d M Y H:i" }}</div>
                                 </div>
                                 <span class="badge {% if req.status == 'completed' %}bg-success{% elif req.status == 'pending' %}bg-warning text-dark{% elif req.status == 'in_progress' %}bg-info{% elif req.status == 'cancelled' %}bg-danger{% else %}bg-primary{% endif %} rounded-pill px-3">{{ req.get_status_display }}</span>
                             </div>
                             {% empty %}
-                            <div class="list-group-item text-center text-muted py-4 bg-surface">No recent lifecycle status events.</div>
+                            <div class="list-group-item text-center text-muted py-4 bg-surface">{% trans "No recent lifecycle status events." %}</div>
                             {% endfor %}
                         </div>
                     </div>
@@ -341,27 +342,27 @@
                 <div class="col-lg-4">
                     <div class="card dashboard-card mb-4">
                         <div class="card-header">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-geo-alt me-2 text-success"></i>Live Fleet Dispatches</h6>
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-geo-alt me-2 text-success"></i>{% trans "Live Fleet Dispatches" %}</h6>
                         </div>
                         <div class="card-body">
-                            <div class="small text-muted mb-3">Currently deployed routes and active logistics tracking.</div>
+                            <div class="small text-muted mb-3">{% trans "Currently deployed routes and active logistics tracking." %}</div>
                             {% if active_routes %}
                             <div class="d-flex flex-column gap-2">
                                 {% for route in active_routes %}
                                 <div class="p-3 border rounded-3 bg-surface-alt">
                                     <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="fw-bold text-sm">Route Node #{{ route.id }}</span>
+                                        <span class="fw-bold text-sm">{% trans "Route Node #" %}{{ route.id }}</span>
                                         <span class="badge bg-info text-white font-monospace" style="font-size: 0.75rem;">{{ route.get_status_display }}</span>
                                     </div>
-                                    <div class="small text-muted"><i class="bi bi-person-badge me-1"></i>Driver: {{ route.driver.user.username|default:"Unassigned" }}</div>
-                                    <div class="small text-muted"><i class="bi bi-truck me-1"></i>Plate Number: {{ route.vehicle.plate_number|default:"None" }}</div>
+                                    <div class="small text-muted"><i class="bi bi-person-badge me-1"></i>{% trans "Driver" %}: {{ route.driver.user.username|default:"Unassigned" }}</div>
+                                    <div class="small text-muted"><i class="bi bi-truck me-1"></i>{% trans "Plate Number" %}: {{ route.vehicle.plate_number|default:"None" }}</div>
                                 </div>
                                 {% endfor %}
                             </div>
                             {% else %}
                             <div class="text-center text-muted py-4 bg-surface-alt rounded-3">
                                 <i class="bi bi-map text-secondary fs-3 d-block mb-1"></i>
-                                <span class="small">No fleet dispatch lines open currently.</span>
+                                <span class="small">{% trans "No fleet dispatch lines open currently." %}</span>
                             </div>
                             {% endif %}
                         </div>
@@ -369,7 +370,7 @@
 
                     <div class="card dashboard-card">
                         <div class="card-header">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-people me-2 text-success"></i>Crew Roster Status</h6>
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-people me-2 text-success"></i>{% trans "Crew Roster Status" %}</h6>
                         </div>
                         <ul class="list-group list-group-flush">
                             {% for driver in drivers|slice:":5" %}
@@ -379,12 +380,12 @@
                                     <div class="small text-muted font-monospace"><i class="bi bi-card-text me-1"></i>{{ driver.vehicle.plate_number|default:"No Asset Linked" }}</div>
                                 </div>
                                 <span class="badge {% if driver.is_available %}bg-success bg-opacity-10 text-success{% else %}bg-secondary bg-opacity-10 text-secondary{% endif %} px-3 rounded-pill">
-                                    {% if driver.is_available %}Available{% else %}Active Route{% endif %}
+                                    {% if driver.is_available %}{% trans "Available" %}{% else %}{% trans "Active Route" %}{% endif %}
                                 </span>
                             </li>
                             {% endfor %}
                             <li class="list-group-item text-center bg-surface-alt py-2">
-                                <a href="{% url 'admin-drivers' %}" class="small text-success text-decoration-none fw-semibold">Manage Complete Roster ({{ total_drivers }})</a>
+                                <a href="{% url 'admin-drivers' %}" class="small text-success text-decoration-none fw-semibold">{% trans "Manage Complete Roster" %} ({{ total_drivers }})</a>
                             </li>
                         </ul>
                     </div>
@@ -399,25 +400,25 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Assign Crew Dispatch</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>{% trans "Assign Crew Dispatch" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <input type="hidden" id="modal-request-id">
                 <div class="mb-3">
-                    <label class="form-label fw-semibold text-secondary">Select Available Crew Member</label>
+                    <label class="form-label fw-semibold text-secondary">{% trans "Select Available Crew Member" %}</label>
                     <select id="modal-driver-select" class="form-select form-select-lg" style="font-size: 0.95rem;">
                         {% for driver in drivers %}
                         {% if driver.is_available %}
-                        <option value="{{ driver.id }}">{{ driver.user.username }} [Asset: {{ driver.vehicle.plate_number|default:"No Vehicle Allocated" }}]</option>
+                        <option value="{{ driver.id }}">{{ driver.user.username }} [{% trans "Asset" %}: {{ driver.vehicle.plate_number|default:"No Vehicle Allocated" }}]</option>
                         {% endif %}
                         {% endfor %}
                     </select>
                 </div>
             </div>
             <div class="modal-footer bg-surface-alt">
-                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">Abort</button>
-                <button class="btn btn-success px-4" onclick="assignDriver(this)">Confirm Dispatch</button>
+                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">{% trans "Abort" %}</button>
+                <button class="btn btn-success px-4" onclick="assignDriver(this)">{% trans "Confirm Dispatch" %}</button>
             </div>
         </div>
     </div>
@@ -428,34 +429,34 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-terminal me-2"></i>Action Hub Terminal</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-terminal me-2"></i>{% trans "Action Hub Terminal" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-0">
                 <div class="list-group list-group-flush">
                     <a href="{% url 'admin-requests' %}" class="list-group-item list-group-item-action p-3 bg-surface">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 fw-bold text-success"><i class="bi bi-plus-circle me-2"></i>Log Manual Collection Request</h6>
+                            <h6 class="mb-1 fw-bold text-success"><i class="bi bi-plus-circle me-2"></i>{% trans "Log Manual Collection Request" %}</h6>
                         </div>
-                        <p class="mb-1 small text-muted">Manually append and drop a waste collection node into maps pipeline.</p>
+                        <p class="mb-1 small text-muted">{% trans "Manually append and drop a waste collection node into maps pipeline." %}</p>
                     </a>
                     <a href="{% url 'admin-drivers' %}" class="list-group-item list-group-item-action p-3 bg-surface">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 fw-bold text-info"><i class="bi bi-person-badge me-2"></i>Register New Driver Node</h6>
+                            <h6 class="mb-1 fw-bold text-info"><i class="bi bi-person-badge me-2"></i>{% trans "Register New Driver Node" %}</h6>
                         </div>
-                        <p class="mb-1 small text-muted">Provision a new profile to staff pool and allocate vehicle resources.</p>
+                        <p class="mb-1 small text-muted">{% trans "Provision a new profile to staff pool and allocate vehicle resources." %}</p>
                     </a>
                     <a href="{% url 'admin-vehicles' %}" class="list-group-item list-group-item-action p-3 bg-surface">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 fw-bold text-primary"><i class="bi bi-truck me-2"></i>Commission New Fleet Asset</h6>
+                            <h6 class="mb-1 fw-bold text-primary"><i class="bi bi-truck me-2"></i>{% trans "Commission New Fleet Asset" %}</h6>
                         </div>
-                        <p class="mb-1 small text-muted">Register structural machinery details and license plates inside DB logs.</p>
+                        <p class="mb-1 small text-muted">{% trans "Register structural machinery details and license plates inside DB logs." %}</p>
                     </a>
                     <a href="{% url 'admin-schedules' %}" class="list-group-item list-group-item-action p-3 bg-surface">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 fw-bold text-warning"><i class="bi bi-calendar-event me-2"></i>Map Zone Routing Calendar</h6>
+                            <h6 class="mb-1 fw-bold text-warning"><i class="bi bi-calendar-event me-2"></i>{% trans "Map Zone Routing Calendar" %}</h6>
                         </div>
-                        <p class="mb-1 small text-muted">Set routine automated pickup loops for synchronized city zones.</p>
+                        <p class="mb-1 small text-muted">{% trans "Set routine automated pickup loops for synchronized city zones." %}</p>
                     </a>
                 </div>
             </div>
@@ -469,7 +470,7 @@
 function getAssignModal() {
     if (typeof bootstrap === 'undefined') {
         console.error('Bootstrap JS failed to load — modal cannot open.');
-        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        showToast(gettext('A page resource failed to load. Please refresh and try again.'), 'danger');
         return null;
     }
     return bootstrap.Modal.getOrCreateInstance(document.getElementById('assignModal'));
@@ -478,7 +479,7 @@ function getAssignModal() {
 function getQuickAddModal() {
     if (typeof bootstrap === 'undefined') {
         console.error('Bootstrap JS failed to load — modal cannot open.');
-        showToast('A page resource failed to load. Please refresh and try again.', 'danger');
+        showToast(gettext('A page resource failed to load. Please refresh and try again.'), 'danger');
         return null;
     }
     return bootstrap.Modal.getOrCreateInstance(document.getElementById('quickAddModal'));
@@ -495,50 +496,51 @@ async function assignDriver(btn) {
     const driverId = document.getElementById('modal-driver-select').value;
 
     if (!driverId) {
-        showToast('No active available driver was chosen.', 'danger');
+        showToast(gettext('No active available driver was chosen.'), 'danger');
         return;
     }
 
     await withButtonBusy(eventButton(btn), 'Assigning...', async () => {
     const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
     if (data && data.id) {
-        showToast('Driver dispatch successfully configured!', 'success');
+        showToast(gettext('Driver dispatch successfully configured!'), 'success');
         const modal = getAssignModal();
         if (modal) modal.hide();
         setTimeout(() => location.reload(), 1000);
     } else {
-        showToast('Failed to deploy driver node.', 'danger');
+        showToast(gettext('Failed to deploy driver node.'), 'danger');
     }
     });
 }
 
 async function cancelRequest(requestId, btn) {
-    if (!confirm('Cancel this request?')) return;
+    if (!confirm(gettext('Cancel this request?'))) return;
     await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
     const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
     if (data && data.id) {
-        showToast('Request cancelled.', 'success');
+        showToast(gettext('Request cancelled.'), 'success');
         setTimeout(() => location.reload(), 1000);
     } else {
-        showToast('Failed to cancel request.', 'danger');
+        showToast(gettext('Failed to cancel request.'), 'danger');
     }
     });
 }
 
 async function deleteRequest(requestId, btn) {
-    if (!confirm('Permanently delete this request? This cannot be undone.')) return;
+    if (!confirm(gettext('Permanently delete this request? This cannot be undone.'))) return;
 
     await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {
         const res = await fetch(`/api/waste-requests/${requestId}/`, {
             method: 'DELETE',
+            credentials: 'same-origin',
             headers: {
-                'Authorization': `Bearer ${getToken()}`,
+                'X-CSRFToken': getCookie('csrftoken'),
             },
         });
 
         if (res.ok) {
-            showToast('Request deleted.', 'success');
+            showToast(gettext('Request deleted.'), 'success');
             setTimeout(() => location.reload(), 800);
         } else {
             let errMsg = 'Failed to delete request.';
@@ -554,7 +556,7 @@ async function deleteRequest(requestId, btn) {
             showToast(errMsg, 'danger');
         }
     } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
+        showToast(gettext('Network error: ') + e.message, 'danger');
     }
     });
 }

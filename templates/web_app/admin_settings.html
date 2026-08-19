@@ -1,4 +1,5 @@
-{% extends 'web_app/base.html' %} {% block title %}Admin Settings{% endblock %}
+{% extends 'web_app/base.html' %} {% load i18n %}
+{% block title %}{% trans "Admin Settings" %}{% endblock %}
 {% block extra_css %}
 <link
   rel="stylesheet"
@@ -44,10 +45,10 @@
       >
         <div>
           <h2 class="mb-1 fw-bold">
-            <i class="bi bi-gear text-success me-2"></i>System Settings
+            <i class="bi bi-gear text-success me-2"></i>{% trans "System Settings" %}
           </h2>
           <p class="text-muted mb-0">
-            Configure system-wide settings and parameters
+            {% trans "Configure system-wide settings and parameters" %}
           </p>
         </div>
         <button
@@ -55,14 +56,14 @@
           data-bs-toggle="modal"
           data-bs-target="#addSettingModal"
         >
-          <i class="bi bi-plus-circle me-2"></i>Add Setting
+          <i class="bi bi-plus-circle me-2"></i>{% trans "Add Setting" %}
         </button>
       </div>
 
       <div class="row g-3 mb-4">
         <div class="col-6 col-md-2">
           <div class="card border-0 bg-surface-alt p-3 rounded-3 shadow-sm">
-            <div class="text-muted small fw-medium">Total Requests</div>
+            <div class="text-muted small fw-medium">{% trans "Total Requests" %}</div>
             <div class="fs-4 fw-bold text-primary">
               {{ system_info.total_requests }}
             </div>
@@ -70,7 +71,7 @@
         </div>
         <div class="col-6 col-md-2">
           <div class="card border-0 bg-surface-alt p-3 rounded-3 shadow-sm">
-            <div class="text-muted small fw-medium">Total Users</div>
+            <div class="text-muted small fw-medium">{% trans "Total Users" %}</div>
             <div class="fs-4 fw-bold text-success">
               {{ system_info.total_users }}
             </div>
@@ -78,7 +79,7 @@
         </div>
         <div class="col-6 col-md-2">
           <div class="card border-0 bg-surface-alt p-3 rounded-3 shadow-sm">
-            <div class="text-muted small fw-medium">Total Drivers</div>
+            <div class="text-muted small fw-medium">{% trans "Total Drivers" %}</div>
             <div class="fs-4 fw-bold text-info">
               {{ system_info.total_drivers }}
             </div>
@@ -86,7 +87,7 @@
         </div>
         <div class="col-6 col-md-2">
           <div class="card border-0 bg-surface-alt p-3 rounded-3 shadow-sm">
-            <div class="text-muted small fw-medium">Total Vehicles</div>
+            <div class="text-muted small fw-medium">{% trans "Total Vehicles" %}</div>
             <div class="fs-4 fw-bold text-warning">
               {{ system_info.total_vehicles }}
             </div>
@@ -94,15 +95,15 @@
         </div>
         <div class="col-6 col-md-2">
           <div class="card border-0 bg-surface-alt p-3 rounded-3 shadow-sm">
-            <div class="text-muted small fw-medium">Active Routes</div>
+            <div class="text-muted small fw-medium">{% trans "Active Routes" %}</div>
             <div class="fs-4 fw-bold text-danger">
               {{ system_info.total_routes }}
             </div>
           </div>
         </div>
-        <div class="col-6 col-md-2">
+        <div class="col-6 col-sm-4 col-lg-2">
           <div class="card border-0 bg-surface-alt p-3 rounded-3 shadow-sm">
-            <div class="text-muted small fw-medium">Database</div>
+            <div class="text-muted small fw-medium">{% trans "Database" %}</div>
             <div class="mt-1">
               <span
                 class="badge bg-success bg-opacity-10 text-success fw-bold fs-6"
@@ -128,7 +129,7 @@
                 type="button"
                 role="tab"
               >
-                <i class="bi bi-sliders me-2"></i>General Settings
+                <i class="bi bi-sliders me-2"></i>{% trans "General Settings" %}
               </button>
             </li>
             <li class="nav-item">
@@ -140,7 +141,7 @@
                 type="button"
                 role="tab"
               >
-                <i class="bi bi-geo-alt-fill me-2"></i>Depot Location
+                <i class="bi bi-geo-alt-fill me-2"></i>{% trans "Depot Location" %}
               </button>
             </li>
             <li class="nav-item">
@@ -152,7 +153,7 @@
                 type="button"
                 role="tab"
               >
-                <i class="bi bi-flag-fill me-2"></i>Checkpoints
+                <i class="bi bi-flag-fill me-2"></i>{% trans "Checkpoints" %}
               </button>
             </li>
             <li class="nav-item">
@@ -164,7 +165,7 @@
                 type="button"
                 role="tab"
               >
-                <i class="bi bi-envelope me-2"></i>Email Configuration
+                <i class="bi bi-envelope me-2"></i>{% trans "Email Configuration" %}
               </button>
             </li>
             <li class="nav-item">
@@ -176,7 +177,7 @@
                 type="button"
                 role="tab"
               >
-                <i class="bi bi-bell me-2"></i>Notifications
+                <i class="bi bi-bell me-2"></i>{% trans "Notifications" %}
               </button>
             </li>
             {% if is_superadmin %}
@@ -189,7 +190,7 @@
                 type="button"
                 role="tab"
               >
-                <i class="bi bi-cloud-arrow-down me-2"></i>Backup & Restore
+                <i class="bi bi-cloud-arrow-down me-2"></i>{% trans "Backup & Restore" %}
               </button>
             </li>
             {% endif %}
@@ -208,35 +209,35 @@
             <div class="row g-4">
               <div class="col-md-6">
                 <label class="form-label small fw-semibold text-secondary"
-                  >System Name</label
+                  >{% trans "System Name" %}</label
                 >
                 <input
                   type="text"
                   class="form-control"
                   value="Waste Management System"
                 />
-                <small class="text-muted">Display name for the system</small>
+                <small class="text-muted">{% trans "Display name for the system" %}</small>
               </div>
               <div class="col-md-6">
                 <label class="form-label small fw-semibold text-secondary"
-                  >Default Timezone</label
+                  >{% trans "Default Timezone" %}</label
                 >
                 <select class="form-select">
-                  <option selected>UTC</option>
-                  <option>EST</option>
-                  <option>CST</option>
-                  <option>PST</option>
+                  <option selected>{% trans "UTC" %}</option>
+                  <option>{% trans "EST" %}</option>
+                  <option>{% trans "CST" %}</option>
+                  <option>{% trans "PST" %}</option>
                 </select>
               </div>
               <div class="col-md-6">
                 <label class="form-label small fw-semibold text-secondary"
-                  >Max Upload Size (MB)</label
+                  >{% trans "Max Upload Size (MB)" %}</label
                 >
                 <input type="number" class="form-control" value="50" min="1" />
               </div>
               <div class="col-md-6">
                 <label class="form-label small fw-semibold text-secondary"
-                  >Session Timeout (minutes)</label
+                  >{% trans "Session Timeout (minutes)" %}</label
                 >
                 <input type="number" class="form-control" value="30" min="5" />
               </div>
@@ -252,13 +253,13 @@
                     class="form-check-label small fw-semibold"
                     for="maintenanceMode"
                   >
-                    Maintenance Mode (disable user access)
+                    {% trans "Maintenance Mode (disable user access)" %}
                   </label>
                 </div>
               </div>
               <div class="col-12">
                 <button class="btn btn-success px-4">
-                  <i class="bi bi-check-circle me-2"></i>Save Settings
+                  <i class="bi bi-check-circle me-2"></i>{% trans "Save Settings" %}
                 </button>
               </div>
             </div>
@@ -268,18 +269,15 @@
             <div class="row g-3">
               <div class="col-12">
                 <h6 class="fw-bold mb-1">
-                  <i class="bi bi-building me-2 text-success"></i>Depot / Office
-                  Starting Point
+                  <i class="bi bi-building me-2 text-success"></i>{% trans "Depot / Office Starting Point" %}
                 </h6>
                 <p class="text-muted small mb-0">
-                  All generated routes will start from this fixed location.
-                  Click the map or drag the marker to set the exact position,
-                  then save it — it stays fixed until you change it again.
+                  {% trans "All generated routes will start from this fixed location. Click the map or drag the marker to set the exact position, then save it — it stays fixed until you change it again." %}
                 </p>
               </div>
               <div class="col-md-4">
                 <label class="form-label small fw-semibold text-secondary"
-                  >Latitude</label
+                  >{% trans "Latitude" %}</label
                 >
                 <input
                   type="number"
@@ -291,7 +289,7 @@
               </div>
               <div class="col-md-4">
                 <label class="form-label small fw-semibold text-secondary"
-                  >Longitude</label
+                  >{% trans "Longitude" %}</label
                 >
                 <input
                   type="number"
@@ -306,7 +304,7 @@
                   class="btn btn-outline-secondary w-100"
                   onclick="useMyGPS()"
                 >
-                  <i class="bi bi-crosshair me-2"></i>Use My GPS
+                  <i class="bi bi-crosshair me-2"></i>{% trans "Use My GPS" %}
                 </button>
               </div>
               <div class="col-12">
@@ -325,9 +323,7 @@
                 ></div>
                 <small class="text-muted mt-1 d-block">
                   <i class="bi bi-info-circle me-1"></i>
-                  Click anywhere on the map or drag the marker to adjust the
-                  depot location. The shaded outline shows the Pokhara
-                  Metropolitan City boundary.
+                  {% trans "Click anywhere on the map or drag the marker to adjust the depot location. The shaded outline shows the Pokhara Metropolitan City boundary." %}
                 </small>
               </div>
               <div class="col-12">
@@ -336,7 +332,7 @@
                   onclick="saveDepotLocation()"
                   id="depot-save-btn"
                 >
-                  <i class="bi bi-check-circle me-2"></i>Save Depot Location
+                  <i class="bi bi-check-circle me-2"></i>{% trans "Save Depot Location" %}
                 </button>
               </div>
             </div>
@@ -351,13 +347,10 @@
                   <div>
                     <h6 class="fw-bold mb-1">
                       <i class="bi bi-flag-fill me-2 text-success"></i
-                      >Designated Checkpoints
+                      >{% trans "Designated Checkpoints" %}
                     </h6>
                     <p class="text-muted small mb-0">
-                      Create and manage pickup/drop-off checkpoints that users
-                      can select when submitting a request. Saved checkpoints
-                      show up as 🚩 flags on the map below — drag a flag to move
-                      it, or use its popup to edit/delete.
+                      {% trans "Create and manage pickup/drop-off checkpoints that users can select when submitting a request. Saved checkpoints show up as 🚩 flags on the map below — drag a flag to move it, or use its popup to edit/delete." %}
                     </p>
                   </div>
                   <div class="d-flex gap-2">
@@ -365,14 +358,13 @@
                       class="btn btn-outline-primary"
                       onclick="toggleAutoGeneratePanel()"
                     >
-                      <i class="bi bi-grid-3x3-gap-fill me-1"></i>Auto-Generate
-                      Checkpoints
+                      <i class="bi bi-grid-3x3-gap-fill me-1"></i>{% trans "Auto-Generate Checkpoints" %}
                     </button>
                     <button
                       class="btn btn-outline-success"
                       onclick="resetCheckpointForm()"
                     >
-                      <i class="bi bi-plus-circle me-1"></i>New Checkpoint
+                      <i class="bi bi-plus-circle me-1"></i>{% trans "New Checkpoint" %}
                     </button>
                   </div>
                 </div>
@@ -386,12 +378,12 @@
                 >
                   <h6 class="fw-bold mb-2">
                     <i class="bi bi-grid-3x3-gap-fill me-2 text-primary"></i
-                    >Auto-Generate Checkpoints Around Depot
+                    >{% trans "Auto-Generate Checkpoints Around Depot" %}
                   </h6>
                   <div class="row g-2 align-items-end">
                     <div class="col-md-3">
                       <label class="form-label small fw-semibold text-secondary"
-                        >Spacing (meters)</label
+                        >{% trans "Spacing (meters)" %}</label
                       >
                       <input
                         type="number"
@@ -404,7 +396,7 @@
                     </div>
                     <div class="col-md-3">
                       <label class="form-label small fw-semibold text-secondary"
-                        >Radius (meters)</label
+                        >{% trans "Radius (meters)" %}</label
                       >
                       <input
                         type="number"
@@ -420,7 +412,7 @@
                         class="btn btn-primary btn-sm w-100"
                         onclick="generateCheckpointGrid()"
                       >
-                        <i class="bi bi-magic me-1"></i>Generate
+                        <i class="bi bi-magic me-1"></i>{% trans "Generate" %}
                       </button>
                     </div>
                     <div class="col-md-3">
@@ -428,7 +420,7 @@
                         class="btn btn-outline-secondary btn-sm w-100"
                         onclick="clearPendingCheckpoints()"
                       >
-                        <i class="bi bi-x-circle me-1"></i>Clear Pending
+                        <i class="bi bi-x-circle me-1"></i>{% trans "Clear Pending" %}
                       </button>
                     </div>
                   </div>
@@ -438,14 +430,10 @@
                         class="btn btn-outline-success btn-sm w-100"
                         onclick="coverFullMetroArea()"
                       >
-                        <i class="bi bi-globe-asia-australia me-1"></i>Cover
-                        Entire Pokhara Metropolitan Area
+                        <i class="bi bi-globe-asia-australia me-1"></i>{% trans "Cover Entire Pokhara Metropolitan Area" %}
                       </button>
                       <small class="text-muted d-block mt-1">
-                        Quick preset: generates a wide grid around the depot,
-                        still clipped to the real Pokhara Metropolitan City
-                        boundary, so checkpoints span the full municipality
-                        without landing outside it.
+                        {% trans "Quick preset: generates a wide grid around the depot, still clipped to the real Pokhara Metropolitan City boundary, so checkpoints span the full municipality without landing outside it." %}
                       </small>
                     </div>
                   </div>
@@ -459,8 +447,7 @@
                       class="btn btn-success btn-sm"
                       onclick="saveAllPendingCheckpoints()"
                     >
-                      <i class="bi bi-check2-all me-1"></i>Save All Pending
-                      Checkpoints
+                      <i class="bi bi-check2-all me-1"></i>{% trans "Save All Pending Checkpoints" %}
                     </button>
                   </div>
                 </div>
@@ -468,29 +455,29 @@
 
               <div class="col-md-4">
                 <label class="form-label small fw-semibold text-secondary"
-                  >Checkpoint Name</label
+                  >{% trans "Checkpoint Name" %}</label
                 >
                 <input
                   type="text"
                   class="form-control"
                   id="checkpoint_name"
-                  placeholder="e.g. Main Street Depot"
+                  placeholder="{% trans 'e.g. Main Street Depot' %}"
                 />
               </div>
               <div class="col-md-4">
                 <label class="form-label small fw-semibold text-secondary"
-                  >Description</label
+                  >{% trans "Description" %}</label
                 >
                 <input
                   type="text"
                   class="form-control"
                   id="checkpoint_description"
-                  placeholder="Optional message for users"
+                  placeholder="{% trans 'Optional message for users' %}"
                 />
               </div>
               <div class="col-md-2">
                 <label class="form-label small fw-semibold text-secondary"
-                  >Latitude</label
+                  >{% trans "Latitude" %}</label
                 >
                 <input
                   type="number"
@@ -502,7 +489,7 @@
               </div>
               <div class="col-md-2">
                 <label class="form-label small fw-semibold text-secondary"
-                  >Longitude</label
+                  >{% trans "Longitude" %}</label
                 >
                 <input
                   type="number"
@@ -517,20 +504,20 @@
                   class="btn btn-outline-secondary"
                   onclick="initCheckpointMap()"
                 >
-                  <i class="bi bi-map me-1"></i>Load Map
+                  <i class="bi bi-map me-1"></i>{% trans "Load Map" %}
                 </button>
                 <button
                   class="btn btn-outline-secondary"
                   onclick="useCheckpointGPS()"
                 >
-                  <i class="bi bi-crosshair me-1"></i>Use My GPS
+                  <i class="bi bi-crosshair me-1"></i>{% trans "Use My GPS" %}
                 </button>
                 <button
                   class="btn btn-success"
                   onclick="saveCheckpoint()"
                   id="checkpoint-save-btn"
                 >
-                  <i class="bi bi-check-circle me-1"></i>Save Checkpoint
+                  <i class="bi bi-check-circle me-1"></i>{% trans "Save Checkpoint" %}
                 </button>
               </div>
               <div class="col-12">
@@ -548,12 +535,7 @@
                   style="height: 300px; border-radius: 8px"
                 ></div>
                 <small class="text-muted mt-1 d-block">
-                  Click the map (or the new-checkpoint marker) to position a new
-                  checkpoint. The shaded outline is the Pokhara Metropolitan
-                  City boundary — checkpoints outside it won't be accepted.
-                  Existing checkpoints appear as 🚩 flags — drag a flag to move
-                  it, then use its popup to save the new position, edit, or
-                  delete it.
+                  {% trans "Click the map (or the new-checkpoint marker) to position a new checkpoint. The shaded outline is the Pokhara Metropolitan City boundary — checkpoints outside it won't be accepted. Existing checkpoints appear as 🚩 flags — drag a flag to move it, then use its popup to save the new position, edit, or delete it." %}
                 </small>
               </div>
               <div class="col-12">
@@ -561,7 +543,7 @@
                   class="d-flex justify-content-between align-items-center mb-2"
                 >
                   <div class="small text-muted">
-                    Select checkpoints you want to delete.
+                    {% trans "Select checkpoints you want to delete." %}
                   </div>
 
                   <button
@@ -572,7 +554,7 @@
                     disabled
                   >
                     <i class="bi bi-trash me-1"></i>
-                    Delete Selected
+                    {% trans "Delete Selected" %}
                   </button>
                 </div>
                 <div class="table-responsive">
@@ -587,19 +569,19 @@
                             class="form-check-input"
                             id="selectAllCheckpoints"
                             onchange="toggleSelectAllCheckpoints(this)"
-                            title="Select All"
+                            title="{% trans 'Select All' %}"
                           />
                         </th>
-                        <th>Name</th>
-                        <th>Coordinates</th>
-                        <th>Status</th>
-                        <th>Actions</th>
+                        <th>{% trans "Name" %}</th>
+                        <th>{% trans "Coordinates" %}</th>
+                        <th>{% trans "Status" %}</th>
+                        <th>{% trans "Actions" %}</th>
                       </tr>
                     </thead>
                     <tbody id="checkpoint-table-body" class="small">
                       <tr>
                         <td colspan="5" class="text-muted text-center py-3">
-                          Loading checkpoints...
+                          {% trans "Loading checkpoints..." %}
                         </td>
                       </tr>
                     </tbody>
@@ -613,33 +595,33 @@
             <div class="row g-4">
               <div class="col-md-6">
                 <label class="form-label small fw-semibold text-secondary"
-                  >SMTP Server</label
+                  >{% trans "SMTP Server" %}</label
                 >
                 <input
                   type="text"
                   class="form-control"
-                  placeholder="smtp.gmail.com"
+                  placeholder="{% trans 'smtp.gmail.com' %}"
                 />
               </div>
               <div class="col-md-6">
                 <label class="form-label small fw-semibold text-secondary"
-                  >SMTP Port</label
+                  >{% trans "SMTP Port" %}</label
                 >
                 <input type="number" class="form-control" value="587" />
               </div>
               <div class="col-md-6">
                 <label class="form-label small fw-semibold text-secondary"
-                  >Email Address</label
+                  >{% trans "Email Address" %}</label
                 >
                 <input
                   type="email"
                   class="form-control"
-                  placeholder="noreply@example.com"
+                  placeholder="{% trans 'noreply@example.com' %}"
                 />
               </div>
               <div class="col-md-6">
                 <label class="form-label small fw-semibold text-secondary"
-                  >Password</label
+                  >{% trans "Password" %}</label
                 >
                 <input
                   type="password"
@@ -658,13 +640,13 @@
                   <label
                     class="form-check-label small fw-semibold"
                     for="tlsEnabled"
-                    >Use TLS Encryption</label
+                    >{% trans "Use TLS Encryption" %}</label
                   >
                 </div>
               </div>
               <div class="col-12">
-                <button class="btn btn-secondary me-2 px-4">Test Email</button>
-                <button class="btn btn-success px-4">Save Configuration</button>
+                <button class="btn btn-secondary me-2 px-4">{% trans "Test Email" %}</button>
+                <button class="btn btn-success px-4">{% trans "Save Configuration" %}</button>
               </div>
             </div>
           </div>
@@ -676,7 +658,7 @@
           >
             <div class="row g-4">
               <div class="col-12">
-                <h6 class="fw-bold mb-1">Notification Preferences</h6>
+                <h6 class="fw-bold mb-1">{% trans "Notification Preferences" %}</h6>
               </div>
               <div class="col-md-6">
                 <div class="form-check form-switch">
@@ -689,7 +671,7 @@
                   <label
                     class="form-check-label small fw-semibold"
                     for="notify_new_request"
-                    >Notify on new waste requests</label
+                    >{% trans "Notify on new waste requests" %}</label
                   >
                 </div>
               </div>
@@ -704,7 +686,7 @@
                   <label
                     class="form-check-label small fw-semibold"
                     for="notify_status_change"
-                    >Notify on status changes</label
+                    >{% trans "Notify on status changes" %}</label
                   >
                 </div>
               </div>
@@ -718,7 +700,7 @@
                   <label
                     class="form-check-label small fw-semibold"
                     for="notify_driver_offline"
-                    >Notify when drivers go offline</label
+                    >{% trans "Notify when drivers go offline" %}</label
                   >
                 </div>
               </div>
@@ -733,13 +715,13 @@
                   <label
                     class="form-check-label small fw-semibold"
                     for="notify_overdue"
-                    >Notify on overdue requests</label
+                    >{% trans "Notify on overdue requests" %}</label
                   >
                 </div>
               </div>
               <div class="col-12">
                 <button class="btn btn-success px-4">
-                  Save Notification Settings
+                  {% trans "Save Notification Settings" %}
                 </button>
               </div>
             </div>
@@ -749,24 +731,24 @@
           <div class="tab-pane fade p-4" id="backup-panel" role="tabpanel">
             <div class="row g-4">
               <div class="col-12">
-                <h6 class="fw-bold mb-1">Database Management</h6>
-                <p class="text-muted small">Backup and restore system data</p>
+                <h6 class="fw-bold mb-1">{% trans "Database Management" %}</h6>
+                <p class="text-muted small">{% trans "Backup and restore system data" %}</p>
               </div>
               <div class="col-md-6">
                 <div class="card border-0 bg-info bg-opacity-10 rounded-3">
                   <div class="card-body">
                     <h6 class="card-title fw-bold">
                       <i class="bi bi-cloud-arrow-down me-2 text-primary"></i
-                      >Create Backup
+                      >{% trans "Create Backup" %}
                     </h6>
                     <p class="card-text text-muted small">
-                      Export all system data to a backup file
+                      {% trans "Export all system data to a backup file" %}
                     </p>
                     <button
                       id="backup-create-btn"
                       class="btn btn-sm btn-primary px-3 fw-semibold"
                     >
-                      <i class="bi bi-download me-1"></i>Create Backup
+                      <i class="bi bi-download me-1"></i>{% trans "Create Backup" %}
                     </button>
                   </div>
                 </div>
@@ -776,10 +758,10 @@
                   <div class="card-body">
                     <h6 class="card-title fw-bold">
                       <i class="bi bi-cloud-arrow-up me-2 text-warning"></i
-                      >Restore from Backup
+                      >{% trans "Restore from Backup" %}
                     </h6>
                     <p class="card-text text-muted small">
-                      Import data from a previously saved backup file
+                      {% trans "Import data from a previously saved backup file" %}
                     </p>
                     <input
                       id="backup-file-input"
@@ -791,29 +773,29 @@
                       id="backup-restore-btn"
                       class="btn btn-sm btn-warning fw-semibold text-dark"
                     >
-                      <i class="bi bi-upload me-1"></i>Restore Backup
+                      <i class="bi bi-upload me-1"></i>{% trans "Restore Backup" %}
                     </button>
                   </div>
                 </div>
               </div>
               <div class="col-12">
-                <h6 class="fw-bold mt-2 mb-3">Recent Backups</h6>
+                <h6 class="fw-bold mt-2 mb-3">{% trans "Recent Backups" %}</h6>
                 <div class="table-responsive">
                   <table
                     class="table table-sm table-bordered align-middle mb-0"
                   >
                     <thead class="table-light text-secondary small">
                       <tr>
-                        <th>Backup File</th>
-                        <th>Size</th>
-                        <th>Created</th>
-                        <th>Actions</th>
+                        <th>{% trans "Backup File" %}</th>
+                        <th>{% trans "Size" %}</th>
+                        <th>{% trans "Created" %}</th>
+                        <th>{% trans "Actions" %}</th>
                       </tr>
                     </thead>
                     <tbody id="backup-table-body" class="small">
                       <tr>
                         <td colspan="4" class="text-muted text-center py-3">
-                          Loading backups...
+                          {% trans "Loading backups..." %}
                         </td>
                       </tr>
                     </tbody>
@@ -836,7 +818,7 @@
     <div class="modal-content border-0 shadow">
       <div class="modal-header bg-success text-white border-bottom-0">
         <h5 class="modal-title fw-bold">
-          <i class="bi bi-plus-circle me-2"></i>Add New Setting
+          <i class="bi bi-plus-circle me-2"></i>{% trans "Add New Setting" %}
         </h5>
         <button
           type="button"
@@ -848,32 +830,32 @@
         <form id="addSettingForm">
           <div class="mb-3">
             <label class="form-label small fw-semibold text-secondary"
-              >Setting Key</label
+              >{% trans "Setting Key" %}</label
             >
             <input
               type="text"
               class="form-control"
               id="setting_key"
-              placeholder="e.g., max_file_size"
+              placeholder="{% trans 'e.g., max_file_size' %}"
               required
             />
-            <small class="text-muted">Unique identifier for this setting</small>
+            <small class="text-muted">{% trans "Unique identifier for this setting" %}</small>
           </div>
           <div class="mb-3">
             <label class="form-label small fw-semibold text-secondary"
-              >Setting Value</label
+              >{% trans "Setting Value" %}</label
             >
             <input
               type="text"
               class="form-control"
               id="setting_value"
-              placeholder="Value"
+              placeholder="{% trans 'Value' %}"
               required
             />
           </div>
           <div class="mb-3">
             <label class="form-label small fw-semibold text-secondary"
-              >Description</label
+              >{% trans "Description" %}</label
             >
             <textarea
               class="form-control"
@@ -888,7 +870,7 @@
               class="form-check-label small fw-semibold"
               for="is_sensitive"
             >
-              Sensitive (hide value in logs)
+              {% trans "Sensitive (hide value in logs)" %}
             </label>
           </div>
         </form>
@@ -899,14 +881,14 @@
           class="btn btn-secondary px-4"
           data-bs-dismiss="modal"
         >
-          Cancel
+          {% trans "Cancel" %}
         </button>
         <button
           type="button"
           class="btn btn-success px-4"
           onclick="addSetting()"
         >
-          Add Setting
+          {% trans "Add Setting" %}
         </button>
       </div>
     </div>
@@ -1065,7 +1047,7 @@
 
       window._settingsLeafletLoadPromise.then(onReady).catch((error) => {
         console.error("Leaflet failed to load for admin settings:", error);
-        showToast("Map failed to load. Please refresh the page.", "danger");
+        showToast(gettext("Map failed to load. Please refresh the page."), "danger");
       });
     }
 
@@ -1143,7 +1125,7 @@
     async function loadDepotLocation() {
       try {
         const res = await fetch("/api/system-settings/depot_location/", {
-          headers: { Authorization: `Bearer ${getToken()}` },
+          headers: { 'X-CSRFToken': getCookie('csrftoken') },
         });
 
         if (res.ok) {
@@ -1166,13 +1148,16 @@
       const lng = round6(parseFloat(document.getElementById("depot_lng").value));
 
       if (isNaN(lat) || isNaN(lng)) {
-        showToast("Please enter valid coordinates or click the map.", "warning");
+        showToast(
+          "Please enter valid coordinates or click the map.",
+          "warning",
+        );
         return;
       }
 
       if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
         showToast(
-          "Coordinates out of range. Lat: -90 to 90, Lng: -180 to 180.",
+          gettext("Coordinates out of range. Lat: -90 to 90, Lng: -180 to 180."),
           "warning",
         );
         return;
@@ -1180,7 +1165,7 @@
 
       if (!isInsidePokhara(lat, lng)) {
         showToast(
-          "That point looks like it is outside Pokhara Metropolitan City. Please pick a depot location inside the municipal boundary (shown shaded on the map).",
+          gettext("That point looks like it is outside Pokhara Metropolitan City. Please pick a depot location inside the municipal boundary (shown shaded on the map)."),
           "warning",
         );
         return;
@@ -1199,7 +1184,7 @@
       let res = await fetch("/api/system-settings/depot_location/", {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${getToken()}`,
+          'X-CSRFToken': getCookie('csrftoken'),
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
@@ -1209,7 +1194,7 @@
         res = await fetch("/api/system-settings/", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ key: "depot_location", ...payload }),
@@ -1218,7 +1203,7 @@
 
       if (res.ok) {
         showToast(
-          "Depot location saved and fixed! All future routes will start here.",
+          gettext("Depot location saved and fixed! All future routes will start here."),
           "success",
         );
         showDepotStatus(`Depot fixed at ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
@@ -1226,7 +1211,7 @@
       } else {
         const err = await res.json().catch(() => ({}));
         showToast(
-          "Failed to save: " + (JSON.stringify(err) || "Unknown error"),
+          gettext("Failed to save: ") + (JSON.stringify(err) || "Unknown error"),
           "danger",
         );
       }
@@ -1238,22 +1223,20 @@
 
     function useMyGPS() {
       if (!navigator.geolocation) {
-        showToast("GPS not available in your browser.", "warning");
+        showToast(gettext("GPS not available in your browser."), "warning");
         return;
       }
-
       showToast("Getting GPS location...", "info");
-
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
           moveDepotMarker(lat, lng);
-          showToast("GPS location captured! Click Save to confirm.", "success");
+          showToast(gettext("GPS location captured! Click Save to confirm."), "success");
         },
         () =>
           showToast(
-            "Could not get GPS location. Allow location access and try again.",
+            gettext("Could not get GPS location. Allow location access and try again."),
             "danger",
           ),
         { timeout: 8000 },
@@ -1467,11 +1450,11 @@
 
       if (!checkpoints.length) {
         tbody.innerHTML = `
-          <tr>
-            <td colspan="5" class="text-muted text-center py-3">
-              No checkpoints configured.
-            </td>
-          </tr>
+            <tr>
+                <td colspan="5" class="text-muted text-center py-3">
+                    No checkpoints configured.
+                </td>
+            </tr>
         `;
         updateBulkDeleteButton();
         return;
@@ -1496,18 +1479,17 @@
             </td>
             <td>${ch.is_active ? "Active" : "Inactive"}</td>
             <td>
-              <button
-                class="btn btn-sm btn-outline-primary me-1"
-                onclick="editCheckpoint(${escapeHtml(ch.id)})"
-              >
-                Edit
-              </button>
-              <button
-                class="btn btn-sm btn-outline-danger"
-                onclick="deleteCheckpoint(${escapeHtml(ch.id)})"
-              >
-                Delete
-              </button>
+                <button
+                    class="btn btn-sm btn-outline-primary me-1"
+                    onclick="editCheckpoint(${escapeHtml(ch.id)})">
+                    Edit
+                </button>
+
+                <button
+                    class="btn btn-sm btn-outline-danger"
+                    onclick="deleteCheckpoint(${escapeHtml(ch.id)})">
+                    Delete
+                </button>
             </td>
           </tr>
         `,
@@ -1628,48 +1610,13 @@
 
       return `
         <div style="min-width:190px;">
-          <strong>🚩 ${escapeHtml(ch.name)}</strong>
-          <br>
-          <span class="text-muted small">${escapeHtml(coordsText)}</span>
-          ${
-            isEditing
-              ? `<div class="small text-primary mt-1">
-                   <i class="bi bi-unlock-fill me-1"></i>Editing — drag the flag to move it
-                 </div>`
-              : ""
-          }
-          <div class="d-flex flex-wrap gap-1 mt-2">
-            ${
-              hasPending
-                ? `
-                  <button
-                    class="btn btn-sm btn-success py-0 px-2"
-                    onclick="saveMovedCheckpoint(${ch.id})"
-                  >
-                    Save Position
-                  </button>
-                `
-                : ""
-            }
-            ${
-              !isEditing
-                ? `
-                  <button
-                    class="btn btn-sm btn-outline-primary py-0 px-2"
-                    onclick="editCheckpoint(${ch.id})"
-                  >
-                    Edit
-                  </button>
-                `
-                : ""
-            }
-            <button
-              class="btn btn-sm btn-outline-danger py-0 px-2"
-              onclick="deleteCheckpoint(${ch.id})"
-            >
-              Delete
-            </button>
-          </div>
+            <strong>🚩 ${escapeHtml(ch.name)}</strong><br>
+            <span class="text-muted small">${escapeHtml(coordsText)}</span>
+            <div class="d-flex flex-wrap gap-1 mt-2">
+                ${hasPending ? `<button class="btn btn-sm btn-success py-0 px-2" onclick="saveMovedCheckpoint(${ch.id})">Save Position</button>` : ""}
+                <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="editCheckpoint(${ch.id})">Edit</button>
+                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteCheckpoint(${ch.id})">Delete</button>
+            </div>
         </div>
       `;
     }
@@ -1731,7 +1678,8 @@
       }
 
       const confirmed = confirm(
-        `Are you sure you want to delete ${ids.length} selected checkpoint(s)?\n\nThis action cannot be undone.`,
+        `Are you sure you want to delete ${ids.length} selected checkpoint(s)?\n\n` +
+          `This action cannot be undone.`,
       );
 
       if (!confirmed) return;
@@ -1747,7 +1695,7 @@
         const res = await fetch("/api/checkpoints/bulk_delete/", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ ids }),
@@ -1933,7 +1881,7 @@
 
       if (!isInsidePokhara(lat, lng)) {
         showToast(
-          "That spot is outside Pokhara Metropolitan City — drag the flag to somewhere inside the shaded boundary before saving.",
+          gettext("That spot is outside Pokhara Metropolitan City — drag the flag to somewhere inside the shaded boundary before saving."),
           "warning",
         );
         return;
@@ -1943,7 +1891,7 @@
         const res = await fetch(`/api/checkpoints/${id}/`, {
           method: "PATCH",
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ latitude: lat, longitude: lng }),
@@ -1954,11 +1902,7 @@
           throw new Error(err.detail || "Failed to update checkpoint position.");
         }
 
-        // The dragged position is now the NEW permanent position.
-        marker._savedLat = lat;
-        marker._savedLng = lng;
-        marker._keepPositionOnClose = true;
-
+        showToast("Checkpoint position updated.", "success");
         delete marker._pendingLat;
         delete marker._pendingLng;
 
@@ -2052,7 +1996,7 @@
         const res = await fetch(url, {
           method,
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
           },
           body: JSON.stringify(payload),
@@ -2220,12 +2164,14 @@
     }
 
     async function deleteCheckpoint(id) {
-      if (!confirm("Delete this checkpoint?")) return;
+      if (!confirm(gettext("Delete this checkpoint?"))) return;
 
       try {
         const res = await fetch(`/api/checkpoints/${id}/`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${getToken()}` },
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
         });
 
         if (!res.ok) throw new Error("Delete failed");
@@ -2298,7 +2244,7 @@
 
       try {
         const res = await fetch("/api/system-settings/depot_location/", {
-          headers: { Authorization: `Bearer ${getToken()}` },
+          headers: { 'X-CSRFToken': getCookie('csrftoken') },
         });
 
         if (res.ok) {
@@ -2351,7 +2297,7 @@
 
         if (!isInsidePokhara(center.lat, center.lng)) {
           showToast(
-            "The depot location itself is outside the Pokhara Metropolitan City boundary — set the depot inside the shaded area first (Depot Location tab).",
+            gettext("The depot location itself is outside the Pokhara Metropolitan City boundary — set the depot inside the shaded area first (Depot Location tab)."),
             "warning",
           );
         }
@@ -2413,12 +2359,12 @@
 
         if (pendingCheckpoints.length) {
           showToast(
-            `${pendingCheckpoints.length} checkpoint(s) generated — drag to adjust, rename, then save.`,
+            interpolate(gettext('%(v0)s checkpoint(s) generated — drag to adjust, rename, then save.'), {v0: pendingCheckpoints.length}, true),
             "success",
           );
         } else {
           showToast(
-            "No checkpoints generated inside the Pokhara boundary. Try increasing the radius or moving the depot.",
+            gettext("No checkpoints generated inside the Pokhara boundary. Try increasing the radius or moving the depot."),
             "warning",
           );
         }
@@ -2512,56 +2458,34 @@
 
       container.innerHTML = `
         <div class="table-responsive">
-          <table class="table table-sm table-bordered align-middle mb-0">
-            <thead class="table-light text-secondary small">
-              <tr>
-                <th>Name</th>
-                <th>Coordinates</th>
-                <th style="width:140px;">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="small">
-              ${pendingCheckpoints
-                .map(
-                  (p) => `
+            <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light text-secondary small">
                     <tr>
-                      <td>
-                        <input
-                          type="text"
-                          class="form-control form-control-sm pending-name-input"
-                          data-id="${p.id}"
-                          value="${escapeHtml(p.name)}"
-                        >
-                      </td>
-                      <td>
-                        ${p.lat.toFixed(6)},
-                        ${p.lng.toFixed(6)}
-                        ${
-                          !isInsidePokhara(p.lat, p.lng)
-                            ? ' <span class="text-danger">(outside!)</span>'
-                            : ""
-                        }
-                      </td>
-                      <td>
-                        <button
-                          class="btn btn-sm btn-success py-0 px-2"
-                          onclick="savePendingCheckpoint('${p.id}')"
-                        >
-                          Save
-                        </button>
-                        <button
-                          class="btn btn-sm btn-outline-danger py-0 px-2"
-                          onclick="removePendingCheckpoint('${p.id}')"
-                        >
-                          Remove
-                        </button>
-                      </td>
+                        <th>Name</th>
+                        <th>Coordinates</th>
+                        <th style="width:140px;">Actions</th>
                     </tr>
-                  `,
-                )
-                .join("")}
-            </tbody>
-          </table>
+                </thead>
+                <tbody class="small">
+                    ${pendingCheckpoints
+                      .map(
+                        (p) => `
+                        <tr>
+                            <td>
+                                <input type="text" class="form-control form-control-sm pending-name-input"
+                                    data-id="${p.id}" value="${escapeHtml(p.name)}">
+                            </td>
+                            <td>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}${!isInsidePokhara(p.lat, p.lng) ? ' <span class="text-danger">(outside!)</span>' : ""}</td>
+                            <td>
+                                <button class="btn btn-sm btn-success py-0 px-2" onclick="savePendingCheckpoint('${p.id}')">Save</button>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="removePendingCheckpoint('${p.id}')">Remove</button>
+                            </td>
+                        </tr>
+                    `,
+                      )
+                      .join("")}
+                </tbody>
+            </table>
         </div>
       `;
 
@@ -2592,7 +2516,7 @@
         const res = await fetch("/api/checkpoints/", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
           },
           body: JSON.stringify(payload),
@@ -2634,7 +2558,7 @@
       if (!name) {
         if (!silent) {
           showToast(
-            "Please give this checkpoint a name before saving.",
+            gettext("Please give this checkpoint a name before saving."),
             "warning",
           );
         }
@@ -2644,7 +2568,7 @@
       if (!isInsidePokhara(item.lat, item.lng)) {
         if (!silent) {
           showToast(
-            `"${name}" is outside Pokhara Metropolitan City — drag it inside the shaded boundary before saving.`,
+            interpolate(gettext('"%(v0)s" is outside Pokhara Metropolitan City — drag it inside the shaded boundary before saving.'), {v0: name}, true),
             "warning",
           );
         }
@@ -2693,7 +2617,7 @@
         if (data.deduped) {
           if (!silent) {
             showToast(
-              `"${name}" matched an already-saved checkpoint nearby (ID ${data.existing_checkpoint_id}) — no new checkpoint was created.`,
+              interpolate(gettext('"%(v0)s" matched an already-saved checkpoint nearby (ID %(v1)s) — no new checkpoint was created.'), {v0: name, v1: data.existing_checkpoint_id}, true),
               "info",
             );
             loadCheckpoints();
@@ -2710,7 +2634,7 @@
         }
 
         if (!silent) {
-          showToast(`"${name}" saved as a checkpoint.`, "success");
+          showToast(interpolate(gettext('"%(v0)s" saved as a checkpoint.'), {v0: name}, true), "success");
           loadCheckpoints();
         }
 
@@ -2759,82 +2683,95 @@
 
       if (invalid.length) {
         showToast(
-          `${invalid.length} checkpoint(s) are outside Pokhara. Move them inside the boundary first.`,
+          `${outside.length} pending checkpoint(s) are outside the Pokhara boundary — drag them inside first, they'll be skipped otherwise.`,
           "warning",
         );
         return;
       }
+      const ids = pendingCheckpoints
+        .filter((p) => isInsidePokhara(p.lat, p.lng))
+        .map((p) => p.id);
+      if (!ids.length) return;
 
-      const payload = pendingCheckpoints.map((p) => {
-        const nameInput = document.querySelector(
-          `.pending-name-input[data-id="${p.id}"]`,
+      if (ids.length > 150) {
+        showToast(
+          `${ids.length} checkpoints pending — that's a lot for one save run and may take a while if the server rate-limits. Consider a wider spacing next time to generate fewer points.`,
+          "info",
         );
-
-        const name = nameInput ? nameInput.value.trim() : p.name;
-
-        return {
-          name,
-          description: "Auto-generated checkpoint",
-          latitude: round6(p.lat),
-          longitude: round6(p.lng),
-          is_active: true,
-        };
-      });
-
-      const unnamed = payload.filter((p) => !p.name);
-
-      if (unnamed.length) {
-        showToast("Every checkpoint must have a name.", "warning");
-        return;
       }
 
       if (btn) {
         btn.disabled = true;
-        btn.dataset.originalHtml = btn.innerHTML;
-        btn.innerHTML =
-          '<span class="spinner-border spinner-border-sm me-1"></span>' +
-          `Saving ${payload.length} checkpoints...`;
+        btn.dataset._originalHtml = btn.innerHTML;
       }
 
-      try {
-        const res = await fetch("/api/checkpoints/bulk_create/", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ checkpoints: payload }),
-        });
+      let saved = 0;
+      let deduped = 0;
+      let rateLimitHits = 0;
+      let cleanStreak = 0;
+      let delay = SAVE_ALL_BASE_DELAY_MS;
+      const failed = [];
 
-        const data = await res.json().catch(() => ({}));
+      for (let i = 0; i < ids.length; i++) {
+        if (btn)
+          btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Saving ${i + 1}/${ids.length}${rateLimitHits ? " (slowed — server busy)" : ""}...`;
 
-        if (!res.ok) {
-          throw new Error(
-            data.detail || data.error || "Failed to save checkpoints.",
-          );
+        const result = await savePendingCheckpoint(ids[i], { silent: true });
+        if (result.ok) {
+          if (result.deduped) {
+            deduped++;
+          } else {
+            saved++;
+          }
+          cleanStreak++;
+          if (
+            cleanStreak >= SAVE_ALL_RECOVERY_STREAK &&
+            delay > SAVE_ALL_BASE_DELAY_MS
+          ) {
+            delay = Math.max(
+              SAVE_ALL_BASE_DELAY_MS,
+              delay / SAVE_ALL_BACKOFF_MULTIPLIER,
+            );
+            cleanStreak = 0;
+          }
+        } else {
+          if (result.rateLimited) {
+            rateLimitHits++;
+            cleanStreak = 0;
+            delay = Math.min(
+              SAVE_ALL_MAX_DELAY_MS,
+              delay * SAVE_ALL_BACKOFF_MULTIPLIER,
+            );
+          } else if (result.name) {
+            failed.push(result.name);
+          }
         }
 
-        const savedCount = Number(data.created_count || 0);
-        const dedupedCount = Number(data.deduped_count || 0);
+        if (i < ids.length - 1) await sleep(delay);
+      }
 
-        clearPendingCheckpoints();
-        await loadCheckpoints();
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML =
+          btn.dataset._originalHtml ||
+          '<i class="bi bi-check2-all me-1"></i>Save All Pending Checkpoints';
+      }
 
+      if (saved) loadCheckpoints();
+
+      const stillPending = pendingCheckpoints.length;
+      if (rateLimitHits && stillPending) {
         showToast(
-          `Done! ${savedCount} checkpoint(s) saved` +
-            (dedupedCount ? `, ${dedupedCount} duplicate(s) skipped.` : "."),
-          "success",
+          `Saved ${saved} checkpoint(s), but the server kept rate-limiting requests (${rateLimitHits} time(s)) — ${stillPending} still pending. Click "Save All" again in a minute to continue, or save smaller batches at a time.`,
+          "warning",
         );
-      } catch (e) {
-        console.error("Bulk checkpoint save failed:", e);
-        showToast(e.message || "Failed to save checkpoints.", "danger");
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML =
-            btn.dataset.originalHtml ||
-            '<i class="bi bi-check2-all me-1"></i>Save All Pending Checkpoints';
-        }
+      } else if (failed.length) {
+        showToast(
+          `Saved ${saved} checkpoint(s). ${failed.length} failed: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? "..." : ""}. You can retry those individually.`,
+          failed.length === ids.length ? "danger" : "warning",
+        );
+      } else {
+        showToast(`All ${saved} checkpoint(s) saved successfully.`, "success");
       }
     }
 
@@ -2892,26 +2829,16 @@
         tableBody.innerHTML = backups
           .map(
             (backup) => `
-                <tr>
-                  <td><code>${backup.file_name}</code></td>
-                  <td>${formatBytes(backup.size_bytes)}</td>
-                  <td>${new Date(backup.created_at).toLocaleString()}</td>
-                  <td>
-                    <button
-                      class="btn btn-sm btn-outline-primary py-0 px-2"
-                      onclick="downloadBackup('${backup.file_name}')"
-                    >
-                      Download
-                    </button>
-                    <button
-                      class="btn btn-sm btn-outline-danger py-0 px-2"
-                      onclick="deleteBackup('${backup.file_name}')"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              `,
+            <tr>
+                <td><code>${backup.file_name}</code></td>
+                <td>${formatBytes(backup.size_bytes)}</td>
+                <td>${new Date(backup.created_at).toLocaleString()}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="downloadBackup('${backup.file_name}')">Download</button>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteBackup('${backup.file_name}')">Delete</button>
+                </td>
+            </tr>
+        `,
           )
           .join("");
       } catch (e) {
@@ -2987,7 +2914,6 @@
         }
 
         showToast(`Backup created: ${data.file_name}`, "success");
-
         await loadBackupFiles();
       } catch (e) {
         showToast(e.message, "danger");
@@ -3071,7 +2997,7 @@
       formData.append("admin_password", adminPassword);
 
       try {
-        showToast("Restoring backup... this may take a moment.", "info");
+        showToast(gettext("Restoring backup... this may take a moment."), "info");
 
         const res = await authFetch("/api/database-backups/restore/", {
           method: "POST",
@@ -3187,7 +3113,7 @@
       const is_sensitive = document.getElementById("is_sensitive").checked;
 
       if (!key || !value) {
-        showToast("Please fill in key and value.", "warning");
+        showToast(gettext("Please fill in key and value."), "warning");
         return;
       }
 
@@ -3195,7 +3121,7 @@
         const res = await fetch("/api/system-settings/", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ key, value, description, is_sensitive }),
@@ -3203,7 +3129,6 @@
 
         if (res.ok) {
           showToast("Setting added successfully!", "success");
-
           bootstrap.Modal.getInstance(
             document.getElementById("addSettingModal"),
           ).hide();
@@ -3211,10 +3136,10 @@
           document.getElementById("addSettingForm").reset();
         } else {
           const err = await res.json();
-          showToast("Error: " + JSON.stringify(err), "danger");
+          showToast(gettext("Error: ") + JSON.stringify(err), "danger");
         }
       } catch (e) {
-        showToast("Network error: " + e.message, "danger");
+        showToast(gettext("Network error: ") + e.message, "danger");
       }
     }
 

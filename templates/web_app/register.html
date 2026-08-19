@@ -1,15 +1,16 @@
 {% extends 'web_app/base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Register — Waste Collection{% endblock %}
+{% block title %}{% trans "Register — Waste Collection" %}{% endblock %}
 
 {% block content %}
 <div class="min-vh-100 d-flex align-items-center justify-content-center bg-light py-4 px-3">
     <div class="card shadow-sm w-100" style="max-width:440px">
         <div class="card-body p-4">
             <div class="text-center mb-4">
-                <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="Logo" width="100" height="100" class="d-inline-block align-text-top me-2">
-                <h4 class="mt-2 fw-bold">Create Account</h4>
+                <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="{% trans 'Logo' %}" width="100" height="100" class="d-inline-block align-text-top me-2">
+                <h4 class="mt-2 fw-bold">{% trans "Create Account" %}</h4>
             </div>
 
             <div id="error-alert" class="alert alert-danger d-none"></div>
@@ -19,34 +20,34 @@
 
             <div class="d-flex align-items-center mb-3">
                 <hr class="flex-grow-1">
-                <span class="px-2 text-muted small">or register with email</span>
+                <span class="px-2 text-muted small">{% trans "or register with email" %}</span>
                 <hr class="flex-grow-1">
             </div>
 
             <div class="row">
                 <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label">Username *</label>
+                    <label class="form-label">{% trans "Username *" %}</label>
                     <input type="text" id="username" class="form-control" autofocus>
                 </div>
                 <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label">Email *</label>
+                    <label class="form-label">{% trans "Email *" %}</label>
                     <input type="email" id="email" class="form-control">
                 </div>
             </div>
             <div class="mb-3">
-                <label class="form-label">Phone</label>
+                <label class="form-label">{% trans "Phone" %}</label>
                 <input type="tel" id="phone" class="form-control">
             </div>
             <div class="mb-3">
-                <label class="form-label">Role *</label>
+                <label class="form-label">{% trans "Role *" %}</label>
                 <select id="role" class="form-select">
-                    <option value="user">Regular User</option>
-                    {% comment %} <option value="driver">Driver</option> {% endcomment %}
+                    <option value="user">{% trans "Regular User" %}</option>
+                    {% comment %} <option value="driver">{% trans "Driver" %}</option> {% endcomment %}
                 </select>
             </div>
             <div class="row">
                 <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label">Password *</label>
+                    <label class="form-label">{% trans "Password *" %}</label>
                     <div class="position-relative">
                         <input type="password" id="password" class="form-control pe-5" oninput="handlePasswordInput()">
                         <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
@@ -54,7 +55,7 @@
                     </div>
                 </div>
                 <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label">Confirm Password *</label>
+                    <label class="form-label">{% trans "Confirm Password *" %}</label>
                     <div class="position-relative">
                         <input type="password" id="password2" class="form-control pe-5" oninput="handlePassword2Input()">
                         <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
@@ -64,12 +65,12 @@
             </div>
 
             <button class="btn btn-success w-100" id="reg-btn" onclick="doRegister()">
-                <span id="reg-text">Create Account</span>
+                <span id="reg-text">{% trans "Create Account" %}</span>
                 <span id="reg-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
             </button>
 
             <p class="text-center mt-3 mb-0 small">
-                Already have an account? <a href="{% url 'login' %}" id="signin-link" class="text-success">Sign in</a>
+                {% trans "Already have an account?" %} <a href="{% url 'login' %}" id="signin-link" class="text-success">{% trans "Sign in" %}</a>
             </p>
         </div>
     </div>
@@ -132,6 +133,7 @@ window.doRegister = async function() {
     try {
         const res = await fetch('/auth/register/', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -229,6 +231,7 @@ async function handleGoogleCredential(response) {
     try {
         const res = await fetch('/auth/google-login/', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -238,9 +241,9 @@ async function handleGoogleCredential(response) {
         const data = await res.json();
 
         if (res.ok) {
-            localStorage.setItem('access_token', data.access);
-            localStorage.setItem('refresh_token', data.refresh);
-
+            // GoogleLoginView sets the HttpOnly session cookie server-side.
+            // We intentionally do not store data.access / data.refresh —
+            // keeping JWTs out of JS-readable storage is the whole point.
             const role = data.user?.role || '';
             const redirectMap = {
                 admin: '/admin-dashboard/',
