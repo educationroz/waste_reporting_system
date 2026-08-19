@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Driver Dashboard{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Driver Dashboard" %}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -99,12 +100,12 @@
 
         <!-- ── मुख्य सामाग्री (Main Content Area) ── -->
         <div class="content-col">
-            <h2 class="mb-4"><i class="bi bi-truck text-success me-2"></i>Driver Dashboard</h2>
+            <h2 class="mb-4"><i class="bi bi-truck text-success me-2"></i>{% trans "Driver Dashboard" %}</h2>
 
             {% if not driver %}
             <div class="alert alert-warning">
                 <i class="bi bi-exclamation-triangle me-2"></i>
-                No driver profile found for your account. Contact admin.
+                {% trans "No driver profile found for your account. Contact admin." %}
             </div>
             {% else %}
 
@@ -113,7 +114,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-success bg-opacity-10 h-100">
                         <div class="card-body text-center">
-                            <div class="text-muted small">Completed Today</div>
+                            <div class="text-muted small">{% trans "Completed Today" %}</div>
                             <div class="fs-2 fw-bold text-success" id="stat-completed-today">{{ completed_today }}</div>
                         </div>
                     </div>
@@ -121,7 +122,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-info bg-opacity-10 h-100">
                         <div class="card-body text-center">
-                            <div class="text-muted small">Total Trips</div>
+                            <div class="text-muted small">{% trans "Total Trips" %}</div>
                             <div class="fs-2 fw-bold text-info" id="stat-total-trips">{{ driver.total_trips }}</div>
                         </div>
                     </div>
@@ -130,8 +131,8 @@
                     <div class="card border-0 bg-warning bg-opacity-10 h-100">
                         <div class="card-body text-center">
                             <div class="text-muted small">
-                                This Month
-                                <span class="text-muted" style="font-size:0.7rem;">({{ current_month_label }})</span>
+                                {% trans "This Month" %}
+                                <span class="text-muted" style="font-size:0.7rem;">({{ current_month_date|date:"F Y" }})</span>
                             </div>
                             <div class="fs-2 fw-bold text-warning" id="stat-completed-month">{{ completed_this_month }}</div>
                         </div>
@@ -140,14 +141,14 @@
                 <div class="col-6 col-md-3">
                     <div class="card border-0 {% if driver.is_available %}bg-success{% else %}bg-secondary{% endif %} bg-opacity-10 h-100" id="availability-stat-card">
                         <div class="card-body text-center">
-                            <div class="text-muted small">Status</div>
+                            <div class="text-muted small">{% trans "Status" %}</div>
                             <div class="fw-bold {% if driver.is_available %}text-success{% else %}text-secondary{% endif %}" id="availability-label">
-                                {% if driver.is_available %}Available{% else %}Busy{% endif %}
+                                {% if driver.is_available %}{% trans "Available" %}{% else %}{% trans "Busy" %}{% endif %}
                             </div>
                             <button class="btn btn-sm {% if driver.is_available %}btn-outline-secondary{% else %}btn-outline-success{% endif %} mt-1"
                                 id="toggle-availability-btn"
                                 onclick="toggleAvailability()">
-                                Toggle
+                                {% trans "Toggle" %}
                             </button>
                         </div>
                     </div>
@@ -155,7 +156,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-primary bg-opacity-10 h-100">
                         <div class="card-body text-center">
-                            <div class="text-muted small">Vehicle</div>
+                            <div class="text-muted small">{% trans "Vehicle" %}</div>
                             <div class="fw-bold text-primary">{{ driver.vehicle.plate_number|default:"Not assigned" }}</div>
                         </div>
                     </div>
@@ -165,53 +166,53 @@
             <!-- Route & Reports Map -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center map-card-header">
-                    <span><i class="bi bi-map text-success me-2"></i>My Route &amp; Reported Locations</span>
+                    <span><i class="bi bi-map text-success me-2"></i>{% trans "My Route" %} &amp; {% trans "Reported Locations" %}</span>
                     <div class="map-header-actions">
                         <span id="map-route-info" class="text-muted small me-3"></span>
-                        <button class="btn btn-sm btn-outline-secondary me-1" onclick="centerMap()" title="Re-center and fit all pins">
-                            <i class="bi bi-crosshair"></i> Center Map
+                        <button class="btn btn-sm btn-outline-secondary me-1" onclick="centerMap()" title="{% trans 'Re-center and fit all pins' %}">
+                            <i class="bi bi-crosshair"></i> {% trans "Center Map" %}
                         </button>
-                        <button class="btn btn-sm btn-outline-success" onclick="loadMapData()" title="Refresh map">
-                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        <button class="btn btn-sm btn-outline-success" onclick="loadMapData()" title="{% trans 'Refresh map' %}">
+                            <i class="bi bi-arrow-clockwise"></i> {% trans "Refresh" %}
                         </button>
                     </div>
                 </div>
                 <div id="driver-map"></div>
                 <div id="map-empty-note" class="map-empty-note d-none">
                     <i class="bi bi-geo fs-3 d-block mb-1"></i>
-                    No active locations right now — completed jobs are removed from the map automatically.
+                    {% trans "No active locations right now — completed jobs are removed from the map automatically." %}
                 </div>
                 <div class="map-legend">
-                    <span class="legend-item"><span class="legend-dot" style="background:#fd7e14;"></span>Pending</span>
-                    <span class="legend-item"><span class="legend-dot" style="background:#0d6efd;"></span>Assigned</span>
-                    <span class="legend-item"><span class="legend-dot" style="background:#0dcaf0;"></span>In Progress</span>
-                    <span class="legend-item">🚩 Checkpoint (drop-off point)</span>
-                    <span class="legend-item">🚛 Your last known location</span>
-                    <span class="legend-item"><span style="border-top:3px solid #198754; width:20px; display:inline-block;"></span>Admin-generated route (road path)</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#fd7e14;"></span>{% trans "Pending" %}</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#0d6efd;"></span>{% trans "Assigned" %}</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#0dcaf0;"></span>{% trans "In Progress" %}</span>
+                    <span class="legend-item">{% trans "🚩 Checkpoint (drop-off point)" %}</span>
+                    <span class="legend-item">{% trans "🚛 Your last known location" %}</span>
+                    <span class="legend-item"><span style="border-top:3px solid #198754; width:20px; display:inline-block;"></span>{% trans "Admin-generated route (road path)" %}</span>
                 </div>
             </div>
 
             <!-- Location Update -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white fw-bold">
-                    <i class="bi bi-geo-alt text-success me-2"></i>Update My Location
+                    <i class="bi bi-geo-alt text-success me-2"></i>{% trans "Update My Location" %}
                 </div>
                 <div class="card-body">
                     <div class="row g-2">
                         <div class="col-md-4">
-                            <input type="number" id="lat" class="form-control" placeholder="Latitude" step="any">
+                            <input type="number" id="lat" class="form-control" placeholder="{% trans 'Latitude' %}" step="any">
                         </div>
                         <div class="col-md-4">
-                            <input type="number" id="lng" class="form-control" placeholder="Longitude" step="any">
+                            <input type="number" id="lng" class="form-control" placeholder="{% trans 'Longitude' %}" step="any">
                         </div>
                         <div class="col-md-4">
                             <button class="btn btn-outline-success w-100" onclick="useGPS()">
-                                <i class="bi bi-crosshair me-1"></i>Use GPS
+                                <i class="bi bi-crosshair me-1"></i>{% trans "Use GPS" %}
                             </button>
                         </div>
                     </div>
                     <button class="btn btn-success mt-2" onclick="updateLocation()">
-                        <i class="bi bi-send me-1"></i>Send Location
+                        <i class="bi bi-send me-1"></i>{% trans "Send Location" %}
                     </button>
                 </div>
             </div>
@@ -219,12 +220,12 @@
             <!-- Assigned Requests -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white fw-bold">
-                    <i class="bi bi-clipboard-check text-success me-2"></i>My Assigned Requests
+                    <i class="bi bi-clipboard-check text-success me-2"></i>{% trans "My Assigned Requests" %}
                 </div>
                 <div class="card-body p-0 table-responsive">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
-                            <tr><th>#</th><th>User</th><th>Address</th><th>Type</th><th>Status</th><th>Date</th><th>Action</th></tr>
+                            <tr><th>#</th><th>{% trans "User" %}</th><th>{% trans "Address" %}</th><th>{% trans "Type" %}</th><th>{% trans "Status" %}</th><th>{% trans "Date" %}</th><th>{% trans "Action" %}</th></tr>
                         </thead>
                         <tbody id="assigned-requests-body">
                             {% for req in assigned_requests %}
@@ -242,16 +243,16 @@
                                 <td>
                                     <div class="btn-group btn-group-sm">
                                         {% if req.status == 'assigned' %}
-                                        <button class="btn btn-outline-info" onclick="updateStatus({{ req.id }}, 'in_progress', this)">Start</button>
+                                        <button class="btn btn-outline-info" onclick="updateStatus({{ req.id }}, 'in_progress', this)">{% trans "Start" %}</button>
                                         {% endif %}
                                         {% if req.status == 'in_progress' %}
-                                        <button class="btn btn-outline-success" onclick="updateStatus({{ req.id }}, 'completed', this)">Done</button>
+                                        <button class="btn btn-outline-success" onclick="updateStatus({{ req.id }}, 'completed', this)">{% trans "Done" %}</button>
                                         {% endif %}
                                     </div>
                                 </td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="7" class="text-center text-muted py-3">No assigned requests.</td></tr>
+                            <tr><td colspan="7" class="text-center text-muted py-3">{% trans "No assigned requests." %}</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -261,19 +262,19 @@
             {# ===== COMPLETED WORK HISTORY — "kaam garyo kaha bata uthayo" log ===== #}
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-check2-circle text-success me-2"></i>Completed Pickup History</span>
-                    <span class="text-muted small">Last {{ completed_history|length }} completed job(s)</span>
+                    <span><i class="bi bi-check2-circle text-success me-2"></i>{% trans "Completed Pickup History" %}</span>
+                    <span class="text-muted small">{% trans "Last" %} {{ completed_history|length }} {% trans "completed job(s)" %}</span>
                 </div>
                 <div class="card-body p-0 table-responsive">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
                                 <th>#</th>
-                                <th>Photo</th>
-                                <th>Picked Up From</th>
-                                <th>Waste Type</th>
-                                <th>Citizen</th>
-                                <th>Completed On</th>
+                                <th>{% trans "Photo" %}</th>
+                                <th>{% trans "Picked Up From" %}</th>
+                                <th>{% trans "Waste Type" %}</th>
+                                <th>{% trans "Citizen" %}</th>
+                                <th>{% trans "Completed On" %}</th>
                             </tr>
                         </thead>
                         <tbody id="completed-history-body">
@@ -283,7 +284,7 @@
                                 <td>
                                     {% if req.photo %}
                                     <a href="{{ req.photo.url }}" target="_blank">
-                                        <img src="{{ req.photo.url }}" alt="photo" class="history-photo-thumb">
+                                        <img src="{{ req.photo.url }}" alt="{% trans 'photo' %}" class="history-photo-thumb">
                                     </a>
                                     {% else %}
                                     <span class="text-muted small">—</span>
@@ -291,11 +292,11 @@
                                 </td>
                                 <td class="small" style="max-width: 260px;">{{ req.pickup_address|truncatechars:50 }}</td>
                                 <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">{{ req.get_waste_type_display }}</span></td>
-                                <td class="small">{% if req.user %}{{ req.user.username }}{% else %}<i class="bi bi-person-x"></i> Guest{% endif %}</td>
+                                <td class="small">{% if req.user %}{{ req.user.username }}{% else %}<i class="bi bi-person-x"></i> {% trans "Guest" %}{% endif %}</td>
                                 <td class="small text-muted">{{ req.completed_at|date:"d M Y, h:i A"|default:"—" }}</td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="6" class="text-center text-muted py-4">No completed pickups yet — finished jobs will show up here.</td></tr>
+                            <tr><td colspan="6" class="text-center text-muted py-4">{% trans "No completed pickups yet — finished jobs will show up here." %}</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -360,7 +361,7 @@ async function connectLocationWebSocket() {
     function notifyLocationSocketIssue(label, event) {
         console.warn(label, event);
         if (!window._locationReconnectWarned) {
-            showToast('Connection lost — live updates paused', 'warning');
+            showToast(gettext('Connection lost — live updates paused'), 'warning');
             window._locationReconnectWarned = true;
         }
         scheduleLocationReconnect();
@@ -370,7 +371,7 @@ async function connectLocationWebSocket() {
         try {
             const data = JSON.parse(e.data);
             if (data.type === 'route_update' && data.driver_id === {{ driver.id|default:'null' }}) {
-                showToast(`New route generated: ${data.total_stops} stops, ${data.total_distance} km`, 'info');
+                showToast(interpolate(gettext('New route generated: %(v0)s stops, %(v1)s km'), {v0: data.total_stops, v1: data.total_distance}, true), 'info');
                 loadMapData();
             }
             if (data.type === 'driver_location') {
@@ -414,23 +415,23 @@ async function connectLocationWebSocket() {
 connectLocationWebSocket();
 
 window.useGPS = function() {
-    if (!navigator.geolocation) { showToast('GPS not supported.', 'warning'); return; }
+    if (!navigator.geolocation) { showToast(gettext('GPS not supported.'), 'warning'); return; }
     navigator.geolocation.getCurrentPosition(
         pos => {
             document.getElementById('lat').value = pos.coords.latitude.toFixed(6);
             document.getElementById('lng').value = pos.coords.longitude.toFixed(6);
         },
-        () => showToast('Could not get GPS location.', 'danger')
+        () => showToast(gettext('Could not get GPS location.'), 'danger')
     );
 };
 
 window.updateLocation = async function() {
     const lat = document.getElementById('lat').value;
     const lng = document.getElementById('lng').value;
-    if (!lat || !lng) { showToast('Enter coordinates.', 'warning'); return; }
+    if (!lat || !lng) { showToast(gettext('Enter coordinates.'), 'warning'); return; }
 
     if (!locationWS || locationWS.readyState !== WebSocket.OPEN) {
-        showToast('Connection lost — live updates paused', 'warning');
+        showToast(gettext('Connection lost — live updates paused'), 'warning');
         return;
     }
 
@@ -440,7 +441,7 @@ window.updateLocation = async function() {
     if (driverId) {
         await API.patch(`/api/drivers/${driverId}/update_location/`, { latitude: lat, longitude: lng });
     }
-    showToast('Location updated!', 'success');
+    showToast(gettext('Location updated!'), 'success');
 
     // Move the driver marker on the map immediately, no need to refetch
     if (typeof updateDriverMarker === 'function') {
@@ -467,7 +468,7 @@ function applyAssignedRowUpdate(requestId, newStatus) {
         const badge = statusCell.querySelector('.badge');
         if (badge) {
             badge.className = `badge ${newStatus === 'in_progress' ? 'bg-info' : 'bg-primary'}`;
-            badge.textContent = newStatus === 'in_progress' ? 'In Progress' : newStatus;
+            badge.textContent = newStatus === 'in_progress' ? gettext('In Progress') : newStatus;
         }
     }
 
@@ -475,7 +476,7 @@ function applyAssignedRowUpdate(requestId, newStatus) {
     if (actionCell && newStatus === 'in_progress') {
         actionCell.innerHTML = `
             <div class="btn-group btn-group-sm">
-                <button class="btn btn-outline-success" onclick="updateStatus(${requestId}, 'completed', this)">Done</button>
+                <button class="btn btn-outline-success" onclick="updateStatus(${requestId}, 'completed', this)">${gettext('Done')}</button>
             </div>`;
     }
 }
@@ -502,7 +503,7 @@ function prependCompletedHistoryRow(req) {
     // req.photo is a server-generated file URL, not free text — safe to
     // interpolate directly into href/src.
     const photoCell = req.photo
-        ? `<a href="${req.photo}" target="_blank"><img src="${req.photo}" alt="photo" class="history-photo-thumb"></a>`
+        ? `<a href="${req.photo}" target="_blank"><img src="${req.photo}" alt="${gettext('photo')}" class="history-photo-thumb"></a>`
         : '<span class="text-muted small">—</span>';
 
     const citizenRaw = req.user
@@ -545,11 +546,11 @@ window.updateStatus = async function(requestId, newStatus, btn) {
 
     if (newStatus === 'completed') {
         if (!navigator.geolocation) {
-            showToast('GPS is not supported on this device. Cannot mark as completed.', 'danger');
+            showToast(gettext('GPS is not supported on this device. Cannot mark as completed.'), 'danger');
             return;
         }
 
-        showToast('Getting your location, please wait...', 'info');
+        showToast(gettext('Getting your location, please wait...'), 'info');
 
         try {
             const position = await new Promise((resolve, reject) => {
@@ -561,7 +562,7 @@ window.updateStatus = async function(requestId, newStatus, btn) {
             payload.latitude = position.coords.latitude;
             payload.longitude = position.coords.longitude;
         } catch (err) {
-            showToast('Location access is required to mark this job as completed. Please enable GPS/location permission and try again.', 'danger');
+            showToast(gettext('Location access is required to mark this job as completed. Please enable GPS/location permission and try again.'), 'danger');
             return;
         }
     }
@@ -579,7 +580,7 @@ window.updateStatus = async function(requestId, newStatus, btn) {
         const data = await res.json();
 
         if (res.ok && data.id) {
-            showToast(`Status updated to ${newStatus}`, 'success');
+            showToast(interpolate(gettext('Status updated to %(v0)s'), {v0: newStatus}, true), 'success');
 
             if (newStatus === 'completed') {
                 removeAssignedRow(requestId);
@@ -595,7 +596,7 @@ window.updateStatus = async function(requestId, newStatus, btn) {
             showToast(data.error || 'Update failed.', 'danger');
         }
     } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
+        showToast(gettext('Network error: ') + e.message, 'danger');
     }
     });
 };
@@ -606,14 +607,14 @@ window.toggleAvailability = async function() {
 
     const data = await API.patch(`/api/drivers/${driverId}/toggle_availability/`, {});
     if (data && data.id) {
-        showToast(`Changed to ${data.is_available ? 'Available' : 'Busy'}`, 'success');
+        showToast(interpolate(gettext('Changed to %(v0)s'), {v0: data.is_available ? 'Available' : 'Busy'}, true), 'success');
 
         const label = document.getElementById('availability-label');
         const btn = document.getElementById('toggle-availability-btn');
         const statCard = document.getElementById('availability-stat-card');
 
         if (label) {
-            label.textContent = data.is_available ? 'Available' : 'Busy';
+            label.textContent = data.is_available ? gettext('Available') : gettext('Busy');
             label.className = `fw-bold ${data.is_available ? 'text-success' : 'text-secondary'}`;
         }
         if (btn) {
@@ -623,7 +624,7 @@ window.toggleAvailability = async function() {
             statCard.className = `card border-0 ${data.is_available ? 'bg-success' : 'bg-secondary'} bg-opacity-10 h-100`;
         }
     } else {
-        showToast('Failed to update availability.', 'danger');
+        showToast(gettext('Failed to update availability.'), 'danger');
     }
 };
 
@@ -732,7 +733,7 @@ function ensureLeafletLoaded(onReady) {
 
     window._driverLeafletLoadPromise.then(onReady).catch((error) => {
         console.error('Leaflet failed to load for driver dashboard:', error);
-        showToast('Map failed to load. Please refresh the page.', 'danger');
+        showToast(gettext('Map failed to load. Please refresh the page.'), 'danger');
     });
 }
 

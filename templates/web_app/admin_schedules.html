@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Admin - Schedules Management{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Admin - Schedules Management" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -71,41 +72,41 @@
 
             <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold"><i class="bi bi-calendar-week text-success me-2"></i>Schedules Management</h2>
-                    <p class="text-muted mb-0">Configure municipal boundary collection maps, recurrence intervals, and operational fleet constraints.</p>
+                    <h2 class="mb-1 fw-bold"><i class="bi bi-calendar-week text-success me-2"></i>{% trans "Schedules Management" %}</h2>
+                    <p class="text-muted mb-0">{% trans "Configure municipal boundary collection maps, recurrence intervals, and operational fleet constraints." %}</p>
                 </div>
                 <div>
                     <button class="btn btn-success px-4 py-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
-                        <i class="bi bi-plus-lg me-2"></i>Create Zone Mapping
+                        <i class="bi bi-plus-lg me-2"></i>{% trans "Create Zone Mapping" %}
                     </button>
                 </div>
             </div>
 
             <div class="card dashboard-card">
                 <div class="card-header py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-calendar2-range me-2 text-success"></i>Configured Operational Route Intervals</h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-calendar2-range me-2 text-success"></i>{% trans "Configured Operational Route Intervals" %}</h6>
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportFilteredSchedules()">
-                        <i class="bi bi-download me-1"></i>Export (CSV)
+                        <i class="bi bi-download me-1"></i>{% trans "Export (CSV)" %}
                     </button>
                 </div>
 
                 {# ===== BULK ACTION TOOLBAR ===== #}
                 <div id="bulk-toolbar" class="d-none align-items-center gap-2 px-3 py-2 border-bottom bulk-toolbar">
-                    <span class="fw-semibold small"><span id="bulk-selected-count">0</span> selected</span>
+                    <span class="fw-semibold small"><span id="bulk-selected-count">0</span> {% trans "selected" %}</span>
                     <button type="button" class="btn btn-sm btn-success" onclick="bulkSetSchedulesActive(true)">
-                        <i class="bi bi-toggle-on me-1"></i>Activate
+                        <i class="bi bi-toggle-on me-1"></i>{% trans "Activate" %}
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkSetSchedulesActive(false)">
-                        <i class="bi bi-toggle-off me-1"></i>Deactivate
+                        <i class="bi bi-toggle-off me-1"></i>{% trans "Deactivate" %}
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-danger" onclick="bulkDeleteSchedules()">
-                        <i class="bi bi-trash me-1"></i>Purge Selected
+                        <i class="bi bi-trash me-1"></i>{% trans "Purge Selected" %}
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportSelectedSchedules()">
-                        <i class="bi bi-download me-1"></i>Export Selected (CSV)
+                        <i class="bi bi-download me-1"></i>{% trans "Export Selected (CSV)" %}
                     </button>
                     <button type="button" class="btn btn-sm btn-link text-muted ms-auto" onclick="clearScheduleSelection()">
-                        Clear selection
+                        {% trans "Clear selection" %}
                     </button>
                 </div>
 
@@ -117,14 +118,14 @@
                                     <th style="width: 2.5rem;">
                                         <input type="checkbox" class="form-check-input" id="select-all-schedules" onchange="toggleSelectAllSchedules(this)">
                                     </th>
-                                    <th># ID</th>
-                                    <th>Sector / Zone Name</th>
-                                    <th>Recurring Day</th>
-                                    <th>Frequency Sequence</th>
-                                    <th>Assigned Operator</th>
-                                    <th>Asset Plate ID</th>
-                                    <th>State Engine</th>
-                                    <th class="text-end pe-4">Registry Actions</th>
+                                    <th>{% trans "# ID" %}</th>
+                                    <th>{% trans "Sector / Zone Name" %}</th>
+                                    <th>{% trans "Recurring Day" %}</th>
+                                    <th>{% trans "Frequency Sequence" %}</th>
+                                    <th>{% trans "Assigned Operator" %}</th>
+                                    <th>{% trans "Asset Plate ID" %}</th>
+                                    <th>{% trans "State Engine" %}</th>
+                                    <th class="text-end pe-4">{% trans "Registry Actions" %}</th>
                                 </tr>
                             </thead>
                             <tbody id="schedules-table-body">
@@ -139,14 +140,14 @@
                                     <td class="fw-medium">
                                         {% if schedule.day_of_week is not None %}
                                             {% with day=schedule.day_of_week %}
-                                                {% if day == 0 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Monday</span>
-                                                {% elif day == 1 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Tuesday</span>
-                                                {% elif day == 2 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Wednesday</span>
-                                                {% elif day == 3 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Thursday</span>
-                                                {% elif day == 4 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Friday</span>
-                                                {% elif day == 5 %}<span class="badge bg-success bg-opacity-10 text-success">Saturday</span>
-                                                {% elif day == 6 %}<span class="badge bg-danger bg-opacity-10 text-danger">Sunday</span>
-                                                {% else %}Unknown
+                                                {% if day == 0 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">{% trans "Monday" %}</span>
+                                                {% elif day == 1 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">{% trans "Tuesday" %}</span>
+                                                {% elif day == 2 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">{% trans "Wednesday" %}</span>
+                                                {% elif day == 3 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">{% trans "Thursday" %}</span>
+                                                {% elif day == 4 %}<span class="badge bg-secondary bg-opacity-10 text-secondary">{% trans "Friday" %}</span>
+                                                {% elif day == 5 %}<span class="badge bg-success bg-opacity-10 text-success">{% trans "Saturday" %}</span>
+                                                {% elif day == 6 %}<span class="badge bg-danger bg-opacity-10 text-danger">{% trans "Sunday" %}</span>
+                                                {% else %}{% trans "Unknown" %}
                                                 {% endif %}
                                             {% endwith %}
                                         {% else %}
@@ -162,7 +163,7 @@
                                         {% if schedule.driver %}
                                             <span><i class="bi bi-person text-secondary me-1"></i>{{ schedule.driver.user.username }}</span>
                                         {% else %}
-                                            <span class="text-muted small italic">No Operator Bound</span>
+                                            <span class="text-muted small italic">{% trans "No Operator Bound" %}</span>
                                         {% endif %}
                                     </td>
                                     <td>
@@ -182,14 +183,14 @@
                                     </td>
                                     <td class="text-end pe-4">
                                         <button class="btn btn-sm btn-outline-danger px-3 py-1" style="font-size: 0.8rem;" onclick="deleteSchedule({{ schedule.id }}, this)">
-                                            <i class="bi bi-trash me-1"></i>Purge
+                                            <i class="bi bi-trash me-1"></i>{% trans "Purge" %}
                                         </button>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
                                     <td colspan="9" class="text-center text-muted py-5">
-                                        <i class="bi bi-inbox fs-3 d-block mb-1"></i> No system-wide scheduling matrices map inside active storage logs.
+                                        <i class="bi bi-inbox fs-3 d-block mb-1"></i> {% trans "No system-wide scheduling matrices map inside active storage logs." %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -206,50 +207,50 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-calendar-plus me-2"></i>Map Operational Schedule Cluster</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-calendar-plus me-2"></i>{% trans "Map Operational Schedule Cluster" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <div class="mb-3">
-                    <label class="form-label small fw-semibold text-secondary">Municipal Zone Identifier</label>
-                    <input type="text" class="form-control" id="add-zone" placeholder="e.g., Ward 8 - Lakeside North">
+                    <label class="form-label small fw-semibold text-secondary">{% trans "Municipal Zone Identifier" %}</label>
+                    <input type="text" class="form-control" id="add-zone" placeholder="{% trans 'e.g., Ward 8 - Lakeside North' %}">
                 </div>
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
-                        <label class="form-label small fw-semibold text-secondary">Recurrence Weekday</label>
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Recurrence Weekday" %}</label>
                         <select class="form-select" id="add-day">
-                            <option value="0">Monday</option>
-                            <option value="1">Tuesday</option>
-                            <option value="2">Wednesday</option>
-                            <option value="3">Thursday</option>
-                            <option value="4">Friday</option>
-                            <option value="5">Saturday</option>
-                            <option value="6">Sunday</option>
+                            <option value="0">{% trans "Monday" %}</option>
+                            <option value="1">{% trans "Tuesday" %}</option>
+                            <option value="2">{% trans "Wednesday" %}</option>
+                            <option value="3">{% trans "Thursday" %}</option>
+                            <option value="4">{% trans "Friday" %}</option>
+                            <option value="5">{% trans "Saturday" %}</option>
+                            <option value="6">{% trans "Sunday" %}</option>
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label small fw-semibold text-secondary">Interval Frequency</label>
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Interval Frequency" %}</label>
                         <select class="form-select" id="add-frequency">
-                            <option value="daily">Daily Stream</option>
-                            <option value="weekly">Weekly Cycle</option>
-                            <option value="biweekly">Bi-Weekly Loop</option>
-                            <option value="monthly">Monthly Mapping</option>
+                            <option value="daily">{% trans "Daily Stream" %}</option>
+                            <option value="weekly">{% trans "Weekly Cycle" %}</option>
+                            <option value="biweekly">{% trans "Bi-Weekly Loop" %}</option>
+                            <option value="monthly">{% trans "Monthly Mapping" %}</option>
                         </select>
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label small fw-semibold text-secondary">Primary Fleet Operator (Optional)</label>
+                    <label class="form-label small fw-semibold text-secondary">{% trans "Primary Fleet Operator (Optional)" %}</label>
                     <select class="form-select" id="add-driver">
-                        <option value="">Leave Unassigned</option>
+                        <option value="">{% trans "Leave Unassigned" %}</option>
                         {% for driver in drivers %}
                         <option value="{{ driver.id }}">{{ driver.user.username }} [{{ driver.vehicle.plate_number|default:"No Asset Machine Linked" }}]</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="mb-1">
-                    <label class="form-label small fw-semibold text-secondary">Asset Heavy Machine Fleet (Optional)</label>
+                    <label class="form-label small fw-semibold text-secondary">{% trans "Asset Heavy Machine Fleet (Optional)" %}</label>
                     <select class="form-select" id="add-vehicle">
-                        <option value="">Leave Unassigned</option>
+                        <option value="">{% trans "Leave Unassigned" %}</option>
                         {% for vehicle in vehicles %}
                         <option value="{{ vehicle.id }}">{{ vehicle.plate_number }} — [{{ vehicle.get_vehicle_type_display }}]</option>
                         {% endfor %}
@@ -257,8 +258,8 @@
                 </div>
             </div>
             <div class="modal-footer bg-surface-alt">
-                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success px-4" onclick="addSchedule(this)">Save Matrix Node</button>
+                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button class="btn btn-success px-4" onclick="addSchedule(this)">{% trans "Save Matrix Node" %}</button>
             </div>
         </div>
     </div>
@@ -322,7 +323,7 @@ async function bulkSetSchedulesActive(isActive) {
     const ids = getSelectedScheduleIds();
     if (!ids.length) return;
     const verb = isActive ? 'activate' : 'deactivate';
-    if (!confirm(`Are you sure you want to ${verb} ${ids.length} selected schedule(s)?`)) return;
+    if (!confirm(interpolate(gettext('Are you sure you want to %(v0)s %(v1)s selected schedule(s)?'), {v0: verb, v1: ids.length}, true))) return;
 
     await withButtonBusy(null, '', async () => {
         const data = await API.post('/api/schedules/bulk_set_active/', { ids, is_active: isActive });
@@ -337,7 +338,7 @@ async function bulkSetSchedulesActive(isActive) {
             });
             clearScheduleSelection();
         } else {
-            showToast('Bulk activation update failed.', 'danger');
+            showToast(gettext('Bulk activation update failed.'), 'danger');
         }
     });
 }
@@ -345,7 +346,7 @@ async function bulkSetSchedulesActive(isActive) {
 async function bulkDeleteSchedules() {
     const ids = getSelectedScheduleIds();
     if (!ids.length) return;
-    if (!confirm(`Permanently delete ${ids.length} selected schedule(s)? This cannot be undone.`)) return;
+    if (!confirm(interpolate(gettext('Permanently delete %(v0)s selected schedule(s)? This cannot be undone.'), {v0: ids.length}, true))) return;
 
     await withButtonBusy(null, '', async () => {
         const data = await API.post('/api/schedules/bulk_delete/', { ids });
@@ -365,7 +366,7 @@ async function bulkDeleteSchedules() {
             }
             clearScheduleSelection();
         } else {
-            showToast('Bulk delete failed.', 'danger');
+            showToast(gettext('Bulk delete failed.'), 'danger');
         }
     });
 }
@@ -391,11 +392,11 @@ async function toggleActive(scheduleId, isActive, el) {
     try {
         const data = await API.patch(`/api/schedules/${scheduleId}/`, { is_active: isActive });
         if (!data || data.id === undefined) {
-            showToast('Failed to patch systemic active lifecycle flag.', 'danger');
+            showToast(gettext('Failed to patch systemic active lifecycle flag.'), 'danger');
             const revert = document.getElementById(`schedule-active-${scheduleId}`);
             if (revert) revert.checked = !isActive;
         } else {
-            showToast('Zone monitoring schedule altered successfully.', 'success');
+            showToast(gettext('Zone monitoring schedule altered successfully.'), 'success');
         }
     } finally {
         if (toggle) toggle.disabled = false;
@@ -403,7 +404,7 @@ async function toggleActive(scheduleId, isActive, el) {
 }
 
 async function deleteSchedule(scheduleId, btn) {
-    if (!confirm('Are you absolutely sure you want to drop this scheduling context from system routing?')) return;
+    if (!confirm(gettext('Are you absolutely sure you want to drop this scheduling context from system routing?'))) return;
 
     await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {
@@ -420,7 +421,7 @@ async function deleteSchedule(scheduleId, btn) {
         // .json() call garda error aauthyo, tesैले toast/refresh kahile
         // dekhdैनthyo jaba samma manually page reload nagareसमम.
         if (res.ok || res.status === 204) {
-            showToast('Operational route sequence entry successfully dropped.', 'success');
+            showToast(gettext('Operational route sequence entry successfully dropped.'), 'success');
             const row = document.getElementById(`schedule-row-${scheduleId}`);
             if (row) row.remove();
 
@@ -443,7 +444,7 @@ async function deleteSchedule(scheduleId, btn) {
             showToast(errMsg, 'danger');
         }
     } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
+        showToast(gettext('Network error: ') + e.message, 'danger');
     }
     });
 }
@@ -466,14 +467,14 @@ async function addSchedule(btn) {
     };
 
     if (!payload.zone_name || payload.day_of_week === undefined || !payload.frequency) {
-        showToast('Required baseline keys (Zone parameters, weekday vector, frequency) are unassigned.', 'warning');
+        showToast(gettext('Required baseline keys (Zone parameters, weekday vector, frequency) are unassigned.'), 'warning');
         return;
     }
 
     await withButtonBusy(eventButton(btn), 'Creating...', async () => {
     const data = await API.post('/api/schedules/', payload);
     if (data && data.id) {
-        showToast('Naya pipeline schedule successfully created!', 'success');
+        showToast(gettext('Naya pipeline schedule successfully created!'), 'success');
         bootstrap.Modal.getInstance(document.getElementById('addScheduleModal')).hide();
 
         // Naya row lai DOM ma directly insert garne — reload nagari nai
@@ -482,7 +483,7 @@ async function addSchedule(btn) {
             daySelect, freqSelect, driverSelect, vehicleSelect,
         });
     } else {
-        showToast('Network fault or schema reject during insertion.', 'danger');
+        showToast(gettext('Network fault or schema reject during insertion.'), 'danger');
     }
     });
 }
@@ -539,7 +540,7 @@ function insertScheduleRow(scheduleData, ctx) {
             </td>
             <td class="text-end pe-4">
                 <button class="btn btn-sm btn-outline-danger px-3 py-1" style="font-size: 0.8rem;" onclick="deleteSchedule(${scheduleData.id}, this)">
-                    <i class="bi bi-trash me-1"></i>Purge
+                    <i class="bi bi-trash me-1"></i>${gettext('Purge')}
                 </button>
             </td>
         </tr>`;

@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Recycle Bin{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Recycle Bin" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -36,12 +37,12 @@
 
             <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-recycle text-success me-2"></i>Recycle Bin</h2>
-                    <p class="text-muted mb-0">Deleted requests stay here until restored or permanently removed.</p>
+                    <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-recycle text-success me-2"></i>{% trans "Recycle Bin" %}</h2>
+                    <p class="text-muted mb-0">{% trans "Deleted requests stay here until restored or permanently removed." %}</p>
                 </div>
                 {% if deleted_requests %}
                 <button class="btn btn-outline-danger" onclick="emptyRecycleBin(this)">
-                    <i class="bi bi-trash3 me-1"></i>Empty Bin
+                    <i class="bi bi-trash3 me-1"></i>{% trans "Empty Bin" %}
                 </button>
                 {% endif %}
             </div>
@@ -53,11 +54,11 @@
                             <thead class="table-light">
                                 <tr>
                                     <th class="ps-4">#</th>
-                                    <th>Type</th>
-                                    <th>Photo</th>
-                                    <th>Status</th>
-                                    <th>Deleted On</th>
-                                    <th class="pe-4 text-end">Actions</th>
+                                    <th>{% trans "Type" %}</th>
+                                    <th>{% trans "Photo" %}</th>
+                                    <th>{% trans "Status" %}</th>
+                                    <th>{% trans "Deleted On" %}</th>
+                                    <th class="pe-4 text-end">{% trans "Actions" %}</th>
                                 </tr>
                             </thead>
                             <tbody id="recycle-bin-body">
@@ -68,7 +69,7 @@
                                     <td>
                                         {% if req.photo %}
                                         <a href="{{ req.photo.url }}" target="_blank">
-                                            <img src="{{ req.photo.url }}" alt="photo"
+                                            <img src="{{ req.photo.url }}" alt="{% trans 'photo' %}"
                                                 style="height:36px;width:36px;object-fit:cover;border-radius:4px;">
                                         </a>
                                         {% else %}
@@ -88,10 +89,10 @@
                                     <td class="small text-muted">{{ req.deleted_at|date:"d M Y H:i" }}</td>
                                     <td class="pe-4 text-end">
                                         <button class="btn btn-sm btn-outline-success me-1" onclick="restoreRequest({{ req.id }}, this)">
-                                            <i class="bi bi-arrow-counterclockwise me-1"></i>Restore
+                                            <i class="bi bi-arrow-counterclockwise me-1"></i>{% trans "Restore" %}
                                         </button>
                                         <button class="btn btn-sm btn-outline-danger" onclick="permanentlyDeleteRequest({{ req.id }}, this)">
-                                            <i class="bi bi-trash3 me-1"></i>Delete Forever
+                                            <i class="bi bi-trash3 me-1"></i>{% trans "Delete Forever" %}
                                         </button>
                                     </td>
                                 </tr>
@@ -99,7 +100,7 @@
                                 <tr>
                                     <td colspan="6" class="text-center text-muted py-5">
                                         <i class="bi bi-recycle fs-2 mb-2 d-block text-secondary"></i>
-                                        Recycle Bin is empty.
+                                        {% trans "Recycle Bin is empty." %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -144,7 +145,7 @@
                 <tr>
                     <td colspan="6" class="text-center text-muted py-5">
                         <i class="bi bi-recycle fs-2 mb-2 d-block text-secondary"></i>
-                        Recycle Bin is empty.
+                        ${gettext('Recycle Bin is empty.')}
                     </td>
                 </tr>`;
             const emptyBtn = document.querySelector('button[onclick="emptyRecycleBin(this)"]');
@@ -164,20 +165,20 @@
             });
 
             if (res.ok) {
-                showToast('Request restored.', 'success');
+                showToast(gettext('Request restored.'), 'success');
                 fadeRemoveRow(requestId);
                 setTimeout(showEmptyStateIfNeeded, 350);
             } else {
-                showToast('Failed to restore request.', 'danger');
+                showToast(gettext('Failed to restore request.'), 'danger');
             }
         } catch (e) {
-            showToast('Network error: ' + e.message, 'danger');
+            showToast(gettext('Network error: ') + e.message, 'danger');
         }
         });
     };
 
     window.permanentlyDeleteRequest = async function(requestId, btn) {
-        if (!confirm('Permanently delete this request? This cannot be undone.')) return;
+        if (!confirm(gettext('Permanently delete this request? This cannot be undone.'))) return;
 
         await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
         try {
@@ -189,14 +190,14 @@
             });
 
             if (res.ok) {
-                showToast('Request permanently deleted.', 'success');
+                showToast(gettext('Request permanently deleted.'), 'success');
                 fadeRemoveRow(requestId);
                 setTimeout(showEmptyStateIfNeeded, 350);
             } else {
-                showToast('Failed to permanently delete request.', 'danger');
+                showToast(gettext('Failed to permanently delete request.'), 'danger');
             }
         } catch (e) {
-            showToast('Network error: ' + e.message, 'danger');
+            showToast(gettext('Network error: ') + e.message, 'danger');
         }
         });
     };
@@ -205,7 +206,7 @@
     // double-click previously started a second pass while the first was still
     // running — duplicate requests for rows not yet removed from the DOM.
     window.emptyRecycleBin = async function(btn) {
-        if (!confirm('Permanently delete ALL items in the Recycle Bin? This cannot be undone.')) return;
+        if (!confirm(gettext('Permanently delete ALL items in the Recycle Bin? This cannot be undone.'))) return;
 
         await withButtonBusy(eventButton(btn), 'Emptying...', async () => {
         const rows = Array.from(document.querySelectorAll('#recycle-bin-body tr[id^="bin-row-"]'));
@@ -231,9 +232,9 @@
         }
 
         if (failedCount === 0) {
-            showToast('Recycle Bin emptied.', 'success');
+            showToast(gettext('Recycle Bin emptied.'), 'success');
         } else {
-            showToast(`Emptied with ${failedCount} item(s) failing to delete.`, 'warning');
+            showToast(interpolate(gettext('Emptied with %(v0)s item(s) failing to delete.'), {v0: failedCount}, true), 'warning');
         }
 
         const badge = document.getElementById('recycle-bin-badge');

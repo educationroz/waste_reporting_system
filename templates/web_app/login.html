@@ -1,6 +1,7 @@
 {% extends 'web_app/base.html' %}
+{% load i18n %}
 {% load static %}
-{% block title %}Login — Waste Collection{% endblock %}
+{% block title %}{% trans "Login — Waste Collection" %}{% endblock %}
 
 {% block content %}
 <div class="min-vh-100 d-flex align-items-center justify-content-center auth-page-bg px-3">
@@ -8,45 +9,45 @@
         <div class="card-body p-4">
             {% csrf_token %}
             <div class="text-center mb-4">
-                 <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="Logo" width="100" height="100" class="d-inline-block align-text-top me-2">
-                <h4 class="mt-2 fw-bold">Sign In</h4>
-                <p class="text-muted small">Waste Collection System</p>
+                 <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="{% trans 'Logo' %}" width="100" height="100" class="d-inline-block align-text-top me-2">
+                <h4 class="mt-2 fw-bold">{% trans "Sign In" %}</h4>
+                <p class="text-muted small">{% trans "Waste Collection System" %}</p>
             </div>
 
             <div id="error-alert" class="alert alert-danger d-none"></div>
 
             <div class="mb-3">
-                <label class="form-label">Username</label>
-                <input type="text" id="username" class="form-control" placeholder="Enter username" autofocus required>
+                <label class="form-label">{% trans "Username" %}</label>
+                <input type="text" id="username" class="form-control" placeholder="{% trans 'Enter username' %}" autofocus required>
             </div>
             <div class="mb-3">
-                <label class="form-label">Password</label>
+                <label class="form-label">{% trans "Password" %}</label>
                 <div class="position-relative">
-                    <input type="password" id="password" class="form-control pe-5" placeholder="Enter password" required
+                    <input type="password" id="password" class="form-control pe-5" placeholder="{% trans 'Enter password' %}" required
                         oninput="handlePasswordInput()">
                     <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted" 
                         id="toggle-password-icon" style="cursor: pointer; display: none;" onclick="togglePassword()"></i>
                 </div>
             </div>
             <button class="btn btn-success w-100" id="login-btn" onclick="doLogin()">
-                <span id="login-text">Sign In</span>
+                <span id="login-text">{% trans "Sign In" %}</span>
                 <span id="login-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
             </button>
 
             <div class="d-flex align-items-center my-3">
                 <hr class="flex-grow-1">
-                <span class="px-2 text-muted small">or</span>
+                <span class="px-2 text-muted small">{% trans "or" %}</span>
                 <hr class="flex-grow-1">
             </div>
 
             <div id="g_id_signin_container" class="d-flex justify-content-center"></div>
 
             <p class="text-center mt-3 mb-0">
-                <a href="{% url 'forgot-password' %}" class="small text-decoration-none" style="color:#6fcf97;">Forgot password?</a>
+                <a href="{% url 'forgot-password' %}" class="small text-decoration-none" style="color:#6fcf97;">{% trans "Forgot password?" %}</a>
             </p>
 
             <p class="text-center mt-2 mb-0 small">
-                Don't have an account? <a href="{% url 'register' %}" id="register-link" class="text-success">Register</a>
+                {% trans "Don't have an account?" %} <a href="{% url 'register' %}" id="register-link" class="text-success">{% trans "Register" %}</a>
             </p>
         </div>
     </div>
