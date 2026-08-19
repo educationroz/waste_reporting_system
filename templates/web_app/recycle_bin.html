@@ -158,8 +158,9 @@
         try {
             const res = await fetch(`/api/waste-requests/${requestId}/restore/`, {
                 method: 'PATCH',
+                credentials: 'same-origin',
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'X-CSRFToken': getCookie('csrftoken'),
                     'Content-Type': 'application/json',
                 },
             });
@@ -184,8 +185,9 @@
         try {
             const res = await fetch(`/api/waste-requests/${requestId}/`, {
                 method: 'DELETE',
+                credentials: 'same-origin',
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'X-CSRFToken': getCookie('csrftoken'),
                 },
             });
 
@@ -217,8 +219,9 @@
             try {
                 const res = await fetch(`/api/waste-requests/${requestId}/`, {
                     method: 'DELETE',
+                    credentials: 'same-origin',
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'X-CSRFToken': getCookie('csrftoken'),
                     },
                 });
                 if (res.ok) {

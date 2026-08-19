@@ -492,6 +492,7 @@ window.addAdmin = async function(btn) {
     try {
         const res = await fetch('/api/auth/create-admin/', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -565,6 +566,7 @@ window.updateAdmin = async function(btn) {
 
         const res = await fetch(`/api/auth/admin/${adminId}/update/`, {
             method: 'PATCH',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -604,6 +606,7 @@ window.removeAdmin = async function(adminId, btn) {
     try {
         const res = await fetch(`/api/auth/admin/${adminId}/delete/`, {
             method: 'DELETE',
+            credentials: 'same-origin',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken'),
             },

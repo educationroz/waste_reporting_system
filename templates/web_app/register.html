@@ -133,6 +133,7 @@ window.doRegister = async function() {
     try {
         const res = await fetch('/auth/register/', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -230,6 +231,7 @@ async function handleGoogleCredential(response) {
     try {
         const res = await fetch('/auth/google-login/', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -239,9 +241,9 @@ async function handleGoogleCredential(response) {
         const data = await res.json();
 
         if (res.ok) {
-            localStorage.setItem('access_token', data.access);
-            localStorage.setItem('refresh_token', data.refresh);
-
+            // GoogleLoginView sets the HttpOnly session cookie server-side.
+            // We intentionally do not store data.access / data.refresh —
+            // keeping JWTs out of JS-readable storage is the whole point.
             const role = data.user?.role || '';
             const redirectMap = {
                 admin: '/admin-dashboard/',

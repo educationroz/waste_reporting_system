@@ -133,8 +133,9 @@
         try {
             const res = await fetch(`/api/waste-requests/${requestId}/`, {
                 method: 'DELETE',
+                credentials: 'same-origin',
                 headers: {
-                    'Authorization': `Bearer ${getToken()}`,
+                    'X-CSRFToken': getCookie('csrftoken'),
                 },
             });
 

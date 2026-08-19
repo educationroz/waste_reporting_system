@@ -66,7 +66,7 @@
             <div class="mb-3">
                 <!--
                     Uses native history.back() (SPA-feel, no full reload).
-                    base.html's authenticated <script> block is now wrapped in
+                    base.html's authenticated script block is now wrapped in
                     a window.__ssAuthScriptLoaded guard, so htmx's
                     history-cache restore re-inserting it no longer throws
                     "Identifier 'API' has already been declared".
@@ -179,7 +179,7 @@ function safaSaharGoBack() {
             }
 
             try {
-                // authFetch (defined in base.html) handles the Bearer token +
+                // authFetch (defined in base.html) handles the session cookie +
                 // 401 refresh for us. Don't set Content-Type manually — the
                 // browser needs to add its own multipart boundary for FormData.
                 const res = await authFetch('/auth/profile/', {
