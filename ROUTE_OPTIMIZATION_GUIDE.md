@@ -149,8 +149,11 @@ Returns distance in kilometers.
 Route updates sent via WebSocket to channel group `driver_locations`:
 ```javascript
 // On client (browser)
+// Auth comes from the HttpOnly session cookie, which the browser sends on the
+// handshake automatically. Never put a token in the URL — query strings are
+// logged by proxies and kept in browser history.
 const ws = new WebSocket(
-  `ws://localhost:8000/ws/driver-locations/?token=<jwt_token>`
+  `ws://localhost:8000/ws/driver-locations/`
 );
 
 ws.onmessage = (e) => {
