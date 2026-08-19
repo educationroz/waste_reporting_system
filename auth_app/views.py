@@ -73,7 +73,16 @@ def send_password_reset_email(user, request):
 
 
 class SessionLoginView(APIView):
+    """Primary browser login: sets the HttpOnly session cookie.
+
+    SECURITY: the browser UI uses this instead of the JWT endpoint so no
+    token is ever readable from JavaScript. It returns the user payload the
+    login page needs for its post-login role redirect, but deliberately
+    returns no access/refresh token.
+    """
+
     permission_classes = [AllowAny]
+    throttle_scope = 'session_login'
 
     def post(self, request):
         username = request.data.get('username')
@@ -81,7 +90,15 @@ class SessionLoginView(APIView):
         user = authenticate(username=username, password=password)
         if user:
             login(request, user)
-            return Response({'message': 'Session created.'})
+            return Response({
+                'message': 'Session created.',
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'role': getattr(user, 'role', ''),
+                },
+            })
         return Response({'error': 'Invalid credentials.'}, status=400)
 
 

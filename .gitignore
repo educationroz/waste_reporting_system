@@ -72,3 +72,6 @@ npm-debug.log*
 # plus they are machine-generated. Keep them local / in off-site storage.
 backups/*.json
 backups/*.sha256
+
+# Local download bundles (generated artifacts, not source)
+_download/

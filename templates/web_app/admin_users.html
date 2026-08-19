@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
-{% block title %}Admin Users Management{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Admin Users Management" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -42,11 +43,11 @@
 
             <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
                 <div>
-                    <h2 class="mb-1 fw-bold"><i class="bi bi-shield-check text-success me-2"></i>Admin Users Management</h2>
-                    <p class="text-muted mb-0">Manage admin accounts and their operational permissions</p>
+                    <h2 class="mb-1 fw-bold"><i class="bi bi-shield-check text-success me-2"></i>{% trans "Admin Users Management" %}</h2>
+                    <p class="text-muted mb-0">{% trans "Manage admin accounts and their operational permissions" %}</p>
                 </div>
                 <button class="btn btn-success px-4 py-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#addAdminModal">
-                    <i class="bi bi-person-plus me-2"></i>Add Admin User
+                    <i class="bi bi-person-plus me-2"></i>{% trans "Add Admin User" %}
                 </button>
             </div>
 
@@ -54,25 +55,25 @@
             <div class="row g-3 mb-4">
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-success bg-opacity-10 p-3 rounded-3 shadow-sm">
-                        <div class="text-muted small fw-medium">Total Admins</div>
+                        <div class="text-muted small fw-medium">{% trans "Total Admins" %}</div>
                         <div class="fs-3 fw-bold text-success" id="stat-total-admins">{{ total_admins }}</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-primary bg-opacity-10 p-3 rounded-3 shadow-sm">
-                        <div class="text-muted small fw-medium">Active Admins</div>
+                        <div class="text-muted small fw-medium">{% trans "Active Admins" %}</div>
                         <div class="fs-3 fw-bold text-primary" id="stat-active-admins">{{ active_admins }}</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-warning bg-opacity-10 p-3 rounded-3 shadow-sm">
-                        <div class="text-muted small fw-medium">Inactive Admins</div>
+                        <div class="text-muted small fw-medium">{% trans "Inactive Admins" %}</div>
                         <div class="fs-3 fw-bold text-warning" id="stat-inactive-admins">{{ inactive_admins }}</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="card border-0 bg-info bg-opacity-10 p-3 rounded-3 shadow-sm">
-                        <div class="text-muted small fw-medium">Total Users</div>
+                        <div class="text-muted small fw-medium">{% trans "Total Users" %}</div>
                         <div class="fs-3 fw-bold text-info" id="stat-all-users">{{ all_users }}</div>
                     </div>
                 </div>
@@ -84,12 +85,12 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light text-secondary">
                             <tr>
-                                <th class="ps-4 py-3"><i class="bi bi-person-circle me-2"></i>Admin Name</th>
-                                <th class="py-3">Email</th>
-                                <th class="py-3">Username</th>
-                                <th class="py-3">Status</th>
-                                <th class="py-3">Created</th>
-                                <th class="pe-4 py-3 text-end">Actions</th>
+                                <th class="ps-4 py-3"><i class="bi bi-person-circle me-2"></i>{% trans "Admin Name" %}</th>
+                                <th class="py-3">{% trans "Email" %}</th>
+                                <th class="py-3">{% trans "Username" %}</th>
+                                <th class="py-3">{% trans "Status" %}</th>
+                                <th class="py-3">{% trans "Created" %}</th>
+                                <th class="pe-4 py-3 text-end">{% trans "Actions" %}</th>
                             </tr>
                         </thead>
                         <tbody id="admins-table-body">
@@ -108,7 +109,7 @@
                                             <div class="fw-bold">
                                                 {{ admin.get_full_name|default:admin.username }}
                                                 {% if admin.is_superadmin %}
-                                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle rounded-pill px-2 py-0.5 ms-1" style="font-size: 0.65rem;"><i class="bi bi-star-fill me-1"></i>Superadmin</span>
+                                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle rounded-pill px-2 py-0.5 ms-1" style="font-size: 0.65rem;"><i class="bi bi-star-fill me-1"></i>{% trans "Superadmin" %}</span>
                                                 {% endif %}
                                             </div>
                                             <div class="small text-muted">{{ admin.phone|default:"-" }}</div>
@@ -123,9 +124,9 @@
                                 </td>
                                 <td>
                                     {% if admin.is_active %}
-                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5"><i class="bi bi-check-circle me-1"></i>Active</span>
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5"><i class="bi bi-check-circle me-1"></i>{% trans "Active" %}</span>
                                     {% else %}
-                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5"><i class="bi bi-x-circle me-1"></i>Inactive</span>
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5"><i class="bi bi-x-circle me-1"></i>{% trans "Inactive" %}</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -145,11 +146,11 @@
                                             data-admin-full-name="{{ admin.get_full_name|default:admin.username|escape }}"
                                             data-admin-active="{{ admin.is_active|yesno:'true,false' }}"
                                             data-admin-is-superadmin="{{ admin.is_superadmin|yesno:'true,false' }}"
-                                            title="Edit Administrative Access"
+                                            title="{% trans 'Edit Administrative Access' %}"
                                         >
                                             <i class="bi bi-pencil"></i>
                                         </button>
-                                        <button class="btn btn-outline-danger btn-sm rounded-end" onclick="if(confirm('Are you absolute sure to remove this admin?')) { removeAdmin({{ admin.id }}, this); }" title="Remove Administrative Access">
+                                        <button class="btn btn-outline-danger btn-sm rounded-end" onclick="if(confirm('Are you absolute sure to remove this admin?')) { removeAdmin({{ admin.id }}, this); }" title="{% trans 'Remove Administrative Access' %}">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </div>
@@ -159,7 +160,7 @@
                             <tr>
                                 <td colspan="6" class="text-center py-5 text-muted">
                                     <i class="bi bi-inbox fs-2 mb-2 d-block text-secondary"></i>
-                                    <span class="fw-medium">No system administrators registered yet.</span>
+                                    <span class="fw-medium">{% trans "No system administrators registered yet." %}</span>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -176,39 +177,39 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-success text-white border-bottom-0">
-                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Add Admin User</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>{% trans "Add Admin User" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <form id="addAdminForm">
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Username</label>
-                        <input type="text" class="form-control" id="username" placeholder="Enter custom username" required>
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Username" %}</label>
+                        <input type="text" class="form-control" id="username" placeholder="{% trans 'Enter custom username' %}" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Email Node</label>
-                        <input type="email" class="form-control" id="email" placeholder="e.g., admin@municipality.org" required>
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Email Node" %}</label>
+                        <input type="email" class="form-control" id="email" placeholder="{% trans 'e.g., admin@municipality.org' %}" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Full Name</label>
-                        <input type="text" class="form-control" id="full_name" placeholder="First and last name">
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Full Name" %}</label>
+                        <input type="text" class="form-control" id="full_name" placeholder="{% trans 'First and last name' %}">
                     </div>
                     <div class="mb-4">
-                        <label class="form-label small fw-semibold text-secondary">Password Security</label>
-                        <input type="password" class="form-control" id="password" placeholder="Create robust password" required>
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Password Security" %}</label>
+                        <input type="password" class="form-control" id="password" placeholder="{% trans 'Create robust password' %}" required>
                     </div>
                     <div class="form-check form-switch mb-0">
                         <input class="form-check-input" type="checkbox" id="is_superadmin">
                         <label class="form-check-label small fw-semibold text-secondary" for="is_superadmin">
-                            Superadmin
-                            <span class="text-muted fw-normal">— can manage other admins and restore the database</span>
+                            {% trans "Superadmin" %}
+                            <span class="text-muted fw-normal">{% trans "— can manage other admins and restore the database" %}</span>
                         </label>
                     </div>
                 </form>
             </div>
             <div class="modal-footer bg-surface-alt border-top-0">
-                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success px-4" onclick="addAdmin(this)">Create Admin</button>
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button type="button" class="btn btn-success px-4" onclick="addAdmin(this)">{% trans "Create Admin" %}</button>
             </div>
         </div>
     </div>
@@ -219,45 +220,45 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-secondary text-white border-bottom-0">
-                <h5 class="modal-title fw-bold"><i class="bi bi-pencil me-2"></i>Edit Admin User</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil me-2"></i>{% trans "Edit Admin User" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <form id="editAdminForm">
                     <input type="hidden" id="edit_admin_id">
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Username</label>
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Username" %}</label>
                         <input type="text" class="form-control" id="edit_username" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Email</label>
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Email" %}</label>
                         <input type="email" class="form-control" id="edit_email" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Full Name</label>
-                        <input type="text" class="form-control" id="edit_full_name" placeholder="First and last name">
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Full Name" %}</label>
+                        <input type="text" class="form-control" id="edit_full_name" placeholder="{% trans 'First and last name' %}">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">New Password</label>
-                        <input type="password" class="form-control" id="edit_password" placeholder="Leave blank to keep current password">
+                        <label class="form-label small fw-semibold text-secondary">{% trans "New Password" %}</label>
+                        <input type="password" class="form-control" id="edit_password" placeholder="{% trans 'Leave blank to keep current password' %}">
                     </div>
                     <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" id="edit_is_active">
-                        <label class="form-check-label small fw-semibold text-secondary" for="edit_is_active">Active account</label>
+                        <label class="form-check-label small fw-semibold text-secondary" for="edit_is_active">{% trans "Active account" %}</label>
                     </div>
                     <div class="form-check form-switch mb-0">
                         <input class="form-check-input" type="checkbox" id="edit_is_superadmin">
                         <label class="form-check-label small fw-semibold text-secondary" for="edit_is_superadmin">
-                            Superadmin
-                            <span class="text-muted fw-normal">— can manage other admins and restore the database</span>
+                            {% trans "Superadmin" %}
+                            <span class="text-muted fw-normal">{% trans "— can manage other admins and restore the database" %}</span>
                         </label>
-                        <div id="edit_is_superadmin_self_note" class="form-text small d-none">You can't change your own superadmin status.</div>
+                        <div id="edit_is_superadmin_self_note" class="form-text small d-none">{% trans "You can't change your own superadmin status." %}</div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer bg-surface-alt border-top-0">
-                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success px-4" onclick="updateAdmin(this)">Save Changes</button>
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button type="button" class="btn btn-success px-4" onclick="updateAdmin(this)">{% trans "Save Changes" %}</button>
             </div>
         </div>
     </div>
@@ -406,11 +407,11 @@ function buildAdminRowHtml(admin, isActive) {
                         data-admin-full-name="${name}"
                         data-admin-active="${isActive}"
                         data-admin-is-superadmin="${isSuperadmin}"
-                        title="Edit Administrative Access"
+                        title="${gettext('Edit Administrative Access')}"
                     >
                         <i class="bi bi-pencil"></i>
                     </button>
-                    <button class="btn btn-outline-danger btn-sm rounded-end" onclick="if(confirm('Are you absolute sure to remove this admin?')) { removeAdmin(${adminId}, this); }" title="Remove Administrative Access">
+                    <button class="btn btn-outline-danger btn-sm rounded-end" onclick="if(confirm(gettext('Are you absolute sure to remove this admin?'))) { removeAdmin(${adminId}, this); }" title="${gettext('Remove Administrative Access')}">
                         <i class="bi bi-trash"></i>
                     </button>
                 </div>
@@ -481,7 +482,7 @@ window.addAdmin = async function(btn) {
     const [first_name, last_name] = splitFullName(full_name);
 
     if (!username || !email || !password) {
-        showToast('Please fill in all required fields.', 'warning');
+        showToast(gettext('Please fill in all required fields.'), 'warning');
         return;
     }
 
@@ -491,6 +492,7 @@ window.addAdmin = async function(btn) {
     try {
         const res = await fetch('/api/auth/create-admin/', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -509,7 +511,7 @@ window.addAdmin = async function(btn) {
         const data = await res.json();
 
         if (res.ok && data.id) {
-            showToast('Admin user created successfully!', 'success');
+            showToast(gettext('Admin user created successfully!'), 'success');
             bootstrap.Modal.getInstance(document.getElementById('addAdminModal')).hide();
             document.getElementById('addAdminForm').reset();
             insertAdminRow(data);
@@ -519,10 +521,10 @@ window.addAdmin = async function(btn) {
             const errMsg = typeof data === 'object'
                 ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
                 : String(data);
-            showToast('Error: ' + errMsg, 'danger');
+            showToast(gettext('Error: ') + errMsg, 'danger');
         }
     } catch (e) {
-        showToast('Error creating admin user: ' + e.message, 'danger');
+        showToast(gettext('Error creating admin user: ') + e.message, 'danger');
     }
     });
 };
@@ -544,7 +546,7 @@ window.updateAdmin = async function(btn) {
     const [first_name, last_name] = splitFullName(fullName);
 
     if (!adminId || !username || !email) {
-        showToast('Username and email are required.', 'warning');
+        showToast(gettext('Username and email are required.'), 'warning');
         return;
     }
 
@@ -564,6 +566,7 @@ window.updateAdmin = async function(btn) {
 
         const res = await fetch(`/api/auth/admin/${adminId}/update/`, {
             method: 'PATCH',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -574,7 +577,7 @@ window.updateAdmin = async function(btn) {
         const data = await res.json();
 
         if (res.ok && data.id) {
-            showToast('Admin user updated successfully!', 'success');
+            showToast(gettext('Admin user updated successfully!'), 'success');
             bootstrap.Modal.getInstance(document.getElementById('editAdminModal')).hide();
 
             const row = document.getElementById(`admin-row-${adminId}`);
@@ -590,10 +593,10 @@ window.updateAdmin = async function(btn) {
             const errMsg = typeof data === 'object'
                 ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
                 : String(data);
-            showToast('Error: ' + errMsg, 'danger');
+            showToast(gettext('Error: ') + errMsg, 'danger');
         }
     } catch (e) {
-        showToast('Error updating admin user: ' + e.message, 'danger');
+        showToast(gettext('Error updating admin user: ') + e.message, 'danger');
     }
     });
 };
@@ -603,13 +606,14 @@ window.removeAdmin = async function(adminId, btn) {
     try {
         const res = await fetch(`/api/auth/admin/${adminId}/delete/`, {
             method: 'DELETE',
+            credentials: 'same-origin',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken'),
             },
         });
 
         if (res.ok || res.status === 204) {
-            showToast('Admin user removed successfully!', 'success');
+            showToast(gettext('Admin user removed successfully!'), 'success');
 
             const row = document.getElementById(`admin-row-${adminId}`);
             const wasActive = row ? !!row.querySelector('.bg-success-subtle') : true;
@@ -624,7 +628,7 @@ window.removeAdmin = async function(adminId, btn) {
                     <tr>
                         <td colspan="6" class="text-center py-5 text-muted">
                             <i class="bi bi-inbox fs-2 mb-2 d-block text-secondary"></i>
-                            <span class="fw-medium">No system administrators registered yet.</span>
+                            <span class="fw-medium">${gettext('No system administrators registered yet.')}</span>
                         </td>
                     </tr>`;
             }
@@ -641,7 +645,7 @@ window.removeAdmin = async function(adminId, btn) {
             showToast(errMsg, 'danger');
         }
     } catch (e) {
-        showToast('Network error: ' + e.message, 'danger');
+        showToast(gettext('Network error: ') + e.message, 'danger');
     }
     });
 };

@@ -1,7 +1,8 @@
 {% extends 'web_app/base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Route Planning - Waste Reporting System{% endblock %}
+{% block title %}{% trans "Route Planning - Waste Reporting System" %}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
@@ -161,38 +162,38 @@
 
                 <div class="col-md-8">
                     <h2 class="mb-4">
-                        <i class="fas fa-route"></i> Route Planning & Tracking
+                        <i class="fas fa-route"></i> {% trans "Route Planning & Tracking" %}
                     </h2>
 
                     <div class="route-controls">
                         <div class="row">
                             <div class="col-md-6 mb-2">
-                                <label>Select Driver</label>
+                                <label>{% trans "Select Driver" %}</label>
                                 <select id="driverSelect" class="form-control">
-                                    <option value="">Loading drivers...</option>
+                                    <option value="">{% trans "Loading drivers..." %}</option>
                                 </select>
                             </div>
                             <div class="col-md-6 mb-2">
-                                <label>Planned Date</label>
+                                <label>{% trans "Planned Date" %}</label>
                                 <input type="date" id="plannedDate" class="form-control">
                             </div>
                         </div>
                         <div class="row mt-2">
                             <div class="col-md-6">
                                 <button class="btn btn-primary w-100" onclick="loadWasteRequests()">
-                                    <i class="fas fa-list"></i> Select Requests
+                                    <i class="fas fa-list"></i> {% trans "Select Requests" %}
                                 </button>
                             </div>
                             <div class="col-md-6">
                                 <button class="btn btn-success w-100" onclick="generateRoute()" id="generateBtn" disabled>
-                                    <i class="fas fa-magic"></i> Generate Optimal Route
+                                    <i class="fas fa-magic"></i> {% trans "Generate Optimal Route" %}
                                 </button>
                             </div>
                         </div>
                         <div class="row mt-2">
                             <div class="col-12">
                                 <button class="btn btn-outline-success w-100" onclick="generateRoute(true)">
-                                    <i class="fas fa-globe"></i> Auto-Generate Route (All Pending Reports)
+                                    <i class="fas fa-globe"></i> {% trans "Auto-Generate Route (All Pending Reports)" %}
                                 </button>
                             </div>
                         </div>
@@ -200,9 +201,9 @@
 
                     <!-- Checkpoint legend -->
                     <div class="map-legend-inline">
-                        <span>🚩 Checkpoint (drop-off point)</span>
-                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#007bff;"></span> Driver start / depot</span>
-                        <span><i class="fas fa-map-marker-alt" style="color:#28a745;"></i> Route stop</span>
+                        <span>{% trans "🚩 Checkpoint (drop-off point)" %}</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#007bff;"></span> {% trans "Driver start / depot" %}</span>
+                        <span><i class="fas fa-map-marker-alt" style="color:#28a745;"></i> {% trans "Route stop" %}</span>
                     </div>
 
                     <!-- Map -->
@@ -211,16 +212,16 @@
                     <!-- Route Info -->
                     <div id="routeInfo" style="display: none;">
                         <div class="route-info-card">
-                            <h5>Route Summary</h5>
+                            <h5>{% trans "Route Summary" %}</h5>
                             <div class="row">
                                 <div class="col-md-6">
-                                    <p><strong>Total Distance:</strong> <span id="totalDistance">0</span> km</p>
-                                    <p><strong>Total Stops:</strong> <span id="totalStops">0</span></p>
+                                    <p><strong>{% trans "Total Distance" %}:</strong> <span id="totalDistance">0</span> km</p>
+                                    <p><strong>{% trans "Total Stops" %}:</strong> <span id="totalStops">0</span></p>
                                 </div>
                                 <div class="col-md-6">
-                                    <p><strong>Status:</strong> <span id="routeStatus" class="route-status planned">Planned</span></p>
+                                    <p><strong>{% trans "Status" %}:</strong> <span id="routeStatus" class="route-status planned">{% trans "Planned" %}</span></p>
                                     <button class="btn btn-sm btn-success" onclick="startRoute()" id="startRouteBtn">
-                                        <i class="fas fa-play"></i> Start Route
+                                        <i class="fas fa-play"></i> {% trans "Start Route" %}
                                     </button>
                                 </div>
                             </div>
@@ -231,10 +232,10 @@
                 <!-- Waypoints Sidebar -->
                 <div class="col-md-4">
                     <h5 class="mb-3">
-                        <i class="fas fa-map-marker-alt"></i> Waypoints
+                        <i class="fas fa-map-marker-alt"></i> {% trans "Waypoints" %}
                     </h5>
                     <div class="waypoint-list" id="waypointList">
-                        <p class="text-muted text-center">Generate a route to see waypoints</p>
+                        <p class="text-muted text-center">{% trans "Generate a route to see waypoints" %}</p>
                     </div>
                 </div>
             </div>
@@ -247,15 +248,15 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Select Waste Requests</h5>
+                <h5 class="modal-title">{% trans "Select Waste Requests" %}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div id="requestsList"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="confirmSelection()">Add Selected</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button type="button" class="btn btn-primary" onclick="confirmSelection()">{% trans "Add Selected" %}</button>
             </div>
         </div>
     </div>
@@ -332,19 +333,14 @@
 
         window._routeLeafletLoadPromise.then(onReady).catch((error) => {
             console.error('Leaflet failed to load for route planning:', error);
-            showToast('Map failed to load. Please refresh the page.', 'danger');
+            showToast(gettext('Map failed to load. Please refresh the page.'), 'danger');
         });
     }
 
-    function getToken() {
-        return localStorage.getItem('access_token');
-    }
-
+    // SECURITY: cookie-session auth; nothing readable for JS to hand around.
     async function authedFetch(url, options = {}) {
-        const token = getToken();
-        const headers = { ...(options.headers || {}) };
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(url, { ...options, headers });
+        const headers = window.csrfHeaders(options.method || 'GET', options.headers);
+        const res = await fetch(url, { ...options, credentials: 'same-origin', headers });
         if (!res.ok) return null;
         try {
             return await res.json();
@@ -510,7 +506,7 @@
     window.loadWasteRequests = async function() {
         const data = await getApiClient().get('/api/waste-requests/');
         if (!data) {
-            showToast('Failed to load requests. Are you logged in?', 'danger');
+            showToast(gettext('Failed to load requests. Are you logged in?'), 'danger');
             return;
         }
         const requests = Array.isArray(data) ? data : (data.results || []);
@@ -543,7 +539,7 @@
         document.getElementById('generateBtn').disabled = selectedRequests.length === 0;
 
         if (selectedRequests.length > 0) {
-            showToast(`${selectedRequests.length} request(s) selected.`, 'success');
+            showToast(interpolate(gettext('%(v0)s request(s) selected.'), {v0: selectedRequests.length}, true), 'success');
         }
         bootstrap.Modal.getInstance(document.getElementById('requestsModal')).hide();
     };
@@ -553,11 +549,11 @@
         const plannedDate = document.getElementById('plannedDate').value;
 
         if (!driverId) {
-            showToast('Please select a driver.', 'warning');
+            showToast(gettext('Please select a driver.'), 'warning');
             return;
         }
         if (!includeAllPending && selectedRequests.length === 0) {
-            showToast('Please select at least one waste request, or use Auto-Generate.', 'warning');
+            showToast(gettext('Please select at least one waste request, or use Auto-Generate.'), 'warning');
             return;
         }
 
@@ -577,9 +573,9 @@
             currentRouteId = data.route?.id || null;
             await displayRoute(data.route_data);
             document.getElementById('routeInfo').style.display = 'block';
-            showToast('Route generated successfully!', 'success');
+            showToast(gettext('Route generated successfully!'), 'success');
         } else {
-            showToast('Error: ' + (data?.error || 'Failed to generate route'), 'danger');
+            showToast(gettext('Error: ') + (data?.error || 'Failed to generate route'), 'danger');
         }
 
         btn.disabled = false;
@@ -615,8 +611,8 @@
                 .addTo(map)
                 .bindPopup(`
                     <strong>${wp.type === 'request' ? '🗑 Request' : '🗂 Bin'} #${wp.id}</strong><br>
-                    Stop <strong>${idx + 1}</strong> of ${waypoints.length}<br>
-                    Distance from previous: <strong>${wp.distance_from_previous.toFixed(2)} km</strong>
+                    ${gettext('Stop')} <strong>${idx + 1}</strong> of ${waypoints.length}<br>
+                    ${gettext('Distance from previous:')} <strong>${wp.distance_from_previous.toFixed(2)} km</strong>
                 `);
             routeMarkers.push(marker);
         });
@@ -691,7 +687,7 @@
 
     window.startRoute = async function() {
         if (!currentRouteId) {
-            showToast('No route to start. Generate one first.', 'warning');
+            showToast(gettext('No route to start. Generate one first.'), 'warning');
             return;
         }
         const data = await getApiClient().patch(`/api/routes/${currentRouteId}/start_route/`, {});
@@ -700,18 +696,13 @@
             statusEl.textContent = 'Active';
             statusEl.className = 'route-status active';
             document.getElementById('startRouteBtn').disabled = true;
-            showToast('Route started!', 'success');
+            showToast(gettext('Route started!'), 'success');
         } else {
-            showToast('Failed to start route.', 'danger');
+            showToast(gettext('Failed to start route.'), 'danger');
         }
     };
 
     async function connectRouteWebSocket() {
-        const token = await (window.getFreshAccessTokenForSockets ? window.getFreshAccessTokenForSockets() : Promise.resolve(getToken()));
-        if (!token) {
-            if (localStorage.getItem('refresh_token')) logout();
-            return;
-        }
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
         if (window._routeReconnectTimer) {
             clearTimeout(window._routeReconnectTimer);
@@ -720,9 +711,7 @@
         window._routeReconnectAttempt = 0;
         window._routeReconnectWarned = false;
 
-        const ws = new WebSocket(
-            `${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`
-        );
+        const ws = new WebSocket(`${protocol}${location.host}/ws/driver-locations/`);
         window._routeWebSocket = ws;
 
         function scheduleRouteReconnect() {
@@ -738,7 +727,7 @@
         function notifyRouteSocketIssue(label, event) {
             console.warn(label, event);
             if (!window._routeReconnectWarned) {
-                showToast('Connection lost — live updates paused', 'warning');
+                showToast(gettext('Connection lost — live updates paused'), 'warning');
                 window._routeReconnectWarned = true;
             }
             scheduleRouteReconnect();
@@ -747,7 +736,7 @@
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (data.type === 'route_update') {
-                showToast('Route updated in real-time!', 'info');
+                showToast(gettext('Route updated in real-time!'), 'info');
                 if (data.waypoints) displayRoute({
                     waypoints: data.waypoints,
                     total_distance_km: data.total_distance,
