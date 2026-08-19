@@ -828,7 +828,7 @@ let geocodeTimer = null;
 
 function reverseGeocodeDebounced(lat, lng) {
     const addressField = document.getElementById('pickup-address');
-    addressField.placeholder = 'Detecting address...';
+    addressField.placeholder = gettext('Detecting address...');
 
     clearTimeout(geocodeTimer);
     geocodeTimer = setTimeout(() => reverseGeocode(lat, lng), 600);
@@ -848,9 +848,19 @@ async function reverseGeocode(lat, lng) {
             addressField.value = data.display_name;
         }
     } catch (e) {
-        // Fallback for user custom text
+        // Lookup failed (offline, rate-limited, or the service is down).
+        // The address is optional-but-expected, so tell the user to type it
+        // rather than failing silently and leaving them staring at an empty
+        // field with no idea why.
+        console.warn('Reverse geocoding failed:', e);
+        if (!addressField.value) {
+            addressField.placeholder = gettext('Could not detect address — please type it');
+        }
+        return;
     } finally {
-        addressField.placeholder = 'Enter your address';
+        if (addressField.placeholder === gettext('Detecting address...')) {
+            addressField.placeholder = gettext('Enter your address');
+        }
     }
 }
 
