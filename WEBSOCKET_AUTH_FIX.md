@@ -33,12 +33,15 @@ All three WebSocket connections now pass the JWT token as a query parameter:
 
 **Example**:
 ```javascript
-const token = localStorage.getItem('access_token');
-const wsURL = token 
-    ? `ws://localhost:8000/ws/notifications/?token=${encodeURIComponent(token)}`
-    : `ws://localhost:8000/ws/notifications/`;
-const notifSocket = new WebSocket(wsURL);
+// Auth rides on the HttpOnly session cookie, sent automatically with the
+// handshake. No token in the URL and none readable from JavaScript.
+const notifSocket = new WebSocket(`ws://localhost:8000/ws/notifications/`);
 ```
+
+> **Superseded.** This document describes the original `?token=` design. That
+> approach was removed: query strings leak into proxy access logs, browser
+> history and `Referer` headers. WebSocket auth now comes from the session
+> cookie — see `api_app/auth_middleware.py` and `SECURITY-auth-hardening.md`.
 
 ## Expected Results After Fix
 ✅ WebSocket CONNECT succeeds with authenticated user  

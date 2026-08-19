@@ -57,10 +57,22 @@ SESSION_SAVE_EVERY_REQUEST = True
 
 ### WebSocket auth (`api_app/auth_middleware.py`)
 
-Now `SessionOrJWTAuthMiddlewareStack`: session cookie first, `?token=` kept
-only as a fallback for non-browser clients (mobile/scripts) that legitimately
-hold a JWT and have no cookie. Verified: cookie-only handshake connects;
-anonymous is rejected.
+Session cookie only. The `?token=` query-string fallback has been **removed
+entirely** — a credential in a URL is written to reverse-proxy access logs
+(nginx logs `$request`, query string included), kept in browser history and
+forwarded in `Referer` headers, where it stays replayable until it expires.
+
+`SessionOrJWTAuthMiddlewareStack` is kept as a name so `asgi.py` and any
+external imports keep working, but it is now a thin alias for Channels'
+`AuthMiddlewareStack`.
+
+Non-browser clients authenticate the same way: POST to `/auth/session-login/`
+over HTTPS and send the returned `sessionid` cookie on the handshake. Every
+standard WebSocket library supports a `Cookie` header.
+
+Verified on all three socket endpoints (`/ws/notifications/`, `/ws/requests/`,
+`/ws/driver-locations/`): cookie handshake connects; `?token=<valid jwt>` is
+**rejected**; anonymous is rejected.
 
 ### Security headers (`waste_system/security.py`)
 
