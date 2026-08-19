@@ -413,8 +413,9 @@
         try {
             const res = await fetch(`/api/complaints/${id}/`, {
                 method: 'DELETE',
+                credentials: 'same-origin',
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'X-CSRFToken': getCookie('csrftoken'),
                 },
             });
 

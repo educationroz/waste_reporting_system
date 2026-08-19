@@ -63,6 +63,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # CSP + hardening headers. Last so it sees the final response.
+    'waste_system.security.SecurityHeadersMiddleware',
 ]
 
 ROOT_URLCONF = 'waste_system.urls'
@@ -93,6 +95,22 @@ ASGI_APPLICATION = 'waste_system.asgi.application'
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# ─── Session cookie hardening ─────────────────────────────────────────────────
+# The browser UI authenticates with this session cookie instead of a JWT held
+# in localStorage. HttpOnly is the entire point: it makes the credential
+# unreadable to JavaScript, so an XSS bug can no longer exfiltrate a token that
+# stays valid for days. (It does NOT stop an attacker acting as the user inside
+# the page — for that, see the CSP below and keep escaping output.)
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'   # blocks cross-site sends on top-level POSTs
+# CSRF cookie must stay readable by JS: fetch() copies it into X-CSRFToken.
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = 'Lax'
+# Rolling expiry so an idle session eventually dies.
+SESSION_COOKIE_AGE = 60 * 60 * 12          # 12 hours
+SESSION_SAVE_EVERY_REQUEST = True          # refresh the window on activity
+
 if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000  # 1 year, per HSTS preload requirements
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True

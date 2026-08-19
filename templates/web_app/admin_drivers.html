@@ -448,36 +448,12 @@
         return cookieValue;
     }
 
+    // SECURITY: auth is the HttpOnly session cookie now, so there is no
+    // token for JS to fetch, validate or refresh. Kept as a shim (returns a
+    // truthy sentinel) so the existing `if (!token) ...expired...` guards at
+    // the call sites below keep their shape.
     async function getValidAccessToken() {
-        let access = localStorage.getItem('access_token');
-        const refresh = localStorage.getItem('refresh_token');
-        if (!access) return null;
-
-        const probe = await fetch('/api/notifications/unread/', {
-            headers: { 'Authorization': `Bearer ${access}` }
-        });
-
-        if (probe.status !== 401) {
-            return access;
-        }
-
-        if (!refresh) return null;
-
-        const refreshRes = await fetch('/auth/token/refresh/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh }),
-        });
-
-        if (refreshRes.ok) {
-            const data = await refreshRes.json();
-            localStorage.setItem('access_token', data.access);
-            return data.access;
-        }
-
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        return null;
+        return 'cookie-session';
     }
 
     function buildVehicleOptionsHtml(selectedVehicleId) {
@@ -707,7 +683,7 @@
             const token = await getValidAccessToken();
             if (token) {
                 const searchRes = await fetch(`/api/drivers/?search=${encodeURIComponent(username)}`, {
-                    headers: { 'Authorization': `Bearer ${token}` },
+                    credentials: 'same-origin',
                 });
                 if (searchRes.ok) {
                     const searchData = await searchRes.json();
@@ -818,8 +794,9 @@
         try {
             const res = await fetch(`/api/drivers/${driverId}/`, {
                 method: 'DELETE',
+                credentials: 'same-origin',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'X-CSRFToken': getCookie('csrftoken'),
                 },
             });
 
@@ -916,8 +893,9 @@
         try {
             const res = await fetch(`/api/drivers/${driverId}/`, {
                 method: 'PATCH',
+                credentials: 'same-origin',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'X-CSRFToken': getCookie('csrftoken'),
                 },
                 body: formData,
             });

@@ -410,8 +410,9 @@ async function deleteSchedule(scheduleId, btn) {
     try {
         const res = await fetch(`/api/schedules/${scheduleId}/`, {
             method: 'DELETE',
+            credentials: 'same-origin',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                'X-CSRFToken': getCookie('csrftoken'),
             },
         });
 

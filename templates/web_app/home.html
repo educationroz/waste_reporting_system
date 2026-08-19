@@ -1330,42 +1330,11 @@ window.removeGarbagePhoto = function(index) {
     renderPhotoThumbnails();
 };
 
-// ── Token helper ─────────────────────────────────────────────────────────────
-async function getOptionalToken() {
-    const access = localStorage.getItem('access_token');
-    const refresh = localStorage.getItem('refresh_token');
-
-    if (!access) return null;
-
-    try {
-        const res = await fetch('/api/notifications/unread/', {
-            headers: { 'Authorization': `Bearer ${access}` }
-        });
-
-        if (res.status === 401) {
-            if (!refresh) return null;
-
-            const refreshRes = await fetch('/auth/token/refresh/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refresh }),
-            });
-
-            if (refreshRes.ok) {
-                const data = await refreshRes.json();
-                localStorage.setItem('access_token', data.access);
-                return data.access;
-            } else {
-                localStorage.removeItem('access_token');
-                localStorage.removeItem('refresh_token');
-                return null;
-            }
-        }
-        return access;
-    } catch {
-        return access;
-    }
-}
+// ── Auth helper ──────────────────────────────────────────────────────────────
+// SECURITY: no JWT in localStorage any more. This page is public (guests can
+// submit), so we need to know whether the visitor is logged in — that comes
+// from the server-rendered template flag, not from a readable token.
+const IS_AUTHENTICATED = {% if user.is_authenticated %}true{% else %}false{% endif %};
 
 // ── Guest token helper ──────────────────────────────────────────────
 function getOrCreateGuestToken() {
@@ -1560,7 +1529,7 @@ window.submitRequest = async function() {
     const hasPhotos = photoFiles.length > 0;
 
     let currentGuestToken = null;
-    if (!localStorage.getItem('access_token')) {
+    if (!IS_AUTHENTICATED) {
         currentGuestToken = getOrCreateGuestToken();
     }
 
@@ -1611,9 +1580,9 @@ window.submitRequest = async function() {
             if (guestEmail) payload.guest_email = guestEmail;
         }
 
-        const headers = {};
-        const accessToken = localStorage.getItem('access_token');
-        if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+        // Cookie auth replays automatically when the queue flushes; we only
+        // need the CSRF token for the unsafe verb.
+        const headers = { 'X-CSRFToken': getCookie('csrftoken') };
 
         try {
             await OfflineQueue.enqueue({
@@ -1691,13 +1660,10 @@ window.submitRequest = async function() {
     }
 
     try {
-        const token = await getOptionalToken();
-        const headers = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
         const res = await fetch('/api/waste-requests/', {
             method: 'POST',
-            headers,
+            credentials: 'same-origin',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
             body: formData,
         });
 
@@ -1758,8 +1724,9 @@ window.deleteRequest = async function(requestId, btn) {
     try {
         const res = await fetch(`/api/waste-requests/${requestId}/soft_delete/`, {
             method: 'PATCH',
+            credentials: 'same-origin',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                'X-CSRFToken': getCookie('csrftoken'),
                 'Content-Type': 'application/json',
             },
         });
@@ -1861,8 +1828,9 @@ window.submitComplaint = async function() {
     try {
         const res = await fetch('/api/complaints/', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                'X-CSRFToken': getCookie('csrftoken'),
             },
             body: formData,
         });
@@ -1892,22 +1860,15 @@ window.submitComplaint = async function() {
 {% if user.is_authenticated %}
 try {
     const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-    const token = localStorage.getItem('access_token');
     let requestWS = null;
     let requestReconnectAttempt = 0;
     let requestReconnectTimer = null;
     let requestReconnectWarned = false;
 
     async function connectRequestWebSocket() {
-        const wsToken = await (window.getFreshAccessTokenForSockets ? window.getFreshAccessTokenForSockets() : Promise.resolve(token));
-        if (!wsToken) {
-            if (localStorage.getItem('refresh_token')) logout();
-            return;
-        }
-        const wsURL = wsToken
-            ? `${protocol}${location.host}/ws/requests/?token=${encodeURIComponent(wsToken)}`
-            : `${protocol}${location.host}/ws/requests/`;
-        const ws = new WebSocket(wsURL);
+        // Handshake carries the HttpOnly session cookie — no ?token= needed,
+        // so the credential stays out of JS, URLs and server logs.
+        const ws = new WebSocket(`${protocol}${location.host}/ws/requests/`);
         requestWS = ws;
 
         function scheduleRequestReconnect() {
@@ -1954,12 +1915,7 @@ try {
     let driverReconnectWarned = false;
 
     async function connectDriverLocationWebSocket() {
-        const wsToken = await (window.getFreshAccessTokenForSockets ? window.getFreshAccessTokenForSockets() : Promise.resolve(token));
-        if (!wsToken) {
-            if (localStorage.getItem('refresh_token')) logout();
-            return;
-        }
-        const ws = new WebSocket(`${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(wsToken)}`);
+        const ws = new WebSocket(`${protocol}${location.host}/ws/driver-locations/`);
         driverWS = ws;
 
         function scheduleDriverReconnect() {

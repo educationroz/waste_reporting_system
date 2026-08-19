@@ -1160,7 +1160,7 @@
     async function loadDepotLocation() {
       try {
         const res = await fetch("/api/system-settings/depot_location/", {
-          headers: { Authorization: `Bearer ${getToken()}` },
+          headers: { 'X-CSRFToken': getCookie('csrftoken') },
         });
         if (res.ok) {
           const data = await res.json();
@@ -1219,7 +1219,7 @@
       let res = await fetch("/api/system-settings/depot_location/", {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${getToken()}`,
+          'X-CSRFToken': getCookie('csrftoken'),
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
@@ -1229,7 +1229,7 @@
         res = await fetch("/api/system-settings/", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ key: "depot_location", ...payload }),
@@ -1580,7 +1580,7 @@
         const res = await fetch("/api/checkpoints/bulk_delete/", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ ids }),
@@ -1682,7 +1682,7 @@
         const res = await fetch(`/api/checkpoints/${id}/`, {
           method: "PATCH",
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ latitude: lat, longitude: lng }),
@@ -1763,7 +1763,7 @@
         const res = await fetch(url, {
           method,
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
           },
           body: JSON.stringify(payload),
@@ -1832,7 +1832,7 @@
         const res = await fetch(`/api/checkpoints/${id}/`, {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
           },
         });
         if (!res.ok) throw new Error("Delete failed");
@@ -1890,7 +1890,7 @@
       }
       try {
         const res = await fetch("/api/system-settings/depot_location/", {
-          headers: { Authorization: `Bearer ${getToken()}` },
+          headers: { 'X-CSRFToken': getCookie('csrftoken') },
         });
         if (res.ok) {
           const data = await res.json();
@@ -2109,7 +2109,7 @@
         const res = await fetch("/api/checkpoints/", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
           },
           body: JSON.stringify(payload),
@@ -2619,7 +2619,7 @@
         const res = await fetch("/api/system-settings/", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            'X-CSRFToken': getCookie('csrftoken'),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ key, value, description, is_sensitive }),

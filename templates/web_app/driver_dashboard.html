@@ -322,10 +322,8 @@ function escapeHtml(str) {
 }
 
 const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-const token = localStorage.getItem('access_token');
-const locationWSURL = token
-    ? `${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`
-    : `${protocol}${location.host}/ws/driver-locations/`;
+// SECURITY: session-cookie handshake, no token in the URL.
+const locationWSURL = `${protocol}${location.host}/ws/driver-locations/`;
 let locationWS = null;
 window._locationReconnectAttempt = 0;
 window._locationReconnectWarned = false;
@@ -337,14 +335,7 @@ async function connectLocationWebSocket() {
         window._locationReconnectTimer = null;
     }
 
-    const token = await (window.getFreshAccessTokenForSockets ? window.getFreshAccessTokenForSockets() : Promise.resolve(localStorage.getItem('access_token')));
-    if (!token) {
-        if (localStorage.getItem('refresh_token')) logout();
-        return;
-    }
-
-    const wsURL = `${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`;
-    const ws = new WebSocket(wsURL);
+    const ws = new WebSocket(locationWSURL);
     locationWS = ws;
     window.locationWS = ws;
 
@@ -570,8 +561,9 @@ window.updateStatus = async function(requestId, newStatus, btn) {
     try {
         const res = await fetch(`/api/waste-requests/${requestId}/update_status/`, {
             method: 'PATCH',
+            credentials: 'same-origin',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                'X-CSRFToken': getCookie('csrftoken'),
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(payload),
