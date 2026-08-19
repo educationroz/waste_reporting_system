@@ -337,15 +337,10 @@
         });
     }
 
-    function getToken() {
-        return localStorage.getItem('access_token');
-    }
-
+    // SECURITY: cookie-session auth; nothing readable for JS to hand around.
     async function authedFetch(url, options = {}) {
-        const token = getToken();
-        const headers = { ...(options.headers || {}) };
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(url, { ...options, headers });
+        const headers = window.csrfHeaders(options.method || 'GET', options.headers);
+        const res = await fetch(url, { ...options, credentials: 'same-origin', headers });
         if (!res.ok) return null;
         try {
             return await res.json();
@@ -708,11 +703,6 @@
     };
 
     async function connectRouteWebSocket() {
-        const token = await (window.getFreshAccessTokenForSockets ? window.getFreshAccessTokenForSockets() : Promise.resolve(getToken()));
-        if (!token) {
-            if (localStorage.getItem('refresh_token')) logout();
-            return;
-        }
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
         if (window._routeReconnectTimer) {
             clearTimeout(window._routeReconnectTimer);
@@ -721,9 +711,7 @@
         window._routeReconnectAttempt = 0;
         window._routeReconnectWarned = false;
 
-        const ws = new WebSocket(
-            `${protocol}${location.host}/ws/driver-locations/?token=${encodeURIComponent(token)}`
-        );
+        const ws = new WebSocket(`${protocol}${location.host}/ws/driver-locations/`);
         window._routeWebSocket = ws;
 
         function scheduleRouteReconnect() {
