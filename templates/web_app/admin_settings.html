@@ -1584,7 +1584,7 @@
 
       marker._keepPositionOnClose = false;
 
-      marker.dragging.enable();
+      setMarkerDragging(marker, true);
       marker.setOpacity(1);
       marker.setZIndexOffset(1000);
 
@@ -1597,8 +1597,40 @@
     }
 
     // Cancel edit / X button.
+    // Leaflet DELETES marker.dragging inside Marker.onRemove(). Any code that
+    // can run while a marker is being torn down (popupclose during
+    // layer.clearLayers(), for example) must therefore never touch
+    // marker.dragging directly, or it throws
+    // "Cannot read properties of undefined (reading 'disable')" and aborts
+    // whatever loop it was running inside.
+    function setMarkerDragging(marker, shouldDrag) {
+      if (!marker || !marker.dragging) return false;
+
+      if (shouldDrag) {
+        marker.dragging.enable();
+      } else {
+        marker.dragging.disable();
+      }
+
+      return true;
+    }
+
     function cancelSavedCheckpointMarkerEdit(marker) {
       if (!marker) return;
+
+      // Marker is mid-removal (or already removed): just reset the plain flags.
+      // Leaflet has already destroyed the drag handler, and the fresh marker
+      // created by the re-render starts locked anyway.
+      //
+      // Crucially we do NOT clear activeSavedCheckpointEditId here. This path
+      // is reached when a re-render tears down a marker whose popup is open,
+      // and that is exactly the case where the edit must SURVIVE the re-render
+      // so renderCheckpointMapMarkers() can hand edit mode to the new marker.
+      if (!marker.dragging) {
+        marker._editEnabled = false;
+        marker._keepPositionOnClose = false;
+        return;
+      }
 
       const hasOriginal =
         marker._savedLat !== undefined && marker._savedLng !== undefined;
@@ -1614,7 +1646,7 @@
       marker._editEnabled = false;
       marker._keepPositionOnClose = false;
 
-      marker.dragging.disable();
+      setMarkerDragging(marker, false);
       marker.setOpacity(1);
       marker.setZIndexOffset(0);
 
@@ -1818,7 +1850,7 @@
         // This also keeps the ".leaflet-marker-draggable" class (and therefore
         // the grab cursor) in sync with edit mode instead of it being on
         // permanently.
-        marker.dragging.disable();
+        setMarkerDragging(marker, false);
 
         delete marker._pendingLat;
         delete marker._pendingLng;
@@ -1828,7 +1860,7 @@
         // Extra safety: a flag cannot be dragged unless Edit was clicked.
         marker.on("dragstart", function () {
           if (!marker._editEnabled) {
-            marker.dragging.disable();
+            setMarkerDragging(marker, false);
             marker.setLatLng([marker._savedLat, marker._savedLng]);
             return;
           }
@@ -1956,7 +1988,7 @@
         delete marker._pendingLng;
 
         marker._editEnabled = false;
-        marker.dragging.disable();
+        setMarkerDragging(marker, false);
         marker.setLatLng([lat, lng]);
         marker.setOpacity(1);
         marker.setZIndexOffset(0);
@@ -2081,7 +2113,7 @@
           delete marker._pendingLng;
 
           marker._editEnabled = false;
-          marker.dragging.disable();
+          setMarkerDragging(marker, false);
           marker.setLatLng([lat, lng]);
           marker.setOpacity(1);
           marker.setZIndexOffset(0);
