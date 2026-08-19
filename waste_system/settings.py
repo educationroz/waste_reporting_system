@@ -93,6 +93,11 @@ TEMPLATES = [
 WSGI_APPLICATION = 'waste_system.wsgi.application'
 ASGI_APPLICATION = 'waste_system.asgi.application'
 
+# Deliberately SAMEORIGIN, not DENY (Django's check --deploy suggests DENY as
+# security.W019). This app previews driver-licence PDFs with same-origin
+# <embed src="...">, which Chrome/Safari treat as framing — DENY would blank
+# those previews. CSP `frame-ancestors 'self'` (see waste_system/security.py)
+# is the modern equivalent and is set consistently with this value.
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
