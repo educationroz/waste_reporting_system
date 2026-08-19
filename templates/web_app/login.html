@@ -113,16 +113,20 @@ function getCookie(name) {
     }
 })();
 
-async function claimGuestRequests(accessToken) {
+async function claimGuestRequests() {
+    // NOTE: guest_claim_tokens are NOT credentials — they are opaque handles
+    // for anonymous submissions, so keeping them in localStorage is fine.
+    // The call itself now authenticates with the HttpOnly session cookie.
     const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
     if (!tokens.length) return;
 
     try {
         const res = await fetch('/api/waste-requests/claim_guest_requests/', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`,
+                'X-CSRFToken': getCookie('csrftoken'),
             },
             body: JSON.stringify({ guest_tokens: tokens }),
         });
@@ -156,36 +160,28 @@ async function doLogin() {
     text.textContent = 'Signing in...';
 
     try {
-        const res = await fetch('/auth/login/', {
+        // SECURITY: browser sessions are cookie-based now. We call
+        // /auth/session-login/ (sets the HttpOnly session cookie) instead of
+        // /auth/login/, so no JWT is ever exposed to JavaScript. The JWT
+        // endpoints still exist for non-browser API clients.
+        const res = await fetch('/auth/session-login/', {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-            body: JSON.stringify({ username, password }),
-        });
-        const data = await res.json();
-        console.log('Login response:', data);
-
-        if (res.ok) {
-        localStorage.setItem('access_token', data.access);
-        localStorage.setItem('refresh_token', data.refresh);
-
-        const role = data.user?.role || '';
-
-        // User मात्रले guest request claim गर्ने
-        if (role === 'user') {
-            await claimGuestRequests(data.access);
-        }
-
-        await fetch('/auth/session-login/', {
-            method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
             },
             body: JSON.stringify({ username, password }),
         });
+        const data = await res.json();
+
+        if (res.ok) {
+        const role = data.user?.role || '';
+
+        // User मात्रले guest request claim गर्ने
+        if (role === 'user') {
+            await claimGuestRequests();
+        }
 
         const redirectMap = {
             admin: '/admin-dashboard/',
@@ -239,6 +235,7 @@ async function handleGoogleCredential(response) {
     try {
         const res = await fetch('/auth/google-login/', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -248,12 +245,11 @@ async function handleGoogleCredential(response) {
         const data = await res.json();
 
         if (res.ok) {
-            localStorage.setItem('access_token', data.access);
-            localStorage.setItem('refresh_token', data.refresh);
-
+            // GoogleLoginView sets the session cookie server-side; we
+            // deliberately ignore data.access / data.refresh here.
             const role = data.user?.role || '';
             if (role === 'user') {
-                await claimGuestRequests(data.access);
+                await claimGuestRequests();
             }
 
             const redirectMap = {
