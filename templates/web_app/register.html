@@ -86,12 +86,12 @@
         border: 1px solid rgba(0,0,0,0.06);
     }
     .google-btn-wrapper {
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 0 auto;
-        text-align: center;
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        margin: 0 auto 0.5rem auto !important;
+        text-align: center !important;
     }
     #g_id_signin_container {
         display: flex !important;
@@ -101,19 +101,14 @@
         margin: 0 auto !important;
         width: 100% !important;
     }
+    #g_id_signin_container > div,
+    #g_id_signin_container > div > div,
     #g_id_signin_container div,
-    #g_id_signin_container > div {
-        margin-left: auto !important;
-        margin-right: auto !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-        text-align: center !important;
-    }
     #g_id_signin_container iframe {
         margin-left: auto !important;
         margin-right: auto !important;
-        display: block !important;
+        left: 0 !important;
+        right: 0 !important;
     }
 
     /* Remove browser default eye / clear icon */
@@ -242,10 +237,11 @@ function getOptimalGoogleButtonWidth() {
     }
     const cardBody = document.querySelector('.auth-card .card-body') || document.querySelector('.card-body');
     if (cardBody && cardBody.clientWidth > 0) {
-        const computedPadding = (parseInt(window.getComputedStyle(cardBody).paddingLeft, 10) || 24) * 2;
-        return Math.max(220, Math.min(400, Math.floor(cardBody.clientWidth - computedPadding)));
+        const padLeft = parseInt(window.getComputedStyle(cardBody).paddingLeft, 10) || 24;
+        const padRight = parseInt(window.getComputedStyle(cardBody).paddingRight, 10) || 24;
+        return Math.max(220, Math.min(400, Math.floor(cardBody.clientWidth - padLeft - padRight)));
     }
-    return 320;
+    return 340;
 }
 
 function renderGoogleButton() {
@@ -256,6 +252,7 @@ function renderGoogleButton() {
     google.accounts.id.renderButton(
         container,
         {
+            type: 'standard',
             theme: 'outline',
             size: 'large',
             width: btnWidth,
@@ -286,6 +283,9 @@ function initGoogleSignIn() {
         window.__gsiRegisterInitialized = true;
     }
     renderGoogleButton();
+    setTimeout(renderGoogleButton, 100);
+    setTimeout(renderGoogleButton, 350);
+}
 }
 
 if (!window._gsiRegResizeBound) {
