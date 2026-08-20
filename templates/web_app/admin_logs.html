@@ -152,6 +152,38 @@
         border-color: var(--border-color, #dee2e6);
         opacity: 0.55;
     }
+
+    .log-action-btns {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+    }
+
+    @media (max-width: 767.98px) {
+        #log-header-actions {
+            width: 100%;
+            display: flex;
+            gap: 0.5rem;
+        }
+        #log-header-actions .btn {
+            flex: 1 1 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.45rem 0.5rem;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+        .table th, .table td {
+            padding: 0.65rem 0.5rem;
+            font-size: 0.82rem;
+        }
+        .log-action-btns .btn {
+            padding: 0.25rem 0.45rem !important;
+            font-size: 0.75rem !important;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -260,19 +292,18 @@
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="width: 40px;" class="text-center">
-                                        <input type="checkbox" id="selectAllLogs" class="form-check-input" onchange="toggleSelectAllLogs(this)">
+                                    <th style="width: 40px; min-width: 40px;" class="text-center">
+                                        <input type="checkbox" id="selectAllLogs" class="form-check-input" onchange="toggleSelectAllLogs(this)" title="{% trans 'Select all' %}">
                                     </th>
-                                    <th>{% trans "Timestamp Node" %}</th>
-                                    <th>{% trans "Operator Node" %}</th>
-                                    <th>{% trans "Action Signature" %}</th>
-                                    <th>{% trans "DB Content Type" %}</th>
-                                    <th>{% trans "Structural Context Description" %}</th>
-                                    <th>{% trans "IP Address Vector" %}</th>
-                                    <th class="text-end pe-4">{% trans "Actions" %}</th>
+                                    <th style="min-width: 140px;">{% trans "Timestamp Node" %}</th>
+                                    <th style="min-width: 120px;">{% trans "Operator Node" %}</th>
+                                    <th style="min-width: 110px;">{% trans "Action Signature" %}</th>
+                                    <th style="min-width: 120px;">{% trans "DB Content Type" %}</th>
+                                    <th style="min-width: 180px;">{% trans "Structural Context Description" %}</th>
+                                    <th style="min-width: 120px;">{% trans "IP Address Vector" %}</th>
+                                    <th style="min-width: 110px;" class="text-end pe-3">{% trans "Actions" %}</th>
                                 </tr>
                             </thead>
                             <tbody id="logs-table-body">
@@ -319,17 +350,19 @@
                                             <span class="text-muted small">—</span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-end pe-4" onclick="event.stopPropagation()">
-                                        <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 me-1"
-                                                data-bs-toggle="modal" data-bs-target="#logDetailModal{{ log.id }}"
-                                                style="font-size: 0.8rem;" title="{% trans 'View details' %}">
-                                            <i class="bi bi-eye me-1"></i>{% trans "View" %}
-                                        </button>
-                                        <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2"
-                                                onclick="deleteSingleLog(event, {{ log.id }})"
-                                                style="font-size: 0.8rem;" title="{% trans 'Delete log' %}">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
+                                    <td class="text-end pe-3" onclick="event.stopPropagation()">
+                                        <div class="log-action-btns">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2"
+                                                    data-bs-toggle="modal" data-bs-target="#logDetailModal{{ log.id }}"
+                                                    style="font-size: 0.8rem;" title="{% trans 'View details' %}">
+                                                <i class="bi bi-eye"></i> <span class="d-none d-md-inline ms-1">{% trans "View" %}</span>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2"
+                                                    onclick="deleteSingleLog(event, {{ log.id }})"
+                                                    style="font-size: 0.8rem;" title="{% trans 'Delete log' %}">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
 
