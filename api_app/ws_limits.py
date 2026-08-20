@@ -14,14 +14,21 @@ costs a channel-layer group membership, an event loop task, and — under
 does use exponential backoff, but a *cooperative* client is not a control: an
 attacker just calls ``new WebSocket()`` in a loop.
 
-TWO INDEPENDENT LIMITS
-----------------------
-1. **Connection cap** (``MAX_CONNECTIONS_PER_USER``) — how many sockets one user
+THREE INDEPENDENT LIMITS
+------------------------
+1. **Handshake rate** (``WS_MAX_HANDSHAKES_PER_WINDOW`` per client IP) — checked
+   *before* authentication, closes with 4010. This is the one the other two
+   cannot cover: a concurrency cap does nothing against connect/disconnect in a
+   loop, because each disconnect frees the slot immediately. It is also the only
+   limit that applies to **anonymous** sockets, which are rejected at 4001 but
+   still cost a session lookup and a DB hit each time.
+
+2. **Connection cap** (``MAX_CONNECTIONS_PER_USER``) — how many sockets one user
    may hold open at once, counted per consumer class so a chatty dashboard
    cannot starve notifications. Exceeding it closes the *new* socket with code
    4008; existing sockets are left alone.
 
-2. **Message rate limit** (``MAX_MESSAGES_PER_WINDOW`` in
+3. **Message rate limit** (``MAX_MESSAGES_PER_WINDOW`` in
    ``MESSAGE_WINDOW_SECONDS``) — a sliding window over inbound frames. A socket
    that floods gets closed with 4009. Without this, a single connection can
    still burn CPU by spamming ``receive()``.
@@ -49,7 +56,13 @@ Override in settings.py (all optional)::
     WS_MAX_CONNECTIONS_PER_USER = 5
     WS_MAX_MESSAGES_PER_WINDOW = 60
     WS_MESSAGE_WINDOW_SECONDS = 10
+    WS_MAX_HANDSHAKES_PER_WINDOW = 30   # 0 disables the handshake limit
+    WS_HANDSHAKE_WINDOW_SECONDS = 60
     WS_EXEMPT_STAFF = False
+
+Note the handshake limit is keyed by **IP**, not user, because it must work
+before we know who the user is. Shared-NAT clients (an office, a campus) share
+that budget, so keep it generous.
 """
 
 import asyncio
@@ -61,6 +74,7 @@ from django.conf import settings
 # Close codes in the 4000-4999 range are application-defined.
 WS_CLOSE_TOO_MANY_CONNECTIONS = 4008
 WS_CLOSE_MESSAGE_FLOOD = 4009
+WS_CLOSE_HANDSHAKE_FLOOD = 4010
 
 # Defaults chosen to sit well above real usage. A normal browser session holds
 # one notification socket plus at most one page-specific socket; 5 leaves room
@@ -69,9 +83,23 @@ DEFAULT_MAX_CONNECTIONS_PER_USER = 5
 DEFAULT_MAX_MESSAGES_PER_WINDOW = 60
 DEFAULT_MESSAGE_WINDOW_SECONDS = 10
 
+# Handshake churn. The concurrency cap above only limits how many sockets are
+# open AT ONCE — it does nothing against connect/disconnect in a loop, because
+# every disconnect frees the slot again. 30 handshakes/60s per IP is well above
+# a real client (which opens ~2 sockets per page load and backs off on failure)
+# but stops a spin loop.
+DEFAULT_MAX_HANDSHAKES_PER_WINDOW = 30
+DEFAULT_HANDSHAKE_WINDOW_SECONDS = 60
+
 # {consumer_class_name: {user_id: int}}
 _connection_counts = defaultdict(lambda: defaultdict(int))
 _counts_lock = asyncio.Lock()
+
+# {client_ip: deque[timestamp]} — shared across consumer classes on purpose:
+# the cost being limited is the handshake itself (session lookup + DB hit),
+# not membership of any one group.
+_handshake_times = defaultdict(deque)
+_handshake_lock = asyncio.Lock()
 
 
 def _setting(name, default):
@@ -99,6 +127,54 @@ async def _release_slot(bucket, user_id):
             _connection_counts[bucket].pop(user_id, None)
 
 
+def _client_ip(scope):
+    """Best-effort client IP from the ASGI scope.
+
+    Behind a proxy the real address is in X-Forwarded-For; scope['client'] would
+    otherwise be the load balancer for every visitor, turning a per-IP limit
+    into a global one that locks out the whole site.
+    """
+    for name, value in scope.get('headers') or []:
+        if name == b'x-forwarded-for':
+            first = value.decode('latin-1').split(',')[0].strip()
+            if first:
+                return first
+    client = scope.get('client')
+    return client[0] if client else 'unknown'
+
+
+async def check_handshake_rate(scope):
+    """Sliding-window limit on handshakes per client IP.
+
+    Returns True if this handshake may proceed. Call BEFORE authenticating so
+    unauthenticated spam is cheap to reject.
+    """
+    limit = _setting('WS_MAX_HANDSHAKES_PER_WINDOW', DEFAULT_MAX_HANDSHAKES_PER_WINDOW)
+    window = _setting('WS_HANDSHAKE_WINDOW_SECONDS', DEFAULT_HANDSHAKE_WINDOW_SECONDS)
+    if not limit:
+        return True
+
+    ip = _client_ip(scope)
+    now = time.monotonic()
+
+    async with _handshake_lock:
+        times = _handshake_times[ip]
+        while times and now - times[0] > window:
+            times.popleft()
+
+        if len(times) >= limit:
+            return False
+
+        times.append(now)
+
+        # Drop idle IPs so the dict cannot grow without bound.
+        if len(_handshake_times) > 10000:
+            for key in [k for k, v in _handshake_times.items() if not v]:
+                _handshake_times.pop(key, None)
+
+    return True
+
+
 def current_connection_count(consumer_cls, user_id):
     """Introspection helper for tests and health checks."""
     return _connection_counts[consumer_cls.__name__].get(user_id, 0)
@@ -107,6 +183,7 @@ def current_connection_count(consumer_cls, user_id):
 def reset_all_counts():
     """Test helper — clears every bucket."""
     _connection_counts.clear()
+    _handshake_times.clear()
 
 
 class ConnectionLimitMixin:
@@ -138,6 +215,19 @@ class ConnectionLimitMixin:
         return self.MESSAGE_WINDOW_SECONDS or _setting(
             'WS_MESSAGE_WINDOW_SECONDS', DEFAULT_MESSAGE_WINDOW_SECONDS
         )
+
+    async def enforce_handshake_rate(self):
+        """Reject handshake churn from one IP.
+
+        Returns True when the socket may continue. On refusal the socket has
+        already been closed with 4010 and the caller must return immediately.
+        Call this FIRST — before the auth check — so anonymous spam is cheap.
+        """
+        if await check_handshake_rate(self.scope):
+            return True
+
+        await self.close(code=WS_CLOSE_HANDSHAKE_FLOOD)
+        return False
 
     async def enforce_connection_limit(self, user):
         """Reserve a slot for ``user``.
