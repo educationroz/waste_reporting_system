@@ -646,6 +646,13 @@ class AdminLogsView(LoginRequiredMixin, ListView):
         ctx['current_action'] = self.request.GET.get('action', '')
         ctx['current_operator'] = self.request.GET.get('operator', '')
         ctx['total_logs'] = AdminLog.objects.count()
+
+        paginator = ctx.get('paginator')
+        page_obj = ctx.get('page_obj')
+        if paginator and page_obj:
+            ctx['elided_page_range'] = paginator.get_elided_page_range(
+                page_obj.number, on_each_side=2, on_ends=1
+            )
         return ctx
 
 
