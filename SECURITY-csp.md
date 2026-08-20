@@ -25,11 +25,26 @@ change provides a working path off `'unsafe-inline'`.
 Set `CSP_MODE` in the environment. Default is `compat`, so **deploying this changes nothing** until
 you opt in.
 
-| Mode | Enforced `script-src` | Report-Only header | Inline `onclick=` | Use when |
-|---|---|---|---|---|
-| `compat` *(default)* | `'self' 'unsafe-inline' <cdns>` | none | works | today |
-| `report` | `'self' 'unsafe-inline' <cdns>` | strict nonce policy | works | measuring |
-| `strict` | `'self' 'nonce-…' 'strict-dynamic'` | none | **blocked** | after cleanup |
+**`CSP_MODE=compat`** — the default; use it today.
+
+- Enforced `script-src`: `'self' 'unsafe-inline' <cdn hosts>`
+- Report-Only header: not sent
+- Inline `onclick=` handlers: keep working
+- Stops script injection? **No** — `'unsafe-inline'` allows it.
+
+**`CSP_MODE=report`** — use this to measure before enforcing.
+
+- Enforced `script-src`: `'self' 'unsafe-inline' <cdn hosts>` (unchanged, nothing breaks)
+- Report-Only header: the strict nonce policy
+- Inline `onclick=` handlers: keep working
+- Stops script injection? Not yet, but it tells you exactly what `strict` would break.
+
+**`CSP_MODE=strict`** — the goal; only after `report` is quiet.
+
+- Enforced `script-src`: `'self' 'nonce-<per-request>' 'strict-dynamic'`
+- Report-Only header: not sent
+- Inline `onclick=` handlers: **blocked** (this is the breaking change)
+- Stops script injection? **Yes** — injected script has no valid nonce.
 
 ### Recommended rollout
 
