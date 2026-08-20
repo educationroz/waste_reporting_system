@@ -2084,6 +2084,13 @@ class NotificationViewSet(viewsets.ModelViewSet):
         qs.update(is_read=True)
         return Response({'message': 'All notifications marked as read.'})
 
+    @action(detail=False, methods=['delete', 'post'])
+    def clear_all(self, request):
+        """Delete all notifications for the current user."""
+        qs = self.get_queryset()
+        count, _ = qs.delete()
+        return Response({'message': 'All notifications cleared.', 'deleted': count})
+
     @action(detail=False, methods=['get'])
     def unread(self, request):
         qs = self.get_queryset().filter(is_read=False)
