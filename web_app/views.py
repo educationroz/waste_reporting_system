@@ -622,6 +622,32 @@ class AdminLogsView(LoginRequiredMixin, ListView):
             return redirect_by_role(request.user)
         return super().dispatch(request, *args, **kwargs)
 
+    def paginate_queryset(self, queryset, page_size):
+        paginator = self.get_paginator(
+            queryset,
+            page_size,
+            orphans=self.get_paginate_orphans(),
+            allow_empty_first_page=self.get_allow_empty_first_page(),
+        )
+        page_kwarg = self.page_kwarg
+        page = self.kwargs.get(page_kwarg) or self.request.GET.get(page_kwarg) or 1
+        try:
+            page_number = int(page)
+        except (ValueError, TypeError):
+            page_number = 1
+
+        if page_number > paginator.num_pages and paginator.num_pages > 0:
+            page_number = paginator.num_pages
+        elif page_number < 1:
+            page_number = 1
+
+        try:
+            page_obj = paginator.page(page_number)
+            return (paginator, page_obj, page_obj.object_list, page_obj.has_other_pages())
+        except Exception:
+            page_obj = paginator.page(1)
+            return (paginator, page_obj, page_obj.object_list, page_obj.has_other_pages())
+
     def get_queryset(self):
         from api_app.models import AdminLog
         qs = AdminLog.objects.select_related('admin_user').order_by('-created_at')

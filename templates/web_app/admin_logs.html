@@ -654,13 +654,10 @@
         if (!tbody) return;
         const rows = tbody.querySelectorAll('tr[id^="log-row-"]');
         if (rows.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="8" class="text-center py-5 text-muted">
-                        <i class="bi bi-inbox fs-3 d-block mb-1"></i> ${window.escapeHtml(gettext('No matching pipeline activity records found inside active indexing node.'))}
-                    </td>
-                </tr>
-            `;
+            // When all items on this page are deleted, automatically reload so the next page's records instantly slide into page 1!
+            setTimeout(() => {
+                window.location.reload();
+            }, 350);
         }
     }
 
