@@ -4,24 +4,19 @@
 
 {% block extra_css %}
 <style>
-    /* ==========================================
-       NOTIFICATION SPECIFIC STYLING —
-       sidebar layout/CSS ab partials/sidebar.html
-       (ra base.html) bata aauँcha, yaha duplicate
-       gareko chaina.
-       ========================================== */
     .notif-card {
         border: none;
         border-radius: 14px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.03);
-        background: #ffffff;
+        background: var(--bg-card, #ffffff);
         overflow: hidden;
     }
 
     .notif-item {
         padding: 1.25rem 1.5rem;
         border-left: 4px solid transparent;
-        transition: all 0.2s ease;
+        transition: all 0.25s ease;
+        position: relative;
     }
 
     .notif-item.unread-style {
@@ -30,8 +25,34 @@
         cursor: pointer;
     }
 
+    [data-theme="dark"] .notif-item.unread-style {
+        background-color: rgba(25, 135, 84, 0.12) !important;
+        border-left-color: #25be27;
+    }
+
     .notif-item.unread-style:hover {
         background-color: #e9f7ef !important;
+    }
+
+    [data-theme="dark"] .notif-item.unread-style:hover {
+        background-color: rgba(25, 135, 84, 0.2) !important;
+    }
+
+    .notif-trash-btn {
+        opacity: 0.6;
+        transition: all 0.18s ease;
+        font-size: 1rem;
+        border: none;
+        background: transparent;
+        color: var(--text-muted, #6c757d);
+        border-radius: 6px;
+        padding: 4px 6px;
+    }
+    .notif-trash-btn:hover {
+        opacity: 1;
+        color: #dc3545 !important;
+        background-color: rgba(220, 53, 69, 0.1);
+        transform: scale(1.1);
     }
 
     .page-link {
@@ -46,8 +67,6 @@
         .notif-item {
             padding: 1rem;
         }
-        /* Title block + timestamp were a strict row with no wrap —
-           a long title could push the timestamp tight against it. */
         .notif-item .d-flex.justify-content-between.align-items-start {
             flex-wrap: wrap;
             gap: 0.35rem;
@@ -72,11 +91,16 @@
                     <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-bell text-success me-2"></i>{% trans "System Notifications" %}</h2>
                     <p class="text-muted mb-0">{% trans "Monitor real-time system alerts, operations, and audit triggers" %}</p>
                 </div>
-                {% if notifications %}
-                <button class="btn btn-outline-success px-3 py-2 fw-semibold btn-sm rounded-2" onclick="markAllRead(this)">
-                    <i class="bi bi-check-all me-1"></i>{% trans "Mark All Read" %}
-                </button>
-                {% endif %}
+                <div class="d-flex align-items-center gap-2 flex-wrap" id="notif-header-actions">
+                    {% if notifications %}
+                    <button class="btn btn-outline-success px-3 py-1 fw-semibold btn-sm rounded-2" onclick="markAllRead(this)">
+                        <i class="bi bi-check-all me-1"></i>{% trans "Mark All Read" %}
+                    </button>
+                    <button class="btn btn-outline-danger px-3 py-1 fw-semibold btn-sm rounded-2" onclick="clearAllNotifications(this)">
+                        <i class="bi bi-trash3 me-1"></i>{% trans "Clear All" %}
+                    </button>
+                    {% endif %}
+                </div>
             </div>
 
             <div class="card notif-card">
@@ -99,7 +123,15 @@
                                 <span class="badge bg-primary ms-1 unread-tag">{% trans "New" %}</span>
                                 {% endif %}
                             </div>
-                            <small class="text-muted fw-medium">{{ notif.created_at|timesince }} {% trans "ago" %}</small>
+                            <div class="d-flex align-items-center gap-2">
+                                <small class="text-muted fw-medium">{{ notif.created_at|timesince }} {% trans "ago" %}</small>
+                                <button type="button" class="btn notif-trash-btn"
+                                        onclick="deleteNotification(event, {{ notif.id }})"
+                                        title="{% trans 'Delete notification' %}"
+                                        aria-label="{% trans 'Delete notification' %}">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </div>
                         </div>
                         <p class="mb-0 mt-2 text-secondary" style="font-size: 0.9rem;">{{ notif.message }}</p>
 
@@ -110,7 +142,7 @@
                         {% endif %}
                     </div>
                     {% empty %}
-                    <div class="text-center py-5 text-muted">
+                    <div class="text-center py-5 text-muted" id="notif-empty-state">
                         <i class="bi bi-bell-slash fs-1 d-block mb-2 text-secondary"></i>
                         <span class="fw-medium">{% trans "No system notifications found at this time." %}</span>
                     </div>
@@ -119,7 +151,7 @@
             </div>
 
             {% if is_paginated %}
-            <nav class="mt-4">
+            <nav class="mt-4" id="notif-pagination">
                 <ul class="pagination justify-content-center m-0">
                     {% if page_obj.has_previous %}
                     <li class="page-item"><a class="page-link shadow-none" href="?page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a></li>
@@ -140,29 +172,129 @@
 <script nonce="{{ csp_nonce }}">
 (function() {
     const _markingRead = new Set();
+    const _deleting = new Set();
 
     window.markOneRead = async function(notifId) {
-        if (_markingRead.has(notifId)) return;
+        if (_markingRead.has(notifId) || _deleting.has(notifId)) return;
         _markingRead.add(notifId);
         try {
-        const data = await API.patch(`/api/notifications/${notifId}/`, { is_read: true });
-        if (data && data.id) {
-            const el = document.getElementById(`notif-${notifId}`);
-            if (el) {
-                el.classList.remove('unread-style');
-                el.removeAttribute('onclick');
-                el.removeAttribute('title');
-                const tag = el.querySelector('.unread-tag');
-                if (tag) tag.remove();
+            const data = await API.patch(`/api/notifications/${notifId}/`, { is_read: true });
+            if (data && data.id) {
+                const el = document.getElementById(`notif-${notifId}`);
+                if (el) {
+                    el.classList.remove('unread-style');
+                    el.removeAttribute('onclick');
+                    el.removeAttribute('title');
+                    const tag = el.querySelector('.unread-tag');
+                    if (tag) tag.remove();
+                }
+                decrementMainBadge();
+            } else {
+                showToast(gettext('Failed to mark as read.'), 'danger');
             }
-            decrementMainBadge();
-        } else {
-            showToast(gettext('Failed to mark as read.'), 'danger');
-        }
         } finally {
             _markingRead.delete(notifId);
         }
     };
+
+    window.deleteNotification = async function(event, notifId) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        if (_deleting.has(notifId)) return;
+        _deleting.add(notifId);
+
+        const el = document.getElementById(`notif-${notifId}`);
+        const isUnread = el && el.classList.contains('unread-style');
+
+        try {
+            const res = await authFetch(`/api/notifications/${notifId}/`, {
+                method: 'DELETE'
+            });
+
+            if (res && (res.ok || res.status === 204)) {
+                if (el) {
+                    el.style.opacity = '0';
+                    el.style.transform = 'translateX(20px)';
+                    setTimeout(() => {
+                        el.remove();
+                        checkEmptyState();
+                    }, 250);
+                }
+                if (isUnread) decrementMainBadge();
+                showToast(gettext('Notification removed.'), 'success');
+            } else {
+                showToast(gettext('Failed to delete notification.'), 'danger');
+            }
+        } catch (err) {
+            console.error('Error deleting notification:', err);
+            showToast(gettext('Failed to delete notification.'), 'danger');
+        } finally {
+            _deleting.delete(notifId);
+        }
+    };
+
+    window.clearAllNotifications = async function(btn) {
+        if (!confirm(gettext('Are you sure you want to clear all notifications?'))) {
+            return;
+        }
+
+        await withButtonBusy(eventButton(btn), gettext('Clearing...'), async () => {
+            try {
+                const res = await authFetch('/api/notifications/clear_all/', {
+                    method: 'POST'
+                });
+
+                if (res && res.ok) {
+                    const list = document.getElementById('notif-list');
+                    if (list) {
+                        list.innerHTML = `
+                            <div class="text-center py-5 text-muted" id="notif-empty-state">
+                                <i class="bi bi-bell-slash fs-1 d-block mb-2 text-secondary"></i>
+                                <span class="fw-medium">${window.escapeHtml(gettext('No system notifications found at this time.'))}</span>
+                            </div>
+                        `;
+                    }
+                    const actions = document.getElementById('notif-header-actions');
+                    if (actions) actions.innerHTML = '';
+                    const pagination = document.getElementById('notif-pagination');
+                    if (pagination) pagination.remove();
+
+                    const mainBadge = document.getElementById('notif-badge');
+                    if (mainBadge) {
+                        mainBadge.classList.add('d-none');
+                        mainBadge.textContent = '';
+                    }
+
+                    showToast(gettext('All notifications cleared.'), 'success');
+                } else {
+                    showToast(gettext('Failed to clear notifications.'), 'danger');
+                }
+            } catch (err) {
+                console.error('Error clearing notifications:', err);
+                showToast(gettext('Something went wrong. Please try again.'), 'danger');
+            }
+        });
+    };
+
+    function checkEmptyState() {
+        const list = document.getElementById('notif-list');
+        if (!list) return;
+        const items = list.querySelectorAll('.notif-item');
+        if (items.length === 0) {
+            list.innerHTML = `
+                <div class="text-center py-5 text-muted" id="notif-empty-state">
+                    <i class="bi bi-bell-slash fs-1 d-block mb-2 text-secondary"></i>
+                    <span class="fw-medium">${window.escapeHtml(gettext('No system notifications found at this time.'))}</span>
+                </div>
+            `;
+            const actions = document.getElementById('notif-header-actions');
+            if (actions) actions.innerHTML = '';
+            const pagination = document.getElementById('notif-pagination');
+            if (pagination) pagination.remove();
+        }
+    }
 
     function decrementMainBadge() {
         const mainBadge = document.getElementById('notif-badge');
@@ -177,38 +309,38 @@
     }
 
     window.markAllRead = async function(btn) {
-        await withButtonBusy(eventButton(btn), 'Marking...', async () => {
-        const unreadItems = document.querySelectorAll('.notif-item.unread-style');
-        const unreadTags = document.querySelectorAll('.unread-tag');
-        const mainBadge = document.getElementById('notif-badge');
+        await withButtonBusy(eventButton(btn), gettext('Marking...'), async () => {
+            const unreadItems = document.querySelectorAll('.notif-item.unread-style');
+            const unreadTags = document.querySelectorAll('.unread-tag');
+            const mainBadge = document.getElementById('notif-badge');
 
-        unreadItems.forEach(el => {
-            el.classList.remove('unread-style');
-            el.removeAttribute('onclick');
-            el.removeAttribute('title');
-        });
-        unreadTags.forEach(el => el.remove());
-        if (mainBadge) {
-            mainBadge.classList.add('d-none');
-            mainBadge.textContent = '';
-        }
-
-        try {
-            const data = await API.patch('/api/notifications/mark_all_read/', {});
-            if (data && (data.message || data.success)) {
-                showToast(gettext('All notifications marked as read.'), 'success');
-            } else {
-                showToast(gettext('Failed to update server data.'), 'danger');
-                unreadItems.forEach(el => {
-                    el.classList.add('unread-style');
-                    el.setAttribute('onclick', `markOneRead(${el.id.replace('notif-', '')})`);
-                    el.setAttribute('title', 'Click to mark as read');
-                });
+            unreadItems.forEach(el => {
+                el.classList.remove('unread-style');
+                el.removeAttribute('onclick');
+                el.removeAttribute('title');
+            });
+            unreadTags.forEach(el => el.remove());
+            if (mainBadge) {
+                mainBadge.classList.add('d-none');
+                mainBadge.textContent = '';
             }
-        } catch (error) {
-            console.error("Error marking notifications:", error);
-            showToast(gettext('Something went wrong. Please try again.'), 'danger');
-        }
+
+            try {
+                const data = await API.patch('/api/notifications/mark_all_read/', {});
+                if (data && (data.message || data.success)) {
+                    showToast(gettext('All notifications marked as read.'), 'success');
+                } else {
+                    showToast(gettext('Failed to update server data.'), 'danger');
+                    unreadItems.forEach(el => {
+                        el.classList.add('unread-style');
+                        el.setAttribute('onclick', `markOneRead(${el.id.replace('notif-', '')})`);
+                        el.setAttribute('title', 'Click to mark as read');
+                    });
+                }
+            } catch (error) {
+                console.error("Error marking notifications:", error);
+                showToast(gettext('Something went wrong. Please try again.'), 'danger');
+            }
         });
     };
 })();
