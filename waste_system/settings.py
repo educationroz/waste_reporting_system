@@ -85,6 +85,9 @@ TEMPLATES = [
                 # attribute and the language switcher in base.html.
                 'django.template.context_processors.i18n',
                 'web_app.context_processors.google_client_id',
+                # Exposes {{ csp_nonce }} so inline <script> tags can carry a
+                # per-request nonce and survive the strict CSP.
+                'waste_system.security.csp_nonce',
             ],
         },
     },
@@ -115,6 +118,19 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 # Rolling expiry so an idle session eventually dies.
 SESSION_COOKIE_AGE = 60 * 60 * 12          # 12 hours
 SESSION_SAVE_EVERY_REQUEST = True          # refresh the window on activity
+
+# ─── Content-Security-Policy ──────────────────────────────────────────────────
+# 'compat' → old permissive behaviour ('unsafe-inline' script-src).
+# 'report' → enforce permissive, but ALSO send the strict nonce policy as
+#            Report-Only so violations show up without breaking anything.
+# 'strict' → enforce the nonce + 'strict-dynamic' policy. Inline on* handlers
+#            stop running, so only flip this after 'report' mode is quiet.
+# Roll out as: compat → report (read the reports) → strict.
+CSP_MODE = config('CSP_MODE', default='compat')
+
+# Optional endpoint that receives JSON violation reports (e.g. a Sentry CSP
+# ingest URL). Empty string disables report-uri/report-to entirely.
+CSP_REPORT_URI = config('CSP_REPORT_URI', default='')
 
 if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000  # 1 year, per HSTS preload requirements

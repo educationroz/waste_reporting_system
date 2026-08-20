@@ -72,7 +72,7 @@
 <!-- Google Identity Services SDK -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
