@@ -1,5 +1,8 @@
 import io
-import magic
+try:
+    import magic
+except Exception:
+    magic = None
 from PIL import Image, UnidentifiedImageError
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -30,11 +33,39 @@ ALLOWED_IMAGE_MIME_TO_PIL_FORMAT = {
 }
 
 
+def _sniff_image_mime(header):
+    if magic is not None:
+        try:
+            return magic.from_buffer(header, mime=True)
+        except Exception:
+            pass
+    if header.startswith(b'\xff\xd8\xff'):
+        return 'image/jpeg'
+    if header.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'image/png'
+    if header.startswith(b'GIF87a') or header.startswith(b'GIF89a'):
+        return 'image/gif'
+    if header.startswith(b'RIFF') and len(header) >= 12 and header[8:12] == b'WEBP':
+        return 'image/webp'
+    return 'application/octet-stream'
+
+
+def _sniff_pdf_mime(header):
+    if magic is not None:
+        try:
+            return magic.from_buffer(header, mime=True)
+        except Exception:
+            pass
+    if header.lstrip().startswith(b'%PDF-'):
+        return 'application/pdf'
+    return 'application/octet-stream'
+
+
 def validate_image_file(uploaded_file):
     """
     Defence-in-depth image validator:
       1. Size cap.
-      2. Real MIME type sniffed from file BYTES (python-magic), not the
+      2. Real MIME type sniffed from file BYTES, not the
          filename extension — defeats renaming a .php/.html file to .jpg.
       3. Pillow actually opens and structurally verifies the file, and its
          detected format must match what the MIME sniff said — catches
@@ -53,7 +84,7 @@ def validate_image_file(uploaded_file):
     header = uploaded_file.read(2048)
     uploaded_file.seek(0)
 
-    mime = magic.from_buffer(header, mime=True)
+    mime = _sniff_image_mime(header)
     if mime not in ALLOWED_IMAGE_MIME_TO_PIL_FORMAT:
         raise ValidationError(
             f'Unsupported or spoofed file type detected ({mime}). '
@@ -92,7 +123,7 @@ def validate_pdf_file(uploaded_file):
     header = uploaded_file.read(2048)
     uploaded_file.seek(0)
 
-    mime = magic.from_buffer(header, mime=True)
+    mime = _sniff_pdf_mime(header)
     if mime != 'application/pdf':
         raise ValidationError(
             f'Unsupported or spoofed file type detected ({mime}). '

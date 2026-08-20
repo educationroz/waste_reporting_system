@@ -137,27 +137,32 @@ class GoogleLoginView(APIView):
             return Response({'error': 'Missing Google credential.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        client_id = getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '')
+        client_id = str(getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '') or '').strip().strip('"\'')
         if not client_id:
             return Response({'error': 'Google sign-in is not configured on this server.'},
                             status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         # --- verify the token with Google -------------------------------
+        payload = None
         try:
-            url = f'{self.GOOGLE_TOKENINFO_URL}?{_urlparse.urlencode({"id_token": credential})}'
-            with _urlrequest.urlopen(url, timeout=10) as resp:
-                payload = _json.loads(resp.read().decode('utf-8'))
+            from google.oauth2 import id_token as google_id_token
+            from google.auth.transport import requests as google_requests
+            payload = google_id_token.verify_oauth2_token(
+                credential, google_requests.Request(), client_id
+            )
         except Exception:
-            # Covers HTTP 400 (invalid/expired token) and network failures
-            # alike; never leak the raw error to the client.
-            return Response({'error': 'Could not verify Google account. Please try again.'},
-                            status=status.HTTP_401_UNAUTHORIZED)
-
-        # aud must be OUR client id, or a token minted for another app
-        # could be replayed against this endpoint.
-        if payload.get('aud') != client_id:
-            return Response({'error': 'This Google token was not issued for this application.'},
-                            status=status.HTTP_401_UNAUTHORIZED)
+            try:
+                url = f'{self.GOOGLE_TOKENINFO_URL}?{_urlparse.urlencode({"id_token": credential})}'
+                with _urlrequest.urlopen(url, timeout=10) as resp:
+                    payload = _json.loads(resp.read().decode('utf-8'))
+                if payload.get('aud') != client_id and payload.get('azp') != client_id:
+                    return Response({'error': 'This Google token was not issued for this application.'},
+                                    status=status.HTTP_401_UNAUTHORIZED)
+            except Exception:
+                # Covers HTTP 400 (invalid/expired token) and network failures
+                # alike; never leak the raw error to the client.
+                return Response({'error': 'Could not verify Google account. Please try again.'},
+                                status=status.HTTP_401_UNAUTHORIZED)
 
         email = (payload.get('email') or '').strip().lower()
         if not email:
