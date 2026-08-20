@@ -16,6 +16,11 @@ class WasteRequestConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
     GROUP_NAME = 'request_updates'
 
     async def connect(self):
+        # Handshake churn check runs BEFORE auth: rejecting an anonymous flood
+        # must be cheaper than the session lookup it would otherwise trigger.
+        if not await self.enforce_handshake_rate():
+            return
+
         user = self.scope.get('user')
         if user is None or not user.is_authenticated:
             await self.close(code=4001)
@@ -94,6 +99,11 @@ class DriverLocationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
     GROUP_NAME = 'driver_locations'
 
     async def connect(self):
+        # Handshake churn check runs BEFORE auth: rejecting an anonymous flood
+        # must be cheaper than the session lookup it would otherwise trigger.
+        if not await self.enforce_handshake_rate():
+            return
+
         user = self.scope.get('user')
         if user is None or not user.is_authenticated:
             await self.close(code=4001)
@@ -186,6 +196,11 @@ class NotificationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
     """
 
     async def connect(self):
+        # Handshake churn check runs BEFORE auth: rejecting an anonymous flood
+        # must be cheaper than the session lookup it would otherwise trigger.
+        if not await self.enforce_handshake_rate():
+            return
+
         user = self.scope.get('user')
         if user is None or not user.is_authenticated:
             await self.close(code=4001)
