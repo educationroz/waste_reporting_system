@@ -26,12 +26,42 @@
   #depot-map,
   #checkpoint-map {
     border: 1px solid var(--border-color) !important;
+  }
 
-    .pending-checkpoint-icon {
-      background: transparent !important;
-      border: none !important;
-      box-shadow: none !important;
-    }
+  /* These rules used to live NESTED inside the #depot-map rule above. Plain
+     CSS nesting is only honoured by newer engines, so in practice they did
+     nothing: the divIcon kept Leaflet's default white box and — critically —
+     the icon element never became a proper drag target. Top-level now, and
+     applied to the saved flag too (it previously had no CSS at all). */
+  .pending-checkpoint-icon,
+  .saved-checkpoint-icon {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    /* Fill the icon box and centre the glyph so the thing you SEE is exactly
+       the thing Leaflet accepts a drag on. */
+    display: flex !important;
+    align-items: flex-end;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  /* Only the flag currently being edited advertises itself as grabbable.
+     Leaflet adds .leaflet-marker-draggable when dragging.enable() is called,
+     so this automatically tracks edit mode. */
+  .saved-checkpoint-icon {
+    cursor: default;
+  }
+
+  .leaflet-marker-draggable.saved-checkpoint-icon,
+  .pending-checkpoint-icon {
+    cursor: grab;
+  }
+
+  .leaflet-marker-draggable.saved-checkpoint-icon:active,
+  .pending-checkpoint-icon:active,
+  .leaflet-drag-target {
+    cursor: grabbing;
   }
 </style>
 {% endblock %} {% block content %}
@@ -896,7 +926,7 @@
 </div>
 {% endblock %} {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
   (function () {
     // ── Pokhara Metropolitan City boundary (simplified from Open Knowledge Nepal's
     //    LocalBoundaries dataset, CC BY 4.0: https://localboundries.oknp.org/) ──
@@ -1554,6 +1584,9 @@
 
       marker._keepPositionOnClose = false;
 
+<<<<<<< HEAD
+      setMarkerDragging(marker, true);
+=======
       // GUARD: the marker may not be fully attached to the map yet (race
       // between the checkpoint tab's own "shown.bs.tab" listener firing
       // initCheckpointMap()+loadCheckpoints() and editCheckpoint()'s
@@ -1565,6 +1598,7 @@
         marker.dragging.enable();
       }
 
+>>>>>>> 220d0d351251be603da9e114f4355aa4a527ff5e
       marker.setOpacity(1);
       marker.setZIndexOffset(1000);
 
@@ -1577,8 +1611,40 @@
     }
 
     // Cancel edit / X button.
+    // Leaflet DELETES marker.dragging inside Marker.onRemove(). Any code that
+    // can run while a marker is being torn down (popupclose during
+    // layer.clearLayers(), for example) must therefore never touch
+    // marker.dragging directly, or it throws
+    // "Cannot read properties of undefined (reading 'disable')" and aborts
+    // whatever loop it was running inside.
+    function setMarkerDragging(marker, shouldDrag) {
+      if (!marker || !marker.dragging) return false;
+
+      if (shouldDrag) {
+        marker.dragging.enable();
+      } else {
+        marker.dragging.disable();
+      }
+
+      return true;
+    }
+
     function cancelSavedCheckpointMarkerEdit(marker) {
       if (!marker) return;
+
+      // Marker is mid-removal (or already removed): just reset the plain flags.
+      // Leaflet has already destroyed the drag handler, and the fresh marker
+      // created by the re-render starts locked anyway.
+      //
+      // Crucially we do NOT clear activeSavedCheckpointEditId here. This path
+      // is reached when a re-render tears down a marker whose popup is open,
+      // and that is exactly the case where the edit must SURVIVE the re-render
+      // so renderCheckpointMapMarkers() can hand edit mode to the new marker.
+      if (!marker.dragging) {
+        marker._editEnabled = false;
+        marker._keepPositionOnClose = false;
+        return;
+      }
 
       const hasOriginal =
         marker._savedLat !== undefined && marker._savedLng !== undefined;
@@ -1594,6 +1660,9 @@
       marker._editEnabled = false;
       marker._keepPositionOnClose = false;
 
+<<<<<<< HEAD
+      setMarkerDragging(marker, false);
+=======
       // GUARD: same race as enableSavedCheckpointMarkerEdit() above — the
       // marker may not have a `.dragging` handler attached yet if it was
       // just created by a concurrent renderCheckpointMapMarkers() call.
@@ -1604,6 +1673,7 @@
         marker.dragging.disable();
       }
 
+>>>>>>> 220d0d351251be603da9e114f4355aa4a527ff5e
       marker.setOpacity(1);
       marker.setZIndexOffset(0);
 
@@ -1802,6 +1872,13 @@
         marker._savedLng = lng;
         marker._editEnabled = false;
 
+        // Created with draggable:true so Leaflet builds the drag handler, but
+        // immediately locked — a flag is only movable after Edit is clicked.
+        // This also keeps the ".leaflet-marker-draggable" class (and therefore
+        // the grab cursor) in sync with edit mode instead of it being on
+        // permanently.
+        setMarkerDragging(marker, false);
+
         delete marker._pendingLat;
         delete marker._pendingLng;
 
@@ -1810,7 +1887,7 @@
         // Extra safety: a flag cannot be dragged unless Edit was clicked.
         marker.on("dragstart", function () {
           if (!marker._editEnabled) {
-            marker.dragging.disable();
+            setMarkerDragging(marker, false);
             marker.setLatLng([marker._savedLat, marker._savedLng]);
             return;
           }
@@ -1966,7 +2043,7 @@
         delete marker._pendingLng;
 
         marker._editEnabled = false;
-        marker.dragging.disable();
+        setMarkerDragging(marker, false);
         marker.setLatLng([lat, lng]);
         marker.setOpacity(1);
         marker.setZIndexOffset(0);
@@ -2091,7 +2168,7 @@
           delete marker._pendingLng;
 
           marker._editEnabled = false;
-          marker.dragging.disable();
+          setMarkerDragging(marker, false);
           marker.setLatLng([lat, lng]);
           marker.setOpacity(1);
           marker.setZIndexOffset(0);
@@ -2245,7 +2322,9 @@
           method: "DELETE",
           credentials: "same-origin",
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            // Cookie-session auth: getToken() no longer returns a real JWT,
+            // so a Bearer header here would send "Bearer true" and 403.
+            "X-CSRFToken": getCookie("csrftoken"),
           },
         });
 

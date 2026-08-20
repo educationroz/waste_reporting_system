@@ -25,8 +25,17 @@ Low** by real-world impact.
 2. **WebSocket auth token passed as a URL query param** (`?token=...`) in `consumers.py`/JS. Query
    strings land in server access logs, browser history, and referrer headers. Prefer passing the
    token in the WebSocket subprotocol header or a short-lived one-time ticket exchanged over HTTPS.
-3. **No `Content-Security-Policy` header** anywhere. You're loading Bootstrap, Leaflet, Google
-   Translate, and htmx from multiple CDNs — a CSP would contain damage from any injected script.
+3. ~~**No `Content-Security-Policy` header** anywhere. You're loading Bootstrap, Leaflet, Google
+   Translate, and htmx from multiple CDNs — a CSP would contain damage from any injected script.~~
+   **RESOLVED.** A full CSP plus five auxiliary security headers now ship from
+   `waste_system.security.SecurityHeadersMiddleware`. Two notes on the original finding: it was
+   written against `main` (which has no `security.py`), and Google Translate no longer exists —
+   it was replaced by Django's server-side i18n, so there is no third-party translate script to
+   allow-list. The real weakness was `'unsafe-inline'` in `script-src`; there is now a
+   `CSP_MODE=compat|report|strict` rollout path, and all 30 inline `<script>` blocks carry a
+   per-request nonce. See **`SECURITY-csp.md`**. Remaining work before `strict`: migrate the
+   166 inline `on*=` attributes to `addEventListener`. SRI hashes for CDN tags are documented but
+   intentionally not guessed offline.
 4. **SQLite is still the default DB** (`DB_ENGINE` defaults to `sqlite3`). Fine for dev, but if a
    production `.env` ever forgets to set `DB_ENGINE=postgresql`, you silently get SQLite in prod —
    no concurrent-write safety, no real backup story. Consider failing loudly instead of silently
