@@ -25,7 +25,7 @@
         Must load BEFORE any script that calls gettext().
     -->
     <script src="{% url 'javascript-catalog' %}"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         // Safety net: if the catalog request ever fails (offline, cache miss,
         // service-worker hiccup), fall back to identity functions so a missing
         // catalog degrades to plain English instead of throwing
@@ -41,7 +41,7 @@
 
     <!-- HTMX + Head-Support Extension -->
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         // Disable htmx's sessionStorage history cache entirely.
         // We were hitting QuotaExceededError trying to snapshot heavy
         // pages (the dashboard's Leaflet map alone renders hundreds of
@@ -70,7 +70,7 @@
          Auth is cookie-based (HttpOnly session cookie) rather than a JWT in
          localStorage, so every unsafe request must carry the CSRF token.
          Defined here, before any page script, so all templates can use it. -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         window.getCookie = function getCookie(name) {
             const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
             return m ? decodeURIComponent(m.pop()) : '';
@@ -85,7 +85,7 @@
     </script>
 
     <!-- Theme Early-Initialization -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         (function () {
             try {
                 var savedTheme = localStorage.getItem('safhasahar_theme');
@@ -314,7 +314,7 @@
 <script src="{% static 'web_app/js/main.js' %}"></script>
 
 <!-- THEME LOGIC -->
-<script type="text/javascript">
+<script nonce="{{ csp_nonce }}" type="text/javascript">
 function applyThemeIcon(theme) {
     var icon = document.getElementById('theme-icon');
     if (!icon) return;
@@ -335,7 +335,7 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 
 <!-- TOAST & UTILITY HELPER FUNCTIONS -->
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
     const SAFE_TYPES = new Set([
         'primary', 'secondary', 'success', 'danger',
@@ -486,7 +486,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 <!-- AUTHENTICATED USER SCRIPT -->
 {% if user.is_authenticated %}
-<script>
+<script nonce="{{ csp_nonce }}">
 // GUARD: this whole block used to run again whenever htmx restored a page
 // from its history cache (e.g. after a native browser Back navigation on an
 // hx-boost="true" site) — the underlying <body> document never actually
@@ -818,7 +818,7 @@ if (!window.__ssAuthScriptLoaded) {
 {% endif %}
 
 <!-- SIDEBAR TOGGLE & RESPONSIVE LOGIC -->
-<script>
+<script nonce="{{ csp_nonce }}">
     document.body.addEventListener('htmx:afterSettle', function () {
         var content = document.getElementById('content-app');
         if (!content) return;

@@ -466,7 +466,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 function getAssignModal() {
     if (typeof bootstrap === 'undefined') {
         console.error('Bootstrap JS failed to load — modal cannot open.');
