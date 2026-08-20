@@ -327,3 +327,40 @@ class NotificationDeletionAPITest(TestCase):
         response = self.client.post('/api/notifications/clear_all/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Notification.objects.filter(user=self.user).count(), 0)
+
+
+class AdminLogDeletionAPITest(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username='log_admin',
+            password='StrongPass123!',
+            role='admin',
+            is_staff=True,
+            is_superadmin=True,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+        from .models import AdminLog
+        self.l1 = AdminLog.objects.create(admin_user=self.admin, action='create', content_type='Checkpoint', object_description='Created 1')
+        self.l2 = AdminLog.objects.create(admin_user=self.admin, action='update', content_type='Checkpoint', object_description='Updated 2')
+        self.l3 = AdminLog.objects.create(admin_user=self.admin, action='delete', content_type='Checkpoint', object_description='Deleted 3')
+
+    def test_delete_single_admin_log(self):
+        from .models import AdminLog
+        response = self.client.delete(f'/api/admin-logs/{self.l1.id}/')
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(AdminLog.objects.filter(id=self.l1.id).exists())
+        self.assertTrue(AdminLog.objects.filter(id=self.l2.id).exists())
+
+    def test_bulk_delete_admin_logs(self):
+        from .models import AdminLog
+        response = self.client.post('/api/admin-logs/bulk_delete/', {'ids': [self.l1.id, self.l2.id]}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(AdminLog.objects.filter(id__in=[self.l1.id, self.l2.id]).exists())
+        self.assertTrue(AdminLog.objects.filter(id=self.l3.id).exists())
+
+    def test_clear_all_admin_logs(self):
+        from .models import AdminLog
+        response = self.client.post('/api/admin-logs/clear_all/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(AdminLog.objects.count(), 0)

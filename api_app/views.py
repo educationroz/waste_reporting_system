@@ -2099,10 +2099,11 @@ class NotificationViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class AdminLogViewSet(viewsets.ReadOnlyModelViewSet):
+class AdminLogViewSet(viewsets.ModelViewSet):
     """
-    Admin activity logs - read-only for admins only.
+    Admin activity logs - admins only.
     Tracks all admin actions for audit trail.
+    Supports individual deletion, bulk deletion, and clearing all logs.
     """
     queryset = AdminLog.objects.select_related('admin_user').order_by('-created_at')
     serializer_class = AdminLogSerializer
@@ -2110,6 +2111,22 @@ class AdminLogViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['action', 'content_type', 'admin_user__username']
     ordering_fields = ['created_at', 'action']
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+
+    @action(detail=False, methods=['post', 'delete'])
+    def bulk_delete(self, request):
+        """Bulk delete selected admin logs by IDs."""
+        ids = request.data.get('ids', [])
+        if not ids:
+            return Response({'error': 'No log IDs provided.'}, status=status.HTTP_400_BAD_REQUEST)
+        count, _ = AdminLog.objects.filter(id__in=ids).delete()
+        return Response({'message': f'Successfully deleted {count} log entries.', 'deleted': count})
+
+    @action(detail=False, methods=['post', 'delete'])
+    def clear_all(self, request):
+        """Clear all admin activity logs."""
+        count, _ = AdminLog.objects.all().delete()
+        return Response({'message': f'Successfully cleared all {count} log entries.', 'deleted': count})
 
 
 class SystemSettingsViewSet(viewsets.ModelViewSet):
