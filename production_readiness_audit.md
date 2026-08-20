@@ -43,8 +43,19 @@ Low** by real-world impact.
 5. **`GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID')`** has no `default=`, so it hard-crashes
    at import time if unset — acceptable, but make sure the **client secret** (if used server-side
    for token verification) is never logged or exposed in any API response/error message.
-6. **No rate limit on WebSocket connections** — `connectNotifSocket`/driver-location sockets can be
-   opened repeatedly; consider a per-user connection cap to prevent resource exhaustion.
+6. ~~**No rate limit on WebSocket connections** — `connectNotifSocket`/driver-location sockets can be
+   opened repeatedly; consider a per-user connection cap to prevent resource exhaustion.~~
+   **RESOLVED.** New `api_app/ws_limits.py` adds a `ConnectionLimitMixin` used by all three
+   consumers. Two independent limits: a per-user **connection cap** (default 5, close code 4008,
+   counted per consumer class) and a sliding-window **message rate limit** (default 60 frames /
+   10 s, close code 4009). Slots are released in `disconnect()`. Confirmed root cause: DRF's
+   throttles only run in the HTTP cycle, so WebSockets bypassed them entirely — the client's
+   exponential backoff in `base.html` was the *only* restraint, and a malicious client simply
+   ignores it. `base.html` now also stops reconnecting on 4001/4008/4009 rather than hammering a
+   server that deliberately refused it. Tunable via `WS_MAX_CONNECTIONS_PER_USER`,
+   `WS_MAX_MESSAGES_PER_WINDOW`, `WS_MESSAGE_WINDOW_SECONDS`, `WS_EXEMPT_STAFF`.
+   **Caveat:** counts are per-process, so with N workers the real ceiling is
+   N × cap; use nginx `limit_conn` for a hard global limit. Rationale in the module docstring.
 
 ## 🟠 High priority — Performance
 
