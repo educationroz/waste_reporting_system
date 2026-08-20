@@ -13,7 +13,7 @@ User = get_user_model()
 
 class BackupRestoreTests(APITestCase):
     def setUp(self):
-        self.admin = User.objects.create_user(username='admin1', password='pw', role='admin', is_staff=True)
+        self.admin = User.objects.create_user(username='admin1', password='pw', role='admin', is_staff=True, is_superadmin=True)
         self.client.force_authenticate(self.admin)
 
     def test_restore_without_confirm_flag_is_rejected(self):
@@ -34,7 +34,7 @@ class BackupRestoreTests(APITestCase):
         bad_file = SimpleUploadedFile('bad.json', b'not valid json{{{', content_type='application/json')
         response = self.client.post(
             '/api/database-backups/restore/',
-            {'backup_file': bad_file, 'confirm': 'true'},
+            {'backup_file': bad_file, 'confirm': 'true', 'admin_password': 'pw'},
             format='multipart',
         )
         self.assertEqual(response.status_code, 400, response.content)
