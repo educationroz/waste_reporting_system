@@ -499,7 +499,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
 const assignModalEl = document.getElementById('assignModal');
 
