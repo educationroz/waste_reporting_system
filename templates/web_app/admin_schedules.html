@@ -323,7 +323,17 @@ async function bulkSetSchedulesActive(isActive) {
     const ids = getSelectedScheduleIds();
     if (!ids.length) return;
     const verb = isActive ? 'activate' : 'deactivate';
-    if (!confirm(interpolate(gettext('Are you sure you want to %(v0)s %(v1)s selected schedule(s)?'), {v0: verb, v1: ids.length}, true))) return;
+    const ok = await showConfirmDialog({
+        title: isActive ? gettext('Activate Schedules?') : gettext('Deactivate Schedules?'),
+        message: interpolate(gettext('Are you sure you want to %(v0)s %(v1)s selected schedule(s)?'), {v0: verb, v1: ids.length}, true),
+        confirmText: isActive ? gettext('Activate') : gettext('Deactivate'),
+        cancelText: gettext('Cancel'),
+        confirmBtnClass: isActive ? 'btn-success' : 'btn-warning text-dark',
+        icon: isActive ? 'bi-check-circle-fill' : 'bi-pause-circle-fill',
+        iconColor: isActive ? '#16a34a' : '#f59e0b',
+        iconBg: isActive ? '#dcfce7' : '#fef3c7'
+    });
+    if (!ok) return;
 
     await withButtonBusy(null, '', async () => {
         const data = await API.post('/api/schedules/bulk_set_active/', { ids, is_active: isActive });
@@ -346,7 +356,17 @@ async function bulkSetSchedulesActive(isActive) {
 async function bulkDeleteSchedules() {
     const ids = getSelectedScheduleIds();
     if (!ids.length) return;
-    if (!confirm(interpolate(gettext('Permanently delete %(v0)s selected schedule(s)? This cannot be undone.'), {v0: ids.length}, true))) return;
+    const ok = await showConfirmDialog({
+        title: gettext('Delete Selected Schedules?'),
+        message: interpolate(gettext('Permanently delete %(v0)s selected schedule(s)? This cannot be undone.'), {v0: ids.length}, true),
+        confirmText: gettext('Delete Forever'),
+        cancelText: gettext('Cancel'),
+        confirmBtnClass: 'btn-danger',
+        icon: 'bi-trash3-fill',
+        iconColor: '#dc2626',
+        iconBg: '#fee2e2'
+    });
+    if (!ok) return;
 
     await withButtonBusy(null, '', async () => {
         const data = await API.post('/api/schedules/bulk_delete/', { ids });
@@ -404,7 +424,17 @@ async function toggleActive(scheduleId, isActive, el) {
 }
 
 async function deleteSchedule(scheduleId, btn) {
-    if (!confirm(gettext('Are you absolutely sure you want to drop this scheduling context from system routing?'))) return;
+    const ok = await showConfirmDialog({
+        title: gettext('Delete Schedule?'),
+        message: gettext('Are you absolutely sure you want to drop this scheduling context from system routing?'),
+        confirmText: gettext('Delete Schedule'),
+        cancelText: gettext('Cancel'),
+        confirmBtnClass: 'btn-danger',
+        icon: 'bi-trash3-fill',
+        iconColor: '#dc2626',
+        iconBg: '#fee2e2'
+    });
+    if (!ok) return;
 
     await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {

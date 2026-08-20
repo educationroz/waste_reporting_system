@@ -1741,10 +1741,16 @@
         return;
       }
 
-      const confirmed = confirm(
-        `Are you sure you want to delete ${ids.length} selected checkpoint(s)?\n\n` +
-          `This action cannot be undone.`,
-      );
+      const confirmed = await showConfirmDialog({
+        title: gettext('Delete Checkpoints?'),
+        message: `Are you sure you want to delete ${ids.length} selected checkpoint(s)? This action cannot be undone.`,
+        confirmText: gettext('Delete Forever'),
+        cancelText: gettext('Cancel'),
+        confirmBtnClass: 'btn-danger',
+        icon: 'bi-trash3-fill',
+        iconColor: '#dc2626',
+        iconBg: '#fee2e2'
+      });
 
       if (!confirmed) return;
 
@@ -2288,7 +2294,17 @@
     }
 
     async function deleteCheckpoint(id) {
-      if (!confirm(gettext("Delete this checkpoint?"))) return;
+      const ok = await showConfirmDialog({
+        title: gettext('Delete Checkpoint?'),
+        message: gettext('Are you sure you want to delete this checkpoint?'),
+        confirmText: gettext('Delete Checkpoint'),
+        cancelText: gettext('Cancel'),
+        confirmBtnClass: 'btn-danger',
+        icon: 'bi-trash3-fill',
+        iconColor: '#dc2626',
+        iconBg: '#fee2e2'
+      });
+      if (!ok) return;
 
       try {
         const res = await fetch(`/api/checkpoints/${id}/`, {

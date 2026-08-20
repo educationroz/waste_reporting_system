@@ -323,7 +323,17 @@
         const ids = getSelectedComplaintIds();
         if (!ids.length) return;
         const newStatus = document.getElementById('bulk-status-select').value;
-        if (!confirm(interpolate(gettext('Update %(v0)s selected complaint(s) to "%(v1)s"?'), {v0: ids.length, v1: newStatus}, true))) return;
+        const ok = await showConfirmDialog({
+            title: gettext('Update Complaints?'),
+            message: interpolate(gettext('Update %(v0)s selected complaint(s) to "%(v1)s"?'), {v0: ids.length, v1: newStatus}, true),
+            confirmText: gettext('Update Status'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-success',
+            icon: 'bi-check2-circle',
+            iconColor: '#16a34a',
+            iconBg: '#dcfce7'
+        });
+        if (!ok) return;
 
         // Track which of the selected ones were pending BEFORE the update,
         // so the sidebar/collapsed complaints badge count stays accurate —
@@ -403,8 +413,17 @@
 
     // ── Delete Complaint ──────────────────────────────────────────────────────
     async function deleteComplaint(id, btn) {
-
-        if (!confirm(gettext('Delete this complaint permanently? This cannot be undone.'))) return;
+        const ok = await showConfirmDialog({
+            title: gettext('Delete Complaint?'),
+            message: gettext('Delete this complaint permanently? This cannot be undone.'),
+            confirmText: gettext('Delete Forever'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-trash3-fill',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        });
+        if (!ok) return;
 
         const complaint = allComplaints.find(c => c.id == id);
         const wasPending = complaint && complaint.status === 'pending';
