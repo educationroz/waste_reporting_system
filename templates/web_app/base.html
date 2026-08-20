@@ -783,8 +783,9 @@ if (!window.__ssAuthScriptLoaded) {
                 //   4001 = not authenticated
                 //   4008 = too many concurrent connections for this user
                 //   4009 = message flood
+                //   4010 = too many handshakes from this IP
                 const code = event && event.code;
-                if (code === 4001 || code === 4008 || code === 4009) {
+                if (code === 4001 || code === 4008 || code === 4009 || code === 4010) {
                     const reason = code === 4001
                         ? gettext('Live updates stopped — please sign in again.')
                         : gettext('Live updates stopped — too many open connections. Close some tabs and reload.');
