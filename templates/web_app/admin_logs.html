@@ -173,6 +173,16 @@
                     <h2 class="mb-1 fw-bold"><i class="bi bi-file-text text-info me-2"></i>{% trans "Admin Activity Logs" %}</h2>
                     <p class="text-muted mb-0">{% trans "System audit trail records tracking operations, record lifecycles, and configuration mappings." %}</p>
                 </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap" id="log-header-actions">
+                    <button id="bulk-delete-logs-btn" class="btn btn-outline-danger btn-sm px-3 py-2 fw-semibold rounded-2"
+                            onclick="bulkDeleteLogs(this)" disabled>
+                        <i class="bi bi-trash me-1"></i>{% trans "Delete Selected" %} (<span id="selected-log-count">0</span>)
+                    </button>
+                    <button id="clear-all-logs-btn" class="btn btn-danger btn-sm px-3 py-2 fw-semibold rounded-2"
+                            onclick="clearAllLogs(this)">
+                        <i class="bi bi-trash3-fill me-1"></i>{% trans "Clear All Logs" %}
+                    </button>
+                </div>
             </div>
 
             <!-- Metrics Dashboard Summary Row -->
@@ -253,31 +263,37 @@
                         <table class="table table-hover mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
+                                    <th style="width: 40px;" class="text-center">
+                                        <input type="checkbox" id="selectAllLogs" class="form-check-input" onchange="toggleSelectAllLogs(this)">
+                                    </th>
                                     <th>{% trans "Timestamp Node" %}</th>
                                     <th>{% trans "Operator Node" %}</th>
                                     <th>{% trans "Action Signature" %}</th>
                                     <th>{% trans "DB Content Type" %}</th>
                                     <th>{% trans "Structural Context Description" %}</th>
                                     <th>{% trans "IP Address Vector" %}</th>
-                                    <th class="text-end pe-4">{% trans "Payload" %}</th>
+                                    <th class="text-end pe-4">{% trans "Actions" %}</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="logs-table-body">
                                 {% for log in logs %}
-                                <tr class="log-row" role="button" tabindex="0" data-bs-toggle="modal" data-bs-target="#logDetailModal{{ log.id }}">
-                                    <td>
+                                <tr class="log-row" id="log-row-{{ log.id }}">
+                                    <td class="text-center" onclick="event.stopPropagation()">
+                                        <input type="checkbox" class="form-check-input log-select" value="{{ log.id }}" onchange="updateLogSelectionUI()">
+                                    </td>
+                                    <td onclick="openLogModal({{ log.id }})">
                                         <span class="text-muted small fw-semibold">
                                             <i class="bi bi-clock me-1 text-secondary"></i>{{ log.created_at|date:"d M Y H:i" }}
                                         </span>
                                     </td>
-                                    <td>
+                                    <td onclick="openLogModal({{ log.id }})">
                                         {% if log.admin_user %}
-                                            <span class="badge bg-primary bg-opacity-10 text-primary px-2 py-1fw-semibold">{{ log.admin_user.username }}</span>
+                                            <span class="badge bg-primary bg-opacity-10 text-primary px-2 py-1 fw-semibold">{{ log.admin_user.username }}</span>
                                         {% else %}
                                             <span class="badge bg-dark bg-opacity-10 text-dark px-2 py-1 fw-semibold">{% trans "SYSTEM CRON" %}</span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td onclick="openLogModal({{ log.id }})">
                                         {% with action_label=log.get_action_display %}
                                             {% if action_label == 'Create' %}
                                                 <span class="badge bg-success bg-opacity-10 text-success px-2 py-1"><i class="bi bi-plus-circle me-1"></i>{{ action_label }}</span>
@@ -292,21 +308,28 @@
                                             {% endif %}
                                         {% endwith %}
                                     </td>
-                                    <td><code class="text-secondary small">{{ log.content_type }}</code></td>
-                                    <td>
+                                    <td onclick="openLogModal({{ log.id }})"><code class="text-secondary small">{{ log.content_type }}</code></td>
+                                    <td onclick="openLogModal({{ log.id }})">
                                         <span class="fw-medium">{{ log.object_description|truncatewords:5 }}</span>
                                     </td>
-                                    <td>
+                                    <td onclick="openLogModal({{ log.id }})">
                                         {% if log.ip_address %}
                                             <code class="text-info font-monospace" style="font-size: 0.8rem;">{{ log.ip_address }}</code>
                                         {% else %}
                                             <span class="text-muted small">—</span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-end pe-4">
-                                        <span class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.8rem;">
+                                    <td class="text-end pe-4" onclick="event.stopPropagation()">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 me-1"
+                                                data-bs-toggle="modal" data-bs-target="#logDetailModal{{ log.id }}"
+                                                style="font-size: 0.8rem;" title="{% trans 'View details' %}">
                                             <i class="bi bi-eye me-1"></i>{% trans "View" %}
-                                        </span>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2"
+                                                onclick="deleteSingleLog(event, {{ log.id }})"
+                                                style="font-size: 0.8rem;" title="{% trans 'Delete log' %}">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
                                     </td>
                                 </tr>
 
@@ -461,9 +484,187 @@
     const operatorInput = document.getElementById('operator-input');
     const operatorWrap = document.getElementById('operator-input-wrap');
     const clearOperatorBtn = operatorWrap.querySelector('.btn-clear-operator');
+    const _deletingLogs = new Set();
 
-    // Quick filter pills — one click sets the hidden action field and
-    // submits immediately, no dropdown to open first.
+    // Open detail modal when clicking row
+    window.openLogModal = function(logId) {
+        const modalEl = document.getElementById(`logDetailModal${logId}`);
+        if (modalEl && typeof bootstrap !== 'undefined') {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        }
+    };
+
+    // Checkbox selection logic
+    window.toggleSelectAllLogs = function(masterCb) {
+        const checkboxes = document.querySelectorAll('.log-select');
+        checkboxes.forEach(cb => {
+            cb.checked = masterCb.checked;
+        });
+        updateLogSelectionUI();
+    };
+
+    window.updateLogSelectionUI = function() {
+        const checkboxes = Array.from(document.querySelectorAll('.log-select'));
+        const checked = checkboxes.filter(cb => cb.checked);
+        const count = checked.length;
+        const total = checkboxes.length;
+
+        const countSpan = document.getElementById('selected-log-count');
+        if (countSpan) countSpan.textContent = count;
+
+        const bulkBtn = document.getElementById('bulk-delete-logs-btn');
+        if (bulkBtn) bulkBtn.disabled = count === 0;
+
+        const masterCb = document.getElementById('selectAllLogs');
+        if (masterCb) {
+            if (total === 0) {
+                masterCb.checked = false;
+                masterCb.indeterminate = false;
+            } else if (count === total) {
+                masterCb.checked = true;
+                masterCb.indeterminate = false;
+            } else if (count > 0) {
+                masterCb.checked = false;
+                masterCb.indeterminate = true;
+            } else {
+                masterCb.checked = false;
+                masterCb.indeterminate = false;
+            }
+        }
+    };
+
+    // Single Log Deletion
+    window.deleteSingleLog = async function(event, logId) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        if (_deletingLogs.has(logId)) return;
+
+        const confirmed = await window.showConfirmDialog({
+            title: gettext('Delete Activity Log?'),
+            message: gettext('Are you sure you want to permanently delete this audit log entry?'),
+            confirmText: gettext('Delete'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-trash3-fill',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        });
+
+        if (!confirmed) return;
+
+        _deletingLogs.add(logId);
+        const row = document.getElementById(`log-row-${logId}`);
+
+        try {
+            await API.delete(`/api/admin-logs/${logId}/`);
+            showToast(gettext('Activity log deleted.'), 'success');
+            if (row) {
+                row.style.opacity = '0';
+                row.style.transform = 'translateX(20px)';
+                setTimeout(() => {
+                    row.remove();
+                    updateLogSelectionUI();
+                    checkEmptyLogState();
+                }, 250);
+            }
+        } catch (err) {
+            console.error('Error deleting activity log:', err);
+            showToast(gettext('Failed to delete activity log.'), 'danger');
+        } finally {
+            _deletingLogs.delete(logId);
+        }
+    };
+
+    // Bulk Delete Selected Logs
+    window.bulkDeleteLogs = async function(btn) {
+        const checked = Array.from(document.querySelectorAll('.log-select:checked'));
+        const ids = checked.map(cb => cb.value);
+        if (!ids.length) return;
+
+        const confirmed = await window.showConfirmDialog({
+            title: gettext('Delete Selected Logs?'),
+            message: interpolate(gettext('Permanently delete %(v0)s selected activity log entry/entries?'), { v0: ids.length }, true),
+            confirmText: gettext('Delete Selected'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-trash3-fill',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        });
+
+        if (!confirmed) return;
+
+        await withButtonBusy(eventButton(btn), gettext('Deleting...'), async () => {
+            try {
+                const data = await API.post('/api/admin-logs/bulk_delete/', { ids });
+                if (data && typeof data.deleted === 'number') {
+                    showToast(interpolate(gettext('Successfully deleted %(v0)s log(s).'), { v0: data.deleted }, true), 'success');
+                    ids.forEach(id => {
+                        const row = document.getElementById(`log-row-${id}`);
+                        if (row) row.remove();
+                    });
+                    updateLogSelectionUI();
+                    checkEmptyLogState();
+                } else {
+                    showToast(gettext('Failed to bulk delete logs.'), 'danger');
+                }
+            } catch (err) {
+                console.error('Error bulk deleting logs:', err);
+                showToast(gettext('Failed to bulk delete logs.'), 'danger');
+            }
+        });
+    };
+
+    // Clear ALL Logs
+    window.clearAllLogs = async function(btn) {
+        const confirmed = await window.showConfirmDialog({
+            title: gettext('Clear ALL Activity Logs?'),
+            message: gettext('Are you sure you want to permanently clear the entire activity audit trail? This action CANNOT be undone.'),
+            confirmText: gettext('Yes, Clear Entire Trail'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-exclamation-octagon-fill',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        });
+
+        if (!confirmed) return;
+
+        await withButtonBusy(eventButton(btn), gettext('Clearing...'), async () => {
+            try {
+                const data = await API.post('/api/admin-logs/clear_all/', {});
+                if (data && typeof data.deleted === 'number') {
+                    showToast(gettext('All activity logs have been cleared.'), 'success');
+                    setTimeout(() => location.reload(), 700);
+                } else {
+                    showToast(gettext('Failed to clear activity logs.'), 'danger');
+                }
+            } catch (err) {
+                console.error('Error clearing activity logs:', err);
+                showToast(gettext('Something went wrong. Please try again.'), 'danger');
+            }
+        });
+    };
+
+    function checkEmptyLogState() {
+        const tbody = document.getElementById('logs-table-body');
+        if (!tbody) return;
+        const rows = tbody.querySelectorAll('tr[id^="log-row-"]');
+        if (rows.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox fs-3 d-block mb-1"></i> ${window.escapeHtml(gettext('No matching pipeline activity records found inside active indexing node.'))}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    // Quick filter pills
     document.querySelectorAll('.action-pill').forEach(function (btn) {
         btn.addEventListener('click', function () {
             actionInput.value = btn.dataset.value;
@@ -471,7 +672,7 @@
         });
     });
 
-    // Show/hide the clear (×) button based on whether there's text.
+    // Clear (×) button on search
     function syncClearButton() {
         operatorWrap.classList.toggle('has-value', operatorInput.value.trim().length > 0);
     }
@@ -483,9 +684,7 @@
         form.submit();
     });
 
-    // Debounced auto-search: typing pauses for a moment and the results
-    // refresh on their own — the Search button and Enter key still work
-    // immediately for anyone who prefers that.
+    // Debounced auto-search
     let debounceTimer;
     operatorInput.addEventListener('input', function () {
         clearTimeout(debounceTimer);
