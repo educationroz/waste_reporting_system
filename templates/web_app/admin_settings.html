@@ -1714,20 +1714,29 @@
       pendingLng,
       isEditing = false,
     ) {
-      const hasPending = pendingLat !== undefined && pendingLng !== undefined;
+      const hasPending =
+        pendingLat !== undefined &&
+        pendingLng !== undefined &&
+        (round6(pendingLat) !== round6(parseFloat(ch.latitude)) ||
+         round6(pendingLng) !== round6(parseFloat(ch.longitude)));
 
-      const coordsText = hasPending
-        ? `${pendingLat.toFixed(6)}, ${pendingLng.toFixed(6)} (unsaved)`
-        : `${parseFloat(ch.latitude).toFixed(6)}, ${parseFloat(ch.longitude).toFixed(6)}`;
+      const currentLat = pendingLat !== undefined ? pendingLat : parseFloat(ch.latitude);
+      const currentLng = pendingLng !== undefined ? pendingLng : parseFloat(ch.longitude);
+      const coordsText = `${parseFloat(currentLat).toFixed(6)}, ${parseFloat(currentLng).toFixed(6)}${hasPending ? ' (unsaved)' : ''}`;
 
       return `
-        <div style="min-width:190px;">
-            <strong>🚩 ${escapeHtml(ch.name)}</strong><br>
-            <span class="text-muted small">${escapeHtml(coordsText)}</span>
-            <div class="d-flex flex-wrap gap-1 mt-2">
-                ${hasPending ? `<button class="btn btn-sm btn-success py-0 px-2" onclick="saveMovedCheckpoint(${ch.id})">Save Position</button>` : ""}
-                <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="editCheckpoint(${ch.id})">Edit</button>
-                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteCheckpoint(${ch.id})">Delete</button>
+        <div style="min-width:210px;" class="p-1">
+            <div class="d-flex align-items-center mb-1">
+                <span class="me-1 fs-5">🚩</span>
+                <strong class="text-dark">${escapeHtml(ch.name)}</strong>
+                ${isEditing ? '<span class="badge bg-warning text-dark ms-auto">Editing</span>' : ''}
+            </div>
+            <span class="text-muted small d-block mb-2 font-monospace">${escapeHtml(coordsText)}</span>
+            ${isEditing ? '<div class="small text-success fw-medium mb-2"><i class="bi bi-arrows-move me-1"></i>Drag 🚩 or click map to move</div>' : ''}
+            <div class="d-flex flex-wrap gap-1 mt-1">
+                ${isEditing && hasPending ? `<button type="button" class="btn btn-sm btn-success py-1 px-2 fw-semibold" onclick="saveMovedCheckpoint(${ch.id})"><i class="bi bi-check-lg me-1"></i>Save Position</button>` : ""}
+                ${!isEditing ? `<button type="button" class="btn btn-sm btn-primary py-1 px-2" onclick="editCheckpoint(${ch.id})"><i class="bi bi-pencil me-1"></i>Edit</button>` : ""}
+                ${isEditing ? `<button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="cancelSavedCheckpointMarkerEdit(markerRegistry[${ch.id}])">Cancel</button>` : `<button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="markerRegistry[${ch.id}]?.closePopup()">Close</button>`}
             </div>
         </div>
       `;
@@ -1905,6 +1914,15 @@
 
         marker.bindPopup(buildSavedCheckpointPopup(ch));
 
+        // Live coordinates sync during drag
+        marker.on("drag", function () {
+          if (!marker._editEnabled) return;
+          const pos = marker.getLatLng();
+          marker._pendingLat = pos.lat;
+          marker._pendingLng = pos.lng;
+          setCheckpointInputs(pos.lat, pos.lng);
+        });
+
         // Extra safety: a flag cannot be dragged unless Edit was clicked.
         marker.on("dragstart", function () {
           if (!marker._editEnabled) {
@@ -1927,18 +1945,10 @@
 
           if (!isInsidePokhara(pos.lat, pos.lng)) {
             showToast(
-              "That spot is outside Pokhara Metropolitan City — choose a location inside the shaded boundary.",
+              gettext("That spot is outside Pokhara Metropolitan City — choose a location inside the shaded boundary."),
               "warning",
             );
 
-            // FIX: previously this always reverted all the way back to the
-            // very first saved position (_savedLat/_savedLng), even if the
-            // user had already made one or more valid drags earlier in this
-            // same edit session. That made it look like the flag "always
-            // snaps back to the same spot" no matter where you dragged it.
-            // Now it reverts to the last VALID position instead — the
-            // pending drag position if one exists, otherwise the original
-            // saved position.
             const fallbackLat =
               marker._pendingLat !== undefined
                 ? marker._pendingLat
@@ -1950,16 +1960,11 @@
 
             marker.setLatLng([fallbackLat, fallbackLng]);
 
-            // Only clear pending coords if there was no earlier valid drag
-            // to fall back to — an out-of-bounds drag shouldn't wipe out an
-            // earlier, still-valid pending move from this same session.
             if (marker._pendingLat === undefined) {
               delete marker._pendingLat;
               delete marker._pendingLng;
             }
 
-            // Still in edit mode after a rejected drag → keep isEditing = true,
-            // and show whichever coordinates are actually active right now.
             marker.setPopupContent(
               buildSavedCheckpointPopup(
                 ch,
@@ -1984,20 +1989,6 @@
           );
 
           marker.openPopup();
-        });
-
-        // X / close = CANCEL.
-        // If the flag was dragged but not saved, return it to the last saved position.
-        // Also lock it again after closing.
-        marker.on("popupclose", function () {
-          if (marker._keepPositionOnClose) {
-            marker._keepPositionOnClose = false;
-            return;
-          }
-
-          if (marker._editEnabled) {
-            cancelSavedCheckpointMarkerEdit(marker);
-          }
         });
 
         markerRegistry[ch.id] = marker;
@@ -2196,7 +2187,12 @@
         }
 
         activeSavedCheckpointEditId = null;
-        editingCheckpointId = savedId;
+        editingCheckpointId = null;
+
+        if (checkpointMarker && checkpointMap && !checkpointMap.hasLayer(checkpointMarker)) {
+          checkpointMarker.addTo(checkpointMap);
+          checkpointMarker.setLatLng([DEFAULT_LAT, DEFAULT_LNG]);
+        }
 
         await loadCheckpoints();
 
