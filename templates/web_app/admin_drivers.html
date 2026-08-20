@@ -413,7 +413,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
     // Parsed once — list of {id, plate_number, type, capacity_kg, status_display}
     let VEHICLES_FOR_JS = [];

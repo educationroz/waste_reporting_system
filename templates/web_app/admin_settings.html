@@ -926,7 +926,7 @@
 </div>
 {% endblock %} {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
   (function () {
     // ── Pokhara Metropolitan City boundary (simplified from Open Knowledge Nepal's
     //    LocalBoundaries dataset, CC BY 4.0: https://localboundries.oknp.org/) ──

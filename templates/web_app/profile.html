@@ -137,7 +137,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 // Global (outside the IIFE below) so the inline onclick="" in the Back
 // button can reach it.
 function safaSaharGoBack() {

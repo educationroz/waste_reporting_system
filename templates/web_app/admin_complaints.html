@@ -155,7 +155,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
     let allComplaints = [];
 
@@ -487,7 +487,7 @@
 
     document.addEventListener('DOMContentLoaded', bootstrapComplaintsPage);
 
-    // T2.5 FIX: this whole <script> block re-executes on every htmx swap
+    // T2.5 FIX: this whole <script nonce="{{ csp_nonce }}"> block re-executes on every htmx swap
     // (it's part of #content-app), so `document.body.addEventListener(...)`
     // was previously called again on every visit to this page — body is
     // never itself swapped, so listeners piled up (2nd visit = 2 loads,
@@ -498,7 +498,7 @@
     }
 
     // On a hard refresh / direct load of this URL, this script executes
-    // mid-parse, BEFORE the later <script> tags in base.html that define
+    // mid-parse, BEFORE the later <script nonce="{{ csp_nonce }}"> tags in base.html that define
     // `API` and `showToast` have run — calling bootstrapComplaintsPage()
     // immediately in that case throws ReferenceError. document.readyState
     // is still 'loading' at that point, so we skip the immediate call and
