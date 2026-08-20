@@ -209,24 +209,17 @@
         const isUnread = el && el.classList.contains('unread-style');
 
         try {
-            const res = await authFetch(`/api/notifications/${notifId}/`, {
-                method: 'DELETE'
-            });
-
-            if (res && (res.ok || res.status === 204)) {
-                if (el) {
-                    el.style.opacity = '0';
-                    el.style.transform = 'translateX(20px)';
-                    setTimeout(() => {
-                        el.remove();
-                        checkEmptyState();
-                    }, 250);
-                }
-                if (isUnread) decrementMainBadge();
-                showToast(gettext('Notification removed.'), 'success');
-            } else {
-                showToast(gettext('Failed to delete notification.'), 'danger');
+            await API.delete(`/api/notifications/${notifId}/`);
+            if (el) {
+                el.style.opacity = '0';
+                el.style.transform = 'translateX(20px)';
+                setTimeout(() => {
+                    el.remove();
+                    checkEmptyState();
+                }, 250);
             }
+            if (isUnread) decrementMainBadge();
+            showToast(gettext('Notification removed.'), 'success');
         } catch (err) {
             console.error('Error deleting notification:', err);
             showToast(gettext('Failed to delete notification.'), 'danger');
@@ -242,11 +235,9 @@
 
         await withButtonBusy(eventButton(btn), gettext('Clearing...'), async () => {
             try {
-                const res = await authFetch('/api/notifications/clear_all/', {
-                    method: 'POST'
-                });
+                const data = await API.post('/api/notifications/clear_all/', {});
 
-                if (res && res.ok) {
+                if (data && (data.message || data.deleted !== undefined)) {
                     const list = document.getElementById('notif-list');
                     if (list) {
                         list.innerHTML = `

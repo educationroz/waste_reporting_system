@@ -303,3 +303,27 @@ class WasteRequestLocationGroupingTest(TestCase):
         self.assertEqual(near_request.status, 'assigned')
         self.assertEqual(far_request.status, 'pending')
         self.assertIsNone(far_request.driver_id)
+
+
+class NotificationDeletionAPITest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='notif_user',
+            password='StrongPass123!',
+            role='user',
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+        self.n1 = Notification.objects.create(user=self.user, title='N1', message='M1')
+        self.n2 = Notification.objects.create(user=self.user, title='N2', message='M2')
+
+    def test_delete_single_notification(self):
+        response = self.client.delete(f'/api/notifications/{self.n1.id}/')
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Notification.objects.filter(id=self.n1.id).exists())
+        self.assertTrue(Notification.objects.filter(id=self.n2.id).exists())
+
+    def test_clear_all_notifications(self):
+        response = self.client.post('/api/notifications/clear_all/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Notification.objects.filter(user=self.user).count(), 0)
