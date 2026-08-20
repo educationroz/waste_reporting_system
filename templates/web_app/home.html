@@ -759,6 +759,9 @@ function initMap(lat, lng) {
         return;
     }
 
+    const mapEl = document.getElementById('map');
+    if (!mapEl) return;
+
     map = L.map('map').setView([lat, lng], 15);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

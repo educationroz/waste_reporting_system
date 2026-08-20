@@ -229,9 +229,18 @@
     };
 
     window.clearAllNotifications = async function(btn) {
-        if (!confirm(gettext('Are you sure you want to clear all notifications?'))) {
-            return;
-        }
+        const isConfirmed = await window.showConfirmDialog({
+            title: gettext('Clear All Notifications?'),
+            message: gettext('Are you sure you want to clear all your notifications? This action cannot be undone.'),
+            confirmText: gettext('Yes, Clear All'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-trash3-fill',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        });
+
+        if (!isConfirmed) return;
 
         await withButtonBusy(eventButton(btn), gettext('Clearing...'), async () => {
             try {

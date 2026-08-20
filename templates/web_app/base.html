@@ -296,6 +296,30 @@
         <!-- Dynamic Toast Container -->
         <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index:2100"></div>
 
+        <!-- Custom Centered Confirmation Modal -->
+        <div class="modal fade" id="appConfirmModal" tabindex="-1" aria-hidden="true" style="z-index: 2200;">
+            <div class="modal-dialog modal-dialog-centered" style="max-width: 380px;">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 18px; overflow: hidden; background: var(--bg-card, #ffffff);">
+                    <div class="modal-body text-center p-4">
+                        <div id="confirmModalIconWrapper" class="d-inline-flex align-items-center justify-content-center mb-3"
+                             style="width: 58px; height: 58px; border-radius: 50%; background-color: #fee2e2; color: #dc2626; font-size: 1.6rem;">
+                            <i class="bi bi-exclamation-triangle" id="confirmModalIcon"></i>
+                        </div>
+                        <h5 class="fw-bold mb-2 text-dark" id="confirmModalTitle">{% trans "Confirm Action" %}</h5>
+                        <p class="text-secondary small mb-4" id="confirmModalMessage">{% trans "Are you sure you want to proceed?" %}</p>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-light flex-grow-1 py-2 fw-semibold border" id="confirmModalCancelBtn" data-bs-dismiss="modal">
+                                {% trans "Cancel" %}
+                            </button>
+                            <button type="button" class="btn btn-danger flex-grow-1 py-2 fw-semibold" id="confirmModalConfirmBtn">
+                                {% trans "Confirm" %}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {% block content %}{% endblock %}
 
         {% block extra_js %}{% endblock %}
@@ -375,6 +399,70 @@ document.addEventListener("DOMContentLoaded", function() {
         setTimeout(function () {
             if (toast.parentNode) toast.parentNode.removeChild(toast);
         }, 4000);
+    };
+
+    // Reusable centered confirmation modal (Promise-based)
+    window.showConfirmDialog = function (options) {
+        const opts = Object.assign({
+            title: gettext('Confirm Action'),
+            message: gettext('Are you sure you want to proceed?'),
+            confirmText: gettext('Confirm'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-exclamation-triangle',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        }, options || {});
+
+        return new Promise(function (resolve) {
+            const modalEl = document.getElementById('appConfirmModal');
+            if (!modalEl || typeof bootstrap === 'undefined') {
+                resolve(window.confirm(opts.message));
+                return;
+            }
+
+            const titleEl = document.getElementById('confirmModalTitle');
+            if (titleEl) titleEl.textContent = opts.title;
+
+            const msgEl = document.getElementById('confirmModalMessage');
+            if (msgEl) msgEl.textContent = opts.message;
+
+            const confirmBtn = document.getElementById('confirmModalConfirmBtn');
+            if (confirmBtn) {
+                confirmBtn.textContent = opts.confirmText;
+                confirmBtn.className = 'btn ' + opts.confirmBtnClass + ' flex-grow-1 py-2 fw-semibold';
+            }
+
+            const cancelBtn = document.getElementById('confirmModalCancelBtn');
+            if (cancelBtn) cancelBtn.textContent = opts.cancelText;
+
+            const iconEl = document.getElementById('confirmModalIcon');
+            if (iconEl) iconEl.className = 'bi ' + opts.icon;
+
+            const iconWrapper = document.getElementById('confirmModalIconWrapper');
+            if (iconWrapper) {
+                iconWrapper.style.backgroundColor = opts.iconBg;
+                iconWrapper.style.color = opts.iconColor;
+            }
+
+            let isConfirmed = false;
+            const bsModal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: true });
+
+            const onConfirmClick = function () {
+                isConfirmed = true;
+                bsModal.hide();
+            };
+
+            if (confirmBtn) confirmBtn.onclick = onConfirmClick;
+
+            modalEl.addEventListener('hidden.bs.modal', function onHidden() {
+                modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                if (confirmBtn) confirmBtn.onclick = null;
+                resolve(isConfirmed);
+            });
+
+            bsModal.show();
+        });
     };
 
 
