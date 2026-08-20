@@ -255,6 +255,8 @@ function initGoogleSignIn() {
     google.accounts.id.initialize({
         client_id: clientId,
         callback: handleGoogleCredential,
+        auto_select: false,
+        use_fedcm_for_button: true,
     });
     renderGoogleButton();
 }
