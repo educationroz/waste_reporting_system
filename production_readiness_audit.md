@@ -48,7 +48,7 @@ Low** by real-world impact.
    for token verification) is never logged or exposed in any API response/error message.
 6. ~~**No rate limit on WebSocket connections** — `connectNotifSocket`/driver-location sockets can be
    opened repeatedly; consider a per-user connection cap to prevent resource exhaustion.~~
-   **RESOLVED** in `45c4b23` + `4c1e1f4`. Root cause was broader than "no limit": DRF's throttles
+   **RESOLVED** in `45c4b23` + `43a0a0a`. Root cause was broader than "no limit": DRF's throttles
    only run in the HTTP cycle, so WebSockets bypassed them entirely. `api_app/ws_limits.py` now adds
    three limits to all three consumers — a handshake rate limit per IP (30/60 s, code 4010, checked
    *before* auth), a per-user connection cap (5, code 4008) and a message rate limit (60 frames/10 s,
