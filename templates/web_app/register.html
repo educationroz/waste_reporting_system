@@ -86,20 +86,32 @@
         border: 1px solid rgba(0,0,0,0.06);
     }
     .google-btn-wrapper {
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 0 auto 0.5rem auto;
-        text-align: center;
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        margin: 0 auto 0.5rem auto !important;
+        text-align: center !important;
+        overflow: hidden !important;
     }
     #g_id_signin_container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 0 auto;
-        text-align: center;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        margin: 0 auto !important;
+        text-align: center !important;
         min-height: 44px;
+        width: 100% !important;
+    }
+    #g_id_signin_container .S9gUrf-YoZ4jf,
+    #g_id_signin_container > div,
+    #g_id_signin_container div[class*="L5Fo6c"],
+    #g_id_signin_container div[id*="gsi_"] {
+        margin-left: auto !important;
+        margin-right: auto !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
     }
 
     /* Remove browser default eye / clear icon */
@@ -223,16 +235,16 @@ function getCookie(name) {
 // ── Google Sign-In ───────────────────────────────────────────────────────────
 function getOptimalGoogleButtonWidth() {
     const fullBtn = document.getElementById('reg-btn');
-    if (fullBtn && fullBtn.offsetWidth > 0) {
-        return Math.max(220, Math.min(400, Math.floor(fullBtn.offsetWidth)));
-    }
     const cardBody = document.querySelector('.auth-card .card-body') || document.querySelector('.card-body');
-    if (cardBody && cardBody.clientWidth > 0) {
-        const padLeft = parseInt(window.getComputedStyle(cardBody).paddingLeft, 10) || 24;
-        const padRight = parseInt(window.getComputedStyle(cardBody).paddingRight, 10) || 24;
-        return Math.max(220, Math.min(400, Math.floor(cardBody.clientWidth - padLeft - padRight)));
+    let width = 300;
+    if (fullBtn && fullBtn.offsetWidth > 0) {
+        width = fullBtn.offsetWidth;
+    } else if (cardBody && cardBody.clientWidth > 0) {
+        const padLeft = parseInt(window.getComputedStyle(cardBody).paddingLeft, 10) || 16;
+        const padRight = parseInt(window.getComputedStyle(cardBody).paddingRight, 10) || 16;
+        width = cardBody.clientWidth - padLeft - padRight;
     }
-    return 340;
+    return Math.max(220, Math.min(380, Math.floor(width)));
 }
 
 function renderGoogleButton() {
