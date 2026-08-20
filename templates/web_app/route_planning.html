@@ -266,7 +266,7 @@
 
 {% block extra_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
     // Guard against this script block running twice on the same page
     // (e.g. htmx re-swapping content that includes this same script tag).
