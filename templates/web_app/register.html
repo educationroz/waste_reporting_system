@@ -236,17 +236,16 @@ function getCookie(name) {
 
 // ── Google Sign-In ───────────────────────────────────────────────────────────
 function getOptimalGoogleButtonWidth() {
-    const refBtn = document.getElementById('reg-btn') || document.getElementById('username');
-    let width = 320;
-    if (refBtn && refBtn.offsetWidth > 0) {
-        width = refBtn.offsetWidth;
-    } else {
-        const cardBody = document.querySelector('.card-body');
-        if (cardBody && cardBody.clientWidth > 0) {
-            width = cardBody.clientWidth - 48;
-        }
+    const fullBtn = document.getElementById('reg-btn');
+    if (fullBtn && fullBtn.offsetWidth > 0) {
+        return Math.max(220, Math.min(400, Math.floor(fullBtn.offsetWidth)));
     }
-    return Math.max(200, Math.min(400, Math.floor(width)));
+    const cardBody = document.querySelector('.auth-card .card-body') || document.querySelector('.card-body');
+    if (cardBody && cardBody.clientWidth > 0) {
+        const computedPadding = (parseInt(window.getComputedStyle(cardBody).paddingLeft, 10) || 24) * 2;
+        return Math.max(220, Math.min(400, Math.floor(cardBody.clientWidth - computedPadding)));
+    }
+    return 320;
 }
 
 function renderGoogleButton() {
