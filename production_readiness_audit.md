@@ -16,26 +16,29 @@ Low** by real-world impact.
 
 ---
 
+**Security status:** items 1, 2, 3 and 6 are **resolved** (commits `45cf897`, `bccac33`,
+`4392e80`+`c41287d`, `45c4b23`). Items 4 and 5 remain open — see the notes on each.
+
 ## 🔴 High priority — Security
 
-1. **JWT stored in `localStorage`** (used in 29 places across templates). Any XSS bug lets an
-   attacker steal the token directly (no `HttpOnly` protection). Recommended fix: move to
-   `HttpOnly` + `Secure` cookies for the access token, or at minimum add a strict
-   `Content-Security-Policy` header to shrink the XSS attack surface while you migrate.
-2. **WebSocket auth token passed as a URL query param** (`?token=...`) in `consumers.py`/JS. Query
-   strings land in server access logs, browser history, and referrer headers. Prefer passing the
-   token in the WebSocket subprotocol header or a short-lived one-time ticket exchanged over HTTPS.
+1. ~~**JWT stored in `localStorage`** (used in 29 places across templates). Any XSS bug lets an
+   attacker steal the token directly (no `HttpOnly` protection).~~
+   **RESOLVED** in `45cf897`. Browser auth moved to `HttpOnly` session cookies; fetch calls now send
+   `credentials: "same-origin"` + `X-CSRFToken`. Zero `localStorage` token reads remain in templates.
+   See `SECURITY-auth-hardening.md`.
+2. ~~**WebSocket auth token passed as a URL query param** (`?token=...`) in `consumers.py`/JS. Query
+   strings land in server access logs, browser history, and referrer headers.~~
+   **RESOLVED** in `bccac33`. Query-string auth removed entirely — the handshake authenticates from
+   the session cookie, so no credential touches the URL. Verified: `?token=<jwt>` and anonymous
+   handshakes are both rejected on all three sockets.
 3. ~~**No `Content-Security-Policy` header** anywhere. You're loading Bootstrap, Leaflet, Google
    Translate, and htmx from multiple CDNs — a CSP would contain damage from any injected script.~~
-   **RESOLVED.** A full CSP plus five auxiliary security headers now ship from
-   `waste_system.security.SecurityHeadersMiddleware`. Two notes on the original finding: it was
-   written against `main` (which has no `security.py`), and Google Translate no longer exists —
-   it was replaced by Django's server-side i18n, so there is no third-party translate script to
-   allow-list. The real weakness was `'unsafe-inline'` in `script-src`; there is now a
-   `CSP_MODE=compat|report|strict` rollout path, and all 30 inline `<script>` blocks carry a
-   per-request nonce. See **`SECURITY-csp.md`**. Remaining work before `strict`: migrate the
-   166 inline `on*=` attributes to `addEventListener`. SRI hashes for CDN tags are documented but
-   intentionally not guessed offline.
+   **RESOLVED** in `4392e80` + `c41287d`. Two corrections to the finding: it was written against
+   `main` (which has no `security.py`), and Google Translate no longer exists — it was replaced by
+   Django's server-side i18n. The real weakness was `'unsafe-inline'` in `script-src`; there is now
+   a `CSP_MODE=compat|report|strict` rollout path and all 30 inline `<script>` blocks carry a
+   per-request nonce. **Remaining before `strict`:** migrate 166 inline `on*=` attributes to
+   `addEventListener`. SRI hashes are documented but not guessed offline. See `SECURITY-csp.md`.
 4. **SQLite is still the default DB** (`DB_ENGINE` defaults to `sqlite3`). Fine for dev, but if a
    production `.env` ever forgets to set `DB_ENGINE=postgresql`, you silently get SQLite in prod —
    no concurrent-write safety, no real backup story. Consider failing loudly instead of silently
@@ -45,17 +48,15 @@ Low** by real-world impact.
    for token verification) is never logged or exposed in any API response/error message.
 6. ~~**No rate limit on WebSocket connections** — `connectNotifSocket`/driver-location sockets can be
    opened repeatedly; consider a per-user connection cap to prevent resource exhaustion.~~
-   **RESOLVED.** New `api_app/ws_limits.py` adds a `ConnectionLimitMixin` used by all three
-   consumers. Two independent limits: a per-user **connection cap** (default 5, close code 4008,
-   counted per consumer class) and a sliding-window **message rate limit** (default 60 frames /
-   10 s, close code 4009). Slots are released in `disconnect()`. Confirmed root cause: DRF's
-   throttles only run in the HTTP cycle, so WebSockets bypassed them entirely — the client's
-   exponential backoff in `base.html` was the *only* restraint, and a malicious client simply
-   ignores it. `base.html` now also stops reconnecting on 4001/4008/4009 rather than hammering a
-   server that deliberately refused it. Tunable via `WS_MAX_CONNECTIONS_PER_USER`,
-   `WS_MAX_MESSAGES_PER_WINDOW`, `WS_MESSAGE_WINDOW_SECONDS`, `WS_EXEMPT_STAFF`.
-   **Caveat:** counts are per-process, so with N workers the real ceiling is
-   N × cap; use nginx `limit_conn` for a hard global limit. Rationale in the module docstring.
+   **RESOLVED** in `45c4b23` + `43a0a0a`. Root cause was broader than "no limit": DRF's throttles
+   only run in the HTTP cycle, so WebSockets bypassed them entirely. `api_app/ws_limits.py` now adds
+   three limits to all three consumers — a handshake rate limit per IP (30/60 s, code 4010, checked
+   *before* auth), a per-user connection cap (5, code 4008) and a message rate limit (60 frames/10 s,
+   code 4009). The handshake limit exists because a concurrency cap alone does nothing against a
+   connect/disconnect loop (each disconnect frees the slot) and nothing at all against anonymous
+   handshakes: measured 300/300 accepted on both paths before it was added.
+   **Caveat:** counts are per-process, so N workers means N × cap — use nginx `limit_conn` for a
+   hard global limit. Details in the module docstring.
 
 ## 🟠 High priority — Performance
 
