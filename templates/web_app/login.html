@@ -68,21 +68,29 @@
         justify-content: center;
         align-items: center;
         margin: 0 auto;
+        text-align: center;
     }
     #g_id_signin_container {
-        width: 100% !important;
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
-    }
-    #g_id_signin_container > div {
+        text-align: center !important;
+        margin: 0 auto !important;
         width: 100% !important;
+    }
+    #g_id_signin_container div,
+    #g_id_signin_container > div {
+        margin-left: auto !important;
+        margin-right: auto !important;
         display: flex !important;
         justify-content: center !important;
+        align-items: center !important;
+        text-align: center !important;
     }
     #g_id_signin_container iframe {
-        width: 100% !important;
-        margin: 0 auto !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        display: block !important;
     }
 
     /* Chrome, Safari, modern Edge eye button hide */
@@ -220,10 +228,17 @@ async function doLogin() {
 
 // ── Google Sign-In ───────────────────────────────────────────────────────────
 function getOptimalGoogleButtonWidth() {
-    const inputEl = document.getElementById('username') || document.getElementById('login-btn');
-    const container = document.getElementById('g_id_signin_container');
-    const parentWidth = inputEl ? inputEl.offsetWidth : (container ? container.offsetWidth : 320);
-    return Math.max(220, Math.min(400, parentWidth || 320));
+    const refBtn = document.getElementById('login-btn') || document.getElementById('username');
+    let width = 320;
+    if (refBtn && refBtn.offsetWidth > 0) {
+        width = refBtn.offsetWidth;
+    } else {
+        const cardBody = document.querySelector('.card-body');
+        if (cardBody && cardBody.clientWidth > 0) {
+            width = cardBody.clientWidth - 48;
+        }
+    }
+    return Math.max(200, Math.min(400, Math.floor(width)));
 }
 
 function renderGoogleButton() {
