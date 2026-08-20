@@ -3599,3 +3599,11 @@ msgstr "🚛 तपाईंको पछिल्लो ज्ञात स्�
 #: templates/web_app/route_planning.html:204
 msgid "🚩 Checkpoint (drop-off point)"
 msgstr "🚩 चेकपोइन्ट (फोहोर बुझाउने ठाउँ)"
+
+#: templates/web_app/base.html
+msgid "Live updates stopped — please sign in again."
+msgstr "प्रत्यक्ष अपडेट रोकियो — कृपया पुनः साइन इन गर्नुहोस्।"
+
+#: templates/web_app/base.html
+msgid "Live updates stopped — too many open connections. Close some tabs and reload."
+msgstr "प्रत्यक्ष अपडेट रोकियो — धेरै जडानहरू खुला छन्। केही ट्याबहरू बन्द गरी पुनः लोड गर्नुहोस्।"

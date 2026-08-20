@@ -777,6 +777,25 @@ if (!window.__ssAuthScriptLoaded) {
                     console.warn(label, '(intentional close, skipping toast)', event);
                     return;
                 }
+
+                // Server refused us on purpose. Retrying just burns the very
+                // resources the limit exists to protect, so stop reconnecting.
+                //   4001 = not authenticated
+                //   4008 = too many concurrent connections for this user
+                //   4009 = message flood
+                const code = event && event.code;
+                if (code === 4001 || code === 4008 || code === 4009) {
+                    const reason = code === 4001
+                        ? gettext('Live updates stopped — please sign in again.')
+                        : gettext('Live updates stopped — too many open connections. Close some tabs and reload.');
+                    console.warn(label, '(server refused, not reconnecting)', event);
+                    if (!window._notifReconnectWarned) {
+                        showToast(reason, 'warning');
+                        window._notifReconnectWarned = true;
+                    }
+                    return;
+                }
+
                 console.warn(label, event);
                 if (!window._notifReconnectWarned) {
                     showToast(gettext('Connection lost — live updates paused'), 'warning');
