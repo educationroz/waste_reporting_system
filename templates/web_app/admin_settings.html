@@ -1584,21 +1584,7 @@
 
       marker._keepPositionOnClose = false;
 
-<<<<<<< HEAD
       setMarkerDragging(marker, true);
-=======
-      // GUARD: the marker may not be fully attached to the map yet (race
-      // between the checkpoint tab's own "shown.bs.tab" listener firing
-      // initCheckpointMap()+loadCheckpoints() and editCheckpoint()'s
-      // explicit loadCheckpoints() call, both rebuilding markers around
-      // the same time). Without this guard, a marker whose onAdd() hasn't
-      // finished yet has no `.dragging` handler and this threw
-      // "Cannot read properties of undefined (reading 'enable')".
-      if (marker.dragging) {
-        marker.dragging.enable();
-      }
-
->>>>>>> 220d0d351251be603da9e114f4355aa4a527ff5e
       marker.setOpacity(1);
       marker.setZIndexOffset(1000);
 
@@ -1660,20 +1646,7 @@
       marker._editEnabled = false;
       marker._keepPositionOnClose = false;
 
-<<<<<<< HEAD
       setMarkerDragging(marker, false);
-=======
-      // GUARD: same race as enableSavedCheckpointMarkerEdit() above — the
-      // marker may not have a `.dragging` handler attached yet if it was
-      // just created by a concurrent renderCheckpointMapMarkers() call.
-      // This was throwing "Cannot read properties of undefined (reading
-      // 'disable')" and crashing before the marker's opacity/z-index reset
-      // below could run.
-      if (marker.dragging) {
-        marker.dragging.disable();
-      }
-
->>>>>>> 220d0d351251be603da9e114f4355aa4a527ff5e
       marker.setOpacity(1);
       marker.setZIndexOffset(0);
 

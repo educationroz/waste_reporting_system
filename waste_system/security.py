@@ -211,13 +211,9 @@ class SecurityHeadersMiddleware:
             'Permissions-Policy',
             'geolocation=(self), microphone=(), camera=(self), payment=()',
         )
-<<<<<<< HEAD
         # COOP must be 'same-origin-allow-popups' so Google OAuth / GIS popup
         # can communicate with window.opener. Strict 'same-origin' breaks Google Sign-In.
         response.setdefault('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
-=======
-        response.setdefault('Cross-Origin-Opener-Policy', 'same-origin')
         response.setdefault('Cross-Origin-Resource-Policy', 'same-origin')
         response.setdefault('X-Content-Type-Options', 'nosniff')
->>>>>>> 4233438df8bca3e5683fe4f14526fe4cf89923e6
         return response
