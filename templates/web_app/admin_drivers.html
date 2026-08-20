@@ -782,7 +782,17 @@
     }
 
     window.removeDriver = async function(driverId, btn) {
-        if (!confirm(gettext('Are you sure you want to remove this driver from the system?'))) return;
+        const ok = await showConfirmDialog({
+            title: gettext('Remove Driver?'),
+            message: gettext('Are you sure you want to remove this driver from the system?'),
+            confirmText: gettext('Remove Driver'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-person-x-fill',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        });
+        if (!ok) return;
 
         await withButtonBusy(eventButton(btn), 'Removing...', async () => {
         const token = await getValidAccessToken();

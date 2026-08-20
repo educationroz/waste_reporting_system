@@ -1738,7 +1738,17 @@ window.submitRequest = async function() {
 
 // ── Cancel Request ────────────────────────────────────────────────────────
 window.cancelRequest = async function(requestId, btn) {
-    if (!confirm(gettext('Cancel this request?'))) return;
+    const ok = await showConfirmDialog({
+        title: gettext('Cancel Request?'),
+        message: gettext('Are you sure you want to cancel this request?'),
+        confirmText: gettext('Yes, Cancel Request'),
+        cancelText: gettext('Keep Request'),
+        confirmBtnClass: 'btn-warning text-dark',
+        icon: 'bi-exclamation-circle-fill',
+        iconColor: '#f59e0b',
+        iconBg: '#fef3c7'
+    });
+    if (!ok) return;
 
     await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
         const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
@@ -1754,7 +1764,17 @@ window.cancelRequest = async function(requestId, btn) {
 
 // ── Move Request to Recycle Bin (soft-delete) ─────────────────────────────────
 window.deleteRequest = async function(requestId, btn) {
-    if (!confirm(gettext('Move this request to Recycle Bin? You can restore it later from there.'))) return;
+    const ok = await showConfirmDialog({
+        title: gettext('Move to Recycle Bin?'),
+        message: gettext('Move this request to Recycle Bin? You can restore it later from there.'),
+        confirmText: gettext('Move to Bin'),
+        cancelText: gettext('Cancel'),
+        confirmBtnClass: 'btn-danger',
+        icon: 'bi-trash3-fill',
+        iconColor: '#dc2626',
+        iconBg: '#fee2e2'
+    });
+    if (!ok) return;
 
     await withButtonBusy(eventButton(btn), 'Moving...', async () => {
     try {

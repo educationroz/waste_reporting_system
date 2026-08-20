@@ -671,7 +671,17 @@ window.submitBulkAssign = async function(btn) {
 window.bulkCancelSelected = async function() {
     const ids = getSelectedRequestIds();
     if (!ids.length) return;
-    if (!confirm(interpolate(gettext('Cancel %(v0)s selected request(s)? Only pending requests will be affected.'), {v0: ids.length}, true))) return;
+    const ok = await showConfirmDialog({
+        title: gettext('Cancel Selected Requests?'),
+        message: interpolate(gettext('Cancel %(v0)s selected request(s)? Only pending requests will be affected.'), {v0: ids.length}, true),
+        confirmText: gettext('Cancel Requests'),
+        cancelText: gettext('Back'),
+        confirmBtnClass: 'btn-warning text-dark',
+        icon: 'bi-exclamation-circle-fill',
+        iconColor: '#f59e0b',
+        iconBg: '#fef3c7'
+    });
+    if (!ok) return;
 
     await withButtonBusy(null, '', async () => {
         const data = await API.post('/api/waste-requests/bulk_cancel/', { ids });
@@ -718,7 +728,17 @@ window.exportFilteredRequests = async function() {
 };
 
 window.cancelRequest = async function(requestId, btn) {
-    if (!confirm(gettext('Are you absolutely sure you want to cancel this municipal request matrix?'))) return;
+    const ok = await showConfirmDialog({
+        title: gettext('Cancel Request?'),
+        message: gettext('Are you absolutely sure you want to cancel this municipal request?'),
+        confirmText: gettext('Yes, Cancel'),
+        cancelText: gettext('Back'),
+        confirmBtnClass: 'btn-warning text-dark',
+        icon: 'bi-exclamation-circle-fill',
+        iconColor: '#f59e0b',
+        iconBg: '#fef3c7'
+    });
+    if (!ok) return;
     await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
     const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
     if (data && data.id) {
@@ -729,10 +749,6 @@ window.cancelRequest = async function(requestId, btn) {
             actionHtml: '<span class="text-muted small italic px-2">Lifecycle Locked</span>',
             showDelete: true,
         });
-        // Status cancelled bhaisake pachi "Assign Driver" button dekhinu hudaina
-        // (template logic sanga milaayera — status == 'cancelled' bhaye button hidden hunuparne).
-        // applyRequestRowUpdate le driverHtml: null pathayeko le driver cell chuँदैन, tesैले button
-        // yeहाँ explicitly हटाउनुपर्यो, natra reload nagarunjel purano button dekhirahancha.
         const row = document.getElementById(`request-row-${requestId}`);
         const driverCell = row ? row.children[9] : null;
         const assignBtn = driverCell ? driverCell.querySelector('button') : null;
@@ -744,7 +760,17 @@ window.cancelRequest = async function(requestId, btn) {
 };
 
 window.deleteRequest = async function(requestId, btn) {
-    if (!confirm(gettext("Are you sure you want to delete this request?"))) return;
+    const ok = await showConfirmDialog({
+        title: gettext('Delete Request?'),
+        message: gettext('Are you sure you want to delete this request permanently?'),
+        confirmText: gettext('Delete'),
+        cancelText: gettext('Cancel'),
+        confirmBtnClass: 'btn-danger',
+        icon: 'bi-trash3-fill',
+        iconColor: '#dc2626',
+        iconBg: '#fee2e2'
+    });
+    if (!ok) return;
 
     await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {
@@ -766,10 +792,20 @@ window.deleteRequest = async function(requestId, btn) {
 
 // ── ML gatekeeper low-confidence review resolution (Approve / Reject) ─────
 window.resolveReview = async function(requestId, decision, btn) {
-    const confirmMsg = decision === 'approve'
-        ? 'Confirm this photo shows real waste? The review flag will be cleared.'
-        : 'Confirm this photo does NOT show waste? The request will be cancelled.';
-    if (!confirm(confirmMsg)) return;
+    const isApprove = decision === 'approve';
+    const ok = await showConfirmDialog({
+        title: isApprove ? gettext('Approve Photo?') : gettext('Reject Request?'),
+        message: isApprove
+            ? gettext('Confirm this photo shows real waste? The review flag will be cleared.')
+            : gettext('Confirm this photo does NOT show waste? The request will be cancelled.'),
+        confirmText: isApprove ? gettext('Approve') : gettext('Reject & Cancel'),
+        cancelText: gettext('Cancel'),
+        confirmBtnClass: isApprove ? 'btn-success' : 'btn-danger',
+        icon: isApprove ? 'bi-check-circle-fill' : 'bi-x-circle-fill',
+        iconColor: isApprove ? '#16a34a' : '#dc2626',
+        iconBg: isApprove ? '#dcfce7' : '#fee2e2'
+    });
+    if (!ok) return;
 
     await withButtonBusy(eventButton(btn), decision === 'approve' ? 'Approving...' : 'Rejecting...', async () => {
         const data = await API.patch(`/api/waste-requests/${requestId}/resolve_review/`, { decision });

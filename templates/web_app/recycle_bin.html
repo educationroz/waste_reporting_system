@@ -179,7 +179,17 @@
     };
 
     window.permanentlyDeleteRequest = async function(requestId, btn) {
-        if (!confirm(gettext('Permanently delete this request? This cannot be undone.'))) return;
+        const ok = await showConfirmDialog({
+            title: gettext('Permanently Delete?'),
+            message: gettext('Permanently delete this request? This cannot be undone.'),
+            confirmText: gettext('Delete Forever'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-trash3-fill',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        });
+        if (!ok) return;
 
         await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
         try {
@@ -208,7 +218,17 @@
     // double-click previously started a second pass while the first was still
     // running — duplicate requests for rows not yet removed from the DOM.
     window.emptyRecycleBin = async function(btn) {
-        if (!confirm(gettext('Permanently delete ALL items in the Recycle Bin? This cannot be undone.'))) return;
+        const ok = await showConfirmDialog({
+            title: gettext('Empty Recycle Bin?'),
+            message: gettext('Permanently delete ALL items in the Recycle Bin? This cannot be undone.'),
+            confirmText: gettext('Yes, Empty Bin'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-trash3-fill',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        });
+        if (!ok) return;
 
         await withButtonBusy(eventButton(btn), 'Emptying...', async () => {
         const rows = Array.from(document.querySelectorAll('#recycle-bin-body tr[id^="bin-row-"]'));

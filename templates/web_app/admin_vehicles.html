@@ -384,7 +384,17 @@ window.updateVehicle = async function(vehicleId, btn) {
 
 // ---------- DELETE — reliable fetch status check + instant DOM row removal ----------
 window.deleteVehicle = async function(vehicleId, btn) {
-    if (!confirm(gettext('Delete this vehicle? This cannot be undone.'))) return;
+    const ok = await showConfirmDialog({
+        title: gettext('Delete Vehicle?'),
+        message: gettext('Delete this vehicle? This cannot be undone.'),
+        confirmText: gettext('Delete Vehicle'),
+        cancelText: gettext('Cancel'),
+        confirmBtnClass: 'btn-danger',
+        icon: 'bi-truck-flatbed',
+        iconColor: '#dc2626',
+        iconBg: '#fee2e2'
+    });
+    if (!ok) return;
 
     await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {

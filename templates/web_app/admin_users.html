@@ -150,7 +150,7 @@
                                         >
                                             <i class="bi bi-pencil"></i>
                                         </button>
-                                        <button class="btn btn-outline-danger btn-sm rounded-end" onclick="if(confirm('Are you absolute sure to remove this admin?')) { removeAdmin({{ admin.id }}, this); }" title="{% trans 'Remove Administrative Access' %}">
+                                        <button class="btn btn-outline-danger btn-sm rounded-end" onclick="removeAdmin({{ admin.id }}, this)" title="{% trans 'Remove Administrative Access' %}">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </div>
@@ -411,7 +411,7 @@ function buildAdminRowHtml(admin, isActive) {
                     >
                         <i class="bi bi-pencil"></i>
                     </button>
-                    <button class="btn btn-outline-danger btn-sm rounded-end" onclick="if(confirm(gettext('Are you absolute sure to remove this admin?'))) { removeAdmin(${adminId}, this); }" title="${gettext('Remove Administrative Access')}">
+                    <button class="btn btn-outline-danger btn-sm rounded-end" onclick="removeAdmin(${adminId}, this)" title="${gettext('Remove Administrative Access')}">
                         <i class="bi bi-trash"></i>
                     </button>
                 </div>
@@ -602,6 +602,18 @@ window.updateAdmin = async function(btn) {
 };
 
 window.removeAdmin = async function(adminId, btn) {
+    const ok = await showConfirmDialog({
+        title: gettext('Remove Administrator?'),
+        message: gettext('Are you sure you want to remove this admin?'),
+        confirmText: gettext('Remove Admin'),
+        cancelText: gettext('Cancel'),
+        confirmBtnClass: 'btn-danger',
+        icon: 'bi-person-x-fill',
+        iconColor: '#dc2626',
+        iconBg: '#fee2e2'
+    });
+    if (!ok) return;
+
     await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
     try {
         const res = await fetch(`/api/auth/admin/${adminId}/delete/`, {

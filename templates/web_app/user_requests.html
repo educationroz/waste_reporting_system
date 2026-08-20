@@ -112,7 +112,17 @@
     }
 
     window.cancelRequest = async function(requestId, btn) {
-        if (!confirm(gettext('Cancel this request?'))) return;
+        const ok = await showConfirmDialog({
+            title: gettext('Cancel Request?'),
+            message: gettext('Are you sure you want to cancel this request?'),
+            confirmText: gettext('Yes, Cancel Request'),
+            cancelText: gettext('Keep Request'),
+            confirmBtnClass: 'btn-warning text-dark',
+            icon: 'bi-exclamation-circle-fill',
+            iconColor: '#f59e0b',
+            iconBg: '#fef3c7'
+        });
+        if (!ok) return;
         await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
             const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
             if (data && data.id) {
@@ -127,7 +137,17 @@
     };
 
     window.deleteRequest = async function(requestId, btn) {
-        if (!confirm(gettext('Permanently delete this request? This cannot be undone.'))) return;
+        const ok = await showConfirmDialog({
+            title: gettext('Permanently Delete?'),
+            message: gettext('Permanently delete this request? This cannot be undone.'),
+            confirmText: gettext('Delete Forever'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-trash3-fill',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        });
+        if (!ok) return;
 
         await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
         try {
