@@ -36,6 +36,9 @@ CDN_HOSTS = (
     'https://cdnjs.cloudflare.com',
     'https://unpkg.com',
     'https://accounts.google.com',
+    'https://apis.google.com',
+    'https://ssl.gstatic.com',
+    'https://www.gstatic.com',
 )
 
 # Third-party HTTP APIs the app genuinely calls with fetch()/XHR. These MUST
@@ -51,6 +54,8 @@ CDN_HOSTS = (
 MAP_API_HOSTS = (
     'https://nominatim.openstreetmap.org',
     'https://router.project-osrm.org',
+    'https://oauth2.googleapis.com',
+    'https://www.googleapis.com',
 )
 
 
@@ -69,7 +74,7 @@ def _policy(is_secure: bool) -> str:
         "img-src 'self' data: blob: https:",
         # The important one: where injected JS is allowed to send data.
         f"connect-src 'self' {ws_scheme} {cdns} {map_apis}",
-        "frame-src 'self' https://accounts.google.com",
+        "frame-src 'self' https://accounts.google.com https://apis.google.com",
         "frame-ancestors 'self'",
         "form-action 'self'",
         "base-uri 'self'",
@@ -98,5 +103,7 @@ class SecurityHeadersMiddleware:
             'Permissions-Policy',
             'geolocation=(self), microphone=(), camera=(self), payment=()',
         )
-        response.setdefault('Cross-Origin-Opener-Policy', 'same-origin')
+        # COOP must be 'same-origin-allow-popups' so Google OAuth / GIS popup
+        # can communicate with window.opener. Strict 'same-origin' breaks Google Sign-In.
+        response.setdefault('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
         return response

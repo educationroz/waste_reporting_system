@@ -211,20 +211,27 @@ async function doLogin() {
 // pathaunchhaun. Session cookie backend ley nai set garcha (GoogleLoginView),
 // tesaile yaha /auth/session-login/ call garnu pardaina.
 function initGoogleSignIn() {
-    if (typeof google === 'undefined' || !google.accounts) {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
         // GSI script avai load bhaisakeko chaina — sano retry
         setTimeout(initGoogleSignIn, 200);
         return;
     }
+    const clientId = '{{ GOOGLE_CLIENT_ID|default:"" }}'.trim();
+    if (!clientId) {
+        console.warn('Google OAuth client_id is empty or not configured.');
+        return;
+    }
     google.accounts.id.initialize({
-    client_id: '{{ GOOGLE_CLIENT_ID }}',
-    callback: handleGoogleCredential,
-    use_fedcm_for_button: true,
+        client_id: clientId,
+        callback: handleGoogleCredential,
     });
-    google.accounts.id.renderButton(
-        document.getElementById('g_id_signin_container'),
-        { theme: 'outline', size: 'large', width: 320, text: 'signin_with' }
-    );
+    const container = document.getElementById('g_id_signin_container');
+    if (container) {
+        google.accounts.id.renderButton(
+            container,
+            { theme: 'outline', size: 'large', width: 320, text: 'signin_with' }
+        );
+    }
 }
 initGoogleSignIn();
 
