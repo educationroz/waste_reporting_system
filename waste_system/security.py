@@ -211,9 +211,12 @@ class SecurityHeadersMiddleware:
             'Permissions-Policy',
             'geolocation=(self), microphone=(), camera=(self), payment=()',
         )
-        # COOP must be 'same-origin-allow-popups' so Google OAuth / GIS popup
-        # can communicate with window.opener. Strict 'same-origin' breaks Google Sign-In.
-        response.setdefault('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
+        # COOP: Google Identity Services (GSI) uses cross-origin postMessage
+        # during login. On auth pages (/login/, /register/), omit COOP so the browser
+        # does not log COOP postMessage diagnostic warnings. On all other pages,
+        # enforce same-origin-allow-popups.
+        if not request.path.startswith(('/login', '/register', '/auth/')):
+            response.setdefault('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
         response.setdefault('Cross-Origin-Resource-Policy', 'same-origin')
         response.setdefault('X-Content-Type-Options', 'nosniff')
         return response
