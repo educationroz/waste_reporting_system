@@ -86,29 +86,34 @@
         border: 1px solid rgba(0,0,0,0.06);
     }
     .google-btn-wrapper {
-        min-height: 44px;
+        width: 100%;
         display: flex;
         justify-content: center;
         align-items: center;
-        width: 100%;
         margin: 0 auto;
+        text-align: center;
     }
     #g_id_signin_container {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        text-align: center !important;
+        margin: 0 auto !important;
         width: 100% !important;
-        max-width: 100% !important;
+    }
+    #g_id_signin_container div,
+    #g_id_signin_container > div {
+        margin-left: auto !important;
+        margin-right: auto !important;
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
         text-align: center !important;
     }
-    #g_id_signin_container > div {
-        margin: 0 auto !important;
-        display: flex !important;
-        justify-content: center !important;
-    }
     #g_id_signin_container iframe {
-        max-width: 100% !important;
-        margin: 0 auto !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        display: block !important;
     }
 
     /* Remove browser default eye / clear icon */
@@ -230,21 +235,41 @@ function getCookie(name) {
 })();
 
 // ── Google Sign-In ───────────────────────────────────────────────────────────
+function getOptimalGoogleButtonWidth() {
+    const refBtn = document.getElementById('reg-btn') || document.getElementById('username');
+    let width = 320;
+    if (refBtn && refBtn.offsetWidth > 0) {
+        width = refBtn.offsetWidth;
+    } else {
+        const cardBody = document.querySelector('.card-body');
+        if (cardBody && cardBody.clientWidth > 0) {
+            width = cardBody.clientWidth - 48;
+        }
+    }
+    return Math.max(200, Math.min(400, Math.floor(width)));
+}
+
 function renderGoogleButton() {
     const container = document.getElementById('g_id_signin_container');
     if (!container || typeof google === 'undefined' || !google.accounts || !google.accounts.id) return;
-    const parentWidth = container.offsetWidth || (container.parentElement ? container.parentElement.offsetWidth : 300);
-    const btnWidth = Math.min(360, Math.max(200, parentWidth));
+    const btnWidth = getOptimalGoogleButtonWidth();
     container.innerHTML = '';
     google.accounts.id.renderButton(
         container,
-        { theme: 'outline', size: 'large', width: btnWidth, text: 'signup_with', shape: 'rectangular', logo_alignment: 'left' }
+        {
+            theme: 'outline',
+            size: 'large',
+            width: btnWidth,
+            text: 'signup_with',
+            shape: 'rectangular',
+            logo_alignment: 'left',
+        }
     );
 }
 
 function initGoogleSignIn() {
     if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
-        setTimeout(initGoogleSignIn, 200);
+        setTimeout(initGoogleSignIn, 150);
         return;
     }
     const clientId = '{{ GOOGLE_CLIENT_ID|default:"" }}'.trim();
@@ -252,19 +277,25 @@ function initGoogleSignIn() {
         console.warn('Google OAuth client_id is empty or not configured.');
         return;
     }
-    google.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleGoogleCredential,
-        auto_select: false,
-        use_fedcm_for_button: true,
-    });
+    if (!window.__gsiRegisterInitialized) {
+        google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleCredential,
+            auto_select: false,
+            use_fedcm_for_button: true,
+        });
+        window.__gsiRegisterInitialized = true;
+    }
     renderGoogleButton();
 }
 
-window.addEventListener('resize', () => {
-    if (window._gRegResizeTimer) clearTimeout(window._gRegResizeTimer);
-    window._gRegResizeTimer = setTimeout(renderGoogleButton, 300);
-});
+if (!window._gsiRegResizeBound) {
+    window.addEventListener('resize', () => {
+        if (window._gRegResizeTimer) clearTimeout(window._gRegResizeTimer);
+        window._gRegResizeTimer = setTimeout(renderGoogleButton, 200);
+    });
+    window._gsiRegResizeBound = true;
+}
 
 initGoogleSignIn();
 
