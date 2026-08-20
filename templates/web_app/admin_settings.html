@@ -1584,7 +1584,21 @@
 
       marker._keepPositionOnClose = false;
 
+<<<<<<< HEAD
       setMarkerDragging(marker, true);
+=======
+      // GUARD: the marker may not be fully attached to the map yet (race
+      // between the checkpoint tab's own "shown.bs.tab" listener firing
+      // initCheckpointMap()+loadCheckpoints() and editCheckpoint()'s
+      // explicit loadCheckpoints() call, both rebuilding markers around
+      // the same time). Without this guard, a marker whose onAdd() hasn't
+      // finished yet has no `.dragging` handler and this threw
+      // "Cannot read properties of undefined (reading 'enable')".
+      if (marker.dragging) {
+        marker.dragging.enable();
+      }
+
+>>>>>>> 220d0d351251be603da9e114f4355aa4a527ff5e
       marker.setOpacity(1);
       marker.setZIndexOffset(1000);
 
@@ -1646,7 +1660,20 @@
       marker._editEnabled = false;
       marker._keepPositionOnClose = false;
 
+<<<<<<< HEAD
       setMarkerDragging(marker, false);
+=======
+      // GUARD: same race as enableSavedCheckpointMarkerEdit() above — the
+      // marker may not have a `.dragging` handler attached yet if it was
+      // just created by a concurrent renderCheckpointMapMarkers() call.
+      // This was throwing "Cannot read properties of undefined (reading
+      // 'disable')" and crashing before the marker's opacity/z-index reset
+      // below could run.
+      if (marker.dragging) {
+        marker.dragging.disable();
+      }
+
+>>>>>>> 220d0d351251be603da9e114f4355aa4a527ff5e
       marker.setOpacity(1);
       marker.setZIndexOffset(0);
 
@@ -1883,14 +1910,42 @@
               "warning",
             );
 
-            marker.setLatLng([marker._savedLat, marker._savedLng]);
+            // FIX: previously this always reverted all the way back to the
+            // very first saved position (_savedLat/_savedLng), even if the
+            // user had already made one or more valid drags earlier in this
+            // same edit session. That made it look like the flag "always
+            // snaps back to the same spot" no matter where you dragged it.
+            // Now it reverts to the last VALID position instead — the
+            // pending drag position if one exists, otherwise the original
+            // saved position.
+            const fallbackLat =
+              marker._pendingLat !== undefined
+                ? marker._pendingLat
+                : marker._savedLat;
+            const fallbackLng =
+              marker._pendingLng !== undefined
+                ? marker._pendingLng
+                : marker._savedLng;
 
-            delete marker._pendingLat;
-            delete marker._pendingLng;
+            marker.setLatLng([fallbackLat, fallbackLng]);
 
-            // Still in edit mode after a rejected drag → keep isEditing = true.
+            // Only clear pending coords if there was no earlier valid drag
+            // to fall back to — an out-of-bounds drag shouldn't wipe out an
+            // earlier, still-valid pending move from this same session.
+            if (marker._pendingLat === undefined) {
+              delete marker._pendingLat;
+              delete marker._pendingLng;
+            }
+
+            // Still in edit mode after a rejected drag → keep isEditing = true,
+            // and show whichever coordinates are actually active right now.
             marker.setPopupContent(
-              buildSavedCheckpointPopup(ch, undefined, undefined, true),
+              buildSavedCheckpointPopup(
+                ch,
+                marker._pendingLat !== undefined ? fallbackLat : undefined,
+                marker._pendingLng !== undefined ? fallbackLng : undefined,
+                true,
+              ),
             );
 
             marker.openPopup();
@@ -2160,15 +2215,18 @@
 
         editingCheckpointId = checkpoint.id;
 
-        // FIX: mark this checkpoint as "wants edit mode" up-front, before
-        // any tab-show/loadCheckpoints races can happen. renderCheckpointMapMarkers()
-        // will now honor this on every render, not just the first one.
+        // Mark this checkpoint as "wants edit mode" up-front, before any
+        // tab-show/loadCheckpoints races can happen. renderCheckpointMapMarkers()
+        // honors this on every render, not just the first one.
         activeSavedCheckpointEditId = checkpoint.id;
 
         // 1. Open Checkpoints tab.
-        const checkpointTab = document.getElementById("checkpoint-tab");
-        if (checkpointTab) {
-          const tab = bootstrap.Tab.getOrCreateInstance(checkpointTab);
+        const checkpointTabEl = document.getElementById("checkpoint-tab");
+        const wasAlreadyActive =
+          checkpointTabEl?.classList.contains("active") || false;
+
+        if (checkpointTabEl) {
+          const tab = bootstrap.Tab.getOrCreateInstance(checkpointTabEl);
           tab.show();
         }
 
@@ -2177,8 +2235,20 @@
           initCheckpointMap();
         }
 
-        // 3. Wait for Bootstrap tab/map to become visible.
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        // FIX: if the tab was NOT already active, Bootstrap's own
+        // "shown.bs.tab" listener (bound near the top of this file) ALSO
+        // fires initCheckpointMap()+loadCheckpoints() asynchronously, after
+        // the tab's fade transition finishes. That was racing against our
+        // own explicit loadCheckpoints() call below — both rebuilding
+        // markers around the same time — and could hand
+        // cancelSavedCheckpointMarkerEdit()/enableSavedCheckpointMarkerEdit()
+        // a marker whose .dragging handler wasn't attached to the map yet,
+        // throwing "Cannot read properties of undefined (reading 'disable'
+        // /'enable')" and aborting edit mode entirely. Give that listener's
+        // async work time to settle first instead of both firing at once.
+        await new Promise((resolve) =>
+          setTimeout(resolve, wasAlreadyActive ? 150 : 350),
+        );
 
         if (checkpointMap) {
           checkpointMap.invalidateSize();
@@ -2768,7 +2838,7 @@
 
       if (invalid.length) {
         showToast(
-          `${outside.length} pending checkpoint(s) are outside the Pokhara boundary — drag them inside first, they'll be skipped otherwise.`,
+          `${invalid.length} pending checkpoint(s) are outside the Pokhara boundary — drag them inside first, they'll be skipped otherwise.`,
           "warning",
         );
         return;
