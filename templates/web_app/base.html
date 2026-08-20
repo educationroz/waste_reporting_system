@@ -170,10 +170,10 @@
 <body hx-ext="head-support" hx-boost="true" hx-target="#content-app" hx-select="#content-app" hx-swap="outerHTML show:window:top">
 
 <!-- NAVBAR SECTION -->
-<nav class="navbar navbar-light shadow-sm sticky-top px-3 px-sm-4 px-lg-5" style="z-index: 1030;">
-    <div class="container-fluid d-flex align-items-center flex-nowrap position-relative px-0">
+<nav class="navbar navbar-light shadow-sm sticky-top" style="z-index: 1030;">
+    <div class="container-fluid d-flex align-items-center flex-nowrap position-relative px-3 px-md-4">
         <a class="navbar-brand notranslate d-flex align-items-center flex-shrink-1 me-2" href="/" translate="no" style="min-width:0;">
-            <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="{% trans 'Logo' %}" width="40" height="40" class="d-inline-block align-text-top me-2 flex-shrink-0">
+            <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="{% trans 'Logo' %}" width="38" height="38" class="d-inline-block align-text-top me-2 flex-shrink-0">
             <span class="fw-semibold text-truncate" style="color: #25be27;">
                 <span class="d-none d-sm-inline">SafhaSahar</span>
                 
@@ -181,13 +181,13 @@
         </a>
 
         <!-- MOBILE: single toggle button that reveals the icon group -->
-            <button class="btn nav-quick-toggle-btn d-inline-flex d-md-none ms-auto" type="button"
+            <button class="btn nav-quick-toggle-btn d-inline-flex d-md-none ms-auto me-1" type="button"
                     onclick="toggleNavQuickMenu()" aria-label="{% trans 'More options' %}" title="{% trans 'More options' %}">
                 <i class="bi bi-list"></i>
             </button>
 
         <!-- Right Side Container: icon group. Desktop = always inline. Mobile = hidden until toggled -->
-        <div id="navQuickMenu" class="d-none d-md-flex align-items-center ms-md-auto gap-2 gap-lg-3 flex-shrink-0 pe-1 pe-lg-2">
+        <div id="navQuickMenu" class="d-none d-md-flex align-items-center ms-md-auto gap-2 gap-lg-3 flex-shrink-0">
             <!-- Dark/Light Theme Toggle -->
             <button id="theme-toggle-btn" class="btn theme-toggle-btn"
                     type="button" onclick="toggleTheme()" aria-label="{% trans 'Toggle dark/light theme' %}" title="{% trans 'Toggle theme' %}">
