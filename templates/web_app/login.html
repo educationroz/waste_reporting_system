@@ -4,14 +4,14 @@
 {% block title %}{% trans "Login — Waste Collection" %}{% endblock %}
 
 {% block content %}
-<div class="min-vh-100 d-flex align-items-center justify-content-center auth-page-bg px-3">
-    <div class="card shadow-sm w-100" style="max-width:400px">
-        <div class="card-body p-4">
+<div class="min-vh-100 d-flex align-items-center justify-content-center auth-page-bg px-2 px-sm-3 py-4">
+    <div class="card shadow-sm w-100 auth-card" style="max-width:400px">
+        <div class="card-body p-3 p-sm-4">
             {% csrf_token %}
             <div class="text-center mb-4">
-                 <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="{% trans 'Logo' %}" width="100" height="100" class="d-inline-block align-text-top me-2">
+                 <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="{% trans 'Logo' %}" width="90" height="90" class="d-inline-block align-text-top mb-1">
                 <h4 class="mt-2 fw-bold">{% trans "Sign In" %}</h4>
-                <p class="text-muted small">{% trans "Waste Collection System" %}</p>
+                <p class="text-muted small mb-0">{% trans "Waste Collection System" %}</p>
             </div>
 
             <div id="error-alert" class="alert alert-danger d-none"></div>
@@ -40,14 +40,16 @@
                 <hr class="flex-grow-1">
             </div>
 
-            <div id="g_id_signin_container" class="d-flex justify-content-center"></div>
+            <div class="google-btn-wrapper w-100 d-flex justify-content-center">
+                <div id="g_id_signin_container" class="w-100 d-flex justify-content-center"></div>
+            </div>
 
             <p class="text-center mt-3 mb-0">
-                <a href="{% url 'forgot-password' %}" class="small text-decoration-none" style="color:#6fcf97;">{% trans "Forgot password?" %}</a>
+                <a href="{% url 'forgot-password' %}" class="small text-decoration-none" style="color:#27ae60;">{% trans "Forgot password?" %}</a>
             </p>
 
             <p class="text-center mt-2 mb-0 small">
-                {% trans "Don't have an account?" %} <a href="{% url 'register' %}" id="register-link" class="text-success">{% trans "Register" %}</a>
+                {% trans "Don't have an account?" %} <a href="{% url 'register' %}" id="register-link" class="text-success fw-medium">{% trans "Register" %}</a>
             </p>
         </div>
     </div>
@@ -56,13 +58,33 @@
 
 {% block extra_js %}
 <style>
-    /* Chrome, Safari, र modern Edge मा ब्राउजरको आफ्नै eye button लुकाउन */
+    .auth-card {
+        border-radius: 14px;
+        border: 1px solid rgba(0,0,0,0.06);
+    }
+    .google-btn-wrapper {
+        min-height: 44px;
+        overflow: hidden;
+    }
+    #g_id_signin_container {
+        width: 100% !important;
+        max-width: 100% !important;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    #g_id_signin_container iframe {
+        max-width: 100% !important;
+        margin: 0 auto !important;
+    }
+
+    /* Chrome, Safari, modern Edge eye button hide */
     input::-webkit-reveal,
     input::-webkit-clear-button {
         display: none !important;
     }
 
-    /* Old Edge र IE को लागि */
+    /* Old Edge & IE */
     input::-ms-reveal,
     input::-ms-clear {
         display: none !important;
@@ -87,13 +109,6 @@ function getCookie(name) {
 }
 
 // ── Guest claim-link backup (email) ─────────────────────────────────────────
-// A guest who gave an email at submission time gets a link like
-// /login/?claim_token=<guest_token> (see api_app.views.send_guest_claim_email).
-// Merge that token into the same guest_claim_tokens list the normal
-// localStorage flow uses, so the existing post-login claimGuestRequests()
-// call below picks it up automatically — no separate claim path needed.
-// Also forward the token onto the Register link, in case this guest doesn't
-// have an account yet and needs to register before logging in.
 (function handleClaimTokenFromUrl() {
     const params = new URLSearchParams(window.location.search);
     const claimToken = params.get('claim_token');
@@ -114,9 +129,6 @@ function getCookie(name) {
 })();
 
 async function claimGuestRequests() {
-    // NOTE: guest_claim_tokens are NOT credentials — they are opaque handles
-    // for anonymous submissions, so keeping them in localStorage is fine.
-    // The call itself now authenticates with the HttpOnly session cookie.
     const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
     if (!tokens.length) return;
 
@@ -140,6 +152,7 @@ async function claimGuestRequests() {
         console.warn('Guest claim failed', e);
     }
 }
+
 async function doLogin() {
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
@@ -160,10 +173,6 @@ async function doLogin() {
     text.textContent = 'Signing in...';
 
     try {
-        // SECURITY: browser sessions are cookie-based now. We call
-        // /auth/session-login/ (sets the HttpOnly session cookie) instead of
-        // /auth/login/, so no JWT is ever exposed to JavaScript. The JWT
-        // endpoints still exist for non-browser API clients.
         const res = await fetch('/auth/session-login/', {
             method: 'POST',
             credentials: 'same-origin',
@@ -176,23 +185,20 @@ async function doLogin() {
         const data = await res.json();
 
         if (res.ok) {
-        const role = data.user?.role || '';
+            const role = data.user?.role || '';
+            if (role === 'user') {
+                await claimGuestRequests();
+            }
 
-        // User मात्रले guest request claim गर्ने
-        if (role === 'user') {
-            await claimGuestRequests();
-        }
+            const redirectMap = {
+                admin: '/admin-dashboard/',
+                driver: '/driver-dashboard/',
+                user: '/',
+            };
 
-        const redirectMap = {
-            admin: '/admin-dashboard/',
-            driver: '/driver-dashboard/',
-            user: '/',
-        };
-
-        window.location.href = redirectMap[role] || '/dashboard/';
-
+            window.location.href = redirectMap[role] || '/dashboard/';
         } else {
-            errDiv.textContent = data.detail || JSON.stringify(data);
+            errDiv.textContent = data.detail || data.error || JSON.stringify(data);
             errDiv.classList.remove('d-none');
         }
     } catch(e) {
@@ -206,13 +212,20 @@ async function doLogin() {
 }
 
 // ── Google Sign-In ───────────────────────────────────────────────────────────
-// Yo redirect-based hoina — Google button click garda seedhai yehi page ma
-// ek id_token (credential) aauँcha, jun hamile backend ma verify garna
-// pathaunchhaun. Session cookie backend ley nai set garcha (GoogleLoginView),
-// tesaile yaha /auth/session-login/ call garnu pardaina.
+function renderGoogleButton() {
+    const container = document.getElementById('g_id_signin_container');
+    if (!container || typeof google === 'undefined' || !google.accounts || !google.accounts.id) return;
+    const parentWidth = container.offsetWidth || (container.parentElement ? container.parentElement.offsetWidth : 300);
+    const btnWidth = Math.min(360, Math.max(200, parentWidth));
+    container.innerHTML = '';
+    google.accounts.id.renderButton(
+        container,
+        { theme: 'outline', size: 'large', width: btnWidth, text: 'signin_with', shape: 'rectangular', logo_alignment: 'left' }
+    );
+}
+
 function initGoogleSignIn() {
     if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
-        // GSI script avai load bhaisakeko chaina — sano retry
         setTimeout(initGoogleSignIn, 200);
         return;
     }
@@ -225,14 +238,14 @@ function initGoogleSignIn() {
         client_id: clientId,
         callback: handleGoogleCredential,
     });
-    const container = document.getElementById('g_id_signin_container');
-    if (container) {
-        google.accounts.id.renderButton(
-            container,
-            { theme: 'outline', size: 'large', width: 320, text: 'signin_with' }
-        );
-    }
+    renderGoogleButton();
 }
+
+window.addEventListener('resize', () => {
+    if (window._gLoginResizeTimer) clearTimeout(window._gLoginResizeTimer);
+    window._gLoginResizeTimer = setTimeout(renderGoogleButton, 300);
+});
+
 initGoogleSignIn();
 
 async function handleGoogleCredential(response) {
@@ -252,8 +265,6 @@ async function handleGoogleCredential(response) {
         const data = await res.json();
 
         if (res.ok) {
-            // GoogleLoginView sets the session cookie server-side; we
-            // deliberately ignore data.access / data.refresh here.
             const role = data.user?.role || '';
             if (role === 'user') {
                 await claimGuestRequests();
@@ -275,7 +286,7 @@ async function handleGoogleCredential(response) {
     }
 }
 
-// Enter थिच्दा अर्को फिल्डमा फोकस लैजान
+// Enter shortcut
 document.getElementById('username').addEventListener('keydown', e => {
     if (e.key === 'Enter') {
         e.preventDefault();
@@ -287,7 +298,6 @@ document.getElementById('password').addEventListener('keydown', e => {
     if (e.key === 'Enter') doLogin();
 });
 
-// पासवर्ड टाइप गर्दा Bootstrap Icon देखाउने/लुकाउने (सुधारिएको)
 function handlePasswordInput() {
     const pwdInput = document.getElementById('password');
     const icon = document.getElementById('toggle-password-icon');
@@ -298,7 +308,6 @@ function handlePasswordInput() {
     }
 }
 
-// शो/हाइड कगल गर्ने फङ्सन
 function togglePassword() {
     const pwdInput = document.getElementById('password');
     const icon = document.getElementById('toggle-password-icon');
