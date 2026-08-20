@@ -170,8 +170,8 @@
 <body hx-ext="head-support" hx-boost="true" hx-target="#content-app" hx-select="#content-app" hx-swap="outerHTML show:window:top">
 
 <!-- NAVBAR SECTION -->
-<nav class="navbar navbar-light shadow-sm sticky-top" style="z-index: 1030;">
-    <div class="container-fluid d-flex align-items-center flex-nowrap position-relative">
+<nav class="navbar navbar-light shadow-sm sticky-top px-3 px-sm-4 px-lg-5" style="z-index: 1030;">
+    <div class="container-fluid d-flex align-items-center flex-nowrap position-relative px-0">
         <a class="navbar-brand notranslate d-flex align-items-center flex-shrink-1 me-2" href="/" translate="no" style="min-width:0;">
             <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="{% trans 'Logo' %}" width="40" height="40" class="d-inline-block align-text-top me-2 flex-shrink-0">
             <span class="fw-semibold text-truncate" style="color: #25be27;">
@@ -187,7 +187,7 @@
             </button>
 
         <!-- Right Side Container: icon group. Desktop = always inline. Mobile = hidden until toggled -->
-        <div id="navQuickMenu" class="d-none d-md-flex align-items-center ms-md-auto gap-2 flex-shrink-0">
+        <div id="navQuickMenu" class="d-none d-md-flex align-items-center ms-md-auto gap-2 gap-lg-3 flex-shrink-0 pe-1 pe-lg-2">
             <!-- Dark/Light Theme Toggle -->
             <button id="theme-toggle-btn" class="btn theme-toggle-btn"
                     type="button" onclick="toggleTheme()" aria-label="{% trans 'Toggle dark/light theme' %}" title="{% trans 'Toggle theme' %}">
@@ -228,12 +228,12 @@
             </form>
 
             {% if user.is_authenticated %}
-                <a class="nav-link position-relative px-1" href="{% url 'notifications' %}">
+                <a class="nav-link position-relative px-2 py-1" href="{% url 'notifications' %}">
                     <i class="bi bi-bell fs-5"></i>
                     <span id="notif-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"></span>
                 </a>
                 <div class="dropdown">
-                    <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" hx-boost="false" data-bs-toggle="dropdown">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center px-2 py-1" href="#" hx-boost="false" data-bs-toggle="dropdown">
                         <!--
                             Wrapped in #navbar-avatar-slot so profile.html can
                             swap the img/icon in place after a successful
@@ -258,8 +258,8 @@
                     </ul>
                 </div>
             {% else %}
-                <a class="nav-link" href="{% url 'login' %}" hx-boost="false"><i class="bi bi-box-arrow-in-right me-1"></i>{% trans 'Sign In' %}</a>
-                <a class="nav-link" href="{% url 'register' %}" hx-boost="false"><i class="bi bi-person-plus me-1"></i>{% trans 'Register' %}</a>
+                <a class="nav-link px-2 py-1" href="{% url 'login' %}" hx-boost="false"><i class="bi bi-box-arrow-in-right me-1"></i>{% trans 'Sign In' %}</a>
+                <a class="nav-link px-2 py-1" href="{% url 'register' %}" hx-boost="false"><i class="bi bi-person-plus me-1"></i>{% trans 'Register' %}</a>
             {% endif %}
         </div>
     </div>

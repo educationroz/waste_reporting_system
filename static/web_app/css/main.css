@@ -137,10 +137,14 @@ nav.navbar {
 .navbar .nav-link {
     color: var(--text-primary) !important;
     font-size: 0.9rem;
-    transition: color 0.2s ease-in-out;
+    padding: 0.35rem 0.65rem;
+    border-radius: 6px;
+    white-space: nowrap;
+    transition: color 0.2s ease-in-out, background-color 0.2s ease-in-out;
 }
 .navbar .nav-link:hover {
     color: var(--brand-green) !important;
+    background-color: var(--bg-hover, rgba(0,0,0,0.04));
 }
 .navbar-brand {
     font-size: 1.3rem;

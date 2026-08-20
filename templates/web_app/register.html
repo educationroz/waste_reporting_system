@@ -87,14 +87,24 @@
     }
     .google-btn-wrapper {
         min-height: 44px;
-        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        margin: 0 auto;
     }
     #g_id_signin_container {
         width: 100% !important;
         max-width: 100% !important;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        text-align: center !important;
+    }
+    #g_id_signin_container > div {
+        margin: 0 auto !important;
+        display: flex !important;
+        justify-content: center !important;
     }
     #g_id_signin_container iframe {
         max-width: 100% !important;
