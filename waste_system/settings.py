@@ -294,6 +294,22 @@ else:
         },
     }
 
+# ─── WebSocket limits ─────────────────────────────────────────────────────────
+# DRF's throttles only run in the HTTP cycle, so WebSockets bypass them
+# entirely. Without these, one authenticated account (or one stolen session
+# cookie) could open unbounded sockets — each costing a channel-layer group
+# membership, an event-loop task, and a Redis subscription in production.
+#
+# Counts are per-process: with N workers the effective ceiling is
+# N × WS_MAX_CONNECTIONS_PER_USER. For a hard global cap, use nginx's
+# `limit_conn` on the WebSocket location. See api_app/ws_limits.py.
+WS_MAX_CONNECTIONS_PER_USER = config('WS_MAX_CONNECTIONS_PER_USER', default=5, cast=int)
+WS_MAX_MESSAGES_PER_WINDOW = config('WS_MAX_MESSAGES_PER_WINDOW', default=60, cast=int)
+WS_MESSAGE_WINDOW_SECONDS = config('WS_MESSAGE_WINDOW_SECONDS', default=10, cast=int)
+# Staff are capped too by default: an admin session is the most valuable one to
+# steal. Set True only if an ops dashboard legitimately needs many sockets.
+WS_EXEMPT_STAFF = config('WS_EXEMPT_STAFF', default=False, cast=bool)
+
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',

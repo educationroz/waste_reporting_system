@@ -3,8 +3,10 @@ import json
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
+from .ws_limits import ConnectionLimitMixin
 
-class WasteRequestConsumer(AsyncWebsocketConsumer):
+
+class WasteRequestConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
     """
     WebSocket consumer for real-time waste request updates.
     Connect: ws://localhost:8000/ws/requests/
@@ -19,6 +21,11 @@ class WasteRequestConsumer(AsyncWebsocketConsumer):
             await self.close(code=4001)
             return
 
+        # Cap concurrent sockets per user. Must run BEFORE group_add so a
+        # refused connection never joins the broadcast group.
+        if not await self.enforce_connection_limit(user):
+            return
+
         self.user = user
         await self.channel_layer.group_add(self.GROUP_NAME, self.channel_name)
         await self.accept()
@@ -28,6 +35,7 @@ class WasteRequestConsumer(AsyncWebsocketConsumer):
         }))
 
     async def disconnect(self, close_code):
+        await self.release_connection_slot()
         await self.channel_layer.group_discard(self.GROUP_NAME, self.channel_name)
 
     async def receive(self, text_data):
@@ -37,6 +45,11 @@ class WasteRequestConsumer(AsyncWebsocketConsumer):
           - ping: keepalive
           - request_update: broadcast status change (admin/driver only)
         """
+        # Flood protection: one socket spamming frames still costs CPU even
+        # though the connection cap is satisfied.
+        if not await self.check_message_rate():
+            return
+
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
@@ -72,7 +85,7 @@ class WasteRequestConsumer(AsyncWebsocketConsumer):
         }))
 
 
-class DriverLocationConsumer(AsyncWebsocketConsumer):
+class DriverLocationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
     """
     WebSocket consumer for real-time driver GPS location tracking.
     Connect: ws://localhost:8000/ws/driver-locations/
@@ -86,15 +99,24 @@ class DriverLocationConsumer(AsyncWebsocketConsumer):
             await self.close(code=4001)
             return
 
+        # Cap concurrent sockets per user. Must run BEFORE group_add so a
+        # refused connection never joins the broadcast group.
+        if not await self.enforce_connection_limit(user):
+            return
+
         self.user = user
         await self.channel_layer.group_add(self.GROUP_NAME, self.channel_name)
         await self.accept()
 
     async def disconnect(self, close_code):
+        await self.release_connection_slot()
         await self.channel_layer.group_discard(self.GROUP_NAME, self.channel_name)
 
     async def receive(self, text_data):
         """Driver sends their GPS coordinates."""
+        if not await self.check_message_rate():
+            return
+
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
@@ -157,7 +179,7 @@ class DriverLocationConsumer(AsyncWebsocketConsumer):
         except Driver.DoesNotExist:
             return None  # Silent fail - driver profile not created yet
 
-class NotificationConsumer(AsyncWebsocketConsumer):
+class NotificationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
     """
     Personal notification channel per user.
     Connect: ws://localhost:8000/ws/notifications/
@@ -169,12 +191,16 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             await self.close(code=4001)
             return
 
+        if not await self.enforce_connection_limit(user):
+            return
+
         self.user = user
         self.group_name = f'notifications_user_{user.id}'
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
 
     async def disconnect(self, close_code):
+        await self.release_connection_slot()
         if hasattr(self, 'group_name'):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
