@@ -38,30 +38,22 @@
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    /* Fill the icon box and centre the glyph so the thing you SEE is exactly
-       the thing Leaflet accepts a drag on. */
     display: flex !important;
     align-items: flex-end;
     justify-content: center;
     line-height: 1;
-  }
-
-  /* Only the flag currently being edited advertises itself as grabbable.
-     Leaflet adds .leaflet-marker-draggable when dragging.enable() is called,
-     so this automatically tracks edit mode. */
-  .saved-checkpoint-icon {
     cursor: default;
   }
 
-  .leaflet-marker-draggable.saved-checkpoint-icon,
-  .pending-checkpoint-icon {
-    cursor: grab;
+  .leaflet-marker-draggable.saved-checkpoint-icon {
+    cursor: grab !important;
+    filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.9));
   }
 
   .leaflet-marker-draggable.saved-checkpoint-icon:active,
   .pending-checkpoint-icon:active,
   .leaflet-drag-target {
-    cursor: grabbing;
+    cursor: grabbing !important;
   }
 </style>
 {% endblock %} {% block content %}
@@ -1013,6 +1005,7 @@
     let pendingIdCounter = 0;
 
     let savedCheckpointsLayer = null;
+    let savedCheckpointsData = [];
     let markerRegistry = {};
 
     // Saved checkpoint flags are locked by default.
@@ -1300,13 +1293,12 @@
 
       drawPokharaBoundary(checkpointMap);
 
-      // This marker is for creating a NEW checkpoint.
-      // Existing saved flags below remain locked until Edit is clicked.
+      // Marker for placing a NEW checkpoint location
       checkpointMarker = L.marker([DEFAULT_LAT, DEFAULT_LNG], {
         draggable: true,
       })
         .addTo(checkpointMap)
-        .bindPopup("<strong>🏁 New Checkpoint Location</strong><br>Drag to adjust")
+        .bindPopup("<strong>🏁 New Checkpoint Location</strong><br>Click map or drag to set position")
         .openPopup();
 
       checkpointMarker.on("dragend", function () {
@@ -1343,7 +1335,34 @@
           return;
         }
 
-        checkpointMarker.setLatLng(e.latlng);
+        // If editing a saved checkpoint, move the active 🚩 flag marker!
+        if (activeSavedCheckpointEditId !== null) {
+          const activeMarker = markerRegistry[activeSavedCheckpointEditId];
+          if (activeMarker && activeMarker._editEnabled) {
+            activeMarker.setLatLng(e.latlng);
+            activeMarker._pendingLat = lat;
+            activeMarker._pendingLng = lng;
+            setCheckpointInputs(lat, lng);
+            const activeCheckpoint = (savedCheckpointsData || []).find(
+              (c) => String(c.id) === String(activeSavedCheckpointEditId),
+            );
+            if (activeCheckpoint) {
+              activeMarker.setPopupContent(
+                buildSavedCheckpointPopup(activeCheckpoint, lat, lng, true),
+              );
+              activeMarker.openPopup();
+            }
+            return;
+          }
+        }
+
+        // Otherwise move the new-checkpoint marker
+        if (checkpointMarker) {
+          if (!checkpointMap.hasLayer(checkpointMarker)) {
+            checkpointMarker.addTo(checkpointMap);
+          }
+          checkpointMarker.setLatLng(e.latlng);
+        }
         setCheckpointInputs(lat, lng);
       });
 
@@ -1351,16 +1370,27 @@
     }
 
     function setCheckpointInputs(lat, lng) {
-      document.getElementById("checkpoint_lat").value =
-        parseFloat(lat).toFixed(6);
-      document.getElementById("checkpoint_lng").value =
-        parseFloat(lng).toFixed(6);
+      const latEl = document.getElementById("checkpoint_lat");
+      const lngEl = document.getElementById("checkpoint_lng");
+      if (latEl) latEl.value = parseFloat(lat).toFixed(6);
+      if (lngEl) lngEl.value = parseFloat(lng).toFixed(6);
     }
 
     function moveCheckpointMarker(lat, lng) {
-      if (checkpointMarker) {
+      if (activeSavedCheckpointEditId !== null) {
+        const activeMarker = markerRegistry[activeSavedCheckpointEditId];
+        if (activeMarker && activeMarker._editEnabled) {
+          activeMarker.setLatLng([lat, lng]);
+          activeMarker._pendingLat = lat;
+          activeMarker._pendingLng = lng;
+          if (checkpointMap) checkpointMap.setView([lat, lng], 16);
+        }
+      } else if (checkpointMarker) {
+        if (checkpointMap && !checkpointMap.hasLayer(checkpointMarker)) {
+          checkpointMarker.addTo(checkpointMap);
+        }
         checkpointMarker.setLatLng([lat, lng]);
-        checkpointMap.setView([lat, lng], 15);
+        if (checkpointMap) checkpointMap.setView([lat, lng], 15);
       }
       setCheckpointInputs(lat, lng);
     }
@@ -1377,12 +1407,17 @@
       activeSavedCheckpointEditId = null;
       editingCheckpointId = null;
 
-      document.getElementById("checkpoint_name").value = "";
-      document.getElementById("checkpoint_description").value = "";
+      const nameEl = document.getElementById("checkpoint_name");
+      const descEl = document.getElementById("checkpoint_description");
+      if (nameEl) nameEl.value = "";
+      if (descEl) descEl.value = "";
 
       setCheckpointInputs(DEFAULT_LAT, DEFAULT_LNG);
 
-      if (checkpointMarker) {
+      if (checkpointMarker && checkpointMap) {
+        if (!checkpointMap.hasLayer(checkpointMarker)) {
+          checkpointMarker.addTo(checkpointMap);
+        }
         checkpointMarker.setLatLng([DEFAULT_LAT, DEFAULT_LNG]);
       }
 
@@ -1569,9 +1604,15 @@
         return;
       }
 
+      // Hide the default "New Checkpoint" blue pin while editing a saved flag
+      if (checkpointMarker && checkpointMap && checkpointMap.hasLayer(checkpointMarker)) {
+        checkpointMap.removeLayer(checkpointMarker);
+      }
+
       lockAllSavedCheckpointMarkers(checkpoint.id);
 
       activeSavedCheckpointEditId = checkpoint.id;
+      editingCheckpointId = checkpoint.id;
 
       marker._editEnabled = true;
 
@@ -1655,6 +1696,13 @@
         String(activeSavedCheckpointEditId) === String(marker._checkpointId)
       ) {
         activeSavedCheckpointEditId = null;
+        editingCheckpointId = null;
+
+        // Restore new checkpoint pin if needed
+        if (checkpointMarker && checkpointMap && !checkpointMap.hasLayer(checkpointMarker)) {
+          checkpointMarker.addTo(checkpointMap);
+          checkpointMarker.setLatLng([DEFAULT_LAT, DEFAULT_LNG]);
+        }
       }
     }
 
@@ -1806,6 +1854,8 @@
     function renderCheckpointMapMarkers(checkpoints) {
       if (!checkpointMap) return;
 
+      savedCheckpointsData = checkpoints || [];
+
       if (!savedCheckpointsLayer) {
         savedCheckpointsLayer = L.layerGroup().addTo(checkpointMap);
       }
@@ -1827,22 +1877,14 @@
 
         bounds.push([lat, lng]);
 
-        // DRAG FIX: the icon box used to be 15x15 with iconAnchor [15,15]
-        // while the glyph itself rendered at ~16px (font-size:1rem). Two
-        // problems: the emoji overflowed its own box, and an anchor equal to
-        // the full width/height pushed that box entirely up-and-left of the
-        // real position. Leaflet only listens for drags on the box, so the
-        // flag you could see was NOT the flag you could grab — dragging
-        // appeared broken. Box is now larger than the glyph, and the anchor
-        // is the flagpole foot (centre-x, bottom-y).
         const marker = L.marker([lat, lng], {
           draggable: true,
           icon: L.divIcon({
             className: "saved-checkpoint-icon",
-            html: '<span style="font-size:1rem;line-height:1;">🚩</span>',
-            iconSize: [24, 24],
-            iconAnchor: [12, 24],
-            popupAnchor: [0, -22],
+            html: '<span style="font-size:1.35rem;line-height:1;user-select:none;pointer-events:none;">🚩</span>',
+            iconSize: [28, 28],
+            iconAnchor: [14, 28],
+            popupAnchor: [0, -26],
           }),
         }).addTo(savedCheckpointsLayer);
 
@@ -2212,6 +2254,11 @@
         // 2. Make sure map exists.
         if (!checkpointMap) {
           initCheckpointMap();
+        }
+
+        // Hide the "New Checkpoint" pin so only the 🚩 flag being edited is active
+        if (checkpointMarker && checkpointMap && checkpointMap.hasLayer(checkpointMarker)) {
+          checkpointMap.removeLayer(checkpointMarker);
         }
 
         // FIX: if the tab was NOT already active, Bootstrap's own
