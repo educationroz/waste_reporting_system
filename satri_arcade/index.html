@@ -4771,6 +4771,32 @@
           if (typeof data.bugLabels[k] === "string") bugFieldLabels[k] = data.bugLabels[k];
         });
       }
+      /* Shared language pools: ekai challenge lai multiple fields ma use garna milchha
+         (questions.json sano rakchha — har challenge EKAI CHOTI store hunchha) */
+      const bugShared = {};
+      if (data.bugShared && typeof data.bugShared === "object") {
+        Object.keys(data.bugShared).forEach((poolKey) => {
+          if (Array.isArray(data.bugShared[poolKey])) {
+            bugShared[poolKey] = data.bugShared[poolKey].filter(isValidBugChallenge);
+          }
+        });
+      }
+      if (data.bugFieldPools && typeof data.bugFieldPools === "object") {
+        Object.keys(data.bugFieldPools).forEach((field) => {
+          const keys = data.bugFieldPools[field];
+          if (!Array.isArray(keys)) return;
+          const composed = [];
+          keys.forEach((pk) => {
+            if (bugShared[pk]) composed.push(...bugShared[pk]);
+          });
+          if (Array.isArray(data.bug) && Array.isArray(data.bug[field])) {
+            composed.push(...data.bug[field].filter(isValidBugChallenge));
+          }
+          if (!composed.length) return;
+          bugFieldChallenges[field] = mergeById(bugFieldChallenges[field] || [], composed);
+          if (bugFieldOrder.indexOf(field) === -1) bugFieldOrder.push(field);
+        });
+      }
       if (data.bug && typeof data.bug === "object") {
         Object.keys(data.bug).forEach((field) => {
           if (!Array.isArray(data.bug[field])) return;
@@ -4792,14 +4818,15 @@
         const remaining = Math.max(0, pool.length - getSeenSet(seenKey).size);
         return `${pool.length} <small>(${remaining} new)</small>`;
       };
-      let bugTotal = 0;
+      /* Bug: UNIQUE challenges count garchha (shared pools le dup count huna dewauna) */
+      const bugIds = new Set();
       let bugRemaining = 0;
       bugFieldOrder.forEach((f) => {
         const pool = bugFieldChallenges[f] || [];
-        bugTotal += pool.length;
+        pool.forEach((c) => bugIds.add(questionId(c)));
         bugRemaining += Math.max(0, pool.length - getSeenSet("bug_" + f).size);
       });
-      el.innerHTML = `📚 Question bank — SQL: ${fmt(sqlChallenges, "sql")} · Git: ${fmt(gitChallenges, "git")} · Bug Hunter: ${bugTotal} <small>(${bugRemaining} new)</small> · Words: ${fmt(wordPool, "word")}<br>Source: ${lastBankSource}`;
+      el.innerHTML = `📚 Question bank — SQL: ${fmt(sqlChallenges, "sql")} · Git: ${fmt(gitChallenges, "git")} · Bug Hunter: ${bugIds.size} unique <small>(${bugRemaining} new)</small> · Words: ${fmt(wordPool, "word")}<br>Source: ${lastBankSource}`;
     }
 
     function resetSeenHistory() {
