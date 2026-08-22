@@ -1,0 +1,462 @@
+{
+  "sql": [
+    {
+      "objective": "Fetch employees hired between 2024-01-01 and 2024-12-31 (both dates included).",
+      "options": [
+        "SELECT * FROM employees WHERE hire_date FROM '2024-01-01' TO '2024-12-31';",
+        "SELECT * FROM employees WHERE hire_date BETWEEN '2024-01-01' AND '2024-12-31';",
+        "SELECT * FROM employees WHERE hire_date IN ('2024-01-01', '2024-12-31');",
+        "SELECT * FROM employees WHERE hire_date RANGE '2024-01-01' - '2024-12-31';"
+      ],
+      "correctIndex": 1
+    },
+    {
+      "objective": "Get all users whose email ends with '@gmail.com'.",
+      "options": [
+        "SELECT * FROM users WHERE email LIKE '@gmail.com%';",
+        "SELECT * FROM users WHERE email LIKE '%@gmail.com';",
+        "SELECT * FROM users WHERE email LIKE '&@gmail.com';",
+        "SELECT * FROM users WHERE email ENDS WITH '@gmail.com';"
+      ],
+      "correctIndex": 1
+    },
+    {
+      "objective": "List products whose category is either 'Electronics' or 'Books'.",
+      "options": [
+        "SELECT * FROM products WHERE category = 'Electronics' AND 'Books';",
+        "SELECT * FROM products WHERE category BETWEEN 'Electronics' AND 'Books';",
+        "SELECT * FROM products WHERE category IN ('Electronics', 'Books');",
+        "SELECT * FROM products WHERE category LIKE 'Electronics, Books';"
+      ],
+      "correctIndex": 2
+    },
+    {
+      "objective": "Show each product's category, but display 'Uncategorized' when category is NULL.",
+      "options": [
+        "SELECT REPLACE(category, NULL, 'Uncategorized') FROM products;",
+        "SELECT COALESCE(category, 'Uncategorized') FROM products;",
+        "SELECT category || 'Uncategorized' FROM products;",
+        "SELECT NULLIF(category, 'Uncategorized') FROM products;"
+      ],
+      "correctIndex": 1
+    },
+    {
+      "objective": "Find the second highest salary from the employees table.",
+      "options": [
+        "SELECT MAX(salary) FROM employees WHERE salary < (SELECT MAX(salary) FROM employees);",
+        "SELECT SECOND(salary) FROM employees;",
+        "SELECT TOP 2 salary FROM employees;",
+        "SELECT salary FROM employees WHERE salary = MAX(salary) - 1;"
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Count how many employees work in each department.",
+      "options": [
+        "SELECT department, TOTAL(*) FROM employees;",
+        "SELECT COUNT(department) FROM employees;",
+        "SELECT department, SUM(*) FROM employees GROUP BY department;",
+        "SELECT department, COUNT(*) FROM employees GROUP BY department;"
+      ],
+      "correctIndex": 3
+    },
+    {
+      "objective": "Rename the table 'old_products' to 'products' using ALTER TABLE.",
+      "options": [
+        "ALTER TABLE old_products RENAME TO products;",
+        "ALTER TABLE old_products CHANGE NAME TO products;",
+        "ALTER TABLE old_products SET NAME = products;",
+        "ALTER TABLE old_products SWAP products;"
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Delete all rows from the 'logs' table but keep the table structure (fastest way).",
+      "options": [
+        "DROP TABLE logs;",
+        "DELETE logs *;",
+        "TRUNCATE TABLE logs;",
+        "REMOVE ALL FROM logs;"
+      ],
+      "correctIndex": 2
+    },
+    {
+      "objective": "Prevent duplicate email values in the already-existing 'users' table.",
+      "options": [
+        "ALTER TABLE users ADD CONSTRAINT uniq_email UNIQUE (email);",
+        "ALTER TABLE users SET email UNIQUE;",
+        "INSERT UNIQUE ON users (email);",
+        "CREATE UNIQUE email ON users;"
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Get the name of the employee with the highest salary.",
+      "options": [
+        "SELECT name FROM employees WHERE salary = MAX();",
+        "SELECT name FROM employees ORDER BY salary DESC LIMIT 1;",
+        "SELECT MAX(name) FROM employees;",
+        "SELECT name, MAX(salary) FROM employees WHERE MAX;"
+      ],
+      "correctIndex": 1
+    },
+    {
+      "objective": "Label each product 'Costly' if price > 1000, otherwise 'Cheap' (MySQL).",
+      "options": [
+        "SELECT name, CASE WHEN price > 1000 THEN 'Costly' ELSE 'Cheap' END AS label FROM products;",
+        "SELECT name, IF price > 1000 THEN 'Costly' ELSE 'Cheap' FROM products;",
+        "SELECT name, SWITCH(price > 1000, 'Costly', 'Cheap') FROM products;",
+        "SELECT name, price > 1000 ? 'Costly' : 'Cheap' FROM products;"
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Find customers who have never placed a single order.",
+      "options": [
+        "SELECT c.name FROM customers c LEFT JOIN orders o ON c.id = o.customer_id WHERE o.id IS NULL;",
+        "SELECT name FROM customers WHERE orders = 0;",
+        "SELECT name FROM customers INNER JOIN orders ON c.id = o.customer_id WHERE o.id = NULL;",
+        "SELECT name FROM customers NOT JOIN orders;"
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Increase every employee's salary by 10%.",
+      "options": [
+        "UPDATE employees SET salary = salary * 1.10;",
+        "UPDATE salary + 10% ON employees;",
+        "ALTER employees SET salary *= 1.10;",
+        "UPDATE employees ADD 10% TO salary;"
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Display employee names in uppercase in the result.",
+      "options": [
+        "SELECT CAPS(name) FROM employees;",
+        "SELECT UPPER(name) FROM employees;",
+        "SELECT TO_CAPS(name) FROM employees;",
+        "SELECT name.UPPER() FROM employees;"
+      ],
+      "correctIndex": 1
+    },
+    {
+      "objective": "Fetch orders placed during the year 2024 (MySQL).",
+      "options": [
+        "SELECT * FROM orders WHERE YEAR(order_date) = 2024;",
+        "SELECT * FROM orders WHERE order_date = 2024;",
+        "SELECT * FROM orders WHERE DATE_FORMAT = 'YYYY';",
+        "SELECT * FROM orders WHERE order_date CONTAINS '2024';"
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Show 3 random products for a featured section (MySQL).",
+      "options": [
+        "SELECT * FROM products RANDOM 3;",
+        "SELECT RANDOM(3) FROM products;",
+        "SELECT * FROM products ORDER BY RAND() LIMIT 3;",
+        "SELECT 3 * FROM products SHUFFLE;"
+      ],
+      "correctIndex": 2
+    },
+    {
+      "objective": "Find email addresses that appear more than once in the users table.",
+      "options": [
+        "SELECT email FROM users WHERE COUNT(email) > 1;",
+        "SELECT DUPLICATE(email) FROM users;",
+        "SELECT email FROM users ORDER BY email HAVING DUPLICATES;",
+        "SELECT email FROM users GROUP BY email HAVING COUNT(*) > 1;"
+      ],
+      "correctIndex": 3
+    },
+    {
+      "objective": "Show each employee's salary along with the average salary of the whole company in the same result.",
+      "options": [
+        "SELECT name, salary, AVG(salary) OVER () FROM employees;",
+        "SELECT name, salary, AVG(salary) FROM employees;",
+        "SELECT name, salary, (SELECT AVG(*) FROM employees) FROM employees;",
+        "SELECT name, salary + AVG(salary) FROM employees GROUP BY name;"
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Copy all rows from 'orders_2023' into the existing table 'orders' (same columns).",
+      "options": [
+        "INSERT INTO orders SELECT * FROM orders_2023;",
+        "COPY orders_2023 TO orders;",
+        "INSERT INTO orders VALUES (SELECT orders_2023);",
+        "UPDATE orders ADD orders_2023;"
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Get the total number of orders placed by customer id 7, aliasing the result as order_count.",
+      "options": [
+        "SELECT TOTAL(*) order_count FROM orders WHERE customer_id = 7;",
+        "SELECT COUNT(customer_id = 7) AS order_count FROM orders;",
+        "SELECT COUNT(*) AS order_count FROM orders WHERE customer_id = 7;",
+        "SELECT SUM(order_id) AS order_count FROM orders WHERE customer_id = 7;"
+      ],
+      "correctIndex": 2
+    }
+  ],
+  "git": [
+    {
+      "objective": "Reapply your current branch's commits on top of the latest 'main' (rewrite history).",
+      "options": ["git rebase main", "git reapply main", "git refresh main", "git merge main --top"],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Copy a single commit abc123 from another branch onto your current branch.",
+      "options": ["git commit copy abc123", "git cherry-pick abc123", "git pick abc123", "git graft abc123"],
+      "correctIndex": 1
+    },
+    {
+      "objective": "Change the message of your most recent commit.",
+      "options": [
+        "git commit --amend -m \"new message\"",
+        "git commit --change -m \"new message\"",
+        "git message -m \"new message\"",
+        "git edit HEAD -m \"new message\""
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Show the commit history of ALL branches as a text graph.",
+      "options": [
+        "git tree --all",
+        "git history --graph",
+        "git log --oneline --graph --all",
+        "git log --map"
+      ],
+      "correctIndex": 2
+    },
+    {
+      "objective": "Set your global Git username to 'Ram Bahadur'.",
+      "options": [
+        "git config --global user.name \"Ram Bahadur\"",
+        "git config user.name --set \"Ram Bahadur\"",
+        "git set user \"Ram Bahadur\"",
+        "git profile --name \"Ram Bahadur\""
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Binary-search your commit history to find which commit introduced a bug.",
+      "options": ["git bisect start", "git search --bug", "git binary find", "git log --find-bug"],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Recover a commit you accidentally lost after a hard reset.",
+      "options": ["git recover", "git undo reset", "git reflog", "git log --deleted"],
+      "correctIndex": 2
+    },
+    {
+      "objective": "Switch to branch 'develop' using the modern (post-2020) command.",
+      "options": ["git switch develop", "git change develop", "git move develop", "git goto develop"],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Discard uncommitted changes in just the file 'style.css' using the modern command.",
+      "options": ["git revert style.css", "git discard style.css", "git clean style.css", "git restore style.css"],
+      "correctIndex": 3
+    },
+    {
+      "objective": "Unstage everything you added with git add (keeping the changes in your files).",
+      "options": ["git undo add", "git restore --staged .", "git reset --hard", "git unstage --all"],
+      "correctIndex": 1
+    },
+    {
+      "objective": "Connect a new remote named 'origin' to a repository URL.",
+      "options": [
+        "git remote add origin <repo-url>",
+        "git origin add <repo-url>",
+        "git connect origin <repo-url>",
+        "git remote set origin <repo-url>"
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Download remote 'main' AND merge it into your current branch in one command.",
+      "options": ["git fetch origin main", "git merge remote main", "git pull origin main", "git get origin main"],
+      "correctIndex": 2
+    },
+    {
+      "objective": "See the changes you have staged for the next commit.",
+      "options": ["git diff --staged", "git diff --remote", "git changes --staged", "git show staged"],
+      "correctIndex": 0
+    },
+    {
+      "objective": "Safely push after rewriting local history — reject the push if someone else added commits.",
+      "options": ["git push --force", "git push --safe", "git push --overwrite", "git push --force-with-lease"],
+      "correctIndex": 3
+    },
+    {
+      "objective": "Stop tracking 'config.env' in Git but keep the file on your disk.",
+      "options": [
+        "git rm --cached config.env",
+        "git delete --keep config.env",
+        "git ignore config.env",
+        "git untrack config.env"
+      ],
+      "correctIndex": 0
+    },
+    {
+      "objective": "What is a 'detached HEAD' state in Git?",
+      "options": [
+        "You checked out a commit directly instead of a branch, so new commits belong to no branch",
+        "The HEAD file inside .git got corrupted",
+        "You deleted the .git folder by mistake",
+        "Your branch has no commits yet"
+      ],
+      "correctIndex": 0
+    }
+  ],
+  "words": [
+    "java", "kotlin", "swift", "linux", "docker", "nginx", "apache", "redis",
+    "mongo", "mysql", "postgres", "graphql", "kubernetes", "websocket", "restful", "json",
+    "xml", "yaml", "regex", "thread", "mutex", "stack", "heap", "pointer",
+    "recursion", "memory", "runtime", "kernel", "shell", "bash", "patch", "deploy",
+    "pipeline", "container", "registry", "artifact", "package", "library", "framework", "serverless"
+  ],
+  "bugLabels": {
+    "cpp": "C++ Programming"
+  },
+  "bug": {
+    "fullstack": [
+      {
+        "difficulty": "easy",
+        "lines": ["<ul>", "  <li>Item one</li>", "  <li>Item two</li>", "</il>"],
+        "bugIndex": 3,
+        "explanation": "Closing tag typo — </il> should be </ul>."
+      },
+      {
+        "difficulty": "medium",
+        "lines": ["const form = document.getElementById('#signup');", "form.addEventListener('submit', handleSignup);"],
+        "bugIndex": 0,
+        "explanation": "getElementById() takes a plain id with NO '#' prefix — '#signup' should be 'signup' (querySelector uses '#', getElementById doesn't)."
+      },
+      {
+        "difficulty": "medium",
+        "lines": ["const age = '25';", "if (age === 25) {", "  console.log('Adult');", "}"],
+        "bugIndex": 1,
+        "explanation": "Strict === never treats string '25' as equal to number 25 — the condition is always false. Convert first (Number(age)) or use loose comparison."
+      },
+      {
+        "difficulty": "hard",
+        "lines": ["var funcs = [];", "for (var i = 0; i < 3; i++) {", "  funcs.push(function () { return i; });", "}", "console.log(funcs[0]());"],
+        "bugIndex": 2,
+        "explanation": "var is function-scoped, so all the closures capture the SAME i — funcs[0]() returns 3, not 0. Using let in the loop fixes it."
+      }
+    ],
+    "python": [
+      {
+        "difficulty": "easy",
+        "lines": ["x = 10", "if x > 5", "    print('big')"],
+        "bugIndex": 1,
+        "explanation": "Missing colon at the end of the if statement — Python throws a SyntaxError."
+      },
+      {
+        "difficulty": "medium",
+        "lines": ["numbers = [1, 2, 3]", "print(numbers[3])"],
+        "bugIndex": 1,
+        "explanation": "IndexError — a 3-item list has valid indexes 0, 1, 2. numbers[3] is out of range."
+      },
+      {
+        "difficulty": "medium",
+        "lines": ["numbers = [1, 2, 3]", "squared = map(lambda n: n ** 2, numbers)", "print(squared[0])"],
+        "bugIndex": 2,
+        "explanation": "map() returns a lazy map object, not a list — it can't be indexed. Wrap it: list(map(...)) first."
+      },
+      {
+        "difficulty": "hard",
+        "lines": ["try:", "    value = int(input('Number: '))", "except ValueError:", "    pass", "print('You typed:', value)"],
+        "bugIndex": 4,
+        "explanation": "If the input isn't a number, 'value' never gets assigned — the except swallows the error and print() crashes with NameError."
+      }
+    ],
+    "react": [
+      {
+        "difficulty": "easy",
+        "lines": ["function Counter() {", "  const [count, setCount] = useState(0);", "  return <button onClick={() => setCunt(count + 1)}>+1</button>;", "}"],
+        "bugIndex": 2,
+        "explanation": "Typo: setCunt is not defined — ReferenceError. Should be setCount."
+      },
+      {
+        "difficulty": "medium",
+        "lines": ["function Profile({ user }) {", "  return <div>{user.name}</div>;", "}"],
+        "bugIndex": 1,
+        "explanation": "While user data is still loading, user is undefined — user.name crashes. Guard it: {user?.name} or give a default."
+      },
+      {
+        "difficulty": "hard",
+        "lines": ["function Cart() {", "  const [items, setItems] = useState([]);", "  const config = { filter: 'all' };", "  useEffect(() => {", "    fetch('/api/items?filter=' + config.filter)", "      .then((r) => r.json())", "      .then(setItems);", "  }, [config]);", "  return <ItemList items={items} />;", "}"],
+        "bugIndex": 7,
+        "explanation": "config is a brand-new object every render, so React re-runs the effect after EVERY render → infinite fetch loop. Depend on config.filter or memoize config."
+      }
+    ],
+    "mern": [
+      {
+        "difficulty": "easy",
+        "lines": ["const express = require('express');", "const app = express();", "app.get('/', (req, res) => res.send('hi'));", "app.start(3000);"],
+        "bugIndex": 3,
+        "explanation": "There is no app.start() — Express listens with app.listen(3000)."
+      },
+      {
+        "difficulty": "medium",
+        "lines": ["router.post('/api/users', async (req, res) => {", "  const user = new User(req.body);", "  user.save();", "  res.json(user);", "});"],
+        "bugIndex": 2,
+        "explanation": "Missing 'await' before user.save() — the response is sent before the document is actually saved, and save errors are silently lost."
+      }
+    ],
+    "django": [
+      {
+        "difficulty": "easy",
+        "lines": ["from django.shortcuts import render", "", "def index(request):", "    return render('home.html')"],
+        "bugIndex": 3,
+        "explanation": "render() needs the request first: render(request, 'home.html') — leaving it out raises a TypeError."
+      },
+      {
+        "difficulty": "medium",
+        "lines": ["def list_posts(request):", "    posts = Post.objects.all", "    return render(request, 'list.html', {'posts': posts})"],
+        "bugIndex": 1,
+        "explanation": "Post.objects.all is missing parentheses — it passes the method itself, not the queryset. Should be Post.objects.all()."
+      }
+    ],
+    "cybersecurity": [
+      {
+        "difficulty": "medium",
+        "lines": ["user = User(username='ram', password='password123')", "user.save()"],
+        "bugIndex": 1,
+        "explanation": "The password is saved in plain text — it must be hashed first (e.g. user.set_password(...) or make_password(...))."
+      },
+      {
+        "difficulty": "medium",
+        "lines": ["import hashlib", "hashed = hashlib.md5(password.encode()).hexdigest()"],
+        "bugIndex": 1,
+        "explanation": "MD5 is broken for password hashing — it's fast and brute-forceable. Use a slow, salted algorithm like bcrypt, argon2 or PBKDF2."
+      }
+    ],
+    "cpp": [
+      {
+        "difficulty": "easy",
+        "lines": ["#include <iostream>", "int main() {", "    cout << \"Hello\";", "    return 0;", "}"],
+        "bugIndex": 2,
+        "explanation": "'cout' is undeclared — the file is missing 'using namespace std;' (or use std::cout)."
+      },
+      {
+        "difficulty": "medium",
+        "lines": ["int* p = new int(5);", "delete p;", "std::cout << *p;"],
+        "bugIndex": 2,
+        "explanation": "Use-after-delete — after 'delete p', p is a dangling pointer and reading *p is undefined behavior."
+      },
+      {
+        "difficulty": "hard",
+        "lines": ["int arr[3] = {1, 2, 3};", "for (int i = 0; i <= 3; i++)", "    std::cout << arr[i];"],
+        "bugIndex": 1,
+        "explanation": "i <= 3 reads arr[3], one past the end of a 3-element array — undefined behavior. The condition must be i < 3."
+      }
+    ]
+  }
+}

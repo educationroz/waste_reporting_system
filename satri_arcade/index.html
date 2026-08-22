@@ -1,0 +1,4838 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="image.png" type="image/png" />
+  <title>Arcade Hub | SATRI</title>
+  <style>
+    :root {
+      --primary-blue: #1d4ed8;
+      --secondary-blue: #2563eb;
+      --dark-blue: #1e40af;
+      --accent-blue: #3b82f6;
+      --text-main: #f8fafc;
+      --text-muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg,
+          var(--primary-blue),
+          var(--dark-blue));
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      overflow-x: hidden;
+      min-width: 0;
+    }
+
+    /* =========================================================
+     NAVBAR
+     ========================================================= */
+
+    .navbar {
+      width: 100%;
+      background-color: var(--secondary-blue);
+      padding: 0.8rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .nav-logo-img {
+      height: 32px;
+      width: auto;
+      display: block;
+      flex-shrink: 0;
+    }
+
+    .nav-logo-text {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #ffffff;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    /* =========================================================
+     MAIN CONTENT
+     ========================================================= */
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      padding: 1.5rem;
+      box-sizing: border-box;
+      min-width: 0;
+      overflow-x: hidden;
+    }
+
+    /* =========================================================
+     GAME CONTAINER
+     ========================================================= */
+
+    .game-container {
+      background-color: #1e293b;
+      color: var(--text-main);
+      padding: 2.5rem 2rem 2rem 2rem;
+      border-radius: 1.25rem;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.4);
+      width: 780px;
+      max-width: 95%;
+      transition: background-color 0.4s ease, width 0.3s ease;
+      position: relative;
+      display: flex;
+      gap: 1.5rem;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .game-container.wide-mode {
+      width: 1150px;
+      max-width: 96vw;
+    }
+
+    .game-main-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    /* =========================================================
+     SIDEBAR
+     ========================================================= */
+
+    .game-sidebar {
+      width: 130px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .sidebar-stat-box {
+      margin-bottom: 0.5rem;
+      min-width: 0;
+    }
+
+    .sidebar-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0.2rem;
+    }
+
+    .sidebar-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #ffffff;
+    }
+
+    /* =========================================================
+     HEADINGS
+     ========================================================= */
+
+    h1 {
+      margin-top: 0.8rem;
+      font-size: 2.2rem;
+      color: #ffffff;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    /* =========================================================
+     SCREEN
+     ========================================================= */
+
+    .screen {
+      display: none;
+      flex-direction: column;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* =========================================================
+     MENU
+     ========================================================= */
+
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.9rem;
+      margin-top: 1.2rem;
+      max-height: 55vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 4px;
+      min-width: 0;
+    }
+
+    .menu-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-radius: 0.85rem;
+      padding: 1rem 0.8rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-width: 0;
+    }
+
+    .menu-card:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--accent-blue);
+      transform: translateY(-1px);
+    }
+
+    .menu-card h3 {
+      margin: 0 0 0.3rem 0;
+      font-size: 1.05rem;
+      color: #ffffff;
+      line-height: 1.25;
+    }
+
+    .menu-card p {
+      margin: 0;
+      font-size: 0.78rem;
+      color: #cbd5e1;
+      line-height: 1.4;
+    }
+
+    /* =========================================================
+   ANSWER FEEDBACK
+   ========================================================= */
+
+    .answer-correct {
+      background-color: #16a34a !important;
+      border-color: #4ade80 !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 15px rgba(34, 197, 94, 0.55);
+    }
+
+    .answer-wrong {
+      background-color: #dc2626 !important;
+      border-color: #f87171 !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+    }
+
+    .answer-disabled {
+      pointer-events: none !important;
+    }
+
+    .answer-feedback {
+      text-align: center;
+      font-size: 1rem;
+      font-weight: bold;
+      margin-top: 0.8rem;
+      min-height: 25px;
+      line-height: 1.4;
+    }
+
+    .answer-feedback.correct {
+      color: #4ade80;
+    }
+
+    .answer-feedback.wrong {
+      color: #f87171;
+    }
+
+    .scramble-correct-word {
+      text-align: center;
+      font-size: 1rem;
+      font-weight: bold;
+      color: #4ade80;
+      margin-top: 0.7rem;
+      min-height: 25px;
+    }
+
+    @media (max-width: 768px) {
+
+      .answer-feedback,
+      .scramble-correct-word {
+        font-size: 0.9rem;
+      }
+    }
+
+    /* =========================================================
+     BACK BUTTON
+     ========================================================= */
+
+    .btn-back {
+      position: absolute;
+      top: 0.7rem;
+      left: 0.7rem;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+      color: white;
+      z-index: 9999;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn-back.hidden {
+      display: none;
+    }
+
+    .btn-back:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: var(--accent-blue);
+    }
+
+    .btn-back:active {
+      transform: scale(0.9);
+    }
+
+    /* =========================================================
+     COLOR FLASH
+     ========================================================= */
+
+    .color-word-display {
+      font-size: 3.5rem;
+      font-weight: bold;
+      margin: 1.5rem 0;
+      min-height: 90px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: #ffffff;
+      text-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+      text-align: center;
+      overflow-wrap: anywhere;
+    }
+
+    .color-btn-group {
+      display: flex;
+      gap: 1.2rem;
+      justify-content: center;
+      width: 100%;
+    }
+
+    /* =========================================================
+     MEMORY GRID
+     ========================================================= */
+
+    .memory-grid-board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      width: min(260px, 85vw);
+      margin: 1.5rem auto;
+    }
+
+    .memory-tile {
+      aspect-ratio: 1;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 0.75rem;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+      min-width: 0;
+    }
+
+    .memory-tile.active-flash {
+      background: #38bdf8;
+      border-color: #ffffff;
+      box-shadow: 0 0 15px #38bdf8;
+    }
+
+    .memory-tile:active {
+      transform: scale(0.95);
+    }
+
+    /* =========================================================
+     WORD SCRAMBLE
+     ========================================================= */
+
+    .scramble-word-box {
+      font-size: 2.8rem;
+      font-weight: bold;
+      letter-spacing: 6px;
+      text-align: center;
+      margin: 1.5rem 0;
+      color: #38bdf8;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+      text-transform: uppercase;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      max-width: 100%;
+    }
+
+    .scramble-input-group {
+      display: flex;
+      gap: 0.8rem;
+      margin-bottom: 1rem;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .scramble-input {
+      flex: 1;
+      min-width: 0;
+      padding: 0.9rem 1rem;
+      font-size: 1.2rem;
+      border-radius: 0.75rem;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      background: rgba(15, 23, 42, 0.8);
+      color: #ffffff;
+      outline: none;
+    }
+
+    .scramble-input:focus {
+      border-color: var(--accent-blue);
+    }
+
+    /* =========================================================
+     CODE / BUG HUNTER
+     ========================================================= */
+
+    .code-snippet-box {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 0.75rem;
+      padding: 1.2rem;
+      font-family: "Courier New", monospace;
+      font-size: 1.15rem;
+      line-height: 1.6;
+      color: #e2e8f0;
+      margin: 1rem 0;
+      overflow-x: auto;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-width: 100%;
+    }
+
+    .bug-line {
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: block;
+      transition: background 0.15s;
+    }
+
+    .bug-line:hover {
+      background: rgba(59, 130, 246, 0.25);
+      color: #60a5fa;
+    }
+
+    /* =========================================================
+     SQL / GIT OPTIONS
+     ========================================================= */
+
+    .sql-options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+      margin: 1rem 0;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .sql-option-btn {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      border-radius: 0.65rem;
+      padding: 0.8rem 1rem;
+      text-align: left;
+      font-family: "Courier New", monospace;
+      font-size: 0.95rem;
+      line-height: 1.45;
+      color: #f8fafc;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      width: 100%;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .sql-option-btn:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: var(--accent-blue);
+    }
+
+    /* =========================================================
+     TYPING GAME
+     ========================================================= */
+
+    .typing-wrapper {
+      position: relative;
+      background: rgba(15, 23, 42, 0.9);
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin: 1.2rem 0;
+      height: 230px;
+      overflow: hidden;
+      min-width: 0;
+      width: 100%;
+      cursor: text;
+    }
+
+    .typing-display {
+      font-size: 2rem;
+      font-family: "Courier New", monospace;
+      letter-spacing: 1px;
+      display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 0 14px;
+      color: var(--text-muted);
+      line-height: 1.35;
+      position: relative;
+      transition: transform 0.15s ease-out;
+      user-select: none;
+      width: 100%;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .word {
+      display: flex;
+      position: relative;
+      min-width: 0;
+    }
+
+    .letter {
+      color: var(--text-muted);
+      position: relative;
+    }
+
+    .letter.correct {
+      color: #e2e8f0;
+    }
+
+    .letter.incorrect {
+      color: #ef4444;
+    }
+
+    .letter.current::before {
+      content: "";
+      position: absolute;
+      left: -2px;
+      top: 10%;
+      bottom: 10%;
+      width: 2.5px;
+      background-color: var(--accent-blue);
+      border-radius: 1px;
+      animation: flash 1s infinite;
+    }
+
+    @keyframes flash {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0;
+      }
+    }
+
+    .typing-input {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1px;
+      height: 1px;
+      opacity: 0.01;
+      pointer-events: auto;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: transparent;
+    }
+
+    /* =========================================================
+     INSTRUCTIONS
+     ========================================================= */
+
+    p.instruction {
+      font-size: 1rem;
+      color: #f8fafc;
+      margin-bottom: 1.2rem;
+      text-align: center;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      line-height: 1.5;
+    }
+
+    /* =========================================================
+     COMMON BUTTONS
+     ========================================================= */
+
+    button {
+      padding: 1rem 1.4rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      border: 2px solid rgba(255, 255, 255, 0.8);
+      border-radius: 0.75rem;
+      cursor: pointer;
+      color: #ffffff;
+      background-color: rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(5px);
+      transition: background-color 0.2s, transform 0.1s;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+      flex: 1;
+      min-width: 0;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button:hover {
+      background-color: rgba(255, 255, 255, 0.25);
+    }
+
+    button:active {
+      transform: scale(0.95);
+    }
+
+    .btn-start {
+      background-color: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      width: 100%;
+      margin-top: 1.2rem;
+      border-radius: 25px;
+      padding: 0.9rem 1.4rem;
+      border: 2px solid #ffffff;
+    }
+
+    .btn-start:hover {
+      background-color: rgba(255, 255, 255, 0.35);
+    }
+
+    /* =========================================================
+     SCOREBOARD
+     ========================================================= */
+
+    .final-score {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #ffffff;
+      margin: 0.5rem 0;
+      text-align: center;
+    }
+
+    .gameover-stats {
+      display: flex;
+      justify-content: space-around;
+      gap: 1rem;
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+
+    /* =========================================================
+     FOOTER
+     ========================================================= */
+
+    footer {
+      width: 100%;
+      text-align: center;
+      padding: 1rem 0;
+      background-color: var(--secondary-blue);
+      flex-shrink: 0;
+    }
+
+    footer p {
+      margin: 0;
+      color: #cbd5e1;
+      font-size: 0.9rem;
+    }
+
+    /* =========================================================
+     TABLET
+     769px - 900px
+     ========================================================= */
+
+    @media (min-width: 769px) and (max-width: 1000px) {
+      .game-container {
+        width: 94%;
+        max-width: 94%;
+      }
+
+      .game-container.wide-mode {
+        width: 96%;
+        max-width: 96%;
+      }
+
+      .menu-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .typing-display {
+        font-size: 1.7rem;
+      }
+    }
+
+    /* =========================================================
+     MOBILE
+     <= 768px
+     ========================================================= */
+
+    @media (max-width: 768px) {
+
+      html,
+      body {
+        min-height: 100%;
+        height: auto;
+      }
+
+      body {
+        min-height: 100vh;
+      }
+
+      /* -------------------------
+       NAVBAR
+       ------------------------- */
+
+      .navbar {
+        padding: 0.65rem 1rem;
+        min-height: 56px;
+      }
+
+      .nav-brand {
+        gap: 8px;
+      }
+
+      .nav-logo-img {
+        height: 28px;
+      }
+
+      .nav-logo-text {
+        font-size: 1.25rem;
+        letter-spacing: 0.7px;
+      }
+
+      /* -------------------------
+       MAIN CONTENT
+       ------------------------- */
+
+      .main-content {
+        padding: 0.7rem;
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+      }
+
+      /* -------------------------
+       GAME CONTAINER
+       ------------------------- */
+
+      .game-container,
+      .game-container.wide-mode {
+        flex-direction: column;
+        padding: 3.1rem 0.9rem 1rem 0.9rem;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        border-radius: 0.8rem;
+        gap: 0.8rem;
+        overflow: hidden;
+      }
+
+      /* -------------------------
+       HEADINGS
+       ------------------------- */
+
+      h1 {
+        font-size: 1.75rem;
+        line-height: 1.2;
+        margin-top: 0.35rem;
+        margin-bottom: 0.7rem;
+      }
+
+      /* -------------------------
+       GENERAL PARAGRAPHS
+       ------------------------- */
+
+      .screen>p {
+        font-size: 0.92rem;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+      }
+
+      p.instruction {
+        font-size: 0.9rem;
+        line-height: 1.45;
+        margin-bottom: 0.9rem;
+      }
+
+      /* -------------------------
+       MENU
+       ------------------------- */
+
+      .menu-grid {
+        grid-template-columns: 1fr;
+        gap: 0.7rem;
+        margin-top: 0.9rem;
+        max-height: none;
+        overflow-y: visible;
+        overflow-x: hidden;
+        padding-right: 0;
+        width: 100%;
+      }
+
+      .menu-card {
+        padding: 0.85rem 0.75rem;
+        min-height: 72px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .menu-card h3 {
+        font-size: 1rem;
+      }
+
+      .menu-card p {
+        font-size: 0.75rem;
+        line-height: 1.35;
+      }
+
+      /* -------------------------
+       BACK BUTTON
+       ------------------------- */
+
+      .btn-back {
+        top: 0.55rem;
+        left: 0.55rem;
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+        font-size: 1.15rem;
+      }
+
+      /* =====================================================
+       GAME SIDEBAR / STATUS BAR
+       ===================================================== */
+
+      .game-sidebar {
+        width: 100% !important;
+        max-width: 100%;
+        flex-direction: row !important;
+        justify-content: space-around;
+        align-items: center;
+        padding: 0.55rem 0.4rem;
+        gap: 0.25rem;
+        margin-bottom: 0.7rem;
+      }
+
+      .sidebar-stat-box {
+        flex: 1;
+        margin-bottom: 0;
+        min-width: 0;
+      }
+
+      .sidebar-title {
+        font-size: 0.65rem;
+        letter-spacing: 0.5px;
+      }
+
+      .sidebar-value {
+        font-size: 1.15rem;
+      }
+
+      /* =====================================================
+       COLOR FLASH
+       ===================================================== */
+
+      .color-word-display {
+        font-size: 2.35rem;
+        letter-spacing: 2px;
+        min-height: 70px;
+        margin: 1rem 0;
+        line-height: 1.15;
+        padding: 0 0.25rem;
+      }
+
+      .color-btn-group {
+        gap: 0.65rem;
+        width: 100%;
+      }
+
+      .color-btn-group button {
+        min-height: 52px;
+        padding: 0.75rem 0.8rem;
+        font-size: 1rem;
+      }
+
+      /* =====================================================
+       MEMORY GRID
+       ===================================================== */
+
+      .memory-grid-board {
+        width: min(260px, 78vw);
+        gap: 9px;
+        margin: 1.1rem auto;
+      }
+
+      .memory-tile {
+        border-radius: 0.6rem;
+      }
+
+      /* =====================================================
+       WORD SCRAMBLE
+       ===================================================== */
+
+      .scramble-word-box {
+        font-size: 2rem;
+        letter-spacing: 3px;
+        line-height: 1.25;
+        margin: 1rem 0;
+        padding: 0 0.25rem;
+        max-width: 100%;
+      }
+
+      .scramble-input-group {
+        flex-direction: column;
+        gap: 0.65rem;
+        margin-bottom: 0.7rem;
+      }
+
+      .scramble-input {
+        width: 100%;
+        min-height: 50px;
+        padding: 0.75rem 0.85rem;
+        font-size: 1rem;
+      }
+
+      .scramble-input-group button {
+        width: 100%;
+        min-height: 50px;
+        flex: none !important;
+        padding: 0.75rem 1rem !important;
+        font-size: 1rem;
+      }
+
+      /* =====================================================
+       TYPING GAME
+       ===================================================== */
+
+      #typing-screen>div[style*="display: flex"] {
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+        width: 100% !important;
+        margin-top: 0.7rem !important;
+      }
+
+      #typing-screen .game-main-panel {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .typing-wrapper {
+        padding: 0.8rem;
+        margin: 0.7rem 0;
+        height: 210px;
+        width: 100%;
+        border-radius: 0.65rem;
+      }
+
+      .typing-display {
+        font-size: 1.25rem;
+        letter-spacing: 0.5px;
+        gap: 0 8px;
+        line-height: 1.5;
+        width: 100%;
+        overflow-wrap: anywhere;
+      }
+
+      .typing-input {
+        width: 1px;
+        height: 1px;
+      }
+
+      /* Typing sidebar */
+      #typing-screen .game-sidebar {
+        order: 2;
+        width: 100% !important;
+        margin-top: 0.1rem;
+        margin-bottom: 0;
+      }
+
+      /* =====================================================
+       BUG HUNTER
+       ===================================================== */
+
+      .code-snippet-box {
+        padding: 0.75rem;
+        margin: 0.75rem 0;
+        font-size: 0.82rem;
+        line-height: 1.45;
+        border-radius: 0.6rem;
+        max-height: 48vh;
+        overflow-x: auto;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .bug-line {
+        padding: 4px 5px;
+      }
+
+      #bug-objective {
+        font-size: 0.85rem !important;
+        line-height: 1.4;
+      }
+
+      /* =====================================================
+       SQL / GIT
+       ===================================================== */
+
+      .sql-options-grid {
+        gap: 0.6rem;
+        margin: 0.75rem 0;
+      }
+
+      .sql-option-btn {
+        padding: 0.75rem 0.8rem;
+        font-size: 0.8rem;
+        line-height: 1.4;
+        border-radius: 0.6rem;
+      }
+
+      #sql-objective,
+      #git-objective {
+        font-size: 0.9rem !important;
+        line-height: 1.45;
+      }
+
+      /* =====================================================
+       COMMON BUTTONS
+       ===================================================== */
+
+      button {
+        min-height: 50px;
+        padding: 0.75rem 0.9rem;
+        font-size: 1rem;
+        border-radius: 0.7rem;
+      }
+
+      .btn-start {
+        min-height: 50px;
+        margin-top: 0.9rem;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+      }
+
+      /* =====================================================
+       GAME OVER
+       ===================================================== */
+
+      .final-score {
+        font-size: 2.1rem;
+      }
+
+      .gameover-stats {
+        gap: 0.5rem;
+        padding: 0.8rem 0.5rem;
+        margin: 0.75rem 0;
+      }
+
+      /* =====================================================
+       FOOTER
+       ===================================================== */
+
+      footer {
+        padding: 0.75rem 0.5rem;
+      }
+
+      footer p {
+        font-size: 0.78rem;
+        line-height: 1.4;
+      }
+    }
+
+    /* =========================================================
+     SMALL MOBILE
+     <= 480px
+     ========================================================= */
+
+    @media (max-width: 480px) {
+      .main-content {
+        padding: 0.5rem;
+      }
+
+      .game-container,
+      .game-container.wide-mode {
+        padding: 3rem 0.75rem 0.8rem 0.75rem;
+        border-radius: 0.7rem;
+      }
+
+      h1 {
+        font-size: 1.55rem;
+      }
+
+      .screen>p {
+        font-size: 0.86rem;
+      }
+
+      .menu-grid {
+        gap: 0.55rem;
+      }
+
+      .menu-card {
+        min-height: 66px;
+        padding: 0.7rem;
+      }
+
+      .menu-card h3 {
+        font-size: 0.92rem;
+      }
+
+      .menu-card p {
+        font-size: 0.7rem;
+      }
+
+      /* Color */
+      .color-word-display {
+        font-size: 2rem;
+        letter-spacing: 1.5px;
+        min-height: 60px;
+      }
+
+      .color-btn-group {
+        gap: 0.5rem;
+      }
+
+      .color-btn-group button {
+        min-height: 48px;
+        font-size: 0.95rem;
+      }
+
+      /* Memory */
+      .memory-grid-board {
+        width: min(235px, 76vw);
+        gap: 8px;
+      }
+
+      /* Scramble */
+      .scramble-word-box {
+        font-size: 1.75rem;
+        letter-spacing: 2px;
+      }
+
+      /* Typing */
+      .typing-wrapper {
+        height: 195px;
+        padding: 0.65rem;
+      }
+
+      .typing-display {
+        font-size: 1.1rem;
+        gap: 0 6px;
+        line-height: 1.5;
+      }
+
+      /* Code */
+      .code-snippet-box {
+        font-size: 0.76rem;
+        line-height: 1.4;
+        padding: 0.65rem;
+      }
+
+      /* SQL/Git */
+      .sql-option-btn {
+        font-size: 0.75rem;
+        padding: 0.7rem;
+      }
+
+      /* Buttons */
+      button {
+        font-size: 0.95rem;
+      }
+
+      .btn-start {
+        font-size: 0.95rem;
+      }
+
+      .sidebar-title {
+        font-size: 0.6rem;
+      }
+
+      .sidebar-value {
+        font-size: 1.05rem;
+      }
+
+      .gameover-stats {
+        padding: 0.7rem 0.4rem;
+      }
+
+      .final-score {
+        font-size: 1.9rem;
+      }
+    }
+
+    /* =========================================================
+     VERY SMALL PHONES
+     <= 360px
+     ========================================================= */
+
+    @media (max-width: 360px) {
+      .navbar {
+        padding: 0.55rem 0.75rem;
+      }
+
+      .nav-logo-img {
+        height: 25px;
+      }
+
+      .nav-logo-text {
+        font-size: 1.1rem;
+      }
+
+      .game-container,
+      .game-container.wide-mode {
+        padding-left: 0.6rem;
+        padding-right: 0.6rem;
+      }
+
+      h1 {
+        font-size: 1.4rem;
+      }
+
+      .color-word-display {
+        font-size: 1.75rem;
+      }
+
+      .memory-grid-board {
+        width: min(220px, 75vw);
+        gap: 7px;
+      }
+
+      .scramble-word-box {
+        font-size: 1.55rem;
+        letter-spacing: 1px;
+      }
+
+      .typing-wrapper {
+        height: 180px;
+        padding: 0.55rem;
+      }
+
+      .typing-display {
+        font-size: 1rem;
+        gap: 0 5px;
+      }
+
+      .code-snippet-box {
+        font-size: 0.7rem;
+      }
+
+      .sql-option-btn {
+        font-size: 0.7rem;
+      }
+
+      button,
+      .btn-start {
+        font-size: 0.9rem;
+      }
+    }
+
+
+    /* =========================================================
+     FINAL RESPONSIVE LAYOUT PATCH
+     Keeps the existing design while preventing overflow,
+     clipped buttons and cramped controls on all screen sizes.
+     ========================================================= */
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    img,
+    video,
+    canvas,
+    svg {
+      max-width: 100%;
+    }
+
+    .main-content {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .game-container,
+    .game-container.wide-mode {
+      box-sizing: border-box;
+      max-width: calc(100vw - 2rem);
+    }
+
+    .screen,
+    .game-main-panel,
+    .menu-grid,
+    .sql-options-grid {
+      max-width: 100%;
+    }
+
+    /* Word Scramble: never let the submit button collapse or clip. */
+    .scramble-input-group {
+      display: flex;
+      align-items: stretch;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .scramble-input-group .scramble-input {
+      flex: 1 1 auto;
+      width: auto;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .scramble-input-group button,
+    #scramble-screen button[type="submit"] {
+      flex: 0 0 auto !important;
+      width: auto;
+      min-width: 105px;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: visible;
+      text-overflow: clip;
+    }
+
+    /* Keep all ordinary text/buttons inside their containers. */
+    button,
+    .btn-start,
+    .sql-option-btn,
+    .color-btn-group button {
+      max-width: 100%;
+    }
+
+    .sql-option-btn {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    /* Prevent long headings/objectives from forcing horizontal scroll. */
+    h1,
+    h2,
+    h3,
+    p,
+    strong,
+    span,
+    .instruction,
+    #sql-objective,
+    #git-objective,
+    #bug-objective {
+      overflow-wrap: anywhere;
+    }
+
+    /* Better desktop/tablet sizing. */
+    @media (min-width: 769px) {
+      .game-container:not(.wide-mode) {
+        width: min(780px, calc(100vw - 2rem));
+      }
+
+      .game-container.wide-mode {
+        width: min(1150px, calc(100vw - 2rem));
+      }
+
+      .scramble-input-group .scramble-input {
+        min-height: 52px;
+      }
+
+      .scramble-input-group button {
+        min-height: 52px;
+      }
+    }
+
+    /* Tablet / mobile: stack controls instead of squeezing them. */
+    @media (max-width: 768px) {
+      .main-content {
+        padding: 0.6rem;
+        align-items: flex-start;
+      }
+
+      .game-container,
+      .game-container.wide-mode {
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+        padding-left: 0.9rem;
+        padding-right: 0.9rem;
+      }
+
+      .scramble-input-group {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .scramble-input-group .scramble-input,
+      .scramble-input-group button,
+      #scramble-screen button[type="submit"] {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        flex: 0 0 auto !important;
+      }
+
+      .scramble-input-group button,
+      #scramble-screen button[type="submit"] {
+        min-height: 50px;
+      }
+
+      .color-btn-group {
+        width: 100%;
+      }
+
+      .color-btn-group button {
+        min-width: 0;
+      }
+
+      .game-sidebar {
+        max-width: 100%;
+      }
+
+      .code-snippet-box {
+        max-width: 100%;
+        overflow-x: auto;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .navbar {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+      }
+
+      .main-content {
+        padding: 0.45rem;
+      }
+
+      .game-container,
+      .game-container.wide-mode {
+        max-width: 100%;
+        padding-left: 0.7rem;
+        padding-right: 0.7rem;
+        border-radius: 0.7rem;
+      }
+
+      .scramble-input-group {
+        gap: 0.55rem;
+      }
+
+      .scramble-input {
+        font-size: 1rem;
+      }
+
+      .scramble-input-group button,
+      #scramble-screen button[type="submit"] {
+        font-size: 1rem;
+        min-height: 48px;
+        padding: 0.7rem 1rem !important;
+      }
+
+      .btn-start {
+        width: 100%;
+      }
+
+      .gameover-stats {
+        width: 100%;
+        max-width: 100%;
+        flex-wrap: wrap;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .main-content {
+        padding: 0.3rem;
+      }
+
+      .game-container,
+      .game-container.wide-mode {
+        padding-left: 0.55rem;
+        padding-right: 0.55rem;
+      }
+
+      .nav-logo-text {
+        font-size: 1.05rem;
+      }
+
+      .scramble-input-group button,
+      #scramble-screen button[type="submit"] {
+        font-size: 0.92rem;
+      }
+    }
+
+    /* =========================================================
+   FINAL CENTERING FIX
+   Keeps every game screen vertically centered
+   on desktop, tablet and mobile.
+   ========================================================= */
+
+    .main-content {
+      display: flex;
+      justify-content: center;
+      align-items: center !important;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* Keep the actual game card centered */
+    .game-container {
+      margin: auto;
+    }
+
+    /* Tablet */
+    @media (max-width: 768px) {
+      .main-content {
+        justify-content: center;
+        align-items: center !important;
+        padding: 0.75rem;
+      }
+
+      .game-container,
+      .game-container.wide-mode {
+        margin: auto;
+        width: 100%;
+        max-width: 95%;
+      }
+    }
+
+    /* Mobile */
+    @media (max-width: 480px) {
+      .main-content {
+        justify-content: center;
+        align-items: center !important;
+        padding: 0.45rem;
+      }
+
+      .game-container,
+      .game-container.wide-mode {
+        margin: auto;
+        width: 100%;
+        max-width: 100%;
+      }
+    }
+
+    /* Very small phones */
+    @media (max-width: 360px) {
+      .main-content {
+        padding: 0.35rem;
+      }
+
+      .game-container,
+      .game-container.wide-mode {
+        margin: auto;
+        width: 100%;
+        max-width: 100%;
+      }
+    }
+
+    /* =========================================================
+   FLASH RECALL (KBC-style memory flash quiz)
+   ========================================================= */
+
+    .flash-display-box {
+      min-height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 1.2rem 0;
+      border-radius: 0.85rem;
+      background: rgba(15, 23, 42, 0.55);
+      border: 2px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .flash-item-text {
+      font-size: 3rem;
+      font-weight: bold;
+      letter-spacing: 3px;
+      color: #ffffff;
+      text-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+      text-align: center;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      padding: 0 0.5rem;
+    }
+
+    .flash-item-text.hidden-item {
+      color: transparent;
+      font-size: 1.4rem;
+      letter-spacing: normal;
+    }
+
+    .flash-item-placeholder {
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: var(--text-muted);
+      text-align: center;
+      letter-spacing: 1px;
+    }
+
+    .kbc-option-btn {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+    }
+
+    .kbc-option-label {
+      font-weight: bold;
+      color: #38bdf8;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 768px) {
+      .flash-display-box {
+        min-height: 100px;
+        margin: 1rem 0;
+      }
+
+      .flash-item-text {
+        font-size: 2.1rem;
+        letter-spacing: 1.5px;
+      }
+
+      .flash-item-placeholder {
+        font-size: 1.05rem;
+      }
+    }
+
+    /* =========================================================
+     QUESTION BANK STATUS (menu screen)
+     ========================================================= */
+
+    .bank-status {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      text-align: center;
+      margin-top: 1rem;
+      line-height: 1.6;
+    }
+
+    .bank-status small {
+      color: #64748b;
+    }
+
+    .reset-link {
+      display: inline-block;
+      text-align: center;
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-top: 0.35rem;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .reset-link:hover {
+      color: #38bdf8;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- SATRI Website Navbar -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <img src="image.png" alt="SATRI Logo" class="nav-logo-img" />
+      <span class="nav-logo-text">SATRI</span>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <div id="game-card" class="game-container">
+
+      <!-- Global persistent back button: always present, sits above every screen -->
+      <button type="button" id="global-back-btn" class="btn-back hidden" onclick="handleGlobalBack()"
+        title="Back">&larr;</button>
+
+      <!-- Selection Hub Menu Screen -->
+      <div id="menu-screen" class="screen active">
+        <h1>SATRI Arcade</h1>
+        <p style="text-align: center; margin-bottom: 0.5rem;">Choose an indoor game mode:</p>
+        <div class="menu-grid">
+          <div class="menu-card" onclick="selectGame('typing')">
+            <h3>Speed Typing</h3>
+            <p>Test WPM & accuracy.</p>
+          </div>
+          <div class="menu-card" onclick="selectGame('color')">
+            <h3>Color Flash</h3>
+            <p>Fast color-match reflex.</p>
+          </div>
+          <div class="menu-card" onclick="selectGame('memory')">
+            <h3>Memory Grid</h3>
+            <p>Flash tile patterns.</p>
+          </div>
+          <div class="menu-card" onclick="selectGame('scramble')">
+            <h3>Word Scramble</h3>
+            <p>Unscramble tech words.</p>
+          </div>
+          <div class="menu-card" onclick="selectGame('bughunter')">
+            <h3>Bug Hunter</h3>
+            <p>Pick your field & squash bugs.</p>
+          </div>
+          <div class="menu-card" onclick="selectGame('sqlmaster')">
+            <h3>SQL Master</h3>
+            <p>Pick correct DB queries.</p>
+          </div>
+          <div class="menu-card" onclick="selectGame('git')">
+            <h3>Git Master</h3>
+            <p>Learn Git & GitHub commands.</p>
+          </div>
+          <div class="menu-card" onclick="selectGame('flashrecall')">
+            <h3>Flash Recall</h3>
+            <p>See a number, then pick it. Digits increase as you survive rounds.</p>
+          </div>
+        </div>
+        <p id="question-bank-status" class="bank-status">📚 Question bank: checking…</p>
+        <span class="reset-link" onclick="resetSeenHistory()">↺ Reset my question history</span>
+      </div>
+
+      <!-- 1. SPEED TYPING GAME SCREENS -->
+      <div id="typing-start-screen" class="screen">
+        <h1>Speed Typing</h1>
+        <p style="text-align: center">Type words as fast as you can within <strong>30 seconds</strong>!</p>
+        <button class="btn-start" onclick="startTypingGame()">Start Typing</button>
+      </div>
+
+      <div id="typing-screen" class="screen">
+        <div style="display: flex; gap: 1rem; width: 100%; margin-top: 1.5rem; min-width: 0;">
+          <div class="game-main-panel">
+            <p class="instruction" style="margin-top: 0;">Tap box or start typing to begin timer...</p>
+            <div class="typing-wrapper" onclick="focusInput()">
+              <div id="typing-display" class="typing-display"></div>
+              <input type="text" id="typing-input" class="typing-input" autocomplete="off" autocapitalize="off"
+                spellcheck="false">
+            </div>
+          </div>
+          <div class="game-sidebar">
+            <div class="sidebar-stat-box">
+              <div class="sidebar-title">Time</div>
+              <div id="typing-timer" class="sidebar-value">30</div>
+            </div>
+            <div class="sidebar-stat-box">
+              <div class="sidebar-title">WPM</div>
+              <div id="wpm-display" class="sidebar-value">0</div>
+            </div>
+            <div class="sidebar-stat-box">
+              <div class="sidebar-title">Accuracy</div>
+              <div id="acc-display" class="sidebar-value">100%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="typing-gameover-screen" class="screen">
+        <h1>Time's Up!</h1>
+        <div class="gameover-stats">
+          <div>
+            <div class="sidebar-title">Final WPM</div>
+            <div id="final-wpm" class="final-score">0</div>
+          </div>
+          <div>
+            <div class="sidebar-title">Accuracy</div>
+            <div id="final-acc" class="final-score" style="color: #38bdf8;">100%</div>
+          </div>
+        </div>
+        <button class="btn-start" onclick="startTypingGame()" style="margin-top: 0.5rem;">Try Again</button>
+      </div>
+
+
+      <!-- 2. COLOR FLASH GAME SCREENS -->
+      <div id="color-start-screen" class="screen">
+        <h1>Color Flash</h1>
+        <p style="text-align: center">Speed increases and time decreases by <strong>5%</strong> every round!</p>
+        <p style="font-size: 0.95rem; color: #f8fafc; text-align: center">One mistake or timeout means <strong>Game
+            Over</strong>!</p>
+        <button class="btn-start" onclick="startColorGame()">Start Game</button>
+      </div>
+
+      <div id="color-screen" class="screen">
+        <div class="game-sidebar"
+          style="width: 100%; flex-direction: row; margin-bottom: 1rem; box-sizing: border-box;">
+          <div class="sidebar-stat-box"><span id="round-counter" style="font-weight: bold; color: #fff;">Round: 1</span>
+          </div>
+          <div class="sidebar-stat-box"><span id="score-counter" style="font-weight: bold; color: #fff;">Score: 0</span>
+          </div>
+        </div>
+        <div
+          style="width: 100%; height: 10px; background-color: rgba(255, 255, 255, 0.3); border-radius: 5px; margin-bottom: 1.2rem; overflow: hidden;">
+          <div id="timer-bar"
+            style="width: 100%; height: 100%; background-color: #ffffff; transition: width 0.05s linear;"></div>
+        </div>
+        <p class="instruction">Does ink color match the word?</p>
+        <div id="color-word-display" class="color-word-display">RED</div>
+        <div class="color-btn-group">
+          <button onclick="checkColorAnswer(true)">YES</button>
+          <button onclick="checkColorAnswer(false)">NO</button>
+        </div>
+      </div>
+
+      <div id="color-gameover-screen" class="screen">
+        <h1>Game Over!</h1>
+        <p style="color: #f8fafc; text-align: center;">Your Final Score:</p>
+        <div id="color-final-score" class="final-score">0</div>
+        <button class="btn-start" onclick="startColorGame()">Play Again</button>
+      </div>
+
+
+      <!-- 3. MEMORY GRID GAME SCREENS -->
+      <div id="memory-start-screen" class="screen">
+        <h1>Memory Grid</h1>
+        <p style="text-align: center">Watch the flashing tiles sequence and repeat it back correctly!</p>
+        <button class="btn-start" onclick="startMemoryGame()">Start Memory Game</button>
+      </div>
+
+      <div id="memory-screen" class="screen">
+        <div class="game-sidebar" style="width: 100%; flex-direction: row; margin-bottom: 0.5rem;">
+          <div class="sidebar-stat-box"><span id="memory-level" style="font-weight: bold; color: #fff;">Level: 1</span>
+          </div>
+          <div class="sidebar-stat-box"><span id="memory-status" style="font-weight: bold; color: #38bdf8;">Watch
+              sequence...</span></div>
+        </div>
+        <div class="memory-grid-board" id="memory-board">
+          <div class="memory-tile" onclick="handleTileClick(0)"></div>
+          <div class="memory-tile" onclick="handleTileClick(1)"></div>
+          <div class="memory-tile" onclick="handleTileClick(2)"></div>
+          <div class="memory-tile" onclick="handleTileClick(3)"></div>
+          <div class="memory-tile" onclick="handleTileClick(4)"></div>
+          <div class="memory-tile" onclick="handleTileClick(5)"></div>
+          <div class="memory-tile" onclick="handleTileClick(6)"></div>
+          <div class="memory-tile" onclick="handleTileClick(7)"></div>
+          <div class="memory-tile" onclick="handleTileClick(8)"></div>
+        </div>
+      </div>
+
+      <div id="memory-gameover-screen" class="screen">
+        <h1>Game Over!</h1>
+        <p style="text-align: center; color: #f8fafc;">Level Reached:</p>
+        <div id="memory-final-score" class="final-score">1</div>
+        <button class="btn-start" onclick="startMemoryGame()">Play Again</button>
+      </div>
+
+
+      <!-- 4. WORD SCRAMBLE GAME SCREENS -->
+      <div id="scramble-start-screen" class="screen">
+        <h1>Word Scramble</h1>
+        <p style="text-align: center">Unscramble the jumbled letters to find the correct tech word within <strong>20
+            seconds</strong> per word!</p>
+        <button class="btn-start" onclick="startScrambleGame()">Start Word Scramble</button>
+      </div>
+
+      <div id="scramble-screen" class="screen">
+        <div class="game-sidebar" style="width: 100%; flex-direction: row; margin-bottom: 0.5rem;">
+          <div class="sidebar-stat-box"><span id="scramble-score" style="font-weight: bold; color: #fff;">Score:
+              0</span></div>
+          <div class="sidebar-stat-box"><span id="scramble-timer" style="font-weight: bold; color: #38bdf8;">Time:
+              20s</span></div>
+        </div>
+        <p class="instruction">Unscramble this word:</p>
+        <div id="scramble-display" class="scramble-word-box">---</div>
+        <form onsubmit="submitScrambleWord(event)" style="display: flex; flex-direction: column; width: 100%;">
+          <div class="scramble-input-group">
+            <input type="text" id="scramble-input" class="scramble-input" placeholder="Type your answer..."
+              autocomplete="off" autocapitalize="off" spellcheck="false">
+            <button type="submit" style="flex: 0; padding: 0.9rem 1.4rem;">Submit</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="scramble-gameover-screen" class="screen">
+        <h1>Time's Up!</h1>
+        <p style="text-align: center; color: #f8fafc;">Final Score:</p>
+        <div id="scramble-final-score" class="final-score">0</div>
+        <button class="btn-start" onclick="startScrambleGame()">Play Again</button>
+      </div>
+
+
+      <!-- 5. BUG HUNTER: FIELD SELECT SCREEN -->
+      <div id="bugfield-select-screen" class="screen">
+        <h1>Bug Hunter</h1>
+        <p style="text-align: center; margin-bottom: 0.5rem;">Choose your field:</p>
+        <div class="menu-grid" id="bugfield-menu-grid"></div>
+      </div>
+
+      <!-- BUG HUNTER GAME SCREENS -->
+      <div id="bughunter-start-screen" class="screen">
+        <h1>Bug Hunter</h1>
+        <p id="bug-field-label" style="text-align: center; color: #38bdf8; font-weight: bold; margin-bottom: 0.3rem;">
+        </p>
+        <p style="text-align: center">Spot and click on the line containing the syntax/logic bug within <strong>15
+            seconds</strong>! Questions mix easy, medium & hard difficulty.</p>
+        <button class="btn-start" onclick="startBugHunterGame()">Start Bug Hunting</button>
+      </div>
+
+      <div id="bughunter-screen" class="screen">
+        <div class="game-sidebar" style="width: 100%; flex-direction: row; margin-bottom: 0.5rem;">
+          <div class="sidebar-stat-box"><span id="bug-score" style="font-weight: bold; color: #fff;">Score: 0</span>
+          </div>
+          <div class="sidebar-stat-box"><span id="bug-timer" style="font-weight: bold; color: #38bdf8;">Time: 15s</span>
+          </div>
+        </div>
+        <p id="bug-objective"
+          style="font-size: 0.95rem; font-weight: bold; color: #38bdf8; text-align: center; margin-bottom: 0.5rem;"></p>
+        <p class="instruction">Click the line with the bug:</p>
+        <div id="bug-code-box" class="code-snippet-box"></div>
+      </div>
+
+      <div id="bughunter-gameover-screen" class="screen">
+        <h1>Game Over!</h1>
+        <p style="text-align: center; color: #f8fafc;">Bugs Squashed (Score):</p>
+        <div id="bug-final-score" class="final-score">0</div>
+        <button class="btn-start" onclick="startBugHunterGame()">Play Again</button>
+      </div>
+
+
+      <!-- 6. SQL MASTER GAME SCREENS -->
+      <div id="sqlmaster-start-screen" class="screen">
+        <h1>SQL Master</h1>
+        <p style="text-align: center">Select the correct SQL query to achieve the given objective within <strong>15
+            seconds</strong>!</p>
+        <button class="btn-start" onclick="startSqlGame()">Start SQL Challenge</button>
+      </div>
+
+      <div id="sqlmaster-screen" class="screen">
+        <div class="game-sidebar" style="width: 100%; flex-direction: row; margin-bottom: 0.5rem;">
+          <div class="sidebar-stat-box"><span id="sql-score" style="font-weight: bold; color: #fff;">Score: 0</span>
+          </div>
+          <div class="sidebar-stat-box"><span id="sql-timer" style="font-weight: bold; color: #38bdf8;">Time: 15s</span>
+          </div>
+        </div>
+        <p id="sql-objective"
+          style="font-size: 1.05rem; font-weight: bold; color: #38bdf8; text-align: center; margin-bottom: 0.8rem;"></p>
+        <div id="sql-options-container" class="sql-options-grid"></div>
+      </div>
+
+      <div id="sqlmaster-gameover-screen" class="screen">
+        <h1>Game Over!</h1>
+        <p style="text-align: center; color: #f8fafc;">Final Score:</p>
+        <div id="sql-final-score" class="final-score">0</div>
+        <button class="btn-start" onclick="startSqlGame()">Play Again</button>
+      </div>
+
+
+      <!-- 7. GIT MASTER GAME SCREENS -->
+      <div id="git-start-screen" class="screen">
+        <h1>Git Master</h1>
+        <p style="text-align: center">Pick the correct Git/GitHub command for each task within <strong>15
+            seconds</strong>!</p>
+        <button class="btn-start" onclick="startGitGame()">Start Git Challenge</button>
+      </div>
+
+      <div id="git-screen" class="screen">
+        <div class="game-sidebar" style="width: 100%; flex-direction: row; margin-bottom: 0.5rem;">
+          <div class="sidebar-stat-box"><span id="git-score" style="font-weight: bold; color: #fff;">Score: 0</span>
+          </div>
+          <div class="sidebar-stat-box"><span id="git-timer" style="font-weight: bold; color: #38bdf8;">Time: 15s</span>
+          </div>
+        </div>
+        <p id="git-objective"
+          style="font-size: 1.05rem; font-weight: bold; color: #38bdf8; text-align: center; margin-bottom: 0.8rem;"></p>
+        <div id="git-options-container" class="sql-options-grid"></div>
+      </div>
+
+      <div id="git-gameover-screen" class="screen">
+        <h1>Game Over!</h1>
+        <p style="text-align: center; color: #f8fafc;">Final Score:</p>
+        <div id="git-final-score" class="final-score">0</div>
+        <button class="btn-start" onclick="startGitGame()">Play Again</button>
+      </div>
+
+      <!-- 8. FLASH RECALL GAME SCREENS -->
+      <div id="flashrecall-start-screen" class="screen">
+        <h1>Flash Recall</h1>
+        <p style="text-align: center">A number flashes on screen. Round 1 starts with <strong>2-3 digits</strong>, then
+          digit length increases every few rounds.</p>
+        <p style="font-size: 0.95rem; color: #f8fafc; text-align: center">One wrong pick or a timeout ends the game!</p>
+        <button class="btn-start" onclick="startFlashRecallGame()">Start Flash Recall</button>
+      </div>
+
+      <div id="flashrecall-screen" class="screen">
+        <div class="game-sidebar" style="width: 100%; flex-direction: row; margin-bottom: 0.5rem;">
+          <div class="sidebar-stat-box"><span id="flash-score" style="font-weight: bold; color: #fff;">Score: 0</span>
+          </div>
+          <div class="sidebar-stat-box"><span id="flash-timer" style="font-weight: bold; color: #38bdf8;">Time:
+              --</span></div>
+        </div>
+        <p id="flash-status-text" class="instruction">Get ready...</p>
+        <div class="flash-display-box">
+          <div id="flash-item-text" class="flash-item-text"></div>
+        </div>
+        <div id="flash-options-container" class="sql-options-grid"></div>
+      </div>
+
+      <div id="flashrecall-gameover-screen" class="screen">
+        <h1>Game Over!</h1>
+        <p style="text-align: center; color: #f8fafc;">Final Score:</p>
+        <div id="flash-final-score" class="final-score">0</div>
+        <button class="btn-start" onclick="startFlashRecallGame()">Play Again</button>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <p>&copy; 2026 SATRI. All rights reserved </p>
+  </footer>
+
+  <script>
+
+
+    const gameCard = document.getElementById("game-card");
+    const globalBackBtn = document.getElementById("global-back-btn");
+    let currentBackAction = null;
+
+    function switchScreen(screenId) {
+      document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+      document.getElementById(screenId).classList.add("active");
+      updateBackButton(screenId);
+    }
+
+    function updateBackButton(screenId) {
+      if (screenId === "menu-screen") {
+        globalBackBtn.classList.add("hidden");
+        currentBackAction = null;
+      } else if (screenId.indexOf("bughunter-") === 0) {
+        globalBackBtn.classList.remove("hidden");
+        currentBackAction = returnToFieldSelect;
+      } else {
+        globalBackBtn.classList.remove("hidden");
+        currentBackAction = returnToMenu;
+      }
+    }
+
+    function handleGlobalBack() {
+      if (typeof currentBackAction === "function") currentBackAction();
+    }
+
+    function returnToMenu() {
+      clearAnswerFeedbackTimers();
+      clearInterval(typingTimerInterval);
+      clearInterval(colorTimerInterval);
+      //clearInterval(memoryTimerInterval);
+      clearInterval(scrambleTimerInterval);
+      clearInterval(bugTimerInterval);
+      clearInterval(sqlTimerInterval);
+      clearInterval(gitTimerInterval);
+      clearInterval(flashTimerInterval);
+      clearTimeout(flashRevealTimeout);
+      selectedBugField = null;
+      gameCard.style.backgroundColor = "#1e293b";
+      gameCard.classList.remove("wide-mode");
+      switchScreen("menu-screen");
+    }
+
+    function selectGame(type) {
+      if (type === 'typing') switchScreen("typing-start-screen");
+      else if (type === 'color') switchScreen("color-start-screen");
+      else if (type === 'memory') switchScreen("memory-start-screen");
+      else if (type === 'scramble') switchScreen("scramble-start-screen");
+      else if (type === 'bughunter') { renderBugFieldMenu(); switchScreen("bugfield-select-screen"); }
+      else if (type === 'sqlmaster') switchScreen("sqlmaster-start-screen");
+      else if (type === 'git') switchScreen("git-start-screen");
+      else if (type === 'flashrecall') switchScreen("flashrecall-start-screen");
+    }
+
+    /* Generic helper: pick a random item from a pool, avoiding an immediate repeat of `last` */
+    function pickDifferent(pool, last) {
+      if (!pool || pool.length === 0) return null;
+      if (pool.length === 1) return pool[0];
+      let choice;
+      do {
+        choice = pool[Math.floor(Math.random() * pool.length)];
+      } while (choice === last);
+      return choice;
+    }
+
+    /* ==================== NO-REPEAT SHUFFLE QUEUES ====================
+       Instead of picking randomly each round (which can repeat questions
+       within the same play session), every question/word/query pool now
+       draws from a shuffled queue that is fully consumed before it is
+       reshuffled — so nothing repeats until every item in that pool has
+       been shown once. */
+    function shuffleArray(arr) {
+      return [...arr].sort(() => 0.5 - Math.random());
+    }
+
+    /* ==================== NO-REPEAT MEMORY (localStorage) ====================
+       Company ma 20+ jana players le (ekai browser/device ma sajhin kheldeo pani)
+       browser le DEKHEKO questions yaad rakhchha. Player le pool ko SABAI
+       questions dekhesamman same question repeat hunchha; sabai dekhesakepachi
+       matra pool feri shuffle hunchha. */
+    const SEEN_PREFIX = "satri_seen_";
+
+    function questionId(item) {
+      if (typeof item === "string") return item;
+      if (item && Array.isArray(item.lines)) return "bug:" + item.lines.join("|");
+      if (item && typeof item.objective === "string") return "obj:" + item.objective;
+      try { return JSON.stringify(item); } catch (err) { return String(item); }
+    }
+
+    function getSeenSet(seenKey) {
+      try {
+        const raw = localStorage.getItem(SEEN_PREFIX + seenKey);
+        return new Set(raw ? JSON.parse(raw) : []);
+      } catch (err) { return new Set(); }
+    }
+
+    function markSeen(seenKey, id) {
+      try {
+        const seen = getSeenSet(seenKey);
+        seen.add(id);
+        localStorage.setItem(SEEN_PREFIX + seenKey, JSON.stringify([...seen]));
+      } catch (err) { /* storage blocked — game still works, memory matra hundraena */ }
+    }
+
+    function drawFromQueue(store, key, pool, lastItem, seenKey) {
+      if (!store[key] || store[key].length === 0) {
+        let source = pool;
+        if (seenKey) {
+          const seen = getSeenSet(seenKey);
+          const unseen = pool.filter((item) => !seen.has(questionId(item)));
+          if (unseen.length > 0) source = unseen;
+        }
+        let fresh = shuffleArray(source);
+        if (fresh.length > 1 && fresh[0] === lastItem) {
+          const tmp = fresh[0];
+          fresh[0] = fresh[1];
+          fresh[1] = tmp;
+        }
+        store[key] = fresh;
+      }
+      const item = store[key].shift();
+      if (seenKey && item != null) markSeen(seenKey, questionId(item));
+      return item;
+    }
+
+    /* Queue reset = khali garne; feri bhar-da unseen-first ordering apply hunchha */
+    function resetQueue(store, key, pool) {
+      store[key] = [];
+    }
+
+    const sqlQueueStore = {};
+    const gitQueueStore = {};
+    const scrambleQueueStore = {};
+    const bugQueueStore = {};
+
+    /* ==================== MONKEYTYPE-STYLE ENGINE ==================== */
+    let wordPool = [
+      "code", "fast", "satri", "web", "design", "type", "speed", "test",
+      "keyboard", "challenge", "developer", "browser", "script", "software",
+      "tech", "network", "system", "future", "modern", "interface", "display",
+      "project", "student", "learning", "logic", "function", "element", "style",
+      "render", "object", "array", "string", "query", "server", "client",
+      "database", "backend", "frontend", "cloud", "python", "variable",
+      "compiler", "syntax", "debug", "commit", "branch", "pixel", "layout",
+      "cache", "token", "module", "class", "loop", "input", "output",
+      "algorithm", "index", "search", "sort", "binary", "vector", "domain"
+    ];
+
+    const GAME_DURATION = 30;
+    let typingTimer = GAME_DURATION;
+    let typingTimerInterval = null;
+    let isTypingPlaying = false;
+    let isTypingFinished = false;
+    let typingWords = [];
+    let currentWordIndex = 0;
+    let currentLetterIndex = 0;
+    let incorrectCharsCount = 0;
+    let correctCharsCount = 0;
+
+    const typingDisplay = document.getElementById("typing-display");
+    const typingInput = document.getElementById("typing-input");
+    const typingTimerDisplay = document.getElementById("typing-timer");
+    const wpmDisplay = document.getElementById("wpm-display");
+    const accDisplay = document.getElementById("acc-display");
+
+    function startTypingGame() {
+      switchScreen("typing-screen");
+      resetTypingStats();
+      generateTypingWords();
+      renderTypingWords();
+      focusInput();
+      gameCard.classList.add("wide-mode");
+    }
+
+    function resetTypingStats() {
+      clearInterval(typingTimerInterval);
+      typingTimer = GAME_DURATION;
+      isTypingPlaying = false;
+      isTypingFinished = false;
+      currentWordIndex = 0;
+      currentLetterIndex = 0;
+      incorrectCharsCount = 0;
+      correctCharsCount = 0;
+      typingTimerDisplay.innerText = typingTimer;
+      wpmDisplay.innerText = "0";
+      accDisplay.innerText = "100%";
+      typingInput.value = "";
+      typingDisplay.style.transform = `translateY(0px)`;
+    }
+
+    function generateTypingWords() {
+      typingWords = [...wordPool].sort(() => 0.5 - Math.random()).slice(0, 40);
+    }
+
+    function buildWordEl(word, markCurrent) {
+      const wordDiv = document.createElement("div");
+      wordDiv.classList.add("word");
+      word.split("").forEach((char, i) => {
+        const letterSpan = document.createElement("span");
+        letterSpan.classList.add("letter");
+        letterSpan.innerText = char;
+        if (markCurrent && i === 0) letterSpan.classList.add("current");
+        wordDiv.appendChild(letterSpan);
+      });
+      return wordDiv;
+    }
+
+    function renderTypingWords() {
+      typingDisplay.innerHTML = "";
+      typingWords.forEach((word, i) => {
+        typingDisplay.appendChild(buildWordEl(word, i === 0));
+      });
+    }
+
+    function focusInput() {
+      typingInput.focus();
+    }
+
+    typingInput.addEventListener("input", (e) => {
+      if (isTypingFinished) return;
+      const inputValue = typingInput.value;
+      if (inputValue.length === 0) return;
+      const lastChar = inputValue.slice(-1);
+
+      if (!isTypingPlaying && lastChar.length === 1 && lastChar !== " ") {
+        startTypingTimer();
+      }
+
+      const currentWordEl = typingDisplay.children[currentWordIndex];
+      if (!currentWordEl) return;
+      const letters = currentWordEl.children;
+
+      if (lastChar === " ") {
+        e.preventDefault();
+        typingInput.value = "";
+        if (currentLetterIndex === 0) return;
+        if (letters[currentLetterIndex]) letters[currentLetterIndex].classList.remove("current");
+        currentWordIndex++;
+        currentLetterIndex = 0;
+        if (currentWordIndex >= typingWords.length - 8) appendMoreTypingWords();
+        const nextWordEl = typingDisplay.children[currentWordIndex];
+        if (nextWordEl && nextWordEl.children[0]) nextWordEl.children[0].classList.add("current");
+        updateLineScroll();
+        typingInput.value = "";
+        return;
+      }
+
+      if (currentLetterIndex < letters.length) {
+        const targetLetter = letters[currentLetterIndex];
+        targetLetter.classList.remove("current");
+        if (lastChar === targetLetter.textContent) {
+          targetLetter.classList.add("correct");
+          correctCharsCount++;
+        } else {
+          targetLetter.classList.add("incorrect");
+          incorrectCharsCount++;
+        }
+        currentLetterIndex++;
+        if (currentLetterIndex < letters.length) letters[currentLetterIndex].classList.add("current");
+        updateLineScroll();
+      }
+      typingInput.value = "";
+    });
+
+    typingInput.addEventListener("keydown", (e) => {
+      if (!document.getElementById("typing-screen").classList.contains("active")) return;
+      if (isTypingFinished) return;
+      const currentWordEl = typingDisplay.children[currentWordIndex];
+      if (!currentWordEl) return;
+      const letters = currentWordEl.children;
+
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        if (currentLetterIndex > 0) {
+          if (letters[currentLetterIndex]) letters[currentLetterIndex].classList.remove("current");
+          currentLetterIndex--;
+          letters[currentLetterIndex].className = "letter current";
+        }
+        updateLineScroll();
+        typingInput.value = "";
+        return;
+      }
+    });
+
+    function getRenderedLineHeight() {
+      const wordElements = typingDisplay.children;
+      if (wordElements.length < 2) return 34;
+      const firstTop = wordElements[0].offsetTop;
+      for (let i = 1; i < wordElements.length; i++) {
+        if (wordElements[i].offsetTop > firstTop) return wordElements[i].offsetTop - firstTop;
+      }
+      return 34;
+    }
+
+    function updateLineScroll() {
+      const currentWordEl = typingDisplay.children[currentWordIndex];
+      if (!currentWordEl) return;
+      const lineTop = currentWordEl.offsetTop;
+      const lineHeight = getRenderedLineHeight();
+      if (lineTop > lineHeight) typingDisplay.style.transform = `translateY(-${lineTop - 8}px)`;
+      else typingDisplay.style.transform = `translateY(0px)`;
+    }
+
+    function appendMoreTypingWords() {
+      const extraWords = [...wordPool].sort(() => 0.5 - Math.random()).slice(0, 15);
+      extraWords.forEach((word) => {
+        typingWords.push(word);
+        typingDisplay.appendChild(buildWordEl(word, false));
+      });
+    }
+
+    function startTypingTimer() {
+      isTypingPlaying = true;
+      typingTimerInterval = setInterval(() => {
+        typingTimer--;
+        typingTimerDisplay.innerText = typingTimer;
+        calculateTypingStats();
+        if (typingTimer <= 0) {
+          clearInterval(typingTimerInterval);
+          endTypingGame();
+        }
+      }, 1000);
+    }
+
+    function calculateTypingStats() {
+      const timeElapsedMin = (GAME_DURATION - typingTimer) / 60;
+      let wpm = timeElapsedMin > 0 ? Math.round((correctCharsCount / 5) / timeElapsedMin) : 0;
+      let totalStrokes = correctCharsCount + incorrectCharsCount;
+      let accuracy = totalStrokes > 0 ? Math.max(0, Math.round((correctCharsCount / totalStrokes) * 100)) : 100;
+      wpmDisplay.innerText = wpm;
+      accDisplay.innerText = `${accuracy}%`;
+    }
+
+    function endTypingGame() {
+      isTypingPlaying = false;
+      isTypingFinished = true;
+      calculateTypingStats();
+      document.getElementById("final-wpm").innerText = wpmDisplay.innerText;
+      document.getElementById("final-acc").innerText = accDisplay.innerText;
+      switchScreen("typing-gameover-screen");
+    }
+
+
+    /* ==================== ANSWER FEEDBACK HELPERS ==================== */
+    const ANSWER_FEEDBACK_DELAY = 1200;
+    const CORRECT_FEEDBACK_DELAY = 550;
+    /* Color Flash is a fast reflex game — a full 550ms pause after every
+       correct tap broke the "smooth" feel it used to have. Keep the green
+       flash, but make the pause much shorter for this game only. */
+    const COLOR_CORRECT_DELAY = 120;
+    const answerFeedbackTimers = new Set();
+
+    function clearAnswerFeedbackTimers() {
+      answerFeedbackTimers.forEach((timer) => clearTimeout(timer));
+      answerFeedbackTimers.clear();
+    }
+
+    function scheduleAfterFeedback(callback) {
+      const timer = setTimeout(() => {
+        answerFeedbackTimers.delete(timer);
+        callback();
+      }, ANSWER_FEEDBACK_DELAY);
+      answerFeedbackTimers.add(timer);
+      return timer;
+    }
+
+    /* Very short delay used ONLY for Color Flash's correct taps, so the
+       green flash is visible for an instant without breaking the fast,
+       smooth reflex pacing the game had originally. */
+    function scheduleAfterColorCorrect(callback) {
+      const timer = setTimeout(() => {
+        answerFeedbackTimers.delete(timer);
+        callback();
+      }, COLOR_CORRECT_DELAY);
+      answerFeedbackTimers.add(timer);
+      return timer;
+    }
+
+    /* Shorter delay used after a CORRECT answer so the green flash is
+       visible before the next question loads. Tracked in the same
+       timer set so returnToMenu()/clearAnswerFeedbackTimers() can
+       cancel it if the player navigates away mid-flash. */
+    function scheduleAfterCorrect(callback) {
+      const timer = setTimeout(() => {
+        answerFeedbackTimers.delete(timer);
+        callback();
+      }, CORRECT_FEEDBACK_DELAY);
+      answerFeedbackTimers.add(timer);
+      return timer;
+    }
+
+    function showAnswerFeedback(parent, text, type = "wrong", id = "") {
+      if (!parent) return null;
+      let feedback = id ? document.getElementById(id) : null;
+      if (!feedback) {
+        feedback = document.createElement("div");
+        if (id) feedback.id = id;
+        feedback.className = "answer-feedback";
+        parent.appendChild(feedback);
+      }
+      feedback.className = `answer-feedback ${type}`;
+      feedback.innerText = text;
+      return feedback;
+    }
+
+    function disableButtons(container) {
+      if (!container) return;
+      container.querySelectorAll("button").forEach((button) => {
+        button.classList.add("answer-disabled");
+      });
+    }
+
+    /* ==================== COLOR FLASH GAME LOGIC ==================== */
+    const colors = [
+      { name: "RED", hex: "#dc2626" },
+      { name: "YELLOW", hex: "#facc15" },
+      { name: "GREEN", hex: "#16a34a" },
+      { name: "BLUE", hex: "#2563eb" },
+      { name: "PURPLE", hex: "#9333ea" },
+      { name: "ORANGE", hex: "#f97316" },
+      { name: "CYAN", hex: "#06b6d4" },
+    ];
+
+    const INITIAL_COLOR_TIME = 3000;
+    let currentColorRound = 0;
+    let colorScore = 0;
+    let colorCorrectAnswer = false;
+    let colorTimerInterval = null;
+    let colorRoundStartTime = null;
+    let currentColorRoundTime = INITIAL_COLOR_TIME;
+
+    const colorWordDisplay = document.getElementById("color-word-display");
+    const roundCounter = document.getElementById("round-counter");
+    const scoreCounter = document.getElementById("score-counter");
+    const timerBar = document.getElementById("timer-bar");
+    const colorFinalScoreText = document.getElementById("color-final-score");
+
+    function startColorGame() {
+      clearAnswerFeedbackTimers();
+      currentColorRound = 0;
+      colorScore = 0;
+      currentColorRoundTime = INITIAL_COLOR_TIME;
+      gameCard.style.backgroundColor = "#1e293b";
+      document.querySelectorAll("#color-screen .answer-feedback").forEach((el) => el.remove());
+      document.querySelectorAll("#color-screen .color-btn-group button").forEach((button) => {
+        button.classList.remove("answer-correct", "answer-wrong", "answer-disabled");
+      });
+      switchScreen("color-screen");
+      nextColorRound();
+    }
+
+    function nextColorRound() {
+      document.querySelectorAll("#color-screen .answer-feedback").forEach((el) => el.remove());
+      document.querySelectorAll("#color-screen .color-btn-group button").forEach((button) => {
+        button.classList.remove("answer-correct", "answer-wrong", "answer-disabled");
+      });
+      currentColorRoundTime = INITIAL_COLOR_TIME * Math.pow(0.95, currentColorRound);
+      currentColorRound++;
+      roundCounter.innerText = `Round: ${currentColorRound}`;
+      scoreCounter.innerText = `Score: ${colorScore}`;
+      const randomWordObj = colors[Math.floor(Math.random() * colors.length)];
+      const shouldMatch = Math.random() < 0.5;
+      let randomColorObj = randomWordObj;
+      if (!shouldMatch) {
+        const filteredColors = colors.filter((c) => c.name !== randomWordObj.name);
+        randomColorObj = filteredColors[Math.floor(Math.random() * filteredColors.length)];
+      }
+      colorCorrectAnswer = shouldMatch;
+      colorWordDisplay.innerText = randomWordObj.name;
+      colorWordDisplay.style.color = "#ffffff";
+      gameCard.style.backgroundColor = randomColorObj.hex;
+      startColorTimer();
+    }
+
+    function startColorTimer() {
+      clearInterval(colorTimerInterval);
+      colorRoundStartTime = Date.now();
+      colorTimerInterval = setInterval(() => {
+        const elapsed = Date.now() - colorRoundStartTime;
+        const remaining = currentColorRoundTime - elapsed;
+        const percentage = (remaining / currentColorRoundTime) * 100;
+        if (percentage <= 0) {
+          clearInterval(colorTimerInterval);
+          handleColorTimeout();
+        } else {
+          timerBar.style.width = `${percentage}%`;
+        }
+      }, 20);
+    }
+
+    /* Ran out of time without an answer — reveal the correct answer in
+       green (same visual language as a wrong tap) before ending. */
+    function handleColorTimeout() {
+      const buttons = document.querySelectorAll("#color-screen .color-btn-group button");
+      const correctButton = colorCorrectAnswer ? buttons[0] : buttons[1];
+      if (correctButton) correctButton.classList.add("answer-correct");
+      disableButtons(document.querySelector("#color-screen .color-btn-group"));
+      showAnswerFeedback(
+        document.querySelector("#color-screen .color-btn-group").parentElement,
+        `Time's up! Correct answer: ${colorCorrectAnswer ? "YES" : "NO"}`,
+        "wrong",
+        "color-answer-feedback"
+      );
+      scheduleAfterFeedback(() => endColorGame());
+    }
+
+    function checkColorAnswer(userAnswer) {
+      clearInterval(colorTimerInterval);
+      const buttons = document.querySelectorAll("#color-screen .color-btn-group button");
+      const selectedButton = userAnswer ? buttons[0] : buttons[1];
+      const correctButton = colorCorrectAnswer ? buttons[0] : buttons[1];
+
+      if (userAnswer === colorCorrectAnswer) {
+        if (selectedButton) selectedButton.classList.add("answer-correct");
+        disableButtons(document.querySelector("#color-screen .color-btn-group"));
+        colorScore++;
+        scheduleAfterColorCorrect(() => nextColorRound());
+      } else {
+        if (selectedButton) selectedButton.classList.add("answer-wrong");
+        if (correctButton) correctButton.classList.add("answer-correct");
+        disableButtons(document.querySelector("#color-screen .color-btn-group"));
+        showAnswerFeedback(
+          document.querySelector("#color-screen .color-btn-group").parentElement,
+          `Wrong! Correct answer: ${colorCorrectAnswer ? "YES" : "NO"}`,
+          "wrong",
+          "color-answer-feedback"
+        );
+        scheduleAfterFeedback(() => endColorGame());
+      }
+    }
+
+    function endColorGame() {
+      clearInterval(colorTimerInterval);
+      gameCard.style.backgroundColor = "#1e293b";
+      switchScreen("color-gameover-screen");
+      colorFinalScoreText.innerText = `${colorScore}`;
+    }
+
+
+    /* ==================== MEMORY GRID GAME LOGIC ==================== */
+    let memoryLevel = 1;
+    let memorySequence = [];
+    let playerSequence = [];
+    let isMemoryPlayerTurn = false;
+
+    const memoryLevelText = document.getElementById("memory-level");
+    const memoryStatusText = document.getElementById("memory-status");
+    const memoryTiles = document.querySelectorAll(".memory-tile");
+    const memoryFinalScore = document.getElementById("memory-final-score");
+
+    function startMemoryGame() {
+      clearAnswerFeedbackTimers();
+      memoryLevel = 1;
+      memorySequence = [];
+      document.querySelectorAll("#memory-screen .answer-feedback").forEach((el) => el.remove());
+      memoryTiles.forEach((tile) => tile.classList.remove("answer-correct", "answer-wrong", "answer-disabled"));
+      switchScreen("memory-screen");
+      nextMemoryRound();
+    }
+
+    function nextMemoryRound() {
+      document.querySelectorAll("#memory-screen .answer-feedback").forEach((el) => el.remove());
+      memoryTiles.forEach((tile) => tile.classList.remove("answer-correct", "answer-wrong", "answer-disabled"));
+      playerSequence = [];
+      isMemoryPlayerTurn = false;
+      memoryLevelText.innerText = `Level: ${memoryLevel}`;
+      memoryStatusText.innerText = "Watch sequence...";
+      memorySequence.push(Math.floor(Math.random() * 9));
+      playMemorySequence();
+    }
+
+    function playMemorySequence() {
+      let i = 0;
+      const interval = setInterval(() => {
+        if (i < memorySequence.length) {
+          flashTile(memorySequence[i]);
+          i++;
+        } else {
+          clearInterval(interval);
+          isMemoryPlayerTurn = true;
+          memoryStatusText.innerText = "Your turn!";
+        }
+      }, 600);
+    }
+
+    /* Used ONLY while the game is replaying the sequence for the player to watch (blue). */
+    function flashTile(index) {
+      const tile = memoryTiles[index];
+      tile.classList.add("active-flash");
+      setTimeout(() => {
+        tile.classList.remove("active-flash");
+      }, 300);
+    }
+
+    /* Used ONLY when the player taps a tile that matches the sequence so far (green).
+       Kept as a separate class/function from flashTile() on purpose — mixing the two
+       caused the "was that the sequence flash or my correct click?" confusion. */
+    function flashCorrectTile(index) {
+      const tile = memoryTiles[index];
+      tile.classList.remove("active-flash");
+      tile.classList.add("answer-correct");
+      setTimeout(() => {
+        tile.classList.remove("answer-correct");
+      }, 350);
+    }
+
+    function handleTileClick(index) {
+      if (!isMemoryPlayerTurn) return;
+      playerSequence.push(index);
+      const currentIndex = playerSequence.length - 1;
+
+      if (playerSequence[currentIndex] !== memorySequence[currentIndex]) {
+        isMemoryPlayerTurn = false;
+        const wrongTile = memoryTiles[index];
+        const correctIndex = memorySequence[currentIndex];
+        const correctTile = memoryTiles[correctIndex];
+        if (wrongTile) wrongTile.classList.add("answer-wrong");
+        if (correctTile) correctTile.classList.add("answer-correct");
+        memoryTiles.forEach((tile) => tile.classList.add("answer-disabled"));
+        showAnswerFeedback(
+          document.getElementById("memory-board").parentElement,
+          `Wrong! Correct tile: ${correctIndex + 1}`,
+          "wrong",
+          "memory-answer-feedback"
+        );
+        scheduleAfterFeedback(() => endMemoryGame());
+        return;
+      }
+
+      /* Correct tap so far — green flash, distinct from the blue sequence playback. */
+      flashCorrectTile(index);
+
+      if (playerSequence.length === memorySequence.length) {
+        isMemoryPlayerTurn = false;
+        memoryLevel++;
+        memoryStatusText.innerText = "Correct!";
+        setTimeout(() => {
+          nextMemoryRound();
+        }, 500);
+      }
+    }
+
+    function endMemoryGame() {
+      isMemoryPlayerTurn = false;
+      memoryFinalScore.innerText = `${memoryLevel}`;
+      switchScreen("memory-gameover-screen");
+    }
+
+
+    /* ==================== WORD SCRAMBLE GAME LOGIC ==================== */
+    let scrambleScore = 0;
+    let scrambleCurrentWord = "";
+    let lastScrambleWord = null;
+    let scrambleTimer = 20;
+    let scrambleTimerInterval = null;
+
+    const scrambleDisplay = document.getElementById("scramble-display");
+    const scrambleInput = document.getElementById("scramble-input");
+    const scrambleScoreText = document.getElementById("scramble-score");
+    const scrambleTimerText = document.getElementById("scramble-timer");
+    const scrambleFinalScore = document.getElementById("scramble-final-score");
+
+    function startScrambleGame() {
+      clearAnswerFeedbackTimers();
+      scrambleScore = 0;
+      lastScrambleWord = null;
+      resetQueue(scrambleQueueStore, "main", wordPool);
+      document.querySelectorAll("#scramble-screen .answer-feedback, #scramble-screen .scramble-correct-word").forEach((el) => el.remove());
+      scrambleInput.disabled = false;
+      scrambleInput.style.borderColor = "rgba(255, 255, 255, 0.3)";
+      const submitButton = document.querySelector("#scramble-screen button[type=submit]");
+      if (submitButton) submitButton.classList.remove("answer-disabled", "answer-correct", "answer-wrong");
+      switchScreen("scramble-screen");
+      nextScrambleRound();
+    }
+
+    function nextScrambleRound() {
+      document.querySelectorAll("#scramble-screen .answer-feedback, #scramble-screen .scramble-correct-word").forEach((el) => el.remove());
+      scrambleInput.disabled = false;
+      scrambleInput.style.borderColor = "rgba(255, 255, 255, 0.3)";
+      const submitButton = document.querySelector("#scramble-screen button[type=submit]");
+      if (submitButton) submitButton.classList.remove("answer-disabled", "answer-correct", "answer-wrong");
+      scrambleInput.value = "";
+      scrambleTimer = 20;
+      scrambleScoreText.innerText = `Score: ${scrambleScore}`;
+      scrambleTimerText.innerText = `Time: ${scrambleTimer}s`;
+
+      scrambleCurrentWord = drawFromQueue(scrambleQueueStore, "main", wordPool, lastScrambleWord, "word");
+      lastScrambleWord = scrambleCurrentWord;
+      let scrambled = scrambleCurrentWord.split("").sort(() => 0.5 - Math.random()).join("");
+
+      if (scrambled === scrambleCurrentWord) {
+        scrambled = scrambleCurrentWord.split("").reverse().join("");
+      }
+
+      scrambleDisplay.innerText = scrambled;
+      startScrambleTimer();
+      scrambleInput.focus();
+    }
+
+    function startScrambleTimer() {
+      clearInterval(scrambleTimerInterval);
+      scrambleTimerInterval = setInterval(() => {
+        scrambleTimer--;
+        scrambleTimerText.innerText = `Time: ${scrambleTimer}s`;
+        if (scrambleTimer <= 0) {
+          clearInterval(scrambleTimerInterval);
+          handleScrambleTimeout();
+        }
+      }, 1000);
+    }
+
+    /* Ran out of time without submitting — reveal the correct word in
+       green before ending, instead of cutting straight to game over. */
+    function handleScrambleTimeout() {
+      scrambleInput.disabled = true;
+      scrambleInput.style.borderColor = "#4ade80";
+      const submitButton = document.querySelector("#scramble-screen button[type=submit]");
+      if (submitButton) {
+        submitButton.classList.add("answer-disabled");
+        submitButton.classList.add("answer-correct");
+      }
+      const feedback = document.createElement("div");
+      feedback.className = "scramble-correct-word";
+      feedback.innerText = `Time's up! Correct answer: ${scrambleCurrentWord.toUpperCase()}`;
+      scrambleInput.parentElement.parentElement.appendChild(feedback);
+      scheduleAfterFeedback(() => endScrambleGame());
+    }
+
+    function submitScrambleWord(e) {
+      e.preventDefault();
+      if (scrambleInput.disabled) return;
+      if (scrambleInput.value.trim().toLowerCase() === scrambleCurrentWord.toLowerCase()) {
+        scrambleScore++;
+        clearInterval(scrambleTimerInterval);
+        scrambleInput.disabled = true;
+        scrambleInput.style.borderColor = "#4ade80";
+        const submitButton = document.querySelector("#scramble-screen button[type=submit]");
+        if (submitButton) {
+          submitButton.classList.add("answer-disabled");
+          submitButton.classList.add("answer-correct");
+        }
+        const feedback = document.createElement("div");
+        feedback.className = "scramble-correct-word";
+        feedback.innerText = "Correct!";
+        scrambleInput.parentElement.parentElement.appendChild(feedback);
+        scheduleAfterCorrect(() => nextScrambleRound());
+      } else {
+        clearInterval(scrambleTimerInterval);
+        scrambleInput.style.borderColor = "#ef4444";
+        scrambleInput.disabled = true;
+        const submitButton = document.querySelector("#scramble-screen button[type=submit]");
+        if (submitButton) {
+          submitButton.classList.add("answer-disabled");
+          submitButton.classList.add("answer-wrong");
+        }
+        const feedback = document.createElement("div");
+        feedback.className = "scramble-correct-word";
+        feedback.innerText = `Wrong! Correct answer: ${scrambleCurrentWord.toUpperCase()}`;
+        scrambleInput.parentElement.parentElement.appendChild(feedback);
+        scheduleAfterFeedback(() => endScrambleGame());
+      }
+    }
+
+    function endScrambleGame() {
+      clearInterval(scrambleTimerInterval);
+      scrambleFinalScore.innerText = `${scrambleScore}`;
+      switchScreen("scramble-gameover-screen");
+    }
+
+
+    /* ==================== BUG HUNTER GAME LOGIC (Field-based, mapped to SATRI courses) ==================== */
+    let bugFieldLabels = {
+      fullstack: "Full-Stack Web Development",
+      mern: "MERN Stack Development",
+      react: "React.js Application Development",
+      nextjs: "Next.js Web Application Development",
+      laravel: "Laravel Framework Development",
+      django: "Django Framework Development",
+      wordpress: "WordPress Web Development",
+      flutter: "Mobile App Development (Flutter)",
+      crossplatform: "Cross-Platform App Development",
+      uiux: "UI/UX Design",
+      graphics: "Professional Graphics Design",
+      productdesign: "Digital Product Design",
+      python: "Python Programming",
+      data: "Data Analytics & Visualization",
+      iot: "IoT Fundamentals",
+      smartiot: "Smart Home & Industrial IoT",
+      cybersecurity: "Cybersecurity Fundamentals",
+      qa: "Software Quality Assurance (QA)",
+      devops: "DevOps",
+      digitalmarketing: "Digital Marketing",
+      socialmedia: "Social Media Management",
+      contentmarketing: "Content Marketing & Branding",
+      projectbased: "Project-Based IT Training",
+      internship: "Professional IT Internship",
+      genai: "Gen AI"
+    };
+
+    let bugFieldOrder = [
+      "fullstack", "mern", "react", "nextjs", "laravel", "django", "wordpress",
+      "flutter", "crossplatform", "uiux", "graphics", "productdesign", "python",
+      "data", "iot", "smartiot", "cybersecurity", "qa", "devops",
+      "digitalmarketing", "socialmedia", "contentmarketing", "projectbased",
+      "internship", "genai"
+    ];
+
+    function renderBugFieldMenu() {
+      const grid = document.getElementById("bugfield-menu-grid");
+      grid.innerHTML = "";
+      bugFieldOrder.forEach((key) => {
+        const card = document.createElement("div");
+        card.className = "menu-card";
+        card.onclick = () => selectBugField(key);
+        const h3 = document.createElement("h3");
+        h3.innerText = bugFieldLabels[key];
+        const p = document.createElement("p");
+        p.innerText = "Spot the bug & squash it.";
+        card.appendChild(h3);
+        card.appendChild(p);
+        grid.appendChild(card);
+      });
+    }
+
+    let bugFieldChallenges = {
+      fullstack: [
+        {
+          difficulty: "easy",
+          lines: ["<div class=\"container\">", "  <p>Hello World</p>", "<div>"],
+          bugIndex: 2,
+          explanation: "Closing tag should be </div>, not another opening <div>."
+        },
+        {
+          difficulty: "easy",
+          lines: [".header {", "  background-color: blue;", "  colr: white;", "}"],
+          bugIndex: 2,
+          explanation: "Typo: 'colr' should be 'color' — the browser ignores this invalid property."
+        },
+        {
+          difficulty: "medium",
+          lines: ["function checkAge(age) {", "  if (age >= 18) {", "    let status = \"Adult\";", "  }", "  return status;", "}"],
+          bugIndex: 2,
+          explanation: "'status' is declared with let inside the if block, so it's out of scope at the return statement — ReferenceError."
+        },
+        {
+          difficulty: "medium",
+          lines: ["document.getElementById('btn').addEventListner('click', handleClick);", "function handleClick() {", "  console.log('Clicked!');", "}"],
+          bugIndex: 0,
+          explanation: "Typo: 'addEventListner' should be 'addEventListener'."
+        },
+        {
+          difficulty: "hard",
+          lines: ["async function loadData() {", "  const data = fetch('/api/data').then(res => res.json());", "  console.log(data);", "}"],
+          bugIndex: 1,
+          explanation: "Missing 'await' before the fetch chain — 'data' logs as a pending Promise, not the actual JSON."
+        },
+        {
+          difficulty: "easy",
+          lines: ["const nav = document.querySelector('.nav')", "nav.classList.add('active');"],
+          bugIndex: 0,
+          explanation: "Missing semicolon after the querySelector line."
+        },
+        {
+          difficulty: "medium",
+          lines: ["let total = 0;", "const prices = [10, 20, 30];", "for (let i = 0; i <= prices.length; i++) {", "  total += prices[i];", "}"],
+          bugIndex: 2,
+          explanation: "Using <= instead of < causes an out-of-bounds read (undefined) on the last loop iteration."
+        },
+        {
+          difficulty: "medium",
+          lines: ["function isEven(num) {", "  if (num % 2 = 0) {", "    return true;", "  }", "  return false;", "}"],
+          bugIndex: 1,
+          explanation: "Using = instead of === for comparison — this is an assignment, not a check."
+        },
+        {
+          difficulty: "hard",
+          lines: ["const users = [{id:1},{id:2}];", "const found = users.find(u => u.id = 2);", "console.log(found);"],
+          bugIndex: 1,
+          explanation: "u.id = 2 assigns 2 to id instead of comparing — should be u.id === 2."
+        }
+      ],
+      mern: [
+        {
+          difficulty: "easy",
+          lines: ["app.get('/api/users', (req, res) => {", "  res.json(users);", "});", "app.post('/api/users' (req, res) => {", "  users.push(req.body);", "  res.send('added');", "});"],
+          bugIndex: 3,
+          explanation: "Missing comma after the route path — should be app.post('/api/users', (req, res) => {."
+        },
+        {
+          difficulty: "easy",
+          lines: ["const userSchema = new mongoose.Schema({", "  name: String,", "  email: Sring,", "  age: Number", "});"],
+          bugIndex: 2,
+          explanation: "Typo: 'Sring' should be 'String' — this throws a ReferenceError."
+        },
+        {
+          difficulty: "medium",
+          lines: ["app.get('/api/users', async (req, res) => {", "  const users = User.find();", "  res.json(users);", "});"],
+          bugIndex: 1,
+          explanation: "Missing 'await' before User.find() — it returns a Query/Promise, not the actual data."
+        },
+        {
+          difficulty: "medium",
+          lines: ["mongoose.connect('mongodb://localhost:27017/mydb', {", "  useNewUrlParser: true,", "  useUnifiedTopology true", "});"],
+          bugIndex: 2,
+          explanation: "Missing colon — should be useUnifiedTopology: true."
+        },
+        {
+          difficulty: "hard",
+          lines: ["const app = express();", "app.post('/api/data', (req, res) => {", "  res.json({ ok: true });", "});", "app.use(cors());"],
+          bugIndex: 4,
+          explanation: "cors() is applied after the route is defined, so it won't protect that route — middleware must come before the routes it should apply to."
+        },
+        {
+          difficulty: "easy",
+          lines: ["const express = require('express')", "const app = express();", "app.listen(5000);"],
+          bugIndex: 0,
+          explanation: "Missing semicolon after the require statement."
+        },
+        {
+          difficulty: "medium",
+          lines: ["router.delete('/api/items/:id', (req, res) => {", "  Item.findByIdAndDelete(req.body.id);", "  res.send('deleted');", "});"],
+          bugIndex: 1,
+          explanation: "The id comes from the route params (req.params.id), not req.body.id."
+        },
+        {
+          difficulty: "hard",
+          lines: ["const orderSchema = new mongoose.Schema({", "  total: Number,", "  items: [itemSchema]", "});", "const Order = mongoose.Model('Order', orderSchema);"],
+          bugIndex: 4,
+          explanation: "Should be mongoose.model() (lowercase 'm') — mongoose.Model is not the factory function used to register a model."
+        }
+      ],
+      react: [
+        {
+          difficulty: "easy",
+          lines: ["function ItemList({ items }) {", "  return (", "    <ul>", "      {items.map(item => <li>{item.name}</li>)}", "    </ul>", "  );", "}"],
+          bugIndex: 3,
+          explanation: "Missing 'key' prop when rendering a list with map() — React needs a unique key per item."
+        },
+        {
+          difficulty: "easy",
+          lines: ["function Counter() {", "  const [count, setCount] = useState(0);", "  useEffect(() => {", "    setCount(count + 1);", "  });", "  return <div>{count}</div>;", "}"],
+          bugIndex: 4,
+          explanation: "useEffect has no dependency array, so it runs after every render — infinite update loop."
+        },
+        {
+          difficulty: "medium",
+          lines: ["function App() {", "  function handleClick() {", "    console.log('Clicked');", "  }", "  return <button onClick={handleClick()}>Click me</button>;", "}"],
+          bugIndex: 4,
+          explanation: "onClick={handleClick()} calls the function immediately during render instead of passing a reference — should be onClick={handleClick}."
+        },
+        {
+          difficulty: "medium",
+          lines: ["function addTodo(todo) {", "  todos.push(todo);", "  setTodos(todos);", "}"],
+          bugIndex: 1,
+          explanation: "Mutating state directly with push() instead of creating a new array — React won't detect the change."
+        },
+        {
+          difficulty: "hard",
+          lines: ["function Timer() {", "  const [seconds, setSeconds] = useState(0);", "  useEffect(() => {", "    const id = setInterval(() => {", "      setSeconds(seconds + 1);", "    }, 1000);", "    return () => clearInterval(id);", "  }, []);", "  return <div>{seconds}</div>;", "}"],
+          bugIndex: 4,
+          explanation: "Stale closure: 'seconds' stays 0 forever since the effect only runs once — use the functional update setSeconds(s => s + 1)."
+        },
+        {
+          difficulty: "easy",
+          lines: ["const [visible, setVisible] = useState(false)", "return <div>{visible && <Modal />}</div>;"],
+          bugIndex: 0,
+          explanation: "Missing semicolon after the useState declaration."
+        },
+        {
+          difficulty: "medium",
+          lines: ["function UserCard(props) {", "  return <div>{this.props.name}</div>;", "}"],
+          bugIndex: 1,
+          explanation: "Functional components don't have 'this' — should just be {props.name}."
+        },
+        {
+          difficulty: "hard",
+          lines: ["const MemoList = React.memo(function List({ items }) {", "  return items.map(i => <div>{i}</div>);", "});"],
+          bugIndex: 1,
+          explanation: "Rendering a list without a 'key' prop on each element — React needs a unique key per mapped item."
+        }
+      ],
+      nextjs: [
+        {
+          difficulty: "easy",
+          lines: ["import Link from 'next/link';", "export default function Nav() {", "  return <Link href='/about'>About<Link>;", "}"],
+          bugIndex: 2,
+          explanation: "Closing tag mismatched — should be </Link>, not <Link>."
+        },
+        {
+          difficulty: "medium",
+          lines: ["'use client'", "import { useState } from 'react';", "export default function Counter() {", "  const [count, setCount] = useState();", "  return <button onClick={() => setCount(count + 1)}>{count}</button>;", "}"],
+          bugIndex: 3,
+          explanation: "useState() has no initial value, so 'count' starts undefined, breaking the +1 addition (NaN)."
+        },
+        {
+          difficulty: "hard",
+          lines: ["export async function getServerSideProps() {", "  const res = fetch('https://api.example.com/data');", "  const data = res.json();", "  return { props: { data } };", "}"],
+          bugIndex: 1,
+          explanation: "Missing 'await' before fetch() — 'res' is a pending Promise, so res.json() fails."
+        },
+        {
+          difficulty: "easy",
+          lines: ["import Image from 'next/image';", "export default function Logo() {", "  return <Image src='/logo.png' width={100} height={100} />", "}"],
+          bugIndex: 3,
+          explanation: "Missing semicolon after the return statement."
+        },
+        {
+          difficulty: "medium",
+          lines: ["export default function Page({ params }) {", "  return <h1>Post: {params.slug}</h1>;", "}", "export function generateStaticParams() {", "  return fetch('/api/posts');", "}"],
+          bugIndex: 4,
+          explanation: "generateStaticParams must return an array of param objects, not a raw fetch Promise/Response."
+        }
+      ],
+      laravel: [
+        {
+          difficulty: "easy",
+          lines: ["Route::get('/home', function () {", "    return view('home')", "});"],
+          bugIndex: 1,
+          explanation: "Missing semicolon after return view('home')."
+        },
+        {
+          difficulty: "medium",
+          lines: ["public function index() {", "    $users = User::all();", "    return view('users.index', ['users' => $user]);", "}"],
+          bugIndex: 2,
+          explanation: "Variable name mismatch — should pass $users, not the undefined $user."
+        },
+        {
+          difficulty: "hard",
+          lines: ["public function search(Request $request) {", "    $query = $request->input('q');", "    $results = Product::where('name', 'LIKE' \"%$query%\")->get();", "    return view('search', compact('results'));", "}"],
+          bugIndex: 2,
+          explanation: "Missing comma between 'LIKE' and the search pattern — breaks the where() call syntax."
+        },
+        {
+          difficulty: "easy",
+          lines: ["class Post extends Model {", "    protected $fillable = ['title', 'body']", "}"],
+          bugIndex: 1,
+          explanation: "Missing semicolon after the $fillable array assignment."
+        },
+        {
+          difficulty: "medium",
+          lines: ["Route::get('/posts/{id}', [PostController::class, 'show']);", "Route::get('/posts/create', [PostController::class, 'create']);"],
+          bugIndex: 0,
+          explanation: "The dynamic '/posts/{id}' route is defined before '/posts/create', so 'create' gets swallowed as an id — specific routes must come before wildcard ones."
+        }
+      ],
+      django: [
+        {
+          difficulty: "medium",
+          lines: ["class Product(models.Model):", "    name = models.CharField(max_length=100)", "    price = models.DecimalField(max_digit=10, decimal_places=2)", "    def __str__(self):", "        return self.name"],
+          bugIndex: 2,
+          explanation: "Typo: should be 'max_digits', not 'max_digit'."
+        },
+        {
+          difficulty: "medium",
+          lines: ["def product_list(request):", "    products = Product.objects.filter(price > 100)", "    return render(request, 'list.html', {'products': products})"],
+          bugIndex: 1,
+          explanation: "Django's filter() needs field__gt=value syntax, not a raw Python comparison operator."
+        },
+        {
+          difficulty: "hard",
+          lines: ["class Order(models.Model):", "    items = models.ManyToManyField(Item)", "    total = models.DecimalField(max_digits=8, decimal_places=2)", "", "def order_view(request, id):", "    order = Order.objects.get(id=id)", "    order.delete", "    return redirect('orders')"],
+          bugIndex: 6,
+          explanation: "order.delete is missing parentheses — without them, it's just a method reference and never actually deletes the order."
+        },
+        {
+          difficulty: "easy",
+          lines: ["urlpatterns = [", "    path('posts/', views.post_list, name='post_list')", "]"],
+          bugIndex: 1,
+          explanation: "Missing comma after the path() call — breaks the urlpatterns list syntax."
+        },
+        {
+          difficulty: "medium",
+          lines: ["def register(request):", "    form = RegisterForm(request.POST)", "    if form.is_valid:", "        form.save()"],
+          bugIndex: 2,
+          explanation: "is_valid is a method and needs parentheses — 'if form.is_valid:' is always truthy since it references the method object, not its result."
+        }
+      ],
+      wordpress: [
+        {
+          difficulty: "easy",
+          lines: ["function my_enqueue_scripts() {", "    wp_enqueue_style('main-style', get_stylesheet_uri());", "}", "add_action('wp_enqueue_script', 'my_enqueue_scripts');"],
+          bugIndex: 3,
+          explanation: "Wrong hook name — should be 'wp_enqueue_scripts' (plural), not 'wp_enqueue_script'."
+        },
+        {
+          difficulty: "medium",
+          lines: ["function custom_shortcode($atts) {", "    return 'Hello ' . $atts['name'];", "}", "add_shortcode('greet' 'custom_shortcode');"],
+          bugIndex: 3,
+          explanation: "Missing comma between the shortcode tag and the callback function name."
+        },
+        {
+          difficulty: "hard",
+          lines: ["function get_recent_posts() {", "    $args = array('post_type' => 'post' 'posts_per_page' => 5);", "    $query = new WP_Query($args);", "    while ($query->have_posts()) {", "        the_post();", "        the_title();", "    }", "}"],
+          bugIndex: 1,
+          explanation: "Missing comma between array items — 'post_type' => 'post' and 'posts_per_page' => 5 need a comma separating them."
+        },
+        {
+          difficulty: "easy",
+          lines: ["function my_theme_setup() {", "    add_theme_support('post-thumbnails')", "}", "add_action('after_setup_theme', 'my_theme_setup');"],
+          bugIndex: 1,
+          explanation: "Missing semicolon after add_theme_support('post-thumbnails')."
+        },
+        {
+          difficulty: "medium",
+          lines: ["<?php if (have_posts()) : ?>", "  <?php while (have_posts()) : the_post(); ?>", "    <h2><?php the_title(); ?></h2>", "<?php endwhile; ?>"],
+          bugIndex: 3,
+          explanation: "Missing the closing 'endif;' for the outer 'if (have_posts())' check."
+        }
+      ],
+      flutter: [
+        {
+          difficulty: "easy",
+          lines: ["int count = 0", "void increment() {", "  count = count + 1;", "}"],
+          bugIndex: 0,
+          explanation: "Missing semicolon after 'int count = 0'."
+        },
+        {
+          difficulty: "medium",
+          lines: ["class Counter extends StatefulWidget {", "  @override", "  _CounterState createState() => _CounterState();", "}", "class _CounterState extends State<Counter> {", "  int count = 0;", "  void increment() {", "    count++;", "  }", "  Widget build(BuildContext context) {", "    return Text('$count');", "  }", "}"],
+          bugIndex: 7,
+          explanation: "count++ updates the variable but isn't wrapped in setState(), so Flutter never rebuilds the widget with the new value."
+        },
+        {
+          difficulty: "hard",
+          lines: ["Future<void> fetchData() async {", "  final response = http.get(Uri.parse('https://api.example.com/data'));", "  print(response.body);", "}"],
+          bugIndex: 1,
+          explanation: "Missing 'await' before http.get() — 'response' is a Future, so .body doesn't exist yet on it directly."
+        },
+        {
+          difficulty: "easy",
+          lines: ["Widget build(BuildContext context) {", "  return Text('Hello')", "}"],
+          bugIndex: 1,
+          explanation: "Missing semicolon after the return statement."
+        },
+        {
+          difficulty: "medium",
+          lines: ["ListView.builder(", "  itemCount: items.length,", "  itemBuilder: (context, index) {", "    return Text(items[index + 1]);", "  },", ")"],
+          bugIndex: 3,
+          explanation: "index + 1 goes out of bounds on the last item — should just use items[index]."
+        }
+      ],
+      crossplatform: [
+        {
+          difficulty: "easy",
+          lines: ["import { View, Text } from 'react-native';", "export default function App() {", "  return (", "    <View>", "      <Text>Hello App<Text>", "    </View>", "  );", "}"],
+          bugIndex: 4,
+          explanation: "Closing tag should be </Text>, not another opening <Text>."
+        },
+        {
+          difficulty: "medium",
+          lines: ["const [items, setItems] = useState([]);", "useEffect(() => {", "  fetchItems().then(data => setItems(data));", "}, [items]);"],
+          bugIndex: 3,
+          explanation: "The effect depends on 'items' but also updates it inside — this creates an infinite fetch loop; the dependency array should be empty []."
+        },
+        {
+          difficulty: "hard",
+          lines: ["<TouchableOpacity onPress={handlePress()}>", "  <Text>Press Me</Text>", "</TouchableOpacity>"],
+          bugIndex: 0,
+          explanation: "onPress={handlePress()} invokes the function immediately during render — should be onPress={handlePress} to pass a reference."
+        },
+        {
+          difficulty: "easy",
+          lines: ["const styles = StyleSheet.create({", "  container: {", "    flex: 1", "  }", "})"],
+          bugIndex: 4,
+          explanation: "Missing semicolon after the StyleSheet.create() call."
+        },
+        {
+          difficulty: "medium",
+          lines: ["import AsyncStorage from '@react-native-async-storage/async-storage';", "function saveName(name) {", "  AsyncStorage.setItem('name', name);", "}"],
+          bugIndex: 2,
+          explanation: "AsyncStorage.setItem requires a string value — passing a raw variable that might not be a string (or skipping JSON.stringify for objects) silently fails; also missing 'await'/error handling for the async call."
+        }
+      ],
+      uiux: [
+        {
+          difficulty: "easy",
+          lines: ["<button style=\"width: 16px; height: 16px;\">", "  <img src=\"delete-icon.png\">", "</button>"],
+          bugIndex: 1,
+          explanation: "The icon has no alt text or aria-label — screen reader users won't know what this button does."
+        },
+        {
+          difficulty: "easy",
+          lines: [".card-title {", "  color: #cccccc;", "  background-color: #ffffff;", "  font-size: 14px;", "}"],
+          bugIndex: 1,
+          explanation: "Light gray text (#cccccc) on white fails WCAG contrast guidelines — hard to read."
+        },
+        {
+          difficulty: "medium",
+          lines: ["<form>", "  <label>Email</label>", "  <input type=\"email\" id=\"user-email\">", "  <button type=\"submit\">Submit</button>", "</form>"],
+          bugIndex: 1,
+          explanation: "The <label> isn't linked to the input with a 'for' attribute matching the input's id."
+        },
+        {
+          difficulty: "medium",
+          lines: [".nav-link {", "  padding: 2px;", "  margin: 0;", "  display: inline-block;", "}"],
+          bugIndex: 1,
+          explanation: "Only 2px padding makes the tap target far smaller than the recommended 44x44px minimum for touch."
+        },
+        {
+          difficulty: "hard",
+          lines: ["<input type=\"text\" placeholder=\"Full Name\" required>", "<input type=\"password\" placeholder=\"Password\" required>", "<button type=\"submit\">Sign Up</button>"],
+          bugIndex: 0,
+          explanation: "Using placeholder text as the only label — it disappears once the user starts typing, hurting usability and accessibility."
+        },
+        {
+          difficulty: "easy",
+          lines: ["<a href=\"#\" onclick=\"deleteAccount()\">Delete my account</a>"],
+          bugIndex: 0,
+          explanation: "A destructive action is a plain link with no confirmation step — this invites accidental, irreversible clicks."
+        },
+        {
+          difficulty: "medium",
+          lines: ["Step 1: Show a loading spinner instantly on every button click", "Step 2: Never dismiss the spinner if the request fails", "Step 3: Log errors to the console only"],
+          bugIndex: 1,
+          explanation: "A spinner that never dismisses on failure leaves the user stuck with no feedback — errors must be surfaced to the user, not just the console."
+        }
+      ],
+      graphics: [
+        {
+          difficulty: "easy",
+          lines: ["Step 1: Set canvas resolution to 72 DPI for print materials", "Step 2: Choose a complementary color palette", "Step 3: Export final file as CMYK for print"],
+          bugIndex: 0,
+          explanation: "Print materials need at least 300 DPI, not 72 DPI (72 DPI is meant for screens, not print)."
+        },
+        {
+          difficulty: "medium",
+          lines: ["Step 1: Design the logo in RGB color mode for a print brochure", "Step 2: Keep important text 5mm from the trim edge for safety margin", "Step 3: Convert to CMYK before sending to the printer"],
+          bugIndex: 0,
+          explanation: "Print work should be designed in CMYK from the start, not RGB — converting late can shift colors unexpectedly."
+        },
+        {
+          difficulty: "hard",
+          lines: ["Step 1: Set the brand's primary and secondary color palette", "Step 2: Use 6 different fonts to make the poster stand out", "Step 3: Maintain consistent spacing using a grid system"],
+          bugIndex: 1,
+          explanation: "Using too many fonts (6) breaks visual consistency — professional designs typically stick to 2-3 complementary fonts."
+        },
+        {
+          difficulty: "easy",
+          lines: ["Step 1: Save the final logo only as a JPEG file", "Step 2: Deliver the JPEG to the client", "Step 3: Archive the project"],
+          bugIndex: 0,
+          explanation: "Logos need a transparent, scalable format (PNG/SVG/vector), not a JPEG — JPEGs have a solid background and lose quality when resized."
+        },
+        {
+          difficulty: "medium",
+          lines: ["Step 1: Pick a bright neon color for all body text", "Step 2: Use a bold heading font for headings", "Step 3: Keep consistent line spacing throughout"],
+          bugIndex: 0,
+          explanation: "Bright neon body text hurts readability over long passages — neon works better sparingly as an accent, not for large text blocks."
+        }
+      ],
+      productdesign: [
+        {
+          difficulty: "easy",
+          lines: ["Step 1: Interview users to understand their pain points", "Step 2: Skip wireframing and jump straight to high-fidelity mockups", "Step 3: Test the prototype with real users"],
+          bugIndex: 1,
+          explanation: "Skipping wireframes means costly design decisions get locked in too early, before the flow is validated."
+        },
+        {
+          difficulty: "medium",
+          lines: ["Step 1: Design a 44x44px minimum tap target for mobile buttons", "Step 2: Use only icons with no text labels for all navigation", "Step 3: Run usability tests before shipping"],
+          bugIndex: 1,
+          explanation: "Icon-only navigation without labels hurts discoverability — users often can't guess what unlabeled icons mean."
+        },
+        {
+          difficulty: "hard",
+          lines: ["Step 1: Define the primary user persona and their goals", "Step 2: Design the onboarding flow with 12 sequential steps", "Step 3: A/B test the final design"],
+          bugIndex: 1,
+          explanation: "A 12-step onboarding flow is far too long — long onboarding causes major user drop-off; it should be as short as possible."
+        },
+        {
+          difficulty: "easy",
+          lines: ["Step 1: Sketch multiple low-fidelity concepts", "Step 2: Pick the first idea without comparing alternatives", "Step 3: Move straight to development"],
+          bugIndex: 1,
+          explanation: "Committing to the first idea without comparing alternatives skips the exploration that usually finds a better solution."
+        },
+        {
+          difficulty: "hard",
+          lines: ["Step 1: Design an error state for the payment form", "Step 2: Show a generic 'Something went wrong' message for every failure", "Step 3: Ship without user testing the error flow"],
+          bugIndex: 1,
+          explanation: "A generic error message for every failure gives users no idea how to fix the actual problem (e.g. wrong card number vs. network issue)."
+        }
+      ],
+      python: [
+        {
+          difficulty: "easy",
+          lines: ["def add_numbers(a, b)", "    return a + b"],
+          bugIndex: 0,
+          explanation: "Missing colon at the end of the function definition."
+        },
+        {
+          difficulty: "easy",
+          lines: ["numbers = [1, 2, 3, 4, 5]", "total = 0", "for n in numbers:", "    total =+ n", "print(total)"],
+          bugIndex: 3,
+          explanation: "Should be += not =+ — this resets total to n instead of adding to it."
+        },
+        {
+          difficulty: "hard",
+          lines: ["def add_item(item, cart=[]):", "    cart.append(item)", "    return cart"],
+          bugIndex: 0,
+          explanation: "Using a mutable default argument (list) — it persists across function calls, a classic Python bug."
+        },
+        {
+          difficulty: "easy",
+          lines: ["age = 20", "print('Age: ' + age)"],
+          bugIndex: 1,
+          explanation: "Can't concatenate a string with an int directly — needs str(age), or an f-string, to avoid a TypeError."
+        },
+        {
+          difficulty: "medium",
+          lines: ["def divide(a, b):", "    return a / b", "result = divide(10, 0)", "print(result)"],
+          bugIndex: 2,
+          explanation: "Dividing by zero raises a ZeroDivisionError at runtime — the call on line 3 triggers the crash."
+        },
+        {
+          difficulty: "hard",
+          lines: ["class Counter:", "    count = 0", "    def increment(self):", "        Counter.count + 1"],
+          bugIndex: 3,
+          explanation: "The expression Counter.count + 1 computes a value but never assigns it back — should be Counter.count += 1."
+        }
+      ],
+      data: [
+        {
+          difficulty: "easy",
+          lines: ["import pandas as pd", "df = pd.read_csv(\"data.csv\")", "print(df.head()"],
+          bugIndex: 2,
+          explanation: "Missing closing parenthesis on print(df.head()."
+        },
+        {
+          difficulty: "easy",
+          lines: ["SELECT department, AVG(salary)", "FROM employees", "GROUP department;"],
+          bugIndex: 2,
+          explanation: "Missing 'BY' — should be GROUP BY department."
+        },
+        {
+          difficulty: "medium",
+          lines: ["import pandas as pd", "df = pd.read_csv('data.csv')", "df_filtered = df[df['age'] = 25]"],
+          bugIndex: 2,
+          explanation: "Using = instead of == inside the filter — comparison is needed, not assignment."
+        },
+        {
+          difficulty: "medium",
+          lines: ["import matplotlib.pyplot as plt", "data = [10, 20, 15, 30]", "plt.bar(range(len(data), data)", "plt.show()"],
+          bugIndex: 2,
+          explanation: "Parenthesis mismatch — range(len(data) is missing its closing bracket before the comma."
+        },
+        {
+          difficulty: "hard",
+          lines: ["sales_by_region = df.groupby('region')['sales'].mean()", "top_region = sales_by_region.sort_values().index[0]", "print(f\"Top region: {top_region}\")"],
+          bugIndex: 1,
+          explanation: "sort_values() sorts ascending by default, so index[0] gives the LOWEST sales region — needs ascending=False."
+        },
+        {
+          difficulty: "easy",
+          lines: ["import pandas as pd", "df = pd.DataFrame(data)", "print(df.shape())"],
+          bugIndex: 2,
+          explanation: "df.shape is a property, not a method — calling it with () raises a TypeError; should be df.shape."
+        },
+        {
+          difficulty: "medium",
+          lines: ["SELECT product_name, price", "FROM products", "ORDER BY price DESC", "LIMIT 5,", "OFFSET 0;"],
+          bugIndex: 3,
+          explanation: "Trailing comma after LIMIT 5 breaks the query — OFFSET should directly follow without a comma (LIMIT 5 OFFSET 0)."
+        }
+      ],
+      iot: [
+        {
+          difficulty: "easy",
+          lines: ["void setup() {", "  pinMode(LED_PIN, OUTPUT)", "}"],
+          bugIndex: 1,
+          explanation: "Missing semicolon after pinMode(LED_PIN, OUTPUT)."
+        },
+        {
+          difficulty: "medium",
+          lines: ["void loop() {", "  int sensorValue = analogRead(A0);", "  if (sensorValue = 500) {", "    digitalWrite(LED_PIN, HIGH);", "  }", "}"],
+          bugIndex: 2,
+          explanation: "Using = (assignment) instead of == (comparison) inside the if condition."
+        },
+        {
+          difficulty: "hard",
+          lines: ["void setup() {", "  Serial.begin(9600);", "  pinMode(TRIG_PIN, OUTPUT);", "  pinMode(ECHO_PIN, OUTPUT);", "}"],
+          bugIndex: 3,
+          explanation: "ECHO_PIN should be set to INPUT, not OUTPUT — it's used to read the returning ultrasonic signal."
+        },
+        {
+          difficulty: "easy",
+          lines: ["void loop() {", "  digitalWrite(LED_PIN, HIGH)", "  delay(1000);", "}"],
+          bugIndex: 1,
+          explanation: "Missing semicolon after digitalWrite(LED_PIN, HIGH)."
+        },
+        {
+          difficulty: "medium",
+          lines: ["int temp = analogRead(A0);", "float voltage = temp * 5 / 1023;", "Serial.println(voltage);"],
+          bugIndex: 1,
+          explanation: "Integer division happens before the float assignment (temp * 5 / 1023 uses int math), truncating the result — needs 5.0 to force floating-point division."
+        }
+      ],
+      smartiot: [
+        {
+          difficulty: "easy",
+          lines: ["#include <WiFi.h>", "void setup() {", "  WiFi.begin(ssid, password)", "}"],
+          bugIndex: 2,
+          explanation: "Missing semicolon after WiFi.begin(ssid, password)."
+        },
+        {
+          difficulty: "medium",
+          lines: ["void loop() {", "  if (WiFi.status() = WL_CONNECTED) {", "    sendSensorData();", "  }", "}"],
+          bugIndex: 1,
+          explanation: "Using = instead of == to compare WiFi.status() with WL_CONNECTED."
+        },
+        {
+          difficulty: "hard",
+          lines: ["void publishData(float temp) {", "  char msg[50];", "  sprintf(msg, 'Temp: %f', temp);", "  client.publish('sensors/temp', msg);", "}"],
+          bugIndex: 2,
+          explanation: "String literals in C/Arduino need double quotes, not single quotes — 'Temp: %f' should be \"Temp: %f\"."
+        },
+        {
+          difficulty: "easy",
+          lines: ["void setup() {", "  Serial.begin(9600)", "  pinMode(RELAY_PIN, OUTPUT);", "}"],
+          bugIndex: 1,
+          explanation: "Missing semicolon after Serial.begin(9600)."
+        },
+        {
+          difficulty: "medium",
+          lines: ["void loop() {", "  client.loop();", "  if (millis() - lastMsg > 2000) {", "    lastMsg = millis()", "    publishData(readTemp());", "  }", "}"],
+          bugIndex: 3,
+          explanation: "Missing semicolon after lastMsg = millis() — breaks compilation."
+        }
+      ],
+      cybersecurity: [
+        {
+          difficulty: "easy",
+          lines: ["$password = $_POST['password'];", "$query = \"SELECT * FROM users WHERE pass = '$password'\";", "$result = mysqli_query($conn, $query);"],
+          bugIndex: 1,
+          explanation: "Directly inserting user input into the SQL string allows SQL injection — parameterized queries should be used instead."
+        },
+        {
+          difficulty: "medium",
+          lines: ["def login(username, password):", "    if password == stored_password:", "        return True", "    return False"],
+          bugIndex: 1,
+          explanation: "Comparing passwords in plaintext — passwords should be hashed and verified securely, never stored or compared as plaintext."
+        },
+        {
+          difficulty: "hard",
+          lines: ["app.get('/user/:id', (req, res) => {", "  const user = db.getUser(req.params.id);", "  res.json(user);", "});"],
+          bugIndex: 0,
+          explanation: "No authentication or authorization check before returning user data — this is an Insecure Direct Object Reference (IDOR) vulnerability."
+        },
+        {
+          difficulty: "easy",
+          lines: ["<input type=\"text\" name=\"comment\">", "<?php echo $_POST['comment']; ?>"],
+          bugIndex: 1,
+          explanation: "Echoing raw user input directly into HTML without escaping (htmlspecialchars) opens the door to Cross-Site Scripting (XSS)."
+        },
+        {
+          difficulty: "medium",
+          lines: ["const jwt = require('jsonwebtoken');", "const token = jwt.sign({ id: user.id }, 'mysecret123');"],
+          bugIndex: 1,
+          explanation: "Hardcoding a weak, guessable JWT secret directly in code — secrets should be strong, random, and loaded from environment variables."
+        },
+        {
+          difficulty: "hard",
+          lines: ["app.use(express.json());", "app.post('/reset-password', (req, res) => {", "  db.query(`UPDATE users SET password='${req.body.password}' WHERE email='${req.body.email}'`);", "  res.send('Password reset');", "});"],
+          bugIndex: 2,
+          explanation: "Building the SQL string with template literals from raw request body is a classic SQL injection vulnerability — use parameterized queries."
+        }
+      ],
+      qa: [
+        {
+          difficulty: "easy",
+          lines: ["def test_addition():", "    result = add(2, 3)", "    assert result = 5"],
+          bugIndex: 2,
+          explanation: "Using = instead of == inside the assert statement — assert needs a boolean expression."
+        },
+        {
+          difficulty: "medium",
+          lines: ["def test_login_valid_user():", "    response = login('user', 'wrongpassword')", "    assert response.status_code == 200"],
+          bugIndex: 1,
+          explanation: "Test uses a wrong password but asserts a successful (200) response — a failed login should expect a 401/403, not 200."
+        },
+        {
+          difficulty: "hard",
+          lines: ["Test Case: Verify checkout button", "Step 1: Add item to cart", "Step 2: Click checkout button", "Expected Result: (not specified)"],
+          bugIndex: 3,
+          explanation: "The expected result is missing — a valid test case must define what 'pass' looks like, or it can't be verified."
+        },
+        {
+          difficulty: "easy",
+          lines: ["def test_signup():", "    response = signup('test@mail.com', 'pass123')", "    assert response.status_code = 201"],
+          bugIndex: 2,
+          explanation: "Using = instead of == inside the assert statement — a syntax error in Python."
+        },
+        {
+          difficulty: "hard",
+          lines: ["Test Plan: Only test the 'happy path' where the user enters valid data", "Skip boundary values and invalid inputs to save time", "Mark the feature as fully tested once the happy path passes"],
+          bugIndex: 2,
+          explanation: "Calling a feature 'fully tested' after only the happy path is misleading — boundary and negative cases are needed for real coverage."
+        }
+      ],
+      devops: [
+        {
+          difficulty: "easy",
+          lines: ["FROM node:18", "WORKDIR /app", "COPY package.json .", "RUN npm install", "EXPOSE 3000", "CMD [\"node\" \"index.js\"]"],
+          bugIndex: 5,
+          explanation: "Missing comma inside the CMD array — should be [\"node\", \"index.js\"]."
+        },
+        {
+          difficulty: "medium",
+          lines: ["name: CI", "on push:", "jobs:", "  build:", "    runs-on: ubuntu-latest", "    steps:", "      - uses: actions/checkout@v3"],
+          bugIndex: 1,
+          explanation: "YAML syntax error — should be 'on: push', not 'on push:' (the colon is in the wrong place)."
+        },
+        {
+          difficulty: "hard",
+          lines: ["version: '3'", "services:", "  web:", "    build: .", "    ports:", "      - '5000-5000'", "  redis:", "    image: 'redis:alpine'"],
+          bugIndex: 5,
+          explanation: "Docker Compose port mapping should use a colon, not a hyphen — '5000-5000' should be '5000:5000' (host:container)."
+        },
+        {
+          difficulty: "easy",
+          lines: ["FROM python:3.11", "COPY requirements.txt .", "RUN pip install requirements.txt"],
+          bugIndex: 2,
+          explanation: "Missing the -r flag — should be 'pip install -r requirements.txt' to install from the file, not treat it as a package name."
+        },
+        {
+          difficulty: "hard",
+          lines: ["jobs:", "  deploy:", "    needs: build", "    runs-on: ubuntu-latest", "    steps:", "      - run: echo ${{ secrets.API_KEY }}"],
+          bugIndex: 5,
+          explanation: "Echoing a secret directly to logs exposes it in plaintext in the CI output — secrets should never be printed."
+        }
+      ],
+      digitalmarketing: [
+        {
+          difficulty: "easy",
+          lines: ["Step 1: Define target audience and buyer personas", "Step 2: Set campaign goals without a measurable KPI", "Step 3: Choose the right marketing channels"],
+          bugIndex: 1,
+          explanation: "Setting goals without a measurable KPI makes it impossible to judge if the campaign succeeded."
+        },
+        {
+          difficulty: "medium",
+          lines: ["Step 1: Set a monthly ad budget", "Step 2: Run the same ad creative for 6 months straight", "Step 3: Review performance metrics weekly"],
+          bugIndex: 1,
+          explanation: "Running the same ad creative for too long causes 'ad fatigue' — audiences stop responding, so creatives need regular refreshing."
+        },
+        {
+          difficulty: "hard",
+          lines: ["Step 1: Send a marketing email to all users, including those who unsubscribed", "Step 2: Segment the remaining list by interest", "Step 3: A/B test subject lines"],
+          bugIndex: 0,
+          explanation: "Emailing unsubscribed users violates anti-spam laws (like GDPR/CAN-SPAM) and damages sender reputation."
+        },
+        {
+          difficulty: "easy",
+          lines: ["Step 1: Write an ad headline promising 'guaranteed #1 ranking in 24 hours'", "Step 2: Launch the campaign", "Step 3: Track click-through rate"],
+          bugIndex: 0,
+          explanation: "Making an unrealistic, unverifiable guarantee like this risks platform ad-policy violations and erodes trust."
+        },
+        {
+          difficulty: "medium",
+          lines: ["Step 1: Build a landing page for the campaign", "Step 2: Drive all ad traffic straight to the homepage instead", "Step 3: Measure conversion rate"],
+          bugIndex: 1,
+          explanation: "Sending targeted ad traffic to the generic homepage instead of the matching landing page usually tanks conversion rate."
+        }
+      ],
+      socialmedia: [
+        {
+          difficulty: "easy",
+          lines: ["Step 1: Post the same content at the same time on every platform", "Step 2: Use platform-specific hashtags", "Step 3: Engage with comments within 24 hours"],
+          bugIndex: 0,
+          explanation: "Content and timing should be tailored to each platform's audience — posting identically everywhere ignores platform differences."
+        },
+        {
+          difficulty: "medium",
+          lines: ["Step 1: Track engagement rate and reach", "Step 2: Buy fake followers to boost follower count", "Step 3: Analyze which post formats perform best"],
+          bugIndex: 1,
+          explanation: "Buying fake followers inflates vanity metrics but hurts real engagement rate and can get accounts penalized."
+        },
+        {
+          difficulty: "hard",
+          lines: ["Step 1: Schedule posts using a content calendar", "Step 2: Ignore negative comments completely", "Step 3: Post consistently 3-4 times a week"],
+          bugIndex: 1,
+          explanation: "Ignoring negative comments hurts brand trust — they should be addressed professionally, not ignored."
+        },
+        {
+          difficulty: "easy",
+          lines: ["Step 1: Post a video with no captions or subtitles", "Step 2: Upload it to every platform", "Step 3: Wait for engagement"],
+          bugIndex: 0,
+          explanation: "Most social video is watched with sound off — no captions means a large share of viewers miss the message entirely."
+        },
+        {
+          difficulty: "hard",
+          lines: ["Step 1: Run a giveaway requiring users to tag 20 friends to enter", "Step 2: Announce the winner", "Step 3: Measure follower growth"],
+          bugIndex: 0,
+          explanation: "Tag-20-friends giveaways violate most platforms' promotion guidelines and tend to attract low-quality, disengaged followers."
+        }
+      ],
+      contentmarketing: [
+        {
+          difficulty: "easy",
+          lines: ["Step 1: Research keywords before writing", "Step 2: Publish content without proofreading", "Step 3: Promote the content across channels"],
+          bugIndex: 1,
+          explanation: "Skipping proofreading risks errors that hurt credibility and readability."
+        },
+        {
+          difficulty: "medium",
+          lines: ["Step 1: Write a catchy headline", "Step 2: Stuff the article with the keyword 30 times for SEO", "Step 3: Add a clear call-to-action at the end"],
+          bugIndex: 1,
+          explanation: "Keyword stuffing hurts readability and is penalized by search engines — natural keyword usage works better."
+        },
+        {
+          difficulty: "hard",
+          lines: ["Step 1: Build brand voice guidelines", "Step 2: Copy a competitor's article and change a few words", "Step 3: Distribute via email and social media"],
+          bugIndex: 1,
+          explanation: "Copying a competitor's article (even lightly edited) is plagiarism and can cause legal and SEO penalties."
+        },
+        {
+          difficulty: "easy",
+          lines: ["Step 1: Write a blog post with no meta description", "Step 2: Publish immediately", "Step 3: Share on social media"],
+          bugIndex: 0,
+          explanation: "Skipping the meta description hurts click-through rate from search results, where it's often shown as the snippet."
+        },
+        {
+          difficulty: "medium",
+          lines: ["Step 1: Set up a content calendar", "Step 2: Write every post in the same generic tone with no brand voice", "Step 3: Publish consistently"],
+          bugIndex: 1,
+          explanation: "A generic, voiceless tone makes content forgettable — consistent brand voice is what makes content recognizable and memorable."
+        }
+      ],
+      projectbased: [
+        {
+          difficulty: "easy",
+          lines: ["function calculateTotal(price, qty) {", "  return price * qty", "}"],
+          bugIndex: 1,
+          explanation: "Missing semicolon after the return statement."
+        },
+        {
+          difficulty: "medium",
+          lines: ["const tasks = ['design', 'develop', 'test'];", "for (let i = 0; i <= tasks.length; i++) {", "  console.log(tasks[i]);", "}"],
+          bugIndex: 1,
+          explanation: "Using <= instead of < causes the loop to read one index past the array's end (undefined)."
+        },
+        {
+          difficulty: "hard",
+          lines: ["function mergeConfig(base, override) {", "  return Object.assign(base, override);", "}"],
+          bugIndex: 1,
+          explanation: "Object.assign(base, override) mutates 'base' directly — should use Object.assign({}, base, override) to avoid side effects."
+        },
+        {
+          difficulty: "easy",
+          lines: ["const btn = document.getElementById('save-btn')", "btn.addEventListener('click', saveData);"],
+          bugIndex: 0,
+          explanation: "Missing semicolon after the getElementById line."
+        },
+        {
+          difficulty: "hard",
+          lines: ["function fetchAndRender() {", "  fetch('/api/items')", "    .then(res => res.json)", "    .then(data => render(data));", "}"],
+          bugIndex: 2,
+          explanation: "res.json is a method and must be called — should be res.json() to actually parse the response body."
+        }
+      ],
+      internship: [
+        {
+          difficulty: "easy",
+          lines: ["const greeting = 'Hello'", "console.log(greeting + ', SATRI!');"],
+          bugIndex: 0,
+          explanation: "Missing semicolon after the const declaration — inconsistent style that can cause automatic-semicolon-insertion bugs."
+        },
+        {
+          difficulty: "medium",
+          lines: ["function greetUser(user) {", "  if (user.name = 'admin') {", "    return 'Welcome, admin!';", "  }", "  return 'Welcome, user!';", "}"],
+          bugIndex: 1,
+          explanation: "Using = instead of === always overwrites user.name to 'admin' and is truthy — should be a comparison, not an assignment."
+        },
+        {
+          difficulty: "hard",
+          lines: ["async function submitReport(data) {", "  try {", "    await api.post('/reports', data);", "  } catch (err) {", "  }", "}"],
+          bugIndex: 3,
+          explanation: "The catch block silently swallows errors — failures go unnoticed since nothing is logged or handled."
+        },
+        {
+          difficulty: "easy",
+          lines: ["const total = items.reduce((sum, item) => {", "  sum + item.price", "}, 0);"],
+          bugIndex: 1,
+          explanation: "Missing 'return' inside the reduce callback — the accumulator never updates, so 'sum + item.price' is computed and discarded."
+        },
+        {
+          difficulty: "medium",
+          lines: ["function formatDate(date) {", "  return date.getMonth() + '/' + date.getDate() + '/' + date.getYear();", "}"],
+          bugIndex: 1,
+          explanation: "getYear() is deprecated and returns a weird offset (e.g. 124 for 2024) — should use getFullYear()."
+        }
+      ],
+      genai: [
+        {
+          difficulty: "easy",
+          lines: ["import openai", "response = openai.ChatCompletion.create(", "  model='gpt-4'", "  messages=[{'role':'user','content':'Hi'}]", ")"],
+          bugIndex: 2,
+          explanation: "Missing comma after model='gpt-4' — Python throws a SyntaxError without it."
+        },
+        {
+          difficulty: "medium",
+          lines: ["def build_prompt(topic):", "    return f'Write an essay about {topics}'"],
+          bugIndex: 1,
+          explanation: "Typo: the f-string references 'topics' (undefined) instead of the function's parameter 'topic'."
+        },
+        {
+          difficulty: "hard",
+          lines: ["for doc in documents:", "    embedding = model.encode(doc)", "    embeddings.append(embedding)", "embeddings = np.array(embedding)"],
+          bugIndex: 3,
+          explanation: "Uses the last loop variable 'embedding' (singular) instead of the accumulated list 'embeddings' — this only captures the final document's vector."
+        },
+        {
+          difficulty: "easy",
+          lines: ["prompt = \"Summarize this: \" + user_text", "response = model.generate(propmt)"],
+          bugIndex: 1,
+          explanation: "Typo: 'propmt' should be 'prompt' — this raises a NameError."
+        },
+        {
+          difficulty: "medium",
+          lines: ["import numpy as np", "def cosine_similarity(a, b):", "    return np.dot(a, b) / (np.norm(a) * np.norm(b))"],
+          bugIndex: 2,
+          explanation: "np.norm doesn't exist — the correct function is np.linalg.norm(a)."
+        },
+        {
+          difficulty: "hard",
+          lines: ["chat_history = []", "def chat(msg):", "    chat_history = chat_history + [msg]", "    return model.generate(chat_history)"],
+          bugIndex: 2,
+          explanation: "Reassigning the local name 'chat_history' inside the function before it's read raises an UnboundLocalError — it needs a 'global' declaration or should be mutated with append()."
+        }
+      ]
+    };
+
+    let selectedBugField = null;
+    let bugScore = 0;
+    let bugTimer = 15;
+    let bugTimerInterval = null;
+    let currentBugObj = null;
+    let lastBugChallenge = null;
+
+    const bugScoreText = document.getElementById("bug-score");
+    const bugTimerText = document.getElementById("bug-timer");
+    const bugCodeBox = document.getElementById("bug-code-box");
+    const bugObjectiveText = document.getElementById("bug-objective");
+    const bugFinalScoreText = document.getElementById("bug-final-score");
+
+    function selectBugField(field) {
+      selectedBugField = field;
+      lastBugChallenge = null;
+      document.getElementById("bug-field-label").innerText = `Field: ${bugFieldLabels[field]}`;
+      switchScreen("bughunter-start-screen");
+    }
+
+    function returnToFieldSelect() {
+      clearAnswerFeedbackTimers();
+      clearInterval(bugTimerInterval);
+      renderBugFieldMenu();
+      switchScreen("bugfield-select-screen");
+    }
+
+    function startBugHunterGame() {
+      clearAnswerFeedbackTimers();
+      if (!selectedBugField) selectedBugField = "fullstack";
+      bugScore = 0;
+      lastBugChallenge = null;
+      const startPool = bugFieldChallenges[selectedBugField] || bugFieldChallenges.fullstack;
+      resetQueue(bugQueueStore, selectedBugField, startPool);
+      document.querySelectorAll("#bughunter-screen .answer-feedback").forEach((el) => el.remove());
+      switchScreen("bughunter-screen");
+      nextBugRound();
+    }
+
+    function nextBugRound() {
+      document.querySelectorAll("#bughunter-screen .answer-feedback").forEach((el) => el.remove());
+      bugTimer = 15;
+      bugScoreText.innerText = `Score: ${bugScore}`;
+      bugTimerText.innerText = `Time: ${bugTimer}s`;
+
+      const pool = bugFieldChallenges[selectedBugField] || bugFieldChallenges.fullstack;
+      currentBugObj = drawFromQueue(bugQueueStore, selectedBugField, pool, lastBugChallenge, "bug_" + selectedBugField);
+      lastBugChallenge = currentBugObj;
+      bugObjectiveText.innerText = `${bugFieldLabels[selectedBugField]} — Difficulty: ${currentBugObj.difficulty.toUpperCase()}`;
+
+      bugCodeBox.innerHTML = "";
+      currentBugObj.lines.forEach((lineText, idx) => {
+        const span = document.createElement("span");
+        span.className = "bug-line";
+        span.innerText = `${idx + 1} |  ${lineText}`;
+        span.onclick = () => checkBugLine(idx);
+        bugCodeBox.appendChild(span);
+      });
+
+      startBugTimer();
+    }
+
+    function startBugTimer() {
+      clearInterval(bugTimerInterval);
+      bugTimerInterval = setInterval(() => {
+        bugTimer--;
+        bugTimerText.innerText = `Time: ${bugTimer}s`;
+        if (bugTimer <= 0) {
+          clearInterval(bugTimerInterval);
+          handleBugTimeout();
+        }
+      }, 1000);
+    }
+
+    /* Ran out of time without clicking a line — reveal the buggy line in
+       green before ending, instead of cutting straight to game over. */
+    function handleBugTimeout() {
+      const lines = bugCodeBox.querySelectorAll(".bug-line");
+      if (lines[currentBugObj.bugIndex]) lines[currentBugObj.bugIndex].classList.add("answer-correct");
+      lines.forEach((line) => line.classList.add("answer-disabled"));
+      showAnswerFeedback(
+        bugCodeBox.parentElement,
+        `Time's up! Correct line: ${currentBugObj.bugIndex + 1}`,
+        "wrong",
+        "bug-answer-feedback"
+      );
+      scheduleAfterFeedback(() => endBugHunterGame());
+    }
+
+    function checkBugLine(idx) {
+      clearInterval(bugTimerInterval);
+      const lines = bugCodeBox.querySelectorAll(".bug-line");
+      if (idx === currentBugObj.bugIndex) {
+        if (lines[idx]) lines[idx].classList.add("answer-correct");
+        lines.forEach((line) => line.classList.add("answer-disabled"));
+        bugScore++;
+        scheduleAfterCorrect(() => nextBugRound());
+      } else {
+        if (lines[idx]) lines[idx].classList.add("answer-wrong");
+        if (lines[currentBugObj.bugIndex]) lines[currentBugObj.bugIndex].classList.add("answer-correct");
+        lines.forEach((line) => line.classList.add("answer-disabled"));
+        showAnswerFeedback(
+          bugCodeBox.parentElement,
+          `Wrong! Correct line: ${currentBugObj.bugIndex + 1}`,
+          "wrong",
+          "bug-answer-feedback"
+        );
+        scheduleAfterFeedback(() => endBugHunterGame());
+      }
+    }
+
+    function endBugHunterGame() {
+      clearInterval(bugTimerInterval);
+      bugFinalScoreText.innerText = `${bugScore}`;
+      switchScreen("bughunter-gameover-screen");
+    }
+
+
+    /* ==================== SQL MASTER GAME LOGIC ==================== */
+    let sqlChallenges = [
+      {
+        objective: "Fetch all active users from the 'users' table sorted by name.",
+        options: [
+          "SELECT * FROM users WHERE status = 'active' ORDER BY name ASC;",
+          "SELECT * FROM users ORDER BY name WHERE status = 'active';",
+          "GET users WHERE status = 'active' SORT name;",
+          "FETCH users ORDER BY name;"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Count the total number of orders in the 'orders' table.",
+        options: [
+          "SELECT MAX(order_id) FROM orders;",
+          "SELECT COUNT(*) FROM orders;",
+          "SELECT SUM(orders) FROM table;",
+          "SELECT COUNT(orders) GROUP BY id;"
+        ],
+        correctIndex: 1
+      },
+      {
+        objective: "Find employees whose salary is greater than 50000.",
+        options: [
+          "SELECT * FROM employees WHERE salary > 50000;",
+          "SELECT * FROM employees HAVING salary => 50000;",
+          "QUERY employees FILTER salary > 50000;",
+          "SELECT employee WHERE salary LIKES 50000;"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Retrieve unique department names from the 'employees' table.",
+        options: [
+          "SELECT DEPARTMENT FROM employees UNIQUE;",
+          "SELECT ALL DEPARTMENT FROM employees;",
+          "SELECT DISTINCT department FROM employees;",
+          "SELECT UNIQUE department FROM employees;"
+        ],
+        correctIndex: 2
+      },
+      {
+        objective: "Insert a new user named 'Sita' with email 'sita@mail.com' into the 'users' table.",
+        options: [
+          "INSERT INTO users (name, email) VALUES ('Sita', 'sita@mail.com');",
+          "INSERT users (name, email) SET ('Sita', 'sita@mail.com');",
+          "UPDATE users SET name='Sita', email='sita@mail.com';",
+          "ADD INTO users VALUES ('Sita', 'sita@mail.com');"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Update the price of the product with id 12 to 499 in the 'products' table.",
+        options: [
+          "UPDATE products SET price = 499 WHERE id = 12;",
+          "UPDATE products SET price = 499;",
+          "SET products.price = 499 WHERE id = 12;",
+          "UPDATE price = 499 IN products WHERE id = 12;"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Delete all orders that were cancelled from the 'orders' table.",
+        options: [
+          "DELETE * FROM orders WHERE status = 'cancelled';",
+          "DELETE FROM orders WHERE status = 'cancelled';",
+          "REMOVE FROM orders WHERE status = 'cancelled';",
+          "DROP FROM orders WHERE status = 'cancelled';"
+        ],
+        correctIndex: 1
+      },
+      {
+        objective: "Get each customer's name along with their order total using an INNER JOIN of 'customers' and 'orders'.",
+        options: [
+          "SELECT customers.name, orders.total FROM customers INNER JOIN orders ON customers.id = orders.customer_id;",
+          "SELECT customers.name, orders.total FROM customers, orders;",
+          "SELECT name, total JOIN customers WITH orders;",
+          "SELECT customers.name, orders.total FROM customers LINK orders ON id;"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Find the total sales amount per region from the 'sales' table.",
+        options: [
+          "SELECT region, TOTAL(amount) FROM sales GROUP region;",
+          "SELECT region, SUM(amount) FROM sales GROUP BY region;",
+          "SELECT SUM(amount), region FROM sales ORDER BY region;",
+          "SELECT region, amount FROM sales SUM BY region;"
+        ],
+        correctIndex: 1
+      },
+      {
+        objective: "Show only departments that have more than 5 employees.",
+        options: [
+          "SELECT department, COUNT(*) FROM employees WHERE COUNT(*) > 5 GROUP BY department;",
+          "SELECT department FROM employees GROUP BY department HAVING COUNT(*) > 5;",
+          "SELECT department FROM employees WHERE department > 5;",
+          "SELECT department, COUNT(*) FROM employees ORDER BY COUNT(*) > 5;"
+        ],
+        correctIndex: 1
+      },
+      {
+        objective: "Find products with no category assigned (category is NULL).",
+        options: [
+          "SELECT * FROM products WHERE category = NULL;",
+          "SELECT * FROM products WHERE category == NULL;",
+          "SELECT * FROM products WHERE category IS NULL;",
+          "SELECT * FROM products WHERE category EMPTY;"
+        ],
+        correctIndex: 2
+      },
+      {
+        objective: "Get the top 5 highest-paid employees from the 'employees' table.",
+        options: [
+          "SELECT * FROM employees ORDER BY salary DESC LIMIT 5;",
+          "SELECT TOP 5 * FROM employees ORDER salary;",
+          "SELECT * FROM employees LIMIT 5 ORDER BY salary;",
+          "SELECT * FROM employees WHERE salary TOP 5;"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Rename the 'users' table column 'uname' to 'username'.",
+        options: [
+          "ALTER TABLE users RENAME COLUMN uname TO username;",
+          "UPDATE users RENAME uname TO username;",
+          "ALTER users SET COLUMN uname = username;",
+          "RENAME TABLE users COLUMN uname TO username;"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Add a new column 'age' (integer) to the 'students' table.",
+        options: [
+          "ALTER TABLE students ADD COLUMN age INT;",
+          "UPDATE students ADD age INT;",
+          "INSERT COLUMN age INT INTO students;",
+          "ALTER students ADD age INT;"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Find customers who placed an order in the last 30 days (MySQL syntax).",
+        options: [
+          "SELECT * FROM orders WHERE order_date > NOW() - 30;",
+          "SELECT * FROM orders WHERE order_date >= DATE_SUB(NOW(), INTERVAL 30 DAY);",
+          "SELECT * FROM orders WHERE order_date - 30 = NOW();",
+          "SELECT * FROM orders WHERE order_date < 30 DAYS;"
+        ],
+        correctIndex: 1
+      },
+      {
+        objective: "Combine the results of two SELECT queries into one result set, removing duplicates.",
+        options: [
+          "SELECT name FROM table1 JOIN SELECT name FROM table2;",
+          "SELECT name FROM table1 UNION SELECT name FROM table2;",
+          "SELECT name FROM table1 MERGE table2;",
+          "SELECT name FROM table1 + table2;"
+        ],
+        correctIndex: 1
+      },
+      {
+        objective: "Create a new table 'reviews' with columns id (int, primary key) and comment (text).",
+        options: [
+          "CREATE TABLE reviews (id INT PRIMARY KEY, comment TEXT);",
+          "NEW TABLE reviews (id INT KEY, comment TEXT);",
+          "CREATE reviews TABLE (id INT PRIMARY, comment TEXT);",
+          "TABLE CREATE reviews (id INT PRIMARY KEY, comment TEXT);"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Get the average order value, rounded to 2 decimal places.",
+        options: [
+          "SELECT ROUND(AVG(total), 2) FROM orders;",
+          "SELECT AVG(ROUND(total, 2)) FROM orders;",
+          "SELECT ROUND(AVG(total)), 2 FROM orders;",
+          "SELECT AVG(total, 2) FROM orders;"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Give each row a rank based on salary, highest first, without skipping ranks for ties (window function).",
+        options: [
+          "SELECT name, salary, DENSE_RANK() OVER (ORDER BY salary DESC) FROM employees;",
+          "SELECT name, salary, RANKING(salary DESC) FROM employees;",
+          "SELECT name, salary FROM employees ORDER BY RANK();",
+          "SELECT name, salary, ROW_NUMBER() FROM employees WHERE RANK = salary;"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Select users whose name starts with the letter 'A'.",
+        options: [
+          "SELECT * FROM users WHERE name LIKE 'A%';",
+          "SELECT * FROM users WHERE name STARTS 'A';",
+          "SELECT * FROM users WHERE name = 'A*';",
+          "SELECT * FROM users WHERE name LIKE '%A';"
+        ],
+        correctIndex: 0
+      }
+    ];
+
+    let sqlScore = 0;
+    let sqlTimer = 15;
+    let sqlTimerInterval = null;
+    let currentSqlObj = null;
+    let lastSqlChallenge = null;
+
+    const sqlScoreText = document.getElementById("sql-score");
+    const sqlTimerText = document.getElementById("sql-timer");
+    const sqlObjectiveText = document.getElementById("sql-objective");
+    const sqlOptionsContainer = document.getElementById("sql-options-container");
+    const sqlFinalScoreText = document.getElementById("sql-final-score");
+
+    function startSqlGame() {
+      clearAnswerFeedbackTimers();
+      sqlScore = 0;
+      lastSqlChallenge = null;
+      resetQueue(sqlQueueStore, "main", sqlChallenges);
+      document.querySelectorAll("#sqlmaster-screen .answer-feedback").forEach((el) => el.remove());
+      switchScreen("sqlmaster-screen");
+      nextSqlRound();
+    }
+
+    function nextSqlRound() {
+      document.querySelectorAll("#sqlmaster-screen .answer-feedback").forEach((el) => el.remove());
+      sqlTimer = 15;
+      sqlScoreText.innerText = `Score: ${sqlScore}`;
+      sqlTimerText.innerText = `Time: ${sqlTimer}s`;
+
+      currentSqlObj = drawFromQueue(sqlQueueStore, "main", sqlChallenges, lastSqlChallenge, "sql");
+      lastSqlChallenge = currentSqlObj;
+      sqlObjectiveText.innerText = `Objective: ${currentSqlObj.objective}`;
+
+      sqlOptionsContainer.innerHTML = "";
+
+      let optionIndices = [0, 1, 2, 3].sort(() => 0.5 - Math.random());
+
+      optionIndices.forEach((origIdx) => {
+        const btn = document.createElement("button");
+        btn.className = "sql-option-btn";
+        btn.dataset.optionIndex = String(origIdx);
+        btn.innerText = currentSqlObj.options[origIdx];
+        btn.onclick = () => checkSqlAnswer(origIdx, currentSqlObj.correctIndex);
+        sqlOptionsContainer.appendChild(btn);
+      });
+
+      startSqlTimer();
+    }
+
+    function startSqlTimer() {
+      clearInterval(sqlTimerInterval);
+      sqlTimerInterval = setInterval(() => {
+        sqlTimer--;
+        sqlTimerText.innerText = `Time: ${sqlTimer}s`;
+        if (sqlTimer <= 0) {
+          clearInterval(sqlTimerInterval);
+          handleSqlTimeout();
+        }
+      }, 1000);
+    }
+
+    /* Ran out of time without picking — reveal the correct query in
+       green before ending, instead of cutting straight to game over. */
+    function handleSqlTimeout() {
+      const buttons = sqlOptionsContainer.querySelectorAll("button");
+      const correctButton = Array.from(buttons).find((button) => button.dataset.optionIndex === String(currentSqlObj.correctIndex));
+      if (correctButton) correctButton.classList.add("answer-correct");
+      disableButtons(sqlOptionsContainer);
+      showAnswerFeedback(
+        sqlOptionsContainer.parentElement,
+        `Time's up! Correct answer: ${currentSqlObj.options[currentSqlObj.correctIndex]}`,
+        "wrong",
+        "sql-answer-feedback"
+      );
+      scheduleAfterFeedback(() => endSqlGame());
+    }
+
+    function checkSqlAnswer(selectedIdx, correctIdx) {
+      clearInterval(sqlTimerInterval);
+      const buttons = sqlOptionsContainer.querySelectorAll("button");
+      const selectedButton = Array.from(buttons).find((button) => button.dataset.optionIndex === String(selectedIdx));
+      const correctButton = Array.from(buttons).find((button) => button.dataset.optionIndex === String(correctIdx));
+
+      if (selectedIdx === correctIdx) {
+        if (selectedButton) selectedButton.classList.add("answer-correct");
+        disableButtons(sqlOptionsContainer);
+        sqlScore++;
+        scheduleAfterCorrect(() => nextSqlRound());
+      } else {
+        if (selectedButton) selectedButton.classList.add("answer-wrong");
+        if (correctButton) correctButton.classList.add("answer-correct");
+        disableButtons(sqlOptionsContainer);
+        showAnswerFeedback(
+          sqlOptionsContainer.parentElement,
+          `Wrong! Correct answer: ${currentSqlObj.options[correctIdx]}`,
+          "wrong",
+          "sql-answer-feedback"
+        );
+        scheduleAfterFeedback(() => endSqlGame());
+      }
+    }
+
+    function endSqlGame() {
+      clearInterval(sqlTimerInterval);
+      sqlFinalScoreText.innerText = `${sqlScore}`;
+      switchScreen("sqlmaster-gameover-screen");
+    }
+
+
+    /* ==================== GIT MASTER GAME LOGIC ==================== */
+    let gitChallenges = [
+      {
+        objective: "Initialize a new Git repository in the current folder.",
+        options: ["git init", "git start", "git new repo", "git create"],
+        correctIndex: 0
+      },
+      {
+        objective: "Stage all changed files for the next commit.",
+        options: ["git add .", "git commit -a", "git stage all", "git push ."],
+        correctIndex: 0
+      },
+      {
+        objective: "Commit staged changes with the message 'fix bug'.",
+        options: [
+          "git commit -m \"fix bug\"",
+          "git commit \"fix bug\"",
+          "git save -m \"fix bug\"",
+          "git push -m \"fix bug\""
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Create and switch to a new branch called 'feature-login'.",
+        options: [
+          "git checkout -b feature-login",
+          "git branch -switch feature-login",
+          "git create-branch feature-login",
+          "git checkout feature-login -new"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Push local branch 'main' to remote 'origin' for the first time, setting the upstream.",
+        options: [
+          "git push -u origin main",
+          "git push origin --track main",
+          "git upload origin main",
+          "git push --set origin main"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "See the commit history in a compact one-line-per-commit format.",
+        options: [
+          "git log --oneline",
+          "git history --short",
+          "git log -compact",
+          "git show --brief"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Undo the last commit but keep the changes in your working directory.",
+        options: [
+          "git reset --soft HEAD~1",
+          "git revert --hard HEAD",
+          "git undo last-commit",
+          "git checkout HEAD~1 --discard"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Merge branch 'develop' into the current branch.",
+        options: [
+          "git merge develop",
+          "git combine develop",
+          "git pull develop --merge",
+          "git branch merge develop"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Discard all uncommitted local changes in the working directory.",
+        options: [
+          "git checkout -- .",
+          "git remove --local",
+          "git undo .",
+          "git clean --changes"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Clone a remote repository to your local machine.",
+        options: [
+          "git clone <repo-url>",
+          "git copy <repo-url>",
+          "git fetch --new <repo-url>",
+          "git pull --init <repo-url>"
+        ],
+        correctIndex: 0
+      },
+      {
+        objective: "Which file tells Git which files/folders to ignore in a repository?",
+        options: [".gitignore", "ignore.git", ".gitconfig", "git.ignore"],
+        correctIndex: 0
+      },
+      {
+        objective: "On GitHub, what do you open to propose merging your branch into another?",
+        options: ["Pull Request", "Merge Ticket", "Push Request", "Branch Proposal"],
+        correctIndex: 0
+      },
+      {
+        objective: "Check which files are staged, unstaged, or untracked in the working directory.",
+        options: ["git status", "git check", "git diff --all", "git files"],
+        correctIndex: 0
+      },
+      {
+        objective: "See the exact line changes between the working directory and the last commit.",
+        options: ["git diff", "git changes", "git compare", "git log --diff"],
+        correctIndex: 0
+      },
+      {
+        objective: "Temporarily save uncommitted changes without committing them, so you can switch branches.",
+        options: ["git stash", "git save", "git pause", "git hold"],
+        correctIndex: 0
+      },
+      {
+        objective: "List all remote repositories connected to this project along with their URLs.",
+        options: ["git remote -v", "git remotes", "git origin list", "git show remotes"],
+        correctIndex: 0
+      },
+      {
+        objective: "Download new commits from the remote without merging them into your current branch.",
+        options: ["git fetch", "git pull --no-merge", "git download", "git sync"],
+        correctIndex: 0
+      },
+      {
+        objective: "Delete a local branch named 'old-feature' that has already been merged.",
+        options: ["git branch -d old-feature", "git delete old-feature", "git remove branch old-feature", "git branch --erase old-feature"],
+        correctIndex: 0
+      },
+      {
+        objective: "Tag the current commit as version 'v1.0.0'.",
+        options: ["git tag v1.0.0", "git version v1.0.0", "git mark v1.0.0", "git release v1.0.0"],
+        correctIndex: 0
+      },
+      {
+        objective: "Find out which commit last changed a specific line in a file (blame the author/commit).",
+        options: ["git blame filename", "git author filename", "git trace filename", "git history-line filename"],
+        correctIndex: 0
+      }
+    ];
+
+    let gitScore = 0;
+    let gitTimer = 15;
+    let gitTimerInterval = null;
+    let currentGitObj = null;
+    let lastGitChallenge = null;
+
+    const gitScoreText = document.getElementById("git-score");
+    const gitTimerText = document.getElementById("git-timer");
+    const gitObjectiveText = document.getElementById("git-objective");
+    const gitOptionsContainer = document.getElementById("git-options-container");
+    const gitFinalScoreText = document.getElementById("git-final-score");
+
+    function startGitGame() {
+      clearAnswerFeedbackTimers();
+      gitScore = 0;
+      lastGitChallenge = null;
+      resetQueue(gitQueueStore, "main", gitChallenges);
+      document.querySelectorAll("#git-screen .answer-feedback").forEach((el) => el.remove());
+      switchScreen("git-screen");
+      nextGitRound();
+    }
+
+    function nextGitRound() {
+      document.querySelectorAll("#git-screen .answer-feedback").forEach((el) => el.remove());
+      gitTimer = 15;
+      gitScoreText.innerText = `Score: ${gitScore}`;
+      gitTimerText.innerText = `Time: ${gitTimer}s`;
+
+      currentGitObj = drawFromQueue(gitQueueStore, "main", gitChallenges, lastGitChallenge, "git");
+      lastGitChallenge = currentGitObj;
+      gitObjectiveText.innerText = `Task: ${currentGitObj.objective}`;
+
+      gitOptionsContainer.innerHTML = "";
+
+      let optionIndices = [0, 1, 2, 3].sort(() => 0.5 - Math.random());
+
+      optionIndices.forEach((origIdx) => {
+        const btn = document.createElement("button");
+        btn.className = "sql-option-btn";
+        btn.dataset.optionIndex = String(origIdx);
+        btn.innerText = currentGitObj.options[origIdx];
+        btn.onclick = () => checkGitAnswer(origIdx, currentGitObj.correctIndex);
+        gitOptionsContainer.appendChild(btn);
+      });
+
+      startGitTimer();
+    }
+
+    function startGitTimer() {
+      clearInterval(gitTimerInterval);
+      gitTimerInterval = setInterval(() => {
+        gitTimer--;
+        gitTimerText.innerText = `Time: ${gitTimer}s`;
+        if (gitTimer <= 0) {
+          clearInterval(gitTimerInterval);
+          handleGitTimeout();
+        }
+      }, 1000);
+    }
+
+    /* Ran out of time without picking — reveal the correct command in
+       green before ending, instead of cutting straight to game over. */
+    function handleGitTimeout() {
+      const buttons = gitOptionsContainer.querySelectorAll("button");
+      const correctButton = Array.from(buttons).find((button) => button.dataset.optionIndex === String(currentGitObj.correctIndex));
+      if (correctButton) correctButton.classList.add("answer-correct");
+      disableButtons(gitOptionsContainer);
+      showAnswerFeedback(
+        gitOptionsContainer.parentElement,
+        `Time's up! Correct answer: ${currentGitObj.options[currentGitObj.correctIndex]}`,
+        "wrong",
+        "git-answer-feedback"
+      );
+      scheduleAfterFeedback(() => endGitGame());
+    }
+
+    function checkGitAnswer(selectedIdx, correctIdx) {
+      clearInterval(gitTimerInterval);
+      const buttons = gitOptionsContainer.querySelectorAll("button");
+      const selectedButton = Array.from(buttons).find((button) => button.dataset.optionIndex === String(selectedIdx));
+      const correctButton = Array.from(buttons).find((button) => button.dataset.optionIndex === String(correctIdx));
+
+      if (selectedIdx === correctIdx) {
+        if (selectedButton) selectedButton.classList.add("answer-correct");
+        disableButtons(gitOptionsContainer);
+        gitScore++;
+        scheduleAfterCorrect(() => nextGitRound());
+      } else {
+        if (selectedButton) selectedButton.classList.add("answer-wrong");
+        if (correctButton) correctButton.classList.add("answer-correct");
+        disableButtons(gitOptionsContainer);
+        showAnswerFeedback(
+          gitOptionsContainer.parentElement,
+          `Wrong! Correct answer: ${currentGitObj.options[correctIdx]}`,
+          "wrong",
+          "git-answer-feedback"
+        );
+        scheduleAfterFeedback(() => endGitGame());
+      }
+    }
+
+    function endGitGame() {
+      clearInterval(gitTimerInterval);
+      gitFinalScoreText.innerText = `${gitScore}`;
+      switchScreen("git-gameover-screen");
+    }
+
+
+    /* ==================== FLASH RECALL GAME LOGIC (KBC-style) ==================== */
+    const FLASH_PRECOUNT_MS = 450;
+    const FLASH_START_DISPLAY_MS = 1000;
+    const FLASH_DISPLAY_DECREASE_MS = 100;
+    const FLASH_MIN_DISPLAY_MS = 400;
+    const FLASH_DIGIT_STEP_ROUNDS = 3;
+    const FLASH_MIN_DIGITS = 2;
+    const FLASH_MAX_DIGITS = 3;
+    const FLASH_MAX_DIGITS_CAP = 9;
+    const FLASH_START_ANSWER_SECONDS = 10;
+    const FLASH_DECREASE_PER_ROUND = 0;
+    const FLASH_MIN_ANSWER_SECONDS = 10;
+
+    let flashScore = 0;
+    let flashRound = 0;
+    let flashTimer = FLASH_START_ANSWER_SECONDS;
+    let flashTimerInterval = null;
+    let flashRevealTimeout = null;
+    let currentFlashDisplayMs = FLASH_START_DISPLAY_MS;
+    let currentFlashItem = null;
+    let currentFlashCorrectIndex = null;
+    let currentFlashCorrectText = null;
+    let lastFlashItem = null;
+
+    const flashScoreText = document.getElementById("flash-score");
+    const flashTimerText = document.getElementById("flash-timer");
+    const flashStatusText = document.getElementById("flash-status-text");
+    const flashItemTextEl = document.getElementById("flash-item-text");
+    const flashOptionsContainer = document.getElementById("flash-options-container");
+    const flashFinalScoreText = document.getElementById("flash-final-score");
+
+    function startFlashRecallGame() {
+      clearAnswerFeedbackTimers();
+      clearInterval(flashTimerInterval);
+      clearTimeout(flashRevealTimeout);
+      flashScore = 0;
+      flashRound = 0;
+      lastFlashItem = null;
+      document.querySelectorAll("#flashrecall-screen .answer-feedback").forEach((el) => el.remove());
+      switchScreen("flashrecall-screen");
+      nextFlashRound();
+    }
+
+    /* Generates a random number string with an exact digit count (no
+       leading zero), used both for the flashed item and its distractors. */
+    function generateFlashNumberWithDigits(digits) {
+      const min = Math.pow(10, digits - 1);
+      const max = Math.pow(10, digits) - 1;
+      return String(Math.floor(min + Math.random() * (max - min + 1)));
+    }
+
+    function getFlashDigitRange(round) {
+      const step = Math.floor((round - 1) / FLASH_DIGIT_STEP_ROUNDS);
+      const minDigits = Math.min(FLASH_MIN_DIGITS + step, FLASH_MAX_DIGITS_CAP - 1);
+      const maxDigits = Math.min(FLASH_MAX_DIGITS + step, FLASH_MAX_DIGITS_CAP);
+      return { minDigits, maxDigits };
+    }
+
+    /* Builds the 4 KBC-style options (1 correct + 3 distractors) for the
+       flashed number, shuffled so the correct answer isn't always in the
+       same slot. */
+    function buildFlashOptions(item) {
+      let distractors = [];
+      const correctText = item;
+      const digits = item.length;
+      const seen = new Set([item]);
+
+      // Hard mode distractors: keep first/last digit same and alter middle only.
+      // This prevents easy elimination by looking at number edges.
+      if (digits >= 3) {
+        const maxAttempts = 120;
+        let attempts = 0;
+        while (distractors.length < 3 && attempts < maxAttempts) {
+          attempts++;
+          const chars = item.split("");
+          const middleIndices = [];
+          for (let i = 1; i < digits - 1; i++) middleIndices.push(i);
+
+          if (middleIndices.length === 0) break;
+          const shuffledMiddle = shuffleArray(middleIndices);
+          const changes = digits >= 6 ? 2 : 1;
+
+          for (let i = 0; i < Math.min(changes, shuffledMiddle.length); i++) {
+            const idx = shuffledMiddle[i];
+            const oldDigit = chars[idx];
+            let newDigit = oldDigit;
+            while (newDigit === oldDigit) {
+              newDigit = String(Math.floor(Math.random() * 10));
+            }
+            chars[idx] = newDigit;
+          }
+
+          const candidate = chars.join("");
+          if (!seen.has(candidate)) {
+            seen.add(candidate);
+            distractors.push(candidate);
+          }
+        }
+      }
+
+      // Fallback for very short numbers or rare duplicate collisions.
+      while (distractors.length < 3) {
+        let candidate;
+        if (digits >= 3) {
+          const chars = item.split("");
+          const mid = Math.floor((digits - 1) / 2);
+          const oldDigit = chars[mid];
+          let newDigit = oldDigit;
+          while (newDigit === oldDigit) {
+            newDigit = String(Math.floor(Math.random() * 10));
+          }
+          chars[mid] = newDigit;
+          candidate = chars.join("");
+        } else {
+          candidate = generateFlashNumberWithDigits(digits);
+        }
+        if (!seen.has(candidate)) {
+          seen.add(candidate);
+          distractors.push(candidate);
+        }
+      }
+
+      const allOptions = shuffleArray([correctText, ...distractors]);
+      return { list: allOptions, correctIndex: allOptions.indexOf(correctText), correctText };
+    }
+
+    function nextFlashRound() {
+      flashRound++;
+      currentFlashDisplayMs = Math.max(
+        FLASH_MIN_DISPLAY_MS,
+        FLASH_START_DISPLAY_MS - (flashRound - 1) * FLASH_DISPLAY_DECREASE_MS
+      );
+      document.querySelectorAll("#flashrecall-screen .answer-feedback").forEach((el) => el.remove());
+      clearInterval(flashTimerInterval);
+      clearTimeout(flashRevealTimeout);
+      flashOptionsContainer.innerHTML = "";
+      flashScoreText.innerText = `Score: ${flashScore}`;
+      flashTimerText.innerText = `Time: --`;
+      flashStatusText.innerText = "Watch closely...";
+      flashItemTextEl.className = "flash-item-placeholder";
+      flashItemTextEl.innerText = "Ready?";
+
+      const { minDigits, maxDigits } = getFlashDigitRange(flashRound);
+      const digits = Math.floor(Math.random() * (maxDigits - minDigits + 1)) + minDigits;
+      let itemValue = generateFlashNumberWithDigits(digits);
+      if (itemValue === lastFlashItem) itemValue = generateFlashNumberWithDigits(digits);
+      currentFlashItem = itemValue;
+      lastFlashItem = itemValue;
+
+      /* Brief "get ready" pause, then flash the item starting at 1s on
+         round 1 and decreasing every round to a minimum threshold. */
+      flashRevealTimeout = setTimeout(() => {
+        flashItemTextEl.className = "flash-item-text";
+        flashItemTextEl.innerText = itemValue;
+        flashRevealTimeout = setTimeout(() => {
+          flashItemTextEl.className = "flash-item-placeholder";
+          flashItemTextEl.innerText = "?";
+          showFlashOptions();
+        }, currentFlashDisplayMs);
+      }, FLASH_PRECOUNT_MS);
+    }
+
+    function showFlashOptions() {
+      flashStatusText.innerText = "What did you see?";
+      const built = buildFlashOptions(currentFlashItem);
+      currentFlashCorrectIndex = built.correctIndex;
+      currentFlashCorrectText = built.correctText;
+
+      flashOptionsContainer.innerHTML = "";
+      const labels = ["A", "B", "C", "D"];
+      built.list.forEach((optText, idx) => {
+        const btn = document.createElement("button");
+        btn.className = "sql-option-btn kbc-option-btn";
+        btn.dataset.optionIndex = String(idx);
+        const labelSpan = document.createElement("span");
+        labelSpan.className = "kbc-option-label";
+        labelSpan.innerText = `${labels[idx]})`;
+        const textSpan = document.createElement("span");
+        textSpan.innerText = optText;
+        btn.appendChild(labelSpan);
+        btn.appendChild(textSpan);
+        btn.onclick = () => checkFlashAnswer(idx, currentFlashCorrectIndex);
+        flashOptionsContainer.appendChild(btn);
+      });
+
+      startFlashTimer();
+    }
+
+    function startFlashTimer() {
+      clearInterval(flashTimerInterval);
+      flashTimer = Math.max(
+        FLASH_MIN_ANSWER_SECONDS,
+        FLASH_START_ANSWER_SECONDS - (flashRound - 1) * FLASH_DECREASE_PER_ROUND
+      );
+      flashTimerText.innerText = `Time: ${flashTimer}s`;
+      flashTimerInterval = setInterval(() => {
+        flashTimer--;
+        flashTimerText.innerText = `Time: ${flashTimer}s`;
+        if (flashTimer <= 0) {
+          clearInterval(flashTimerInterval);
+          handleFlashTimeout();
+        }
+      }, 1000);
+    }
+
+    /* Ran out of time without picking — reveal the correct answer in
+       green before ending, instead of cutting straight to game over. */
+    function handleFlashTimeout() {
+      const buttons = flashOptionsContainer.querySelectorAll("button");
+      const correctButton = buttons[currentFlashCorrectIndex];
+      if (correctButton) correctButton.classList.add("answer-correct");
+      disableButtons(flashOptionsContainer);
+      flashStatusText.innerText = "Time's up!";
+      showAnswerFeedback(
+        flashOptionsContainer.parentElement,
+        `Time's up! Correct answer: ${currentFlashCorrectText}`,
+        "wrong",
+        "flash-answer-feedback"
+      );
+      scheduleAfterFeedback(() => endFlashRecallGame());
+    }
+
+    function checkFlashAnswer(selectedIdx, correctIdx) {
+      clearInterval(flashTimerInterval);
+      const buttons = flashOptionsContainer.querySelectorAll("button");
+      const selectedButton = buttons[selectedIdx];
+      const correctButton = buttons[correctIdx];
+
+      if (selectedIdx === correctIdx) {
+        if (selectedButton) selectedButton.classList.add("answer-correct");
+        disableButtons(flashOptionsContainer);
+        flashScore++;
+        flashStatusText.innerText = "Correct!";
+        scheduleAfterCorrect(() => nextFlashRound());
+      } else {
+        if (selectedButton) selectedButton.classList.add("answer-wrong");
+        if (correctButton) correctButton.classList.add("answer-correct");
+        disableButtons(flashOptionsContainer);
+        flashStatusText.innerText = "Wrong!";
+        showAnswerFeedback(
+          flashOptionsContainer.parentElement,
+          `Wrong! Correct answer: ${currentFlashCorrectText}`,
+          "wrong",
+          "flash-answer-feedback"
+        );
+        scheduleAfterFeedback(() => endFlashRecallGame());
+      }
+    }
+
+    function endFlashRecallGame() {
+      clearInterval(flashTimerInterval);
+      clearTimeout(flashRevealTimeout);
+      flashFinalScoreText.innerText = `${flashScore}`;
+      switchScreen("flashrecall-gameover-screen");
+    }
+
+    /* ============================================================
+       REMOTE QUESTION BANK  (link bata questions — hard-code hatauna)
+       ============================================================
+       Kaam garne tarika (3-tier fallback):
+         1) REMOTE_QUESTIONS_URL  → tapaiko online questions.json link
+            (GitHub raw link, kunai hosting, CDN — jaha bata raw JSON milchha)
+         2) ./questions.json      → game ko same folder ma rakheko file (server bata khelda)
+         3) Built-in questions    → yo HTML bhitra ko (offline pani game bhastrindaina)
+
+       Merge rule: objective/lines same bhaye duplicate maninchha (naya le purano replace).
+       Naya Bug Hunter field pani JSON bata tharna milchha — "bugLabels" ma label dinus.
+
+       Company ma questions thapna: questions.json ma naya question thapera
+       GitHub ma save garnu bhayo bhane — sabai player lai turantai naya questions!
+    ============================================================ */
+    const REMOTE_QUESTIONS_URL = ""; // e.g. "https://raw.githubusercontent.com/<username>/<repo>/main/questions.json"
+    const LOCAL_QUESTIONS_URL = "./questions.json";
+    let lastBankSource = "built-in (offline fallback)";
+
+    function isValidChoiceQuestion(q) {
+      return q && typeof q.objective === "string" && Array.isArray(q.options) &&
+        q.options.length >= 2 && Number.isInteger(q.correctIndex) &&
+        q.correctIndex >= 0 && q.correctIndex < q.options.length;
+    }
+
+    function isValidBugChallenge(c) {
+      return c && Array.isArray(c.lines) && c.lines.length > 0 &&
+        Number.isInteger(c.bugIndex) && c.bugIndex >= 0 && c.bugIndex < c.lines.length;
+    }
+
+    function mergeById(existing, incoming) {
+      const map = new Map();
+      existing.forEach((q) => map.set(questionId(q), q));
+      incoming.forEach((q) => map.set(questionId(q), q));
+      return [...map.values()];
+    }
+
+    function clearAllQueues() {
+      Object.keys(sqlQueueStore).forEach((k) => delete sqlQueueStore[k]);
+      Object.keys(gitQueueStore).forEach((k) => delete gitQueueStore[k]);
+      Object.keys(scrambleQueueStore).forEach((k) => delete scrambleQueueStore[k]);
+      Object.keys(bugQueueStore).forEach((k) => delete bugQueueStore[k]);
+    }
+
+    function applyQuestionBank(data, sourceLabel) {
+      if (!data || typeof data !== "object") return;
+      if (Array.isArray(data.sql)) {
+        const clean = data.sql.filter(isValidChoiceQuestion);
+        if (clean.length) sqlChallenges = mergeById(sqlChallenges, clean);
+      }
+      if (Array.isArray(data.git)) {
+        const clean = data.git.filter(isValidChoiceQuestion);
+        if (clean.length) gitChallenges = mergeById(gitChallenges, clean);
+      }
+      if (Array.isArray(data.words)) {
+        const clean = data.words.filter((w) => typeof w === "string" && /^[a-z]+$/i.test(w));
+        if (clean.length) wordPool = mergeById(wordPool, clean);
+      }
+      if (data.bugLabels && typeof data.bugLabels === "object") {
+        Object.keys(data.bugLabels).forEach((k) => {
+          if (typeof data.bugLabels[k] === "string") bugFieldLabels[k] = data.bugLabels[k];
+        });
+      }
+      if (data.bug && typeof data.bug === "object") {
+        Object.keys(data.bug).forEach((field) => {
+          if (!Array.isArray(data.bug[field])) return;
+          const clean = data.bug[field].filter(isValidBugChallenge);
+          if (!clean.length) return;
+          bugFieldChallenges[field] = mergeById(bugFieldChallenges[field] || [], clean);
+          if (bugFieldOrder.indexOf(field) === -1) bugFieldOrder.push(field);
+        });
+      }
+      clearAllQueues();
+      lastBankSource = sourceLabel;
+      updateBankStatus();
+    }
+
+    function updateBankStatus() {
+      const el = document.getElementById("question-bank-status");
+      if (!el) return;
+      const fmt = (pool, seenKey) => {
+        const remaining = Math.max(0, pool.length - getSeenSet(seenKey).size);
+        return `${pool.length} <small>(${remaining} new)</small>`;
+      };
+      let bugTotal = 0;
+      let bugRemaining = 0;
+      bugFieldOrder.forEach((f) => {
+        const pool = bugFieldChallenges[f] || [];
+        bugTotal += pool.length;
+        bugRemaining += Math.max(0, pool.length - getSeenSet("bug_" + f).size);
+      });
+      el.innerHTML = `📚 Question bank — SQL: ${fmt(sqlChallenges, "sql")} · Git: ${fmt(gitChallenges, "git")} · Bug Hunter: ${bugTotal} <small>(${bugRemaining} new)</small> · Words: ${fmt(wordPool, "word")}<br>Source: ${lastBankSource}`;
+    }
+
+    function resetSeenHistory() {
+      try {
+        Object.keys(localStorage)
+          .filter((k) => k.indexOf(SEEN_PREFIX) === 0)
+          .forEach((k) => localStorage.removeItem(k));
+      } catch (err) { /* storage blocked */ }
+      clearAllQueues();
+      updateBankStatus();
+    }
+
+    async function loadQuestionBank() {
+      const sources = [];
+      if (REMOTE_QUESTIONS_URL) sources.push({ url: REMOTE_QUESTIONS_URL, label: "online link ✅" });
+      sources.push({ url: LOCAL_QUESTIONS_URL, label: "local questions.json" });
+      for (let i = 0; i < sources.length; i++) {
+        const src = sources[i];
+        try {
+          const bust = src.url + (src.url.indexOf("?") === -1 ? "?" : "&") + "t=" + Date.now();
+          const res = await fetch(bust, { cache: "no-store" });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          applyQuestionBank(await res.json(), src.label);
+          return;
+        } catch (err) { /* arkai source try garum */ }
+      }
+      lastBankSource = "built-in (offline fallback)";
+      updateBankStatus();
+    }
+
+    updateBankStatus();
+    loadQuestionBank();
+  </script>
+</body>
+
+</html>
