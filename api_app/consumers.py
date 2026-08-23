@@ -109,19 +109,22 @@ class DriverLocationConsumer(AsyncWebsocketConsumer):
         if lat is None or lng is None:
             return
 
-        # Save to DB and get driver ID
-        driver_id = await self.save_driver_location(lat, lng)
+        # Save to DB and get driver details
+        driver_info = await self.save_driver_location(lat, lng)
         
-        if driver_id:
+        if driver_info:
             # Broadcast to all (admins watching the map)
             await self.channel_layer.group_send(
                 self.GROUP_NAME,
                 {
                     'type': 'driver_location_update',
-                    'driver_id': driver_id,
-                    'driver_name': self.user.username,
+                    'driver_id': driver_info['id'],
+                    'driver_name': driver_info['driver_name'],
                     'latitude': str(lat),
                     'longitude': str(lng),
+                    'vehicle_plate': driver_info.get('vehicle_plate'),
+                    'is_available': driver_info.get('is_available', True),
+                    'phone': driver_info.get('phone', ''),
                 }
             )
 
@@ -132,6 +135,9 @@ class DriverLocationConsumer(AsyncWebsocketConsumer):
             'driver_name': event['driver_name'],
             'latitude': event['latitude'],
             'longitude': event['longitude'],
+            'vehicle_plate': event.get('vehicle_plate'),
+            'is_available': event.get('is_available', True),
+            'phone': event.get('phone', ''),
         }))
 
     async def route_update(self, event):
@@ -149,11 +155,17 @@ class DriverLocationConsumer(AsyncWebsocketConsumer):
     def save_driver_location(self, lat, lng):
         from .models import Driver
         try:
-            driver = Driver.objects.get(user=self.user)
+            driver = Driver.objects.select_related('vehicle').get(user=self.user)
             driver.current_latitude = lat
             driver.current_longitude = lng
             driver.save(update_fields=['current_latitude', 'current_longitude'])
-            return driver.id
+            return {
+                'id': driver.id,
+                'driver_name': self.user.username,
+                'vehicle_plate': driver.vehicle.plate_number if driver.vehicle else None,
+                'is_available': driver.is_available,
+                'phone': getattr(self.user, 'phone', '') or '',
+            }
         except Driver.DoesNotExist:
             return None  # Silent fail - driver profile not created yet
 
