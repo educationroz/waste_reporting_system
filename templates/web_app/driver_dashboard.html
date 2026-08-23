@@ -192,12 +192,28 @@
                 </div>
             </div>
 
-            <!-- Location Update -->
+            <!-- Location Update & Live GPS Streaming -->
             <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white fw-bold">
-                    <i class="bi bi-geo-alt text-success me-2"></i>{% trans "Update My Location" %}
+                <div class="card-header bg-white fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <i class="bi bi-geo-alt text-success me-2"></i>{% trans "Driver Live GPS Tracking" %}
+                    </div>
+                    <div id="live-streaming-indicator" class="d-none align-items-center gap-1 text-danger small fw-semibold">
+                        <span class="spinner-grow spinner-grow-sm text-danger me-1" style="width: 8px; height: 8px;"></span>
+                        {% trans "Live GPS Streaming Active" %}
+                    </div>
                 </div>
                 <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button type="button" class="btn btn-outline-danger px-3 py-2 fw-semibold" id="toggle-live-gps-btn" onclick="toggleLiveGPSStreaming()">
+                            <i class="bi bi-broadcast me-1" id="live-gps-icon"></i>
+                            <span id="live-gps-text">{% trans "Start Continuous Live GPS" %}</span>
+                        </button>
+                        <button type="button" class="btn btn-success px-3 py-2 fw-semibold" onclick="sendInstantLocation(this)">
+                            <i class="bi bi-send me-1"></i>{% trans "Send Current Location Once" %}
+                        </button>
+                    </div>
+
                     <div class="row g-2">
                         <div class="col-md-4">
                             <input type="number" id="lat" class="form-control" placeholder="{% trans 'Latitude' %}" step="any">
@@ -206,14 +222,11 @@
                             <input type="number" id="lng" class="form-control" placeholder="{% trans 'Longitude' %}" step="any">
                         </div>
                         <div class="col-md-4">
-                            <button class="btn btn-outline-success w-100" onclick="useGPS()">
-                                <i class="bi bi-crosshair me-1"></i>{% trans "Use GPS" %}
+                            <button type="button" class="btn btn-outline-secondary w-100" onclick="useGPS()">
+                                <i class="bi bi-crosshair me-1"></i>{% trans "Get GPS Coords" %}
                             </button>
                         </div>
                     </div>
-                    <button class="btn btn-success mt-2" onclick="updateLocation()">
-                        <i class="bi bi-send me-1"></i>{% trans "Send Location" %}
-                    </button>
                 </div>
             </div>
 
@@ -405,15 +418,159 @@ async function connectLocationWebSocket() {
 
 connectLocationWebSocket();
 
+let _watchPositionId = null;
+let _liveIntervalId = null;
+let _isStreamingGPS = false;
+
+window.toggleLiveGPSStreaming = function() {
+    if (_isStreamingGPS) {
+        stopLiveGPSStreaming();
+    } else {
+        startLiveGPSStreaming();
+    }
+};
+
+function startLiveGPSStreaming() {
+    if (!navigator.geolocation) {
+        showToast(gettext('GPS is not supported on this device.'), 'warning');
+        return;
+    }
+
+    _isStreamingGPS = true;
+    const btn = document.getElementById('toggle-live-gps-btn');
+    const txt = document.getElementById('live-gps-text');
+    const icon = document.getElementById('live-gps-icon');
+    const indicator = document.getElementById('live-streaming-indicator');
+
+    if (btn) btn.className = 'btn btn-danger px-3 py-2 fw-semibold';
+    if (txt) txt.textContent = gettext('Stop Live GPS Streaming');
+    if (icon) icon.className = 'bi bi-stop-circle me-1';
+    if (indicator) indicator.className = 'd-flex align-items-center gap-1 text-danger small fw-semibold';
+
+    showToast(gettext('Live GPS streaming started! Your truck location will update automatically on Admin map as you drive.'), 'success');
+
+    // Send immediate position
+    sendCurrentLocationGPS();
+
+    // 1. Native watchPosition: automatically fires whenever the vehicle moves
+    _watchPositionId = navigator.geolocation.watchPosition(
+        pos => {
+            const lat = pos.coords.latitude.toFixed(6);
+            const lng = pos.coords.longitude.toFixed(6);
+            const latInput = document.getElementById('lat');
+            const lngInput = document.getElementById('lng');
+            if (latInput) latInput.value = lat;
+            if (lngInput) lngInput.value = lng;
+            broadcastLocation(lat, lng);
+        },
+        err => {
+            console.warn('watchPosition notice:', err);
+        },
+        {
+            enableHighAccuracy: true,
+            maximumAge: 2000,
+            timeout: 10000,
+        }
+    );
+
+    // 2. Heartbeat interval every 4 seconds to guarantee live movement
+    _liveIntervalId = setInterval(() => {
+        sendCurrentLocationGPS();
+    }, 4000);
+}
+
+function stopLiveGPSStreaming() {
+    _isStreamingGPS = false;
+    if (_watchPositionId !== null) {
+        navigator.geolocation.clearWatch(_watchPositionId);
+        _watchPositionId = null;
+    }
+    if (_liveIntervalId !== null) {
+        clearInterval(_liveIntervalId);
+        _liveIntervalId = null;
+    }
+
+    const btn = document.getElementById('toggle-live-gps-btn');
+    const txt = document.getElementById('live-gps-text');
+    const icon = document.getElementById('live-gps-icon');
+    const indicator = document.getElementById('live-streaming-indicator');
+
+    if (btn) btn.className = 'btn btn-outline-danger px-3 py-2 fw-semibold';
+    if (txt) txt.textContent = gettext('Start Continuous Live GPS');
+    if (icon) icon.className = 'bi bi-broadcast me-1';
+    if (indicator) indicator.className = 'd-none';
+
+    showToast(gettext('Live GPS streaming stopped.'), 'info');
+}
+
+function broadcastLocation(lat, lng) {
+    if (!lat || !lng) return;
+    if (locationWS && locationWS.readyState === WebSocket.OPEN) {
+        locationWS.send(JSON.stringify({ latitude: lat, longitude: lng }));
+    }
+    if (typeof updateDriverMarker === 'function') {
+        updateDriverMarker(parseFloat(lat), parseFloat(lng));
+    }
+}
+
+function sendCurrentLocationGPS() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            const lat = pos.coords.latitude.toFixed(6);
+            const lng = pos.coords.longitude.toFixed(6);
+            const latInput = document.getElementById('lat');
+            const lngInput = document.getElementById('lng');
+            if (latInput) latInput.value = lat;
+            if (lngInput) lngInput.value = lng;
+            broadcastLocation(lat, lng);
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 6000 }
+    );
+}
+
 window.useGPS = function() {
     if (!navigator.geolocation) { showToast(gettext('GPS not supported.'), 'warning'); return; }
     navigator.geolocation.getCurrentPosition(
         pos => {
             document.getElementById('lat').value = pos.coords.latitude.toFixed(6);
             document.getElementById('lng').value = pos.coords.longitude.toFixed(6);
+            showToast(gettext('GPS coordinates captured.'), 'info');
         },
         () => showToast(gettext('Could not get GPS location.'), 'danger')
     );
+};
+
+window.sendInstantLocation = async function(btn) {
+    if (!navigator.geolocation) {
+        showToast(gettext('GPS is not supported.'), 'warning');
+        return;
+    }
+
+    await withButtonBusy(eventButton(btn), gettext('Broadcasting...'), async () => {
+        try {
+            const pos = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 8000
+                });
+            });
+            const lat = pos.coords.latitude.toFixed(6);
+            const lng = pos.coords.longitude.toFixed(6);
+            document.getElementById('lat').value = lat;
+            document.getElementById('lng').value = lng;
+            broadcastLocation(lat, lng);
+
+            const driverId = {{ driver.id|default:'null' }};
+            if (driverId) {
+                await API.patch(`/api/drivers/${driverId}/update_location/`, { latitude: lat, longitude: lng });
+            }
+            showToast(gettext('Current location broadcasted to Admin Dashboard!'), 'success');
+        } catch (e) {
+            showToast(gettext('Could not get current GPS location.'), 'danger');
+        }
+    });
 };
 
 window.updateLocation = async function() {
@@ -421,23 +578,13 @@ window.updateLocation = async function() {
     const lng = document.getElementById('lng').value;
     if (!lat || !lng) { showToast(gettext('Enter coordinates.'), 'warning'); return; }
 
-    if (!locationWS || locationWS.readyState !== WebSocket.OPEN) {
-        showToast(gettext('Connection lost — live updates paused'), 'warning');
-        return;
-    }
-
-    locationWS.send(JSON.stringify({ latitude: lat, longitude: lng }));
+    broadcastLocation(lat, lng);
 
     const driverId = {{ driver.id|default:'null' }};
     if (driverId) {
         await API.patch(`/api/drivers/${driverId}/update_location/`, { latitude: lat, longitude: lng });
     }
     showToast(gettext('Location updated!'), 'success');
-
-    // Move the driver marker on the map immediately, no need to refetch
-    if (typeof updateDriverMarker === 'function') {
-        updateDriverMarker(parseFloat(lat), parseFloat(lng));
-    }
 };
 
 // ── Live DOM helpers (no reload) ─────────────────────────────────────────
