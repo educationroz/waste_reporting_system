@@ -434,8 +434,13 @@ function startLiveGPSStreaming() {
 
     showToast(gettext('Live GPS streaming started! Your truck location will update automatically on Admin map as you drive.'), 'success');
 
-    // Send immediate position
+    // Send immediate position and notify admin
     sendCurrentLocationGPS();
+
+    const driverId = {{ driver.id|default:'null' }};
+    if (driverId) {
+        API.post(`/api/drivers/${driverId}/broadcast_gps_status/`, { status: 'started' }).catch(() => {});
+    }
 
     // 1. Native watchPosition: automatically fires whenever the vehicle moves
     _watchPositionId = navigator.geolocation.watchPosition(
@@ -473,6 +478,11 @@ function stopLiveGPSStreaming() {
     if (_liveIntervalId !== null) {
         clearInterval(_liveIntervalId);
         _liveIntervalId = null;
+    }
+
+    const driverId = {{ driver.id|default:'null' }};
+    if (driverId) {
+        API.post(`/api/drivers/${driverId}/broadcast_gps_status/`, { status: 'stopped' }).catch(() => {});
     }
 
     const btn = document.getElementById('toggle-live-gps-btn');
@@ -549,7 +559,11 @@ window.sendInstantLocation = async function(btn) {
 
             const driverId = {{ driver.id|default:'null' }};
             if (driverId) {
-                await API.patch(`/api/drivers/${driverId}/update_location/`, { latitude: lat, longitude: lng });
+                await API.post(`/api/drivers/${driverId}/broadcast_gps_status/`, {
+                    status: 'instant',
+                    latitude: lat,
+                    longitude: lng
+                }).catch(() => {});
             }
             showToast(gettext('Current location broadcasted to Admin Dashboard!'), 'success');
         } catch (e) {

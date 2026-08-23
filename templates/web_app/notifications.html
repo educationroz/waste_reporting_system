@@ -139,6 +139,14 @@
                         <div class="mt-2">
                             <span class="badge bg-light text-secondary border rounded-1">{% trans "Request #" %}{{ notif.related_request.id }}</span>
                         </div>
+                        {% elif "GPS" in notif.title or "Location" in notif.title or "Driver" in notif.title %}
+                        {% if user.role == 'admin' %}
+                        <div class="mt-2">
+                            <a href="{% url 'admin-dashboard' %}#live-fleet-map" class="btn btn-sm btn-outline-success py-1 px-2.5 rounded-2 d-inline-flex align-items-center gap-1.5" style="font-size: 0.78rem;">
+                                <i class="bi bi-geo-alt-fill text-success"></i> {% trans "Track on Live Map" %}
+                            </a>
+                        </div>
+                        {% endif %}
                         {% endif %}
                     </div>
                     {% empty %}

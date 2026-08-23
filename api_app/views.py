@@ -710,6 +710,53 @@ class DriverViewSet(viewsets.ModelViewSet):
             )
         return Response({'message': 'Location updated.', 'latitude': lat, 'longitude': lng})
 
+    @action(detail=True, methods=['post', 'patch'], permission_classes=[IsAuthenticated])
+    def broadcast_gps_status(self, request, pk=None):
+        """Driver notifies admins that live GPS tracking was turned ON, OFF, or broadcasted once."""
+        driver = self.get_object()
+        if request.user.role != 'admin' and driver.user != request.user:
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        status_type = request.data.get('status', 'started')
+        lat = request.data.get('latitude')
+        lng = request.data.get('longitude')
+
+        if lat is not None and lng is not None:
+            try:
+                driver.current_latitude = lat
+                driver.current_longitude = lng
+                driver.save(update_fields=['current_latitude', 'current_longitude'])
+            except Exception:
+                pass
+
+        plate = driver.vehicle.plate_number if driver.vehicle else 'Vehicle'
+        driver_name = driver.user.username
+
+        if status_type == 'started':
+            title = f"Driver {driver_name} Live GPS Started"
+            message = f"Driver {driver_name} ({plate}) started continuous live GPS tracking."
+            notif_type = 'info'
+        elif status_type == 'stopped':
+            title = f"Driver {driver_name} Live GPS Stopped"
+            message = f"Driver {driver_name} ({plate}) stopped live GPS broadcast."
+            notif_type = 'warning'
+        else:
+            title = f"Driver {driver_name} Location Broadcast"
+            message = f"Driver {driver_name} ({plate}) shared current location on map."
+            notif_type = 'info'
+
+        _notify_admins(
+            title=title,
+            message=message,
+            notification_type=notif_type,
+        )
+
+        return Response({
+            'message': 'Status broadcasted to admins.',
+            'driver_id': driver.id,
+            'status': status_type,
+        })
+
 
 
 class BinViewSet(viewsets.ModelViewSet):
