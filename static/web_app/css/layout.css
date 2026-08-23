@@ -268,9 +268,16 @@
         }
 
         .layout-wrapper.mobile-open .sidebar-logo-text,
-        .layout-wrapper.mobile-open .sidebar-link-text,
-        .layout-wrapper.mobile-open .badge-text {
+        .layout-wrapper.mobile-open .sidebar-link-text {
             display: inline !important;
+        }
+
+        .layout-wrapper.mobile-open .badge-text:not(.d-none) {
+            display: inline-block !important;
+        }
+
+        .layout-wrapper.mobile-open .badge-text.d-none {
+            display: none !important;
         }
 
         .layout-wrapper.mobile-open .sidebar-header {

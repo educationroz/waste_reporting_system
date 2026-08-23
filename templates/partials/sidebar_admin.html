@@ -10,7 +10,7 @@
     <a href="{% url 'admin-complaints' %}" class="nav-link mb-2 d-flex align-items-center {% if request.resolver_match.url_name == 'admin-complaints' %}active bg-success{% endif %}">
         <i class="bi bi-exclamation-circle me-2"></i>
         <span class="sidebar-link-text">{% trans "Complaints" %}</span>
-        <span id="complaints-badge" class="badge rounded-pill bg-danger ms-auto badge-text d-none">0</span>
+        <span id="complaints-badge" class="badge rounded-pill bg-danger ms-auto badge-text d-none"></span>
     </a>
     <a href="{% url 'admin-drivers' %}" class="nav-link mb-2 d-flex align-items-center {% if request.resolver_match.url_name == 'admin-drivers' %}active bg-success{% endif %}">
         <i class="bi bi-person-badge me-2"></i><span class="sidebar-link-text">{% trans "Manage Drivers" %}</span>

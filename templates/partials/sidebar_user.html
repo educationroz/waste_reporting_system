@@ -9,7 +9,7 @@
 <a href="{% url 'user-recycle-bin' %}" class="nav-link {% if request.resolver_match.url_name == 'user-recycle-bin' %}active bg-success{% endif %} mb-2 d-flex align-items-center">
     <i class="bi bi-recycle me-2"></i>
     <span class="sidebar-link-text">{% trans "Recycle Bin" %}</span>
-    <span id="recycle-bin-badge" class="badge rounded-pill bg-danger ms-auto d-none">0</span>
+    <span id="recycle-bin-badge" class="badge rounded-pill bg-danger ms-auto d-none"></span>
 </a>
 <a href="{% url 'notifications' %}" class="nav-link {% if request.resolver_match.url_name == 'notifications' %}active bg-success{% endif %} mb-2 d-flex align-items-center">
     <i class="bi bi-bell me-2"></i><span class="sidebar-link-text">{% trans "Notifications" %}</span>
