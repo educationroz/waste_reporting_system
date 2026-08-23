@@ -623,7 +623,7 @@ class DriverViewSet(viewsets.ModelViewSet):
 
         drivers = (
             Driver.objects
-            .select_related('user')
+            .select_related('user', 'vehicle')
             .filter(
                 current_latitude__isnull=False,
                 current_longitude__isnull=False,
@@ -637,6 +637,9 @@ class DriverViewSet(viewsets.ModelViewSet):
                 'driver_name': driver.user.username,
                 'current_latitude': str(driver.current_latitude),
                 'current_longitude': str(driver.current_longitude),
+                'is_available': driver.is_available,
+                'vehicle_plate': driver.vehicle.plate_number if driver.vehicle else None,
+                'phone': getattr(driver.user, 'phone', '') or '',
             }
             for driver in drivers
         ]
