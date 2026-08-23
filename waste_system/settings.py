@@ -139,6 +139,26 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+    # Health probes must not be redirected. Load balancers and kubelets hit
+    # the instance over plain HTTP on the internal network; without this
+    # exemption SECURE_SSL_REDIRECT answers them with a 301, which every
+    # probe implementation scores as a failure, and the LB drains a
+    # perfectly healthy instance. Values are regexes matched against the
+    # path with the leading slash stripped.
+    SECURE_REDIRECT_EXEMPT = [
+        r'^healthz$',
+        r'^healthz/live$',
+    ]
+
+# ─── Health checks ────────────────────────────────────────────────────────────
+# See waste_system/health.py. HEALTHCHECK_TIMEOUT bounds each dependency probe
+# and should stay below the probe timeout configured on the load balancer.
+# HEALTHCHECK_DETAIL controls whether exception messages appear in the JSON
+# body — leave it on inside a private network, turn it off if /healthz is
+# reachable from the internet.
+HEALTHCHECK_TIMEOUT = config('HEALTHCHECK_TIMEOUT', default=2.0, cast=float)
+HEALTHCHECK_DETAIL = config('HEALTHCHECK_DETAIL', default=DEBUG, cast=bool)
 # ─── Database ─────────────────────────────────────────────────────────────────
 # Use SQLite for development, PostgreSQL for production
 DB_ENGINE = config('DB_ENGINE', default='sqlite3')  # 'postgresql' or 'sqlite3'

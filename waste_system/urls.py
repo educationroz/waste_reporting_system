@@ -20,7 +20,25 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.decorators.cache import cache_page
 from django.views.i18n import JavaScriptCatalog
+
+from waste_system.health import healthz, healthz_live
+
 urlpatterns = [
+    # ── Health checks ────────────────────────────────────────────────────────
+    # Registered first so they can never be shadowed by the catch-all
+    # web_app include at the bottom of this list, and so a probe costs the
+    # shortest possible URL resolution.
+    #
+    #   /healthz/live  liveness  — no dependencies, 200 while the worker runs
+    #   /healthz       readiness — DB + cache + Channels (+ Redis), 503 on fail
+    #
+    # /healthz/live is declared BEFORE /healthz even though they cannot
+    # collide, purely to keep the more specific route adjacent to its parent.
+    # Both are in SECURE_REDIRECT_EXEMPT (settings.py) so SECURE_SSL_REDIRECT
+    # does not answer a plain-HTTP probe with a 301 that reads as "unhealthy".
+    path('healthz/live', healthz_live, name='healthz-live'),
+    path('healthz', healthz, name='healthz'),
+
     path('admin/', admin.site.urls),
 
     # auth_app REST API
