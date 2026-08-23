@@ -596,360 +596,391 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
 <script nonce="{{ csp_nonce }}">
-let fleetMap = null;
-let driverMarkers = {};
-let driverDataStore = {};
+(function() {
+    let fleetMap = null;
+    let driverMarkers = {};
+    let driverDataStore = {};
 
-const DEFAULT_LAT = 28.2096;
-const DEFAULT_LNG = 83.9856;
+    const DEFAULT_LAT = 28.2096;
+    const DEFAULT_LNG = 83.9856;
 
-function initFleetTrackingMap() {
-    const mapEl = document.getElementById('live-fleet-map');
-    if (!mapEl || fleetMap) return;
-
-    if (typeof L === 'undefined') {
-        setTimeout(initFleetTrackingMap, 150);
-        return;
+    if (!document.body.dataset._adminFleetCleanupBound) {
+        document.body.addEventListener('htmx:beforeSwap', () => {
+            if (window._adminFleetMap) {
+                try { window._adminFleetMap.remove(); } catch(e) {}
+                window._adminFleetMap = null;
+            }
+            if (window._fleetWs) {
+                try { window._fleetWs.close(); } catch(e) {}
+                window._fleetWs = null;
+            }
+        });
+        document.body.dataset._adminFleetCleanupBound = '1';
     }
 
-    fleetMap = L.map('live-fleet-map', {
-        scrollWheelZoom: false,
-        attributionControl: false
-    }).setView([DEFAULT_LAT, DEFAULT_LNG], 13);
+    function initFleetTrackingMap() {
+        const mapEl = document.getElementById('live-fleet-map');
+        if (!mapEl) return;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-    }).addTo(fleetMap);
-
-    // Initial fetch of active driver locations
-    loadInitialDriverLocations();
-
-    // Start real-time WebSocket connection
-    connectFleetLocationWebSocket();
-}
-
-async function loadInitialDriverLocations() {
-    try {
-        const drivers = await API.get('/api/drivers/public-locations/');
-        if (Array.isArray(drivers)) {
-            drivers.forEach(driver => {
-                updateOrAddDriverMarker(driver);
-            });
-            updateDriverChipsUI();
-            handleInitialUrlTracking();
+        if (window._adminFleetMap) {
+            try { window._adminFleetMap.remove(); } catch(e) {}
+            window._adminFleetMap = null;
         }
-    } catch (e) {
-        console.warn('Initial driver location load failed:', e);
+
+        if (typeof L === 'undefined') {
+            setTimeout(initFleetTrackingMap, 150);
+            return;
+        }
+
+        fleetMap = L.map('live-fleet-map', {
+            scrollWheelZoom: false,
+            attributionControl: false
+        }).setView([DEFAULT_LAT, DEFAULT_LNG], 13);
+
+        window._adminFleetMap = fleetMap;
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+        }).addTo(fleetMap);
+
+        // Initial fetch of active driver locations
+        loadInitialDriverLocations();
+
+        // Start real-time WebSocket connection
+        connectFleetLocationWebSocket();
     }
-}
 
-function handleInitialUrlTracking() {
-    const params = new URLSearchParams(window.location.search);
-    const trackDriverId = params.get('track_driver');
-    const hasHash = window.location.hash === '#live-fleet-map' || trackDriverId;
-
-    if (hasHash) {
-        const mapCard = document.getElementById('live-fleet-map')?.closest('.card');
-        if (mapCard) {
-            mapCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    async function loadInitialDriverLocations() {
+        try {
+            const drivers = await API.get('/api/drivers/public-locations/');
+            if (Array.isArray(drivers)) {
+                drivers.forEach(driver => {
+                    updateOrAddDriverMarker(driver);
+                });
+                updateDriverChipsUI();
+                handleInitialUrlTracking();
+            }
+        } catch (e) {
+            console.warn('Initial driver location load failed:', e);
         }
     }
-    if (trackDriverId) {
-        setTimeout(() => {
-            focusDriverOnMap(parseInt(trackDriverId, 10));
-        }, 500);
+
+    function handleInitialUrlTracking() {
+        const params = new URLSearchParams(window.location.search);
+        const trackDriverId = params.get('track_driver');
+        const hasHash = window.location.hash === '#live-fleet-map' || trackDriverId;
+
+        if (hasHash) {
+            const mapCard = document.getElementById('live-fleet-map')?.closest('.card');
+            if (mapCard) {
+                mapCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+        if (trackDriverId) {
+            setTimeout(() => {
+                focusDriverOnMap(parseInt(trackDriverId, 10));
+            }, 600);
+        }
     }
-}
 
-function updateOrAddDriverMarker(data) {
-    const driverId = data.id || data.driver_id;
-    const lat = parseFloat(data.current_latitude || data.latitude);
-    const lng = parseFloat(data.current_longitude || data.longitude);
+    function updateOrAddDriverMarker(data) {
+        const driverId = data.id || data.driver_id;
+        const lat = parseFloat(data.current_latitude || data.latitude);
+        const lng = parseFloat(data.current_longitude || data.longitude);
 
-    if (isNaN(lat) || isNaN(lng) || !driverId || !fleetMap) return;
+        if (isNaN(lat) || isNaN(lng) || !driverId || !fleetMap) return;
 
-    driverDataStore[driverId] = Object.assign({}, driverDataStore[driverId] || {}, data, {
-        latitude: lat,
-        longitude: lng,
-        lastUpdated: new Date()
-    });
+        driverDataStore[driverId] = Object.assign({}, driverDataStore[driverId] || {}, data, {
+            latitude: lat,
+            longitude: lng,
+            lastUpdated: new Date()
+        });
 
-    const isAvailable = data.is_available !== false;
-    const driverName = data.driver_name || ('Driver #' + driverId);
-    const vehiclePlate = data.vehicle_plate || '—';
-    const phone = data.phone || '';
+        const isAvailable = data.is_available !== false;
+        const driverName = data.driver_name || ('Driver #' + driverId);
+        const vehiclePlate = data.vehicle_plate || '—';
+        const phone = data.phone || '';
 
-    const popupHtml = `
-        <div style="min-width: 190px;" class="p-1">
-            <div class="d-flex align-items-center mb-1">
-                <span class="me-2 fs-5">🚚</span>
-                <div>
-                    <strong class="text-dark d-block">${window.escapeHtml(driverName)}</strong>
-                    <span class="badge ${isAvailable ? 'bg-success' : 'bg-primary'} px-2 py-0.5 rounded-pill" style="font-size: 0.7rem;">
-                        ${isAvailable ? gettext('Available') : gettext('On Route')}
-                    </span>
+        const popupHtml = `
+            <div style="min-width: 190px;" class="p-1">
+                <div class="d-flex align-items-center mb-1">
+                    <span class="me-2 fs-5">🚚</span>
+                    <div>
+                        <strong class="text-dark d-block">${window.escapeHtml(driverName)}</strong>
+                        <span class="badge ${isAvailable ? 'bg-success' : 'bg-primary'} px-2 py-0.5 rounded-pill" style="font-size: 0.7rem;">
+                            ${isAvailable ? gettext('Available') : gettext('On Route')}
+                        </span>
+                    </div>
+                </div>
+                <div class="small text-muted mt-2">
+                    <div><i class="bi bi-truck me-1"></i><strong>${gettext('Vehicle')}:</strong> ${window.escapeHtml(vehiclePlate)}</div>
+                    ${phone ? `<div><i class="bi bi-telephone me-1"></i><strong>${gettext('Phone')}:</strong> ${window.escapeHtml(phone)}</div>` : ''}
+                    <div class="mt-1 font-monospace" style="font-size: 0.75rem;"><i class="bi bi-geo-alt me-1"></i>${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
                 </div>
             </div>
-            <div class="small text-muted mt-2">
-                <div><i class="bi bi-truck me-1"></i><strong>${gettext('Vehicle')}:</strong> ${window.escapeHtml(vehiclePlate)}</div>
-                ${phone ? `<div><i class="bi bi-telephone me-1"></i><strong>${gettext('Phone')}:</strong> ${window.escapeHtml(phone)}</div>` : ''}
-                <div class="mt-1 font-monospace" style="font-size: 0.75rem;"><i class="bi bi-geo-alt me-1"></i>${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
-            </div>
-        </div>
-    `;
-
-    if (driverMarkers[driverId]) {
-        driverMarkers[driverId].setLatLng([lat, lng]);
-        driverMarkers[driverId].setPopupContent(popupHtml);
-    } else {
-        const iconHtml = `
-            <div class="driver-truck-pin ${isAvailable ? '' : 'busy'}">
-                <div class="driver-pulse-ring"></div>
-                <i class="bi bi-truck"></i>
-            </div>
         `;
 
-        const truckIcon = L.divIcon({
-            className: 'driver-truck-marker',
-            html: iconHtml,
-            iconSize: [36, 36],
-            iconAnchor: [18, 18],
-            popupAnchor: [0, -20],
-        });
-
-        const marker = L.marker([lat, lng], { icon: truckIcon })
-            .addTo(fleetMap)
-            .bindPopup(popupHtml);
-
-        driverMarkers[driverId] = marker;
-    }
-
-    updateDriverChipsUI();
-}
-
-function updateDriverChipsUI() {
-    const container = document.getElementById('driver-chips-container');
-    if (!container) return;
-
-    const drivers = Object.values(driverDataStore);
-    if (drivers.length === 0) {
-        container.innerHTML = `<span class="text-muted italic small">${gettext('No active drivers sending GPS currently.')}</span>`;
-        return;
-    }
-
-    container.innerHTML = drivers.map(d => {
-        const id = d.id || d.driver_id;
-        const name = d.driver_name || ('Driver #' + id);
-        const isAvail = d.is_available !== false;
-        return `
-            <button type="button" class="driver-chip" onclick="focusDriverOnMap(${id})">
-                <span class="status-dot" style="background-color: ${isAvail ? '#198754' : '#0d6efd'};"></span>
-                <span>${window.escapeHtml(name)}</span>
-                <i class="bi bi-crosshair text-muted small ms-0.5"></i>
-            </button>
-        `;
-    }).join('');
-}
-
-window.focusDriverOnMap = function(driverId) {
-    const marker = driverMarkers[driverId];
-    if (marker && fleetMap) {
-        const latLng = marker.getLatLng();
-        fleetMap.setView(latLng, 16, { animate: true });
-        marker.openPopup();
-    }
-};
-
-window.fitAllDriversOnMap = function() {
-    if (!fleetMap) return;
-    const markers = Object.values(driverMarkers);
-    if (markers.length === 0) {
-        fleetMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
-        return;
-    }
-    const group = L.featureGroup(markers);
-    fleetMap.fitBounds(group.getBounds(), { padding: [40, 40], maxZoom: 16 });
-};
-
-function connectFleetLocationWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-    const wsUrl = `${protocol}${location.host}/ws/driver-locations/`;
-
-    try {
-        const ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-            const badge = document.getElementById('fleet-live-status-badge');
-            if (badge) {
-                badge.className = 'badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2.5 py-1.5 fw-semibold small';
-                badge.innerHTML = '<span class="spinner-grow spinner-grow-sm me-1 text-success" role="status" style="width: 8px; height: 8px;"></span> ' + gettext('Live GPS Active');
-            }
-        };
-
-        ws.onmessage = (e) => {
-            try {
-                const data = JSON.parse(e.data);
-                if (data.type === 'driver_location') {
-                    updateOrAddDriverMarker(data);
-                }
-            } catch (err) {
-                console.error('Error parsing live GPS update:', err);
-            }
-        };
-
-        ws.onclose = () => {
-            const badge = document.getElementById('fleet-live-status-badge');
-            if (badge) {
-                badge.className = 'badge bg-secondary bg-opacity-10 text-secondary border px-2.5 py-1.5 fw-semibold small';
-                badge.innerHTML = '<i class="bi bi-wifi-off me-1"></i> ' + gettext('Reconnecting...');
-            }
-            setTimeout(connectFleetLocationWebSocket, 4000);
-        };
-
-        ws.onerror = () => {
-            ws.close();
-        };
-    } catch (e) {
-        console.warn('Fleet WebSocket setup error:', e);
-    }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    initFleetTrackingMap();
-});
-
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(initFleetTrackingMap, 100);
-}
-
-function getAssignModal() {
-    if (typeof bootstrap === 'undefined') {
-        console.error('Bootstrap JS failed to load — modal cannot open.');
-        showToast(gettext('A page resource failed to load. Please refresh and try again.'), 'danger');
-        return null;
-    }
-    return bootstrap.Modal.getOrCreateInstance(document.getElementById('assignModal'));
-}
-
-function getQuickAddModal() {
-    if (typeof bootstrap === 'undefined') {
-        console.error('Bootstrap JS failed to load — modal cannot open.');
-        showToast(gettext('A page resource failed to load. Please refresh and try again.'), 'danger');
-        return null;
-    }
-    return bootstrap.Modal.getOrCreateInstance(document.getElementById('quickAddModal'));
-}
-
-function openAssignModal(requestId) {
-    document.getElementById('modal-request-id').value = requestId;
-    const modal = getAssignModal();
-    if (modal) modal.show();
-}
-
-async function assignDriver(btn) {
-    const requestId = document.getElementById('modal-request-id').value;
-    const driverId = document.getElementById('modal-driver-select').value;
-
-    if (!driverId) {
-        showToast(gettext('No active available driver was chosen.'), 'danger');
-        return;
-    }
-
-    await withButtonBusy(eventButton(btn), 'Assigning...', async () => {
-    const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
-    if (data && data.id) {
-        showToast(gettext('Driver dispatch successfully configured!'), 'success');
-        const modal = getAssignModal();
-        if (modal) modal.hide();
-        setTimeout(() => location.reload(), 1000);
-    } else {
-        showToast(gettext('Failed to deploy driver node.'), 'danger');
-    }
-    });
-}
-
-async function cancelRequest(requestId, btn) {
-    const ok = await showConfirmDialog({
-        title: gettext('Cancel Request?'),
-        message: gettext('Are you sure you want to cancel this request?'),
-        confirmText: gettext('Yes, Cancel Request'),
-        cancelText: gettext('Keep Request'),
-        confirmBtnClass: 'btn-warning text-dark',
-        icon: 'bi-exclamation-circle-fill',
-        iconColor: '#f59e0b',
-        iconBg: '#fef3c7'
-    });
-    if (!ok) return;
-
-    await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
-    const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
-    if (data && data.id) {
-        showToast(gettext('Request cancelled.'), 'success');
-        setTimeout(() => location.reload(), 1000);
-    } else {
-        showToast(gettext('Failed to cancel request.'), 'danger');
-    }
-    });
-}
-
-async function deleteRequest(requestId, btn) {
-    const ok = await showConfirmDialog({
-        title: gettext('Permanently Delete?'),
-        message: gettext('Permanently delete this request? This cannot be undone.'),
-        confirmText: gettext('Delete Forever'),
-        cancelText: gettext('Cancel'),
-        confirmBtnClass: 'btn-danger',
-        icon: 'bi-trash3-fill',
-        iconColor: '#dc2626',
-        iconBg: '#fee2e2'
-    });
-    if (!ok) return;
-
-    await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
-    try {
-        const res = await fetch(`/api/waste-requests/${requestId}/`, {
-            method: 'DELETE',
-            credentials: 'same-origin',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-        });
-
-        if (res.ok) {
-            showToast(gettext('Request deleted.'), 'success');
-            setTimeout(() => location.reload(), 800);
+        if (driverMarkers[driverId]) {
+            driverMarkers[driverId].setLatLng([lat, lng]);
+            driverMarkers[driverId].setPopupContent(popupHtml);
         } else {
-            let errMsg = 'Failed to delete request.';
-            try {
-                const data = await res.json();
-                errMsg = typeof data === 'object'
-                    ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
-                    : String(data);
+            const iconHtml = `
+                <div class="driver-truck-pin ${isAvailable ? '' : 'busy'}">
+                    <div class="driver-pulse-ring"></div>
+                    <i class="bi bi-truck"></i>
+                </div>
+            `;
 
-            } catch (e) {
-                console.error('Failed to parse error response JSON:', e);
-            }
-            showToast(errMsg, 'danger');
+            const truckIcon = L.divIcon({
+                className: 'driver-truck-marker',
+                html: iconHtml,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18],
+                popupAnchor: [0, -20],
+            });
+
+            const marker = L.marker([lat, lng], { icon: truckIcon })
+                .addTo(fleetMap)
+                .bindPopup(popupHtml);
+
+            driverMarkers[driverId] = marker;
         }
-    } catch (e) {
-        showToast(gettext('Network error: ') + e.message, 'danger');
+
+        updateDriverChipsUI();
     }
-    });
-}
 
-function applyFilters() {
-    const searchTerm = document.getElementById('search-box').value.trim();
-    const status = document.getElementById('filter-status').value;
+    function updateDriverChipsUI() {
+        const container = document.getElementById('driver-chips-container');
+        if (!container) return;
 
-    let url = '{% url "admin-requests" %}?';
-    if (searchTerm) url += `search=${encodeURIComponent(searchTerm)}&`;
-    if (status) url += `status=${status}`;
+        const drivers = Object.values(driverDataStore);
+        if (drivers.length === 0) {
+            container.innerHTML = `<span class="text-muted italic small">${gettext('No active drivers sending GPS currently.')}</span>`;
+            return;
+        }
 
-    window.location.href = url;
-}
+        container.innerHTML = drivers.map(d => {
+            const id = d.id || d.driver_id;
+            const name = d.driver_name || ('Driver #' + id);
+            const isAvail = d.is_available !== false;
+            return `
+                <button type="button" class="driver-chip" onclick="focusDriverOnMap(${id})">
+                    <span class="status-dot" style="background-color: ${isAvail ? '#198754' : '#0d6efd'};"></span>
+                    <span>${window.escapeHtml(name)}</span>
+                    <i class="bi bi-crosshair text-muted small ms-0.5"></i>
+                </button>
+            `;
+        }).join('');
+    }
 
-document.getElementById('search-box').addEventListener('keypress', e => {
-    if (e.key === 'Enter') applyFilters();
-});
+    window.focusDriverOnMap = function(driverId) {
+        const marker = driverMarkers[driverId];
+        if (marker && fleetMap) {
+            const latLng = marker.getLatLng();
+            fleetMap.setView(latLng, 16, { animate: true });
+            marker.openPopup();
+        }
+    };
+
+    window.fitAllDriversOnMap = function() {
+        if (!fleetMap) return;
+        const markers = Object.values(driverMarkers);
+        if (markers.length === 0) {
+            fleetMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
+            return;
+        }
+        const group = L.featureGroup(markers);
+        fleetMap.fitBounds(group.getBounds(), { padding: [40, 40], maxZoom: 16 });
+    };
+
+    function connectFleetLocationWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const wsUrl = `${protocol}${location.host}/ws/driver-locations/`;
+
+        try {
+            if (window._fleetWs) {
+                try { window._fleetWs.close(); } catch(e) {}
+            }
+            const ws = new WebSocket(wsUrl);
+            window._fleetWs = ws;
+
+            ws.onopen = () => {
+                const badge = document.getElementById('fleet-live-status-badge');
+                if (badge) {
+                    badge.className = 'badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2.5 py-1.5 fw-semibold small';
+                    badge.innerHTML = '<span class="spinner-grow spinner-grow-sm me-1 text-success" role="status" style="width: 8px; height: 8px;"></span> ' + gettext('Live GPS Active');
+                }
+            };
+
+            ws.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'driver_location') {
+                        updateOrAddDriverMarker(data);
+                    }
+                } catch (err) {
+                    console.error('Error parsing live GPS update:', err);
+                }
+            };
+
+            ws.onclose = () => {
+                const badge = document.getElementById('fleet-live-status-badge');
+                if (badge) {
+                    badge.className = 'badge bg-secondary bg-opacity-10 text-secondary border px-2.5 py-1.5 fw-semibold small';
+                    badge.innerHTML = '<i class="bi bi-wifi-off me-1"></i> ' + gettext('Reconnecting...');
+                }
+                setTimeout(connectFleetLocationWebSocket, 4000);
+            };
+
+            ws.onerror = () => {
+                ws.close();
+            };
+        } catch (e) {
+            console.warn('Fleet WebSocket setup error:', e);
+        }
+    }
+
+    window.initFleetTrackingMap = initFleetTrackingMap;
+
+    document.addEventListener('DOMContentLoaded', initFleetTrackingMap);
+    document.body.addEventListener('htmx:afterSwap', initFleetTrackingMap);
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(initFleetTrackingMap, 100);
+    }
+
+    function getAssignModal() {
+        if (typeof bootstrap === 'undefined') {
+            console.error('Bootstrap JS failed to load — modal cannot open.');
+            showToast(gettext('A page resource failed to load. Please refresh and try again.'), 'danger');
+            return null;
+        }
+        return bootstrap.Modal.getOrCreateInstance(document.getElementById('assignModal'));
+    }
+
+    function getQuickAddModal() {
+        if (typeof bootstrap === 'undefined') {
+            console.error('Bootstrap JS failed to load — modal cannot open.');
+            showToast(gettext('A page resource failed to load. Please refresh and try again.'), 'danger');
+            return null;
+        }
+        return bootstrap.Modal.getOrCreateInstance(document.getElementById('quickAddModal'));
+    }
+
+    window.openAssignModal = function(requestId) {
+        document.getElementById('modal-request-id').value = requestId;
+        const modal = getAssignModal();
+        if (modal) modal.show();
+    };
+
+    window.assignDriver = async function(btn) {
+        const requestId = document.getElementById('modal-request-id').value;
+        const driverId = document.getElementById('modal-driver-select').value;
+
+        if (!driverId) {
+            showToast(gettext('No active available driver was chosen.'), 'danger');
+            return;
+        }
+
+        await withButtonBusy(eventButton(btn), 'Assigning...', async () => {
+            const data = await API.patch(`/api/waste-requests/${requestId}/assign_driver/`, { driver_id: driverId });
+            if (data && data.id) {
+                showToast(gettext('Driver dispatch successfully configured!'), 'success');
+                const modal = getAssignModal();
+                if (modal) modal.hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(gettext('Failed to deploy driver node.'), 'danger');
+            }
+        });
+    };
+
+    window.cancelRequest = async function(requestId, btn) {
+        const ok = await showConfirmDialog({
+            title: gettext('Cancel Request?'),
+            message: gettext('Are you sure you want to cancel this request?'),
+            confirmText: gettext('Yes, Cancel Request'),
+            cancelText: gettext('Keep Request'),
+            confirmBtnClass: 'btn-warning text-dark',
+            icon: 'bi-exclamation-circle-fill',
+            iconColor: '#f59e0b',
+            iconBg: '#fef3c7'
+        });
+        if (!ok) return;
+
+        await withButtonBusy(eventButton(btn), 'Cancelling...', async () => {
+            const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
+            if (data && data.id) {
+                showToast(gettext('Request cancelled.'), 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(gettext('Failed to cancel request.'), 'danger');
+            }
+        });
+    };
+
+    window.deleteRequest = async function(requestId, btn) {
+        const ok = await showConfirmDialog({
+            title: gettext('Permanently Delete?'),
+            message: gettext('Permanently delete this request? This cannot be undone.'),
+            confirmText: gettext('Delete Forever'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-trash3-fill',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        });
+        if (!ok) return;
+
+        await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
+            try {
+                const res = await fetch(`/api/waste-requests/${requestId}/`, {
+                    method: 'DELETE',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                });
+
+                if (res.ok) {
+                    showToast(gettext('Request deleted.'), 'success');
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    let errMsg = 'Failed to delete request.';
+                    try {
+                        const data = await res.json();
+                        errMsg = typeof data === 'object'
+                            ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                            : String(data);
+
+                    } catch (e) {
+                        console.error('Failed to parse error response JSON:', e);
+                    }
+                    showToast(errMsg, 'danger');
+                }
+            } catch (e) {
+                showToast(gettext('Network error: ') + e.message, 'danger');
+            }
+        });
+    };
+
+    window.applyFilters = function() {
+        const searchTerm = document.getElementById('search-box').value.trim();
+        const status = document.getElementById('filter-status').value;
+
+        let url = '{% url "admin-requests" %}?';
+        if (searchTerm) url += `search=${encodeURIComponent(searchTerm)}&`;
+        if (status) url += `status=${status}`;
+
+        window.location.href = url;
+    };
+
+    const searchBox = document.getElementById('search-box');
+    if (searchBox) {
+        searchBox.addEventListener('keypress', e => {
+            if (e.key === 'Enter') window.applyFilters();
+        });
+    }
+})();
 </script>
 {% endblock %}
