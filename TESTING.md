@@ -67,6 +67,28 @@ All were caught, and the suite returned to green once reverted.
 
 ## CI
 
+> **One manual step required.** GitHub refuses pushes that create or modify
+> `.github/workflows/**` unless the pushing token holds the `workflows` permission, which the
+> agent's token does not:
+>
+> ```
+> refusing to allow a GitHub App to create or update workflow
+> `.github/workflows/tests.yml` without `workflows` permission
+> ```
+>
+> Everything else in this change is pushed. To enable CI, add the workflow yourself — the file
+> is ready at **`_download/tests.yml`**:
+>
+> ```bash
+> mkdir -p .github/workflows
+> cp _download/tests.yml .github/workflows/tests.yml
+> git add .github/workflows/tests.yml
+> git commit -m "Add CI workflow"
+> git push origin arena/01a0146f-waste-reporting-system
+> ```
+>
+> Your own credentials carry the permission, so this succeeds from your machine.
+
 `.github/workflows/tests.yml` runs on **every push, every PR**, and on manual dispatch.
 In-progress runs for the same branch are cancelled when you push again.
 
