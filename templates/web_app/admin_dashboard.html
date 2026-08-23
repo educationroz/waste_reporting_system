@@ -824,12 +824,17 @@
             };
 
             ws.onclose = () => {
+                if (!document.getElementById('live-fleet-map')) return;
                 const badge = document.getElementById('fleet-live-status-badge');
                 if (badge) {
                     badge.className = 'badge bg-secondary bg-opacity-10 text-secondary border px-2.5 py-1.5 fw-semibold small';
                     badge.innerHTML = '<i class="bi bi-wifi-off me-1"></i> ' + gettext('Reconnecting...');
                 }
-                setTimeout(connectFleetLocationWebSocket, 4000);
+                setTimeout(() => {
+                    if (document.getElementById('live-fleet-map')) {
+                        connectFleetLocationWebSocket();
+                    }
+                }, 4000);
             };
 
             ws.onerror = () => {
