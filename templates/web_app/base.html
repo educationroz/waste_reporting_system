@@ -814,6 +814,19 @@ if (!window.__ssAuthScriptLoaded) {
 
                     if (typeof window.onLiveNotification === 'function') {
                         window.onLiveNotification(data);
+                    } else if (data.title && data.message) {
+                        const titleLower = data.title.toLowerCase();
+                        if (titleLower.includes('driver') && (titleLower.includes('gps') || titleLower.includes('location'))) {
+                            showToast(
+                                `<strong>${window.escapeHtml(data.title)}</strong><br>${window.escapeHtml(data.message)} <a href="/admin-dashboard/#live-fleet-map" class="btn btn-sm btn-light py-0.5 px-2 mt-1.5 d-inline-flex align-items-center gap-1 text-success fw-bold shadow-xs"><i class="bi bi-geo-alt-fill"></i> ${gettext('Track Live')}</a>`,
+                                'info'
+                            );
+                        } else {
+                            showToast(
+                                `<strong>${window.escapeHtml(data.title)}</strong><br>${window.escapeHtml(data.message)}`,
+                                data.notification_type || 'info'
+                            );
+                        }
                     }
 
                     if (data.title && data.title.toLowerCase().includes('checkpoint')) {

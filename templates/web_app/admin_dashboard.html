@@ -636,9 +636,28 @@ async function loadInitialDriverLocations() {
                 updateOrAddDriverMarker(driver);
             });
             updateDriverChipsUI();
+            handleInitialUrlTracking();
         }
     } catch (e) {
         console.warn('Initial driver location load failed:', e);
+    }
+}
+
+function handleInitialUrlTracking() {
+    const params = new URLSearchParams(window.location.search);
+    const trackDriverId = params.get('track_driver');
+    const hasHash = window.location.hash === '#live-fleet-map' || trackDriverId;
+
+    if (hasHash) {
+        const mapCard = document.getElementById('live-fleet-map')?.closest('.card');
+        if (mapCard) {
+            mapCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+    if (trackDriverId) {
+        setTimeout(() => {
+            focusDriverOnMap(parseInt(trackDriverId, 10));
+        }, 500);
     }
 }
 
