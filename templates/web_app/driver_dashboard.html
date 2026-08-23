@@ -384,24 +384,9 @@ async function connectLocationWebSocket() {
                 const lng = parseFloat(data.longitude);
                 if (isNaN(lat) || isNaN(lng) || !driverId) return;
 
-                const name = data.driver_name || `Driver #${driverId}`;
-                const popupHtml = `<strong>🚛 ${name}</strong><br>Live driver location`;
-                const icon = L.divIcon({
-                    className: 'driver-marker-icon',
-                    html: '<span style="font-size:1.4rem; line-height:1;">🚛</span>',
-                    iconSize: [28, 28],
-                    iconAnchor: [14, 14],
-                });
-
-                let driverMarker = driverMarkers.get(driverId);
-                if (driverMarker) {
-                    driverMarker.setLatLng([lat, lng]);
-                    driverMarker.setPopupContent(popupHtml);
-                } else if (driverMarkersLayer) {
-                    driverMarker = L.marker([lat, lng], { icon })
-                        .addTo(driverMarkersLayer)
-                        .bindPopup(popupHtml);
-                    driverMarkers.set(driverId, driverMarker);
+                const myDriverId = {{ driver.id|default:'null' }};
+                if (driverId === myDriverId && typeof updateDriverMarker === 'function') {
+                    updateDriverMarker(lat, lng);
                 }
             }
         } catch (err) {
