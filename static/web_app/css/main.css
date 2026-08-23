@@ -422,3 +422,118 @@ nav.navbar {
     background-color: var(--bg-card) !important;
     color: var(--text-body) !important;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   MOBILE-FRIENDLY & RESPONSIVE POLISH (Site-Wide)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Mobile table touch-scrolling and clean spacing */
+.table-responsive {
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+}
+
+.table-responsive::-webkit-scrollbar {
+    height: 5px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+[data-theme="dark"] .table-responsive::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Touch-friendly tabs on mobile (swipable horizontal ribbon) */
+.card-header-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+}
+
+.card-header-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.card-header-tabs .nav-item {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.card-header-tabs .nav-link {
+    white-space: nowrap;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.88rem;
+}
+
+/* Mobile buttons, badges & form inputs */
+@media (max-width: 767.98px) {
+    /* Prevent iOS auto-zoom on input focus */
+    input[type="text"],
+    input[type="password"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="number"],
+    input[type="search"],
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+
+    /* Metric card responsive scaling */
+    .metric-card .card-body {
+        padding: 1rem 0.85rem !important;
+    }
+    .metric-card .display-6 {
+        font-size: 1.65rem !important;
+    }
+    .metric-card .small {
+        font-size: 0.75rem !important;
+    }
+
+    /* Modals on mobile: proper padding & rounded corners */
+    .modal-dialog {
+        margin: 0.75rem auto;
+        max-width: calc(100% - 1.5rem) !important;
+    }
+    .modal-content {
+        border-radius: 16px !important;
+    }
+    .modal-body {
+        padding: 1.25rem 1rem !important;
+    }
+
+    /* Table cells on mobile */
+    .table td, .table th {
+        padding: 0.75rem 0.6rem !important;
+        font-size: 0.82rem !important;
+    }
+
+    /* Action buttons in tables touch spacing */
+    .btn-sm {
+        padding: 0.35rem 0.6rem !important;
+        font-size: 0.8rem !important;
+    }
+
+    /* Maps on mobile */
+    #map, #live-fleet-map, #driver-map, #route-map, #checkpoint-map, #depot-map {
+        min-height: 260px;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .metric-card .display-6 {
+        font-size: 1.45rem !important;
+    }
+    .card-header {
+        padding: 0.85rem 1rem !important;
+    }
+    .btn {
+        font-size: 0.85rem;
+    }
+}
