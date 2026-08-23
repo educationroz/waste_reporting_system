@@ -700,8 +700,12 @@ class DriverViewSet(viewsets.ModelViewSet):
                 {
                     'type': 'driver_location_update',
                     'driver_id': driver.id,
+                    'driver_name': driver.user.username,
                     'latitude': str(lat),
                     'longitude': str(lng),
+                    'vehicle_plate': driver.vehicle.plate_number if driver.vehicle else '',
+                    'is_available': driver.is_available,
+                    'phone': getattr(driver.user, 'phone', '') or '',
                 }
             )
         return Response({'message': 'Location updated.', 'latitude': lat, 'longitude': lng})
