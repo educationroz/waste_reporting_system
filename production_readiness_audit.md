@@ -128,9 +128,18 @@ Low** by real-world impact.
 - **Structured driver ETA/tracking** — you already have live driver location; a "your collector is
   ~12 min away" estimate for the citizen (using the existing route/distance data) would be a strong
   differentiator with little new infrastructure.
-- **Automated tests + CI** — `tests.py` exists in each app but scanning suggests light coverage;
+- ~~**Automated tests + CI** — `tests.py` exists in each app but scanning suggests light coverage;
   wiring GitHub Actions to run `manage.py test` on every push would catch regressions like the ones
-  already fixed in your commit history (map crashes, double-submit bugs) before they reach prod.
+  already fixed in your commit history (map crashes, double-submit bugs) before they reach prod.~~
+  **RESOLVED.** Coverage went 12 → **43 tests**; `.github/workflows/tests.yml` runs migrations
+  check + system check + suite on every push and PR. Worse than "light" on inspection: **2 of the
+  12 existing tests were already failing** (stale `IsSuperAdminUser` and `admin_password`
+  contracts), `web_app/tests.py` was an empty stub, and `pip install` could not succeed on Linux
+  at all because `python-magic-bin` is a Windows-only wheel with no platform marker — CI would
+  have been red from the first run. New tests were validated by mutation (breaking the CSP nonce,
+  the handshake limiter and slot release each produced failures). Also fixed en route: a duplicate
+  `GOOGLE_OAUTH_CLIENT_ID` that made a fresh checkout crash at import, and a root-logger
+  `logging.basicConfig` in `api_app/views.py`. See **`TESTING.md`**.
 - **Health-check endpoint** (`/healthz`) reporting DB/Redis/Channels connectivity — needed for any
   real load balancer or container orchestrator to know when to route traffic away from a bad instance.
 

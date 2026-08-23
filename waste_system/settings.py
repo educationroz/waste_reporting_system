@@ -200,8 +200,13 @@ CACHES = {
 # ─── Custom User Model ────────────────────────────────────────────────────────
 AUTH_USER_MODEL = 'auth_app.User'
 
-GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID')
- 
+# NOTE: GOOGLE_OAUTH_CLIENT_ID is defined once, above, with default=''. A second
+# assignment used to sit here without a default, silently overriding it and
+# hard-crashing at import time whenever the variable was unset — which is why a
+# fresh checkout could not even run `manage.py check`. GoogleLoginView already
+# handles the empty case by returning 503 "not configured", which is the right
+# behaviour: an unconfigured optional integration should disable itself, not
+# take down the whole site.
 
 # ─── Password Validation ──────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
@@ -318,6 +323,39 @@ WS_HANDSHAKE_WINDOW_SECONDS = config('WS_HANDSHAKE_WINDOW_SECONDS', default=60, 
 # Staff are capped too by default: an admin session is the most valuable one to
 # steal. Set True only if an ops dashboard legitimately needs many sockets.
 WS_EXEMPT_STAFF = config('WS_EXEMPT_STAFF', default=False, cast=bool)
+
+# ─── Logging ──────────────────────────────────────────────────────────────────
+# Replaces a stray logging.basicConfig(level=INFO) that used to run at import
+# time in api_app/views.py. That call reconfigured the ROOT logger for the whole
+# process, so every management command and test run was flooded with INFO lines.
+#
+# LOG_LEVEL controls the app's own loggers. Tests set it to CRITICAL so failure
+# output stays readable.
+LOG_LEVEL = config('LOG_LEVEL', default='INFO' if DEBUG else 'WARNING')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {'format': '{levelname} {name}: {message}', 'style': '{'},
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {'handlers': ['console'], 'level': 'WARNING'},
+    'loggers': {
+        # Application loggers.
+        'notif_debug': {'handlers': ['console'], 'level': LOG_LEVEL, 'propagate': False},
+        'backup': {'handlers': ['console'], 'level': LOG_LEVEL, 'propagate': False},
+        # django.request logs a WARNING for every 4xx. Those are normal here —
+        # the test suite deliberately asserts 401/403/404 responses — so keep
+        # them at ERROR to avoid drowning real problems.
+        'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
+    },
+}
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [

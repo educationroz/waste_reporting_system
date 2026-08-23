@@ -63,7 +63,10 @@ User = get_user_model()
 
 import logging
 logger = logging.getLogger('notif_debug')
-logging.basicConfig(level=logging.INFO)
+# NOTE: no logging.basicConfig() here. Calling it at import time reconfigures
+# the ROOT logger for the entire process — it overrode Django's own logging
+# config and spammed INFO lines through every management command and test run.
+# Logging levels/handlers belong in settings.LOGGING, not in a view module.
 backup_logger = logging.getLogger('backup')  # same logger name as backup_utils.py, so backup-related
                                               # log lines from both files end up under one logger/handler
 # ── Completion GPS verification ──────────────────────────────────────────────
