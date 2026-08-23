@@ -268,6 +268,7 @@
 
 {% block extra_js %}
 <script nonce="{{ csp_nonce }}">
+(function() {
 // ---------- XSS escaping helper ----------
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -592,5 +593,17 @@ function insertScheduleRow(scheduleData, ctx) {
     document.getElementById('add-driver').value = '';
     document.getElementById('add-vehicle').value = '';
 }
+
+window.onScheduleCheckboxChange = onScheduleCheckboxChange;
+window.toggleSelectAllSchedules = toggleSelectAllSchedules;
+window.bulkSetSchedulesActive = bulkSetSchedulesActive;
+window.bulkDeleteSchedules = bulkDeleteSchedules;
+window.exportSelectedSchedules = exportSelectedSchedules;
+window.exportFilteredSchedules = exportFilteredSchedules;
+window.toggleActive = toggleActive;
+window.deleteSchedule = deleteSchedule;
+window.onFrequencyChange = onFrequencyChange;
+window.addSchedule = addSchedule;
+})();
 </script>
 {% endblock %}
