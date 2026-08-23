@@ -230,7 +230,7 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small fw-semibold text-secondary">{% trans "Interval Frequency" %}</label>
-                        <select class="form-select" id="add-frequency">
+                        <select class="form-select" id="add-frequency" onchange="onFrequencyChange()">
                             <option value="daily">{% trans "Daily Stream" %}</option>
                             <option value="weekly">{% trans "Weekly Cycle" %}</option>
                             <option value="biweekly">{% trans "Bi-Weekly Loop" %}</option>
@@ -592,6 +592,20 @@ function insertScheduleRow(scheduleData, ctx) {
     document.getElementById('add-frequency').selectedIndex = 0;
     document.getElementById('add-driver').value = '';
     document.getElementById('add-vehicle').value = '';
+}
+
+function onFrequencyChange() {
+    const freqEl = document.getElementById('add-frequency');
+    const dayEl = document.getElementById('add-day');
+    if (!freqEl || !dayEl) return;
+    const freq = freqEl.value;
+    const isFixedDay = ['weekly', 'biweekly'].includes(freq);
+    dayEl.disabled = !isFixedDay;
+    if (!isFixedDay) {
+        dayEl.value = '';
+    } else if (!dayEl.value) {
+        dayEl.value = '0';
+    }
 }
 
 window.onScheduleCheckboxChange = onScheduleCheckboxChange;
