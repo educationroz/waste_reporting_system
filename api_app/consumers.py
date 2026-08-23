@@ -163,11 +163,11 @@ class DriverLocationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
     async def driver_location_update(self, event):
         await self.send(json.dumps({
             'type': 'driver_location',
-            'driver_id': event['driver_id'],
-            'driver_name': event['driver_name'],
-            'latitude': event['latitude'],
-            'longitude': event['longitude'],
-            'vehicle_plate': event.get('vehicle_plate'),
+            'driver_id': event.get('driver_id'),
+            'driver_name': event.get('driver_name') or f"Driver #{event.get('driver_id', '')}",
+            'latitude': str(event.get('latitude', '')),
+            'longitude': str(event.get('longitude', '')),
+            'vehicle_plate': event.get('vehicle_plate') or '',
             'is_available': event.get('is_available', True),
             'phone': event.get('phone', ''),
         }))
