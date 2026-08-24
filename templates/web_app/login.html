@@ -98,6 +98,8 @@
         align-items: center !important;
         margin: 0 auto 0.5rem auto !important;
         text-align: center !important;
+        min-height: 44px !important;
+        height: 44px !important;
         overflow: hidden !important;
     }
     #g_id_signin_container {
@@ -106,7 +108,8 @@
         align-items: center !important;
         margin: 0 auto !important;
         text-align: center !important;
-        min-height: 44px;
+        min-height: 44px !important;
+        height: 44px !important;
         width: 100% !important;
     }
     #g_id_signin_container > div,
@@ -263,7 +266,7 @@
         }
     };
 
-    // ── Google Sign-In (Unified Singleton) ──────────────────────────────────────
+    // ── Google Sign-In (Unified Singleton & Zero-Flicker) ──────────────────────
     function getOptimalGoogleButtonWidth() {
         const fullBtn = document.getElementById('login-btn');
         const cardBody = document.querySelector('.auth-card .card-body') || document.querySelector('.card-body');
@@ -278,11 +281,38 @@
         return Math.max(200, Math.min(400, Math.floor(width)));
     }
 
+    function ensureGoogleSdkInit() {
+        if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) return false;
+        const clientId = '{{ GOOGLE_CLIENT_ID|default:"" }}'.trim();
+        if (!clientId) return false;
+
+        if (!window.__gsiGlobalInitialized) {
+            google.accounts.id.initialize({
+                client_id: clientId,
+                callback: function(resp) {
+                    if (typeof window.handleGoogleCredential === 'function') {
+                        window.handleGoogleCredential(resp);
+                    }
+                },
+                auto_select: false,
+                use_fedcm_for_button: true,
+            });
+            window.__gsiGlobalInitialized = true;
+        }
+        return true;
+    }
+
     function renderGoogleButton() {
         const container = document.getElementById('g_id_signin_container');
-        if (!container || typeof google === 'undefined' || !google.accounts || !google.accounts.id) return;
+        if (!container || !ensureGoogleSdkInit()) return;
+
         const btnWidth = getOptimalGoogleButtonWidth();
+        if (container.dataset.renderedWidth === String(btnWidth) && container.querySelector('iframe')) {
+            return;
+        }
+
         container.innerHTML = '';
+        container.dataset.renderedWidth = String(btnWidth);
         google.accounts.id.renderButton(
             container,
             {
@@ -341,36 +371,21 @@
 
     function initGoogleSignIn() {
         if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
-            setTimeout(initGoogleSignIn, 150);
+            setTimeout(initGoogleSignIn, 80);
             return;
         }
-        const clientId = '{{ GOOGLE_CLIENT_ID|default:"" }}'.trim();
-        if (!clientId) {
-            console.warn('Google OAuth client_id is empty or not configured.');
-            return;
-        }
-        if (!window.__gsiGlobalInitialized) {
-            google.accounts.id.initialize({
-                client_id: clientId,
-                callback: function(resp) {
-                    if (typeof window.handleGoogleCredential === 'function') {
-                        window.handleGoogleCredential(resp);
-                    }
-                },
-                auto_select: false,
-                use_fedcm_for_button: true,
-            });
-            window.__gsiGlobalInitialized = true;
-        }
+        ensureGoogleSdkInit();
         renderGoogleButton();
-        setTimeout(renderGoogleButton, 100);
-        setTimeout(renderGoogleButton, 350);
     }
 
     if (!window._gsiGlobalResizeBound) {
         window.addEventListener('resize', () => {
             if (window._gGlobalResizeTimer) clearTimeout(window._gGlobalResizeTimer);
-            window._gGlobalResizeTimer = setTimeout(renderGoogleButton, 200);
+            window._gGlobalResizeTimer = setTimeout(() => {
+                const container = document.getElementById('g_id_signin_container');
+                if (container) delete container.dataset.renderedWidth;
+                renderGoogleButton();
+            }, 150);
         });
         window._gsiGlobalResizeBound = true;
     }
