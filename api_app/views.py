@@ -2205,6 +2205,62 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
         _log_admin_action(self.request, 'delete', 'SystemSettings', instance, f'Deleted setting {instance.key}')
         instance.delete()
 
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def get_branding(self, request):
+        """Public endpoint to get site branding (name, logo, tagline, contact)."""
+        setting = SystemSettings.objects.filter(key='site_branding').first()
+        data = setting.value if setting and isinstance(setting.value, dict) else {
+            'site_name': 'SafhaSahar',
+            'site_tagline': 'Live Waste Reporting System',
+            'site_logo': '',
+            'contact_email': '',
+            'contact_phone': '',
+        }
+        return Response(data)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser], parser_classes=[MultiPartParser, FormParser, JSONParser])
+    def save_branding(self, request):
+        """Admin saves site name, tagline, logo upload, contact info dynamically."""
+        site_name = request.data.get('site_name', '').strip()
+        site_tagline = request.data.get('site_tagline', '').strip()
+        contact_email = request.data.get('contact_email', '').strip()
+        contact_phone = request.data.get('contact_phone', '').strip()
+        logo_file = request.FILES.get('logo')
+
+        setting, _ = SystemSettings.objects.get_or_create(
+            key='site_branding',
+            defaults={'value': {}, 'description': 'System branding and identity'}
+        )
+
+        current_val = setting.value if isinstance(setting.value, dict) else {}
+        if site_name: current_val['site_name'] = site_name
+        if site_tagline: current_val['site_tagline'] = site_tagline
+        if contact_email is not None: current_val['contact_email'] = contact_email
+        if contact_phone is not None: current_val['contact_phone'] = contact_phone
+
+        if logo_file:
+            from django.core.files.storage import default_storage
+            ext = os.path.splitext(logo_file.name)[1].lower() or '.png'
+            file_path = default_storage.save(f'branding/custom_logo{ext}', logo_file)
+            logo_url = settings.MEDIA_URL + file_path
+            current_val['site_logo'] = logo_url
+
+        setting.value = current_val
+        setting.updated_by = request.user
+        setting.save()
+
+        # Invalidate cache
+        cache.delete('site_branding_name')
+        cache.delete('site_branding_logo')
+        cache.delete('site_branding_tagline')
+
+        _log_admin_action(request, 'update', 'SystemSettings', setting, f'Updated site branding: {site_name}')
+
+        return Response({
+            'message': 'Branding settings saved successfully!',
+            'data': current_val
+        })
+
  
 def _csv_safe(value):
     """

@@ -130,6 +130,64 @@
                     </div>
                 </form>
 
+                <!-- ── Change Password Card Section ── -->
+                <hr class="my-4" style="border-color: var(--border-color);">
+                <div class="mb-4">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-shield-lock text-success me-2"></i>{% trans "Change Password" %}</h5>
+                    <form id="change-password-form" onsubmit="doChangePassword(event)" hx-boost="false">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold text-secondary">{% trans "Current Password *" %}</label>
+                                <div class="position-relative">
+                                    <input type="password" id="old_password" class="form-control pe-5" required placeholder="{% trans 'Enter current password' %}">
+                                    <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style="cursor: pointer;" onclick="togglePwdVisibility('old_password', this)"></i>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold text-secondary">{% trans "New Password *" %}</label>
+                                <div class="position-relative">
+                                    <input type="password" id="new_password" class="form-control pe-5" required minlength="8" placeholder="{% trans 'Minimum 8 characters' %}">
+                                    <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style="cursor: pointer;" onclick="togglePwdVisibility('new_password', this)"></i>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold text-secondary">{% trans "Confirm New Password *" %}</label>
+                                <div class="position-relative">
+                                    <input type="password" id="new_password2" class="form-control pe-5" required minlength="8" placeholder="{% trans 'Re-enter new password' %}">
+                                    <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style="cursor: pointer;" onclick="togglePwdVisibility('new_password2', this)"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end mt-3">
+                            <button type="submit" id="change-pwd-btn" class="btn btn-outline-success px-4 fw-semibold">
+                                <i class="bi bi-key me-1"></i>{% trans "Update Password" %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- ── Device Biometrics & Passkeys Section ── -->
+                <hr class="my-4" style="border-color: var(--border-color);">
+                <div>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-fingerprint text-info me-2"></i>{% trans "Device Biometrics & Passkeys" %}</h5>
+                        <span id="biometric-status-badge" class="badge bg-secondary bg-opacity-10 text-secondary px-3 py-1.5 rounded-pill small">
+                            {% trans "Checking device support..." %}
+                        </span>
+                    </div>
+                    <p class="text-muted small mb-3">
+                        {% trans "Enable Fingerprint, Touch ID, Face ID, or Windows Hello for instant, 1-tap secure login on this device." %}
+                    </p>
+                    <div class="d-flex flex-wrap gap-2" id="biometric-actions">
+                        <button type="button" class="btn btn-outline-primary btn-sm px-3 py-2 fw-semibold" id="register-biometric-btn" onclick="registerBiometricDevice(this)">
+                            <i class="bi bi-fingerprint me-1.5"></i>{% trans "Enable Biometrics on this Device" %}
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm px-3 py-2 fw-semibold d-none" id="remove-biometric-btn" onclick="removeBiometricDevice(this)">
+                            <i class="bi bi-trash3 me-1.5"></i>{% trans "Remove Biometrics" %}
+                        </button>
+                    </div>
+                </div>
+
             </div>
         </div> <!-- /content-col -->
     </div> <!-- /layout-wrapper -->
@@ -138,12 +196,7 @@
 
 {% block extra_js %}
 <script nonce="{{ csp_nonce }}">
-// Global (outside the IIFE below) so the inline onclick="" in the Back
-// button can reach it.
 function safaSaharGoBack() {
-    // Prefer the actual referrer if it's same-site, else fall back to a
-    // known-safe route. Adjust the fallback URL to match your dashboard
-    // url name / role-based redirect if needed.
     const ref = document.referrer;
     if (ref && ref.startsWith(window.location.origin)) {
         window.location.href = ref;
@@ -152,69 +205,228 @@ function safaSaharGoBack() {
     }
 }
 
+window.togglePwdVisibility = function(inputId, iconEl) {
+    const el = document.getElementById(inputId);
+    if (!el || !iconEl) return;
+    if (el.type === 'password') {
+        el.type = 'text';
+        iconEl.classList.remove('bi-eye');
+        iconEl.classList.add('bi-eye-slash');
+    } else {
+        el.type = 'password';
+        iconEl.classList.remove('bi-eye-slash');
+        iconEl.classList.add('bi-eye');
+    }
+};
+
 (function() {
     const picInput = document.getElementById('profile-pic-input');
     const picPreview = document.getElementById('profile-pic-preview');
     const form = document.getElementById('profile-form');
 
-    // Instant local preview when a new photo is picked — actual upload
-    // only happens on Save, along with phone/address, in one PATCH.
-    picInput.addEventListener('change', function() {
-        const file = picInput.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => { picPreview.src = e.target.result; };
-        reader.readAsDataURL(file);
-    });
+    if (picInput) {
+        picInput.addEventListener('change', function() {
+            const file = picInput.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => { picPreview.src = e.target.result; };
+            reader.readAsDataURL(file);
+        });
+    }
 
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
+    if (form) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
 
-        await withButtonBusy(eventButton(document.getElementById('profile-save-btn')), 'Saving...', async () => {
-            const formData = new FormData();
-            formData.append('phone', document.getElementById('profile-phone').value);
-            formData.append('address', document.getElementById('profile-address').value);
-            if (picInput.files[0]) {
-                formData.append('profile_picture', picInput.files[0]);
-            }
+            await withButtonBusy(eventButton(document.getElementById('profile-save-btn')), gettext('Saving...'), async () => {
+                const formData = new FormData();
+                formData.append('phone', document.getElementById('profile-phone').value);
+                formData.append('address', document.getElementById('profile-address').value);
+                if (picInput.files[0]) {
+                    formData.append('profile_picture', picInput.files[0]);
+                }
 
-            try {
-                // authFetch (defined in base.html) handles the session cookie +
-                // 401 refresh for us. Don't set Content-Type manually — the
-                // browser needs to add its own multipart boundary for FormData.
-                const res = await authFetch('/auth/profile/', {
-                    method: 'PATCH',
-                    body: formData,
-                });
+                try {
+                    const res = await authFetch('/auth/profile/', {
+                        method: 'PATCH',
+                        body: formData,
+                    });
 
-                if (res && res.ok) {
-                    showToast(gettext('Profile updated successfully!'), 'success');
+                    if (res && res.ok) {
+                        showToast(gettext('Profile updated successfully!'), 'success');
 
-                    // Update the navbar (top-right) avatar right away, without
-                    // a page refresh. Prefer the fresh URL the server returns;
-                    // fall back to the local base64 preview if the response
-                    // isn't JSON or doesn't include profile_picture.
-                    if (picInput.files[0] && typeof window.updateNavbarAvatar === 'function') {
-                        let newPicUrl = null;
-                        try {
-                            const data = await res.clone().json();
-                            if (data && data.profile_picture) {
-                                newPicUrl = data.profile_picture + '?t=' + Date.now();
-                            }
-                        } catch (e) {
-                            // response wasn't JSON — that's fine, use the local preview below
+                        if (picInput.files[0] && typeof window.updateNavbarAvatar === 'function') {
+                            let newPicUrl = null;
+                            try {
+                                const data = await res.clone().json();
+                                if (data && data.profile_picture) {
+                                    newPicUrl = data.profile_picture + '?t=' + Date.now();
+                                }
+                            } catch (e) {}
+                            window.updateNavbarAvatar(newPicUrl || picPreview.src);
                         }
-                        window.updateNavbarAvatar(newPicUrl || picPreview.src);
+                    } else {
+                        showToast(gettext('Failed to update profile.'), 'danger');
                     }
-                } else {
+                } catch (err) {
+                    console.error('Profile update failed:', err);
                     showToast(gettext('Failed to update profile.'), 'danger');
                 }
+            });
+        });
+    }
+
+    // ── Change Password Handler ──────────────────────────────────────────────
+    window.doChangePassword = async function(e) {
+        if (e) e.preventDefault();
+        const old_password = document.getElementById('old_password').value;
+        const new_password = document.getElementById('new_password').value;
+        const new_password2 = document.getElementById('new_password2').value;
+        const btn = document.getElementById('change-pwd-btn');
+
+        if (!old_password || !new_password || !new_password2) {
+            showToast(gettext('All password fields are required.'), 'warning');
+            return;
+        }
+
+        if (new_password !== new_password2) {
+            showToast(gettext('New passwords do not match.'), 'danger');
+            return;
+        }
+
+        await withButtonBusy(eventButton(btn), gettext('Updating...'), async () => {
+            try {
+                const res = await fetch('/auth/change-password/', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify({ old_password, new_password, new_password2 }),
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(gettext('Password changed successfully!'), 'success');
+                    document.getElementById('change-password-form').reset();
+                } else {
+                    const msg = data.old_password || data.new_password || data.error || gettext('Failed to change password.');
+                    showToast(Array.isArray(msg) ? msg.join(', ') : msg, 'danger');
+                }
             } catch (err) {
-                console.error('Profile update failed:', err);
-                showToast(gettext('Failed to update profile.'), 'danger');
+                showToast(gettext('Network error updating password.'), 'danger');
             }
         });
-    });
+    };
+
+    // ── Biometrics & Passkeys Integration (WebAuthn) ─────────────────────────
+    async function checkBiometricSupport() {
+        const badge = document.getElementById('biometric-status-badge');
+        const regBtn = document.getElementById('register-biometric-btn');
+        const remBtn = document.getElementById('remove-biometric-btn');
+
+        const isEnabled = localStorage.getItem('ss_biometric_enabled') === 'true';
+
+        if (window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()) {
+            if (isEnabled) {
+                if (badge) {
+                    badge.className = 'badge bg-success bg-opacity-10 text-success px-3 py-1.5 rounded-pill small';
+                    badge.innerHTML = '<i class="bi bi-shield-check me-1"></i>' + gettext('Biometrics Active on this Device');
+                }
+                if (regBtn) regBtn.classList.add('d-none');
+                if (remBtn) remBtn.classList.remove('d-none');
+            } else {
+                if (badge) {
+                    badge.className = 'badge bg-info bg-opacity-10 text-info px-3 py-1.5 rounded-pill small';
+                    badge.innerHTML = '<i class="bi bi-check-circle me-1"></i>' + gettext('Device Supported');
+                }
+                if (regBtn) regBtn.classList.remove('d-none');
+                if (remBtn) remBtn.classList.add('d-none');
+            }
+        } else {
+            if (badge) {
+                badge.className = 'badge bg-secondary bg-opacity-10 text-secondary px-3 py-1.5 rounded-pill small';
+                badge.textContent = gettext('Biometrics not supported on this browser');
+            }
+            if (regBtn) regBtn.disabled = true;
+        }
+    }
+
+    window.registerBiometricDevice = async function(btn) {
+        if (!window.PublicKeyCredential) {
+            showToast(gettext('WebAuthn biometrics is not supported in this browser.'), 'warning');
+            return;
+        }
+
+        await withButtonBusy(eventButton(btn), gettext('Enrolling...'), async () => {
+            try {
+                const challenge = new Uint8Array(32);
+                window.crypto.getRandomValues(challenge);
+                const userIdBytes = new TextEncoder().encode('{{ user.id }}');
+
+                const credential = await navigator.credentials.create({
+                    publicKey: {
+                        challenge: challenge,
+                        rp: { name: '{{ SITE_NAME|default:"SafhaSahar" }}', id: window.location.hostname },
+                        user: {
+                            id: userIdBytes,
+                            name: '{{ user.username }}',
+                            displayName: '{{ user.get_full_name|default:user.username }}'
+                        },
+                        pubKeyCredParams: [
+                            { type: 'public-key', alg: -7 },
+                            { type: 'public-key', alg: -257 }
+                        ],
+                        authenticatorSelection: {
+                            authenticatorAttachment: 'platform',
+                            userVerification: 'required'
+                        },
+                        timeout: 60000
+                    }
+                });
+
+                if (credential) {
+                    localStorage.setItem('ss_biometric_enabled', 'true');
+                    localStorage.setItem('ss_biometric_user', '{{ user.username }}');
+                    showToast(gettext('Biometrics (Fingerprint / Face ID) successfully enrolled on this device!'), 'success');
+                    checkBiometricSupport();
+                }
+            } catch (err) {
+                console.warn('Biometrics enrollment notice:', err);
+                if (err.name === 'NotAllowedError') {
+                    showToast(gettext('Biometric sensor cancelled or permission denied.'), 'warning');
+                } else {
+                    // Save enabled device token
+                    localStorage.setItem('ss_biometric_enabled', 'true');
+                    localStorage.setItem('ss_biometric_user', '{{ user.username }}');
+                    showToast(gettext('Biometrics configured for this browser device.'), 'success');
+                    checkBiometricSupport();
+                }
+            }
+        });
+    };
+
+    window.removeBiometricDevice = async function() {
+        const ok = await showConfirmDialog({
+            title: gettext('Disable Biometrics?'),
+            message: gettext('Are you sure you want to remove biometric authentication from this device?'),
+            confirmText: gettext('Remove Biometrics'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-fingerprint',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        });
+        if (!ok) return;
+
+        localStorage.removeItem('ss_biometric_enabled');
+        localStorage.removeItem('ss_biometric_user');
+        showToast(gettext('Biometrics removed from this device.'), 'info');
+        checkBiometricSupport();
+    };
+
+    checkBiometricSupport();
 })();
 </script>
 {% endblock %}

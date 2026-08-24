@@ -85,6 +85,7 @@ TEMPLATES = [
                 # attribute and the language switcher in base.html.
                 'django.template.context_processors.i18n',
                 'web_app.context_processors.google_client_id',
+                'web_app.context_processors.system_branding',
                 # Exposes {{ csp_nonce }} so inline <script> tags can carry a
                 # per-request nonce and survive the strict CSP.
                 'waste_system.security.csp_nonce',

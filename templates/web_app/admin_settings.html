@@ -228,63 +228,64 @@
             id="general-panel"
             role="tabpanel"
           >
-            <div class="row g-4">
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold text-secondary"
-                  >{% trans "System Name" %}</label
-                >
-                <input
-                  type="text"
-                  class="form-control"
-                  value="Waste Management System"
-                />
-                <small class="text-muted">{% trans "Display name for the system" %}</small>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold text-secondary"
-                  >{% trans "Default Timezone" %}</label
-                >
-                <select class="form-select">
-                  <option selected>{% trans "UTC" %}</option>
-                  <option>{% trans "EST" %}</option>
-                  <option>{% trans "CST" %}</option>
-                  <option>{% trans "PST" %}</option>
-                </select>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold text-secondary"
-                  >{% trans "Max Upload Size (MB)" %}</label
-                >
-                <input type="number" class="form-control" value="50" min="1" />
-              </div>
-              <div class="col-md-6">
-                <label class="form-label small fw-semibold text-secondary"
-                  >{% trans "Session Timeout (minutes)" %}</label
-                >
-                <input type="number" class="form-control" value="30" min="5" />
-              </div>
-              <div class="col-md-12">
-                <div class="form-check form-switch m-0">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
-                    id="maintenanceMode"
-                    checked
-                  />
-                  <label
-                    class="form-check-label small fw-semibold"
-                    for="maintenanceMode"
-                  >
-                    {% trans "Maintenance Mode (disable user access)" %}
-                  </label>
+            <form id="branding-settings-form" onsubmit="saveBrandingSettings(event)">
+              <div class="row g-4">
+                <div class="col-12">
+                  <h6 class="fw-bold mb-1">
+                    <i class="bi bi-palette me-2 text-success"></i>{% trans "System Identity & Branding" %}
+                  </h6>
+                  <p class="text-muted small mb-0">
+                    {% trans "Customize the application name, municipal branding, tagline, and logo across the entire system without editing any code." %}
+                  </p>
+                </div>
+
+                <!-- Logo Uploader & Preview -->
+                <div class="col-md-4 text-center">
+                  <label class="form-label small fw-semibold text-secondary d-block">{% trans "System Logo" %}</label>
+                  <div class="p-3 border rounded-3 bg-surface-alt d-inline-block position-relative">
+                    <img id="branding-logo-preview"
+                         src="{% if SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{% static 'web_app/image/SafhaSahar.png' %}{% endif %}"
+                         alt="{% trans 'Logo' %}"
+                         style="width: 100px; height: 100px; object-fit: contain;" class="d-block mb-2">
+                    <label for="branding-logo-input" class="btn btn-sm btn-outline-success w-100">
+                      <i class="bi bi-upload me-1"></i>{% trans "Change Logo" %}
+                    </label>
+                    <input type="file" id="branding-logo-input" accept="image/*" class="d-none" onchange="previewBrandingLogo(this)">
+                  </div>
+                  <small class="text-muted d-block mt-1">{% trans "PNG, JPG, or WebP (recommended 256x256)" %}</small>
+                </div>
+
+                <div class="col-md-8">
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label small fw-semibold text-secondary">{% trans "Application / System Name *" %}</label>
+                      <input type="text" class="form-control" id="branding-site-name" value="{{ SITE_NAME|default:'SafhaSahar' }}" required>
+                      <small class="text-muted">{% trans "Displayed on Navbar, Mobile Drawer, and Headers" %}</small>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label small fw-semibold text-secondary">{% trans "Organization Tagline" %}</label>
+                      <input type="text" class="form-control" id="branding-site-tagline" value="{{ SITE_TAGLINE|default:'Live Waste Reporting System' }}">
+                      <small class="text-muted">{% trans "Subtitle on Login, Register and Meta titles" %}</small>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label small fw-semibold text-secondary">{% trans "Public Contact Email" %}</label>
+                      <input type="email" class="form-control" id="branding-contact-email" placeholder="e.g. info@safhasahar.gov.np">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label small fw-semibold text-secondary">{% trans "Public Helpdesk Phone" %}</label>
+                      <input type="tel" class="form-control" id="branding-contact-phone" placeholder="e.g. 061-520000 / 98XXXXXXXX">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <hr class="my-2 text-muted">
+                  <button type="submit" id="save-branding-btn" class="btn btn-success px-4 py-2 fw-semibold">
+                    <i class="bi bi-check-circle me-1.5"></i>{% trans "Save System Branding" %}
+                  </button>
                 </div>
               </div>
-              <div class="col-12">
-                <button class="btn btn-success px-4">
-                  <i class="bi bi-check-circle me-2"></i>{% trans "Save Settings" %}
-                </button>
-              </div>
-            </div>
+            </form>
           </div>
 
           <div class="tab-pane fade p-4" id="depot-panel" role="tabpanel">
@@ -1040,6 +1041,69 @@
       });
       document.body.dataset._leafletCleanupBound = "1";
     }
+
+    window.previewBrandingLogo = function(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const preview = document.getElementById("branding-logo-preview");
+          if (preview) preview.src = e.target.result;
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    };
+
+    window.saveBrandingSettings = async function(event) {
+      if (event) event.preventDefault();
+      const btn = document.getElementById("save-branding-btn");
+      const name = document.getElementById("branding-site-name")?.value.trim();
+      const tagline = document.getElementById("branding-site-tagline")?.value.trim();
+      const email = document.getElementById("branding-contact-email")?.value.trim();
+      const phone = document.getElementById("branding-contact-phone")?.value.trim();
+      const logoFile = document.getElementById("branding-logo-input")?.files[0];
+
+      if (!name) {
+        showToast(gettext("Application / System Name is required."), "warning");
+        return;
+      }
+
+      await withButtonBusy(eventButton(btn), gettext("Saving..."), async () => {
+        const formData = new FormData();
+        formData.append("site_name", name);
+        formData.append("site_tagline", tagline);
+        formData.append("contact_email", email);
+        formData.append("contact_phone", phone);
+        if (logoFile) {
+          formData.append("logo", logoFile);
+        }
+
+        try {
+          const res = await authFetch("/api/system-settings/save_branding/", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (res && res.ok) {
+            const result = await res.json();
+            showToast(gettext("System branding updated successfully! Reloading to apply new theme..."), "success");
+
+            const brandNames = document.querySelectorAll(".site-brand-name span");
+            brandNames.forEach((el) => { el.textContent = name; });
+            if (result.data && result.data.site_logo) {
+              const brandLogos = document.querySelectorAll(".site-brand-logo");
+              brandLogos.forEach((img) => { img.src = result.data.site_logo + "?t=" + Date.now(); });
+            }
+
+            setTimeout(() => location.reload(), 900);
+          } else {
+            showToast(gettext("Failed to update system branding."), "danger");
+          }
+        } catch (e) {
+          console.error("Save branding error:", e);
+          showToast(gettext("Failed to save branding."), "danger");
+        }
+      });
+    };
 
     function ensureLeafletLoaded(onReady) {
       if (typeof L !== "undefined") {
