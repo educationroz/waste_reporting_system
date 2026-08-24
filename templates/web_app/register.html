@@ -6,51 +6,87 @@
 
 {% block content %}
 <div class="min-vh-100 d-flex align-items-center justify-content-center auth-page-bg py-4 px-2 px-sm-3">
-    <div class="card shadow-sm w-100 auth-card" style="max-width:460px">
+    <div class="card shadow-sm w-100 auth-card" style="max-width:440px">
         <div class="card-body p-3 p-sm-4">
-            <div class="text-center mb-4">
-                <img src="{% if SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{% static 'web_app/image/SafhaSahar.png' %}{% endif %}" alt="{% trans 'Logo' %}" width="90" height="90" class="d-inline-block align-text-top mb-1" style="object-fit: contain;">
-                <h4 class="mt-2 fw-bold">{% trans "Create Account" %}</h4>
+            <div class="text-center mb-3">
+                <img src="{% if SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{% static 'web_app/image/SafhaSahar.png' %}{% endif %}" alt="{% trans 'Logo' %}" width="80" height="80" class="d-inline-block align-text-top mb-1" style="object-fit: contain;">
+                <h4 class="mt-2 fw-bold mb-1">{% trans "Create Account" %}</h4>
                 <p class="text-muted small mb-0">{{ SITE_TAGLINE|default:"Live Waste Reporting System" }}</p>
             </div>
 
-            <div id="error-alert" class="alert alert-danger d-none"></div>
-            <div id="success-alert" class="alert alert-success d-none"></div>
-
-            <div class="google-btn-wrapper w-100 d-flex justify-content-center mb-3">
-                <div id="g_id_signin_container" class="w-100 d-flex justify-content-center"></div>
+            <!-- Step Progress Indicator -->
+            <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
+                <div class="d-flex align-items-center gap-1.5 small fw-semibold" id="step1-indicator">
+                    <span class="step-badge active" id="step1-badge">1</span>
+                    <span class="text-success" id="step1-label">{% trans "Basic Details" %}</span>
+                </div>
+                <div class="step-line" id="step-divider-line"></div>
+                <div class="d-flex align-items-center gap-1.5 small fw-semibold text-muted" id="step2-indicator">
+                    <span class="step-badge" id="step2-badge">2</span>
+                    <span id="step2-label">{% trans "Password & Role" %}</span>
+                </div>
             </div>
 
-            <div class="d-flex align-items-center mb-3">
-                <hr class="flex-grow-1">
-                <span class="px-2 text-muted small">{% trans "or register with email" %}</span>
-                <hr class="flex-grow-1">
-            </div>
+            <div id="error-alert" class="alert alert-danger d-none py-2 small"></div>
+            <div id="success-alert" class="alert alert-success d-none py-2 small"></div>
 
-            <div class="row g-2">
-                <div class="col-12 col-sm-6 mb-3">
+            <!-- ══════════════════════════════════════════════════════════════
+                 STEP 1: Basic & Contact Info
+                 ══════════════════════════════════════════════════════════════ -->
+            <div id="reg-step-1">
+                <div class="google-btn-wrapper w-100 d-flex justify-content-center mb-3">
+                    <div id="g_id_signin_container" class="w-100 d-flex justify-content-center"></div>
+                </div>
+
+                <div class="d-flex align-items-center mb-3">
+                    <hr class="flex-grow-1">
+                    <span class="px-2 text-muted small">{% trans "or register with email" %}</span>
+                    <hr class="flex-grow-1">
+                </div>
+
+                <div class="mb-3">
                     <label class="form-label small fw-semibold">{% trans "Username *" %}</label>
-                    <input type="text" id="username" class="form-control" placeholder="{% trans 'Choose username' %}" autofocus>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+                        <input type="text" id="username" class="form-control" placeholder="{% trans 'Choose a username' %}" autofocus>
+                    </div>
                 </div>
-                <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label small fw-semibold">{% trans "Email *" %}</label>
-                    <input type="email" id="email" class="form-control" placeholder="{% trans 'name@example.com' %}">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">{% trans "Email Address *" %}</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="bi bi-envelope"></i></span>
+                        <input type="email" id="email" class="form-control" placeholder="{% trans 'name@example.com' %}">
+                    </div>
                 </div>
+                <div class="mb-4">
+                    <label class="form-label small fw-semibold">{% trans "Phone Number" %} <span class="text-muted fw-normal">({% trans "Optional" %})</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="bi bi-telephone"></i></span>
+                        <input type="tel" id="phone" class="form-control" placeholder="{% trans '98XXXXXXXX' %}">
+                    </div>
+                </div>
+
+                <button class="btn btn-success w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-1 shadow-xs" type="button" id="btn-goto-step2" onclick="goToStep2()">
+                    <span>{% trans "Next" %}</span>
+                    <i class="bi bi-arrow-right"></i>
+                </button>
             </div>
-            <div class="row g-2">
-                <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label small fw-semibold">{% trans "Phone" %}</label>
-                    <input type="tel" id="phone" class="form-control" placeholder="{% trans '98XXXXXXXX' %}">
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 STEP 2: Role & Password Security
+                 ══════════════════════════════════════════════════════════════ -->
+            <div id="reg-step-2" class="d-none">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">{% trans "Account Role *" %}</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="bi bi-person-badge"></i></span>
+                        <select id="role" class="form-select">
+                            <option value="user" selected>{% trans "Regular User / Citizen" %}</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label small fw-semibold">{% trans "Role *" %}</label>
-                    <select id="role" class="form-select">
-                        <option value="user" selected>{% trans "Regular User / Citizen" %}</option>
-                    </select>
-                </div>
-            </div>
-            <div class="row g-2">
-                <div class="col-12 col-sm-6 mb-3">
+
+                <div class="mb-3">
                     <label class="form-label small fw-semibold">{% trans "Password *" %}</label>
                     <div class="position-relative">
                         <input type="password" id="password" class="form-control pe-5" placeholder="{% trans 'Min. 8 characters' %}" oninput="handlePasswordInput()">
@@ -58,20 +94,26 @@
                             id="toggle-password-icon" style="cursor: pointer; display: none;" onclick="togglePassword()"></i>
                     </div>
                 </div>
-                <div class="col-12 col-sm-6 mb-3">
+
+                <div class="mb-4">
                     <label class="form-label small fw-semibold">{% trans "Confirm Password *" %}</label>
                     <div class="position-relative">
-                        <input type="password" id="password2" class="form-control pe-5" placeholder="{% trans 'Re-type password' %}" oninput="handlePassword2Input()">
+                        <input type="password" id="password2" class="form-control pe-5" placeholder="{% trans 'Re-enter password' %}" oninput="handlePassword2Input()">
                         <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
                             id="toggle-password2-icon" style="cursor: pointer; display: none;" onclick="togglePassword2()"></i>
                     </div>
                 </div>
-            </div>
 
-            <button class="btn btn-success w-100 py-2 fw-semibold" id="reg-btn" onclick="doRegister()">
-                <span id="reg-text">{% trans "Create Account" %}</span>
-                <span id="reg-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
-            </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary px-3 py-2 fw-semibold" onclick="goToStep1()">
+                        <i class="bi bi-arrow-left me-1"></i>{% trans "Back" %}
+                    </button>
+                    <button class="btn btn-success flex-grow-1 py-2 fw-semibold shadow-xs" id="reg-btn" type="button" onclick="doRegister()">
+                        <span id="reg-text">{% trans "Create Account" %}</span>
+                        <span id="reg-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
+                    </button>
+                </div>
+            </div>
 
             <p class="text-center mt-3 mb-0 small">
                 {% trans "Already have an account?" %} <a href="{% url 'login' %}" id="signin-link" class="text-success fw-semibold text-decoration-none">{% trans "Sign in" %}</a>
@@ -91,6 +133,32 @@
     }
     .auth-page-bg {
         background-color: var(--bg-body, #f8f9fa);
+    }
+    .step-badge {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        background-color: #e2e8f0;
+        color: #64748b;
+        font-weight: 700;
+        transition: all 0.2s ease;
+    }
+    .step-badge.active {
+        background-color: #198754;
+        color: #ffffff;
+    }
+    .step-line {
+        width: 32px;
+        height: 2px;
+        background-color: #e2e8f0;
+        transition: all 0.2s ease;
+    }
+    .step-line.active {
+        background-color: #198754;
     }
     .google-btn-wrapper {
         width: 100% !important;
@@ -140,6 +208,65 @@
 (function() {
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+// ── Multi-Step Form Navigation ──────────────────────────────────────────────
+window.goToStep2 = function() {
+    const errDiv = document.getElementById('error-alert');
+    errDiv.classList.add('d-none');
+
+    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
+
+    if (!username) {
+        errDiv.textContent = gettext('Please enter a username.');
+        errDiv.classList.remove('d-none');
+        document.getElementById('username').focus();
+        return;
+    }
+
+    if (!email) {
+        errDiv.textContent = gettext('Please enter your email address.');
+        errDiv.classList.remove('d-none');
+        document.getElementById('email').focus();
+        return;
+    }
+
+    if (!emailRegex.test(email)) {
+        errDiv.textContent = gettext('Please enter a valid email address.');
+        errDiv.classList.remove('d-none');
+        document.getElementById('email').focus();
+        return;
+    }
+
+    // Switch panels
+    document.getElementById('reg-step-1').classList.add('d-none');
+    document.getElementById('reg-step-2').classList.remove('d-none');
+
+    // Update progress indicator
+    document.getElementById('step-divider-line').classList.add('active');
+    document.getElementById('step2-badge').classList.add('active');
+    document.getElementById('step2-indicator').classList.remove('text-muted');
+    document.getElementById('step2-indicator').classList.add('text-success');
+
+    setTimeout(() => {
+        const pwd = document.getElementById('password');
+        if (pwd) pwd.focus();
+    }, 50);
+};
+
+window.goToStep1 = function() {
+    const errDiv = document.getElementById('error-alert');
+    errDiv.classList.add('d-none');
+
+    document.getElementById('reg-step-2').classList.add('d-none');
+    document.getElementById('reg-step-1').classList.remove('d-none');
+
+    document.getElementById('step-divider-line').classList.remove('active');
+    document.getElementById('step2-badge').classList.remove('active');
+    document.getElementById('step2-indicator').classList.add('text-muted');
+    document.getElementById('step2-indicator').classList.remove('text-success');
+};
+
+// ── Registration Submission ─────────────────────────────────────────────────
 window.doRegister = async function() {
     const errDiv = document.getElementById('error-alert');
     const sucDiv = document.getElementById('success-alert');
@@ -148,6 +275,7 @@ window.doRegister = async function() {
     const btn = document.getElementById('reg-btn');
     errDiv.classList.add('d-none');
     sucDiv.classList.add('d-none');
+
     const payload = {
         username: document.getElementById('username').value.trim(),
         email: document.getElementById('email').value.trim(),
@@ -157,14 +285,15 @@ window.doRegister = async function() {
         password2: document.getElementById('password2').value,
     };
 
-    if (!payload.username || !payload.email || !payload.password) {
-        errDiv.textContent = gettext('Username, email and password are required.');
+    if (!payload.username || !payload.email) {
+        goToStep1();
+        errDiv.textContent = gettext('Username and email are required.');
         errDiv.classList.remove('d-none');
         return;
     }
 
-    if (!emailRegex.test(payload.email)) {
-        errDiv.textContent = gettext('Please enter a valid email address.');
+    if (!payload.password || !payload.password2) {
+        errDiv.textContent = gettext('Please enter and confirm your password.');
         errDiv.classList.remove('d-none');
         return;
     }
@@ -255,12 +384,9 @@ function getCookie(name) {
 
 // ── Google Sign-In ───────────────────────────────────────────────────────────
 function getOptimalGoogleButtonWidth() {
-    const fullBtn = document.getElementById('reg-btn');
     const cardBody = document.querySelector('.auth-card .card-body') || document.querySelector('.card-body');
     let width = 320;
-    if (fullBtn && fullBtn.offsetWidth > 0) {
-        width = fullBtn.offsetWidth;
-    } else if (cardBody && cardBody.clientWidth > 0) {
+    if (cardBody && cardBody.clientWidth > 0) {
         const padLeft = parseInt(window.getComputedStyle(cardBody).paddingLeft, 10) || 16;
         const padRight = parseInt(window.getComputedStyle(cardBody).paddingRight, 10) || 16;
         width = cardBody.clientWidth - padLeft - padRight;
@@ -356,22 +482,38 @@ async function handleGoogleCredential(response) {
 }
 
 // Enter key order
-const fieldOrder = ['username', 'email', 'phone', 'role', 'password', 'password2'];
+document.getElementById('username').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('email').focus();
+    }
+});
 
-fieldOrder.forEach((id, idx) => {
-    const el = document.getElementById(id);
-    if (el) {
-        el.addEventListener('keydown', e => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const nextId = fieldOrder[idx + 1];
-                if (nextId) {
-                    document.getElementById(nextId).focus();
-                } else {
-                    doRegister();
-                }
-            }
-        });
+document.getElementById('email').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('phone').focus();
+    }
+});
+
+document.getElementById('phone').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        goToStep2();
+    }
+});
+
+document.getElementById('password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('password2').focus();
+    }
+});
+
+document.getElementById('password2').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        doRegister();
     }
 });
 
