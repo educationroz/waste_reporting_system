@@ -1,37 +1,37 @@
 {% extends 'web_app/base.html' %}
 {% load i18n %}
 {% load static %}
-{% block title %}{% trans "Personal Settings — Safha Sahar" %}{% endblock %}
+{% block title %}{% trans "Settings — Safha Sahar" %}{% endblock %}
 
 {% block extra_css %}
 <style>
     .settings-container {
-        max-width: 1140px;
+        max-width: 1040px;
         margin: 0 auto;
     }
 
     .settings-nav-card {
         background: var(--bg-card, #ffffff);
         border: 1px solid var(--border-color, #e2e8f0);
-        border-radius: 16px;
+        border-radius: 14px;
     }
 
     .settings-content-card {
         background: var(--bg-card, #ffffff);
         border: 1px solid var(--border-color, #e2e8f0);
-        border-radius: 16px;
-        min-height: 520px;
+        border-radius: 14px;
+        min-height: 440px;
     }
 
     .settings-tab-btn {
         color: var(--text-primary, #334155);
         border-radius: 10px;
         font-weight: 500;
-        font-size: 0.92rem;
-        padding: 10px 14px;
+        font-size: 0.95rem;
+        padding: 12px 16px;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
         border: none;
         background: transparent;
         width: 100%;
@@ -48,7 +48,7 @@
         background: #198754;
         color: #ffffff !important;
         font-weight: 600;
-        box-shadow: 0 2px 8px rgba(25, 135, 84, 0.25);
+        box-shadow: 0 2px 6px rgba(25, 135, 84, 0.22);
     }
 
     .settings-tab-btn.active i {
@@ -57,18 +57,18 @@
 
     .profile-pic-wrapper {
         position: relative;
-        width: 110px;
-        height: 110px;
+        width: 105px;
+        height: 105px;
         margin: 0 auto;
     }
 
     .profile-pic-wrapper img {
-        width: 110px;
-        height: 110px;
+        width: 105px;
+        height: 105px;
         object-fit: cover;
         border-radius: 50%;
         border: 3px solid var(--bg-card, #ffffff);
-        box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+        box-shadow: 0 3px 12px rgba(0,0,0,0.1);
     }
 
     .profile-pic-edit-btn {
@@ -86,35 +86,8 @@
         box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
 
-    .theme-card-option {
-        border: 2px solid var(--border-color, #e2e8f0);
-        border-radius: 12px;
-        padding: 16px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        background: var(--bg-card, #ffffff);
-    }
-
-    .theme-card-option:hover {
-        border-color: #198754;
-        transform: translateY(-2px);
-    }
-
-    .theme-card-option.active {
-        border-color: #198754;
-        background: rgba(25, 135, 84, 0.05);
-        box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.15);
-    }
-
-    .stat-mini-card {
-        border: 1px solid var(--border-color, #e2e8f0);
-        border-radius: 12px;
-        padding: 12px 14px;
-        background: var(--bg-card, #ffffff);
-    }
-
     .pwd-strength-bar {
-        height: 6px;
+        height: 5px;
         border-radius: 3px;
         transition: all 0.3s ease;
     }
@@ -125,14 +98,14 @@
             overflow-x: auto;
             flex-wrap: nowrap;
             gap: 6px;
-            padding-bottom: 8px;
+            padding-bottom: 6px;
             -webkit-overflow-scrolling: touch;
         }
         .settings-tab-btn {
             white-space: nowrap;
             width: auto;
-            padding: 8px 12px;
-            font-size: 0.85rem;
+            padding: 8px 14px;
+            font-size: 0.88rem;
         }
     }
 </style>
@@ -150,61 +123,22 @@
         <!-- RIGHT CONTENT -->
         <div class="content-col">
 
-            <!-- Page Title & Header -->
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                <div>
-                    <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
-                        <i class="bi bi-person-gear text-success"></i>
-                        <span>{% trans "Personal Settings & Account Center" %}</span>
-                    </h4>
-                    <p class="text-muted small mb-0">
-                        {% trans "Manage your profile identity, security, device biometrics, theme, and data preferences." %}
-                    </p>
-                </div>
-                <div class="d-flex gap-2">
-                    <a href="{% if user.role == 'admin' %}{% url 'admin-dashboard' %}{% elif user.role == 'driver' %}{% url 'driver-dashboard' %}{% else %}{% url 'home' %}{% endif %}" class="btn btn-sm btn-outline-secondary px-3">
-                        <i class="bi bi-house-door me-1"></i>{% trans "Dashboard" %}
-                    </a>
-                </div>
-            </div>
-
             <div class="row g-3">
                 <!-- Settings Navigation Column -->
                 <div class="col-12 col-md-4 col-lg-3">
                     <div class="card shadow-sm settings-nav-card p-2 p-md-3">
-                        <div class="d-none d-md-flex align-items-center gap-3 p-2 mb-2 border-bottom">
-                            <img src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}https://ui-avatars.com/api/?name={{ user.username|urlencode }}&background=198754&color=fff&size=64{% endif %}"
-                                 alt="Avatar" width="44" height="44" class="rounded-circle border" style="object-fit: cover;" id="sidebar-preview-avatar">
-                            <div class="overflow-hidden">
-                                <div class="fw-bold text-truncate small">{{ user.get_full_name|default:user.username }}</div>
-                                <span class="badge bg-success bg-opacity-10 text-success p-1 font-monospace" style="font-size:0.7rem;">{{ user.get_role_display }}</span>
-                            </div>
-                        </div>
-
-                        <div class="settings-nav-pill-group nav flex-md-column">
+                        <div class="settings-nav-pill-group nav flex-md-column gap-1">
                             <button class="settings-tab-btn active" id="tab-btn-profile" onclick="switchSettingsTab('profile')">
                                 <i class="bi bi-person-circle text-success fs-5"></i>
-                                <span>{% trans "Profile & Identity" %}</span>
+                                <span>{% trans "Profile" %}</span>
                             </button>
                             <button class="settings-tab-btn" id="tab-btn-security" onclick="switchSettingsTab('security')">
                                 <i class="bi bi-shield-lock text-primary fs-5"></i>
-                                <span>{% trans "Password & Security" %}</span>
+                                <span>{% trans "Password" %}</span>
                             </button>
                             <button class="settings-tab-btn" id="tab-btn-biometrics" onclick="switchSettingsTab('biometrics')">
                                 <i class="bi bi-fingerprint text-info fs-5"></i>
-                                <span>{% trans "Biometrics & Passkeys" %}</span>
-                            </button>
-                            <button class="settings-tab-btn" id="tab-btn-appearance" onclick="switchSettingsTab('appearance')">
-                                <i class="bi bi-palette text-warning fs-5"></i>
-                                <span>{% trans "Display & Theme" %}</span>
-                            </button>
-                            <button class="settings-tab-btn" id="tab-btn-notifications" onclick="switchSettingsTab('notifications')">
-                                <i class="bi bi-bell text-danger fs-5"></i>
-                                <span>{% trans "Notification Alerts" %}</span>
-                            </button>
-                            <button class="settings-tab-btn" id="tab-btn-privacy" onclick="switchSettingsTab('privacy')">
-                                <i class="bi bi-shield-check text-secondary fs-5"></i>
-                                <span>{% trans "Data & Privacy" %}</span>
+                                <span>{% trans "Biometrics" %}</span>
                             </button>
                         </div>
                     </div>
@@ -215,14 +149,11 @@
                     <div class="card shadow-sm settings-content-card p-3 p-md-4">
 
                         <!-- ══════════════════════════════════════════════════════
-                             TAB 1: PROFILE & IDENTITY
+                             TAB 1: PROFILE
                              ══════════════════════════════════════════════════════ -->
                         <div id="settings-tab-content-profile" class="settings-tab-pane">
                             <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
-                                <div>
-                                    <h5 class="fw-bold mb-0">{% trans "Profile & Personal Information" %}</h5>
-                                    <p class="text-muted small mb-0">{% trans "Update your contact details and public account identity." %}</p>
-                                </div>
+                                <h5 class="fw-bold mb-0">{% trans "Profile Settings" %}</h5>
                                 <span class="badge bg-success bg-opacity-10 text-success px-3 py-1.5 rounded-pill">
                                     <i class="bi bi-person-badge me-1"></i>{{ user.get_role_display }}
                                 </span>
@@ -241,34 +172,6 @@
                                     </div>
                                     <h5 class="fw-bold mt-2 mb-0">{{ user.get_full_name|default:user.username }}</h5>
                                     <div class="text-muted small">@{{ user.username }} &bull; {{ user.email }}</div>
-                                </div>
-
-                                <!-- Activity Snapshot -->
-                                <div class="row g-2 mb-4">
-                                    <div class="col-6 col-sm-3">
-                                        <div class="stat-mini-card text-center">
-                                            <div class="text-muted small">{% trans "Total Requests" %}</div>
-                                            <div class="fs-5 fw-bold text-success">{{ user_total_requests|default:0 }}</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-sm-3">
-                                        <div class="stat-mini-card text-center">
-                                            <div class="text-muted small">{% trans "Completed" %}</div>
-                                            <div class="fs-5 fw-bold text-primary">{{ user_completed_requests|default:0 }}</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-sm-3">
-                                        <div class="stat-mini-card text-center">
-                                            <div class="text-muted small">{% trans "Pending" %}</div>
-                                            <div class="fs-5 fw-bold text-warning">{{ user_pending_requests|default:0 }}</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-sm-3">
-                                        <div class="stat-mini-card text-center">
-                                            <div class="text-muted small">{% trans "Complaints" %}</div>
-                                            <div class="fs-5 fw-bold text-danger">{{ user_complaints_count|default:0 }}</div>
-                                        </div>
-                                    </div>
                                 </div>
 
                                 <div class="row g-3">
@@ -298,7 +201,7 @@
                                         <label class="form-label small fw-semibold">{% trans "Account Registered" %}</label>
                                         <div class="input-group">
                                             <span class="input-group-text bg-light"><i class="bi bi-calendar-check"></i></span>
-                                            <input type="text" class="form-control bg-light" value="{{ user.created_at|date:'d M Y, H:i' }}" disabled>
+                                            <input type="text" class="form-control bg-light" value="{{ user.created_at|date:'d M Y' }}" disabled>
                                         </div>
                                     </div>
                                     <div class="col-12">
@@ -306,14 +209,14 @@
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
                                             <textarea id="profile-address" name="address" class="form-control" rows="2"
-                                                      placeholder="{% trans 'Enter your street, toll, or ward number for pickup dispatch' %}">{{ user.address|default:'' }}</textarea>
+                                                      placeholder="{% trans 'Enter your street, toll, or ward area' %}">{{ user.address|default:'' }}</textarea>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div class="d-flex justify-content-end mt-4">
                                     <button type="submit" id="profile-save-btn" class="btn btn-success px-4 fw-semibold shadow-xs">
-                                        <i class="bi bi-check2-circle me-1"></i>{% trans "Save Profile Changes" %}
+                                        <i class="bi bi-check2-circle me-1"></i>{% trans "Save Changes" %}
                                     </button>
                                 </div>
                             </form>
@@ -324,12 +227,9 @@
                              ══════════════════════════════════════════════════════ -->
                         <div id="settings-tab-content-security" class="settings-tab-pane d-none">
                             <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
-                                <div>
-                                    <h5 class="fw-bold mb-0">{% trans "Password & Account Security" %}</h5>
-                                    <p class="text-muted small mb-0">{% trans "Manage your password authentication and session protection." %}</p>
-                                </div>
+                                <h5 class="fw-bold mb-0">{% trans "Change Password" %}</h5>
                                 <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-1.5 rounded-pill">
-                                    <i class="bi bi-shield-lock me-1"></i>{% trans "Secured" %}
+                                    <i class="bi bi-shield-lock me-1"></i>{% trans "Security" %}
                                 </span>
                             </div>
 
@@ -338,14 +238,14 @@
                                     <div class="col-12">
                                         <label class="form-label small fw-semibold">{% trans "Current Password *" %}</label>
                                         <div class="position-relative">
-                                            <input type="password" id="old_password" class="form-control pe-5" required placeholder="{% trans 'Enter your current password' %}">
+                                            <input type="password" id="old_password" class="form-control pe-5" required placeholder="{% trans 'Enter current password' %}">
                                             <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style="cursor: pointer;" onclick="togglePwdVisibility('old_password', this)"></i>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label small fw-semibold">{% trans "New Password *" %}</label>
                                         <div class="position-relative">
-                                            <input type="password" id="new_password" class="form-control pe-5" required minlength="8" placeholder="{% trans 'Minimum 8 characters' %}" oninput="checkPwdStrength(this.value)">
+                                            <input type="password" id="new_password" class="form-control pe-5" required minlength="8" placeholder="{% trans 'Min. 8 characters' %}" oninput="checkPwdStrength(this.value)">
                                             <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style="cursor: pointer;" onclick="togglePwdVisibility('new_password', this)"></i>
                                         </div>
                                         <div class="progress mt-2 pwd-strength-bar bg-light" style="height: 5px;">
@@ -364,15 +264,6 @@
                                     </div>
                                 </div>
 
-                                <div class="card bg-light-subtle border p-3 mt-3 rounded-3">
-                                    <h6 class="fw-bold small mb-2"><i class="bi bi-info-circle text-primary me-1"></i>{% trans "Password Security Rules" %}</h6>
-                                    <ul class="small text-muted mb-0 ps-3">
-                                        <li>{% trans "Must be at least 8 characters long." %}</li>
-                                        <li>{% trans "Use a mix of uppercase, lowercase, numbers, and symbols." %}</li>
-                                        <li>{% trans "Never share your credentials with anyone." %}</li>
-                                    </ul>
-                                </div>
-
                                 <div class="d-flex justify-content-end mt-4">
                                     <button type="submit" id="change-pwd-btn" class="btn btn-outline-success px-4 fw-semibold shadow-xs">
                                         <i class="bi bi-key me-1"></i>{% trans "Update Password" %}
@@ -382,21 +273,18 @@
                         </div>
 
                         <!-- ══════════════════════════════════════════════════════
-                             TAB 3: BIOMETRICS & PASSKEYS (Multi-Account WebAuthn)
+                             TAB 3: BIOMETRICS & PASSKEYS (Multi-Account)
                              ══════════════════════════════════════════════════════ -->
                         <div id="settings-tab-content-biometrics" class="settings-tab-pane d-none">
                             <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
-                                <div>
-                                    <h5 class="fw-bold mb-0">{% trans "Device Biometrics & Passkeys" %}</h5>
-                                    <p class="text-muted small mb-0">{% trans "Manage 1-tap Fingerprint, Face ID, or Windows Hello authentication for this device." %}</p>
-                                </div>
+                                <h5 class="fw-bold mb-0">{% trans "Device Biometrics" %}</h5>
                                 <span id="biometric-status-badge" class="badge bg-secondary bg-opacity-10 text-secondary px-3 py-1.5 rounded-pill small">
                                     {% trans "Checking sensor..." %}
                                 </span>
                             </div>
 
-                            <!-- Current Account Enrollment Status -->
-                            <div class="card border p-3 mb-4 rounded-3 bg-light-subtle">
+                            <!-- Current Account Status -->
+                            <div class="card border p-3 mb-3 rounded-3 bg-light-subtle">
                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="p-2 rounded-circle bg-success bg-opacity-10 text-success">
@@ -408,175 +296,31 @@
                                         </div>
                                     </div>
                                     <div id="current-acc-bio-actions" class="d-flex gap-2">
-                                        <!-- Dynamic buttons injected via JS -->
+                                        <!-- Buttons injected via JS -->
                                     </div>
                                 </div>
                                 <p class="text-muted small mb-0" id="current-acc-bio-desc">
-                                    {% trans "Enabling biometrics securely links this browser / device platform authenticator (Touch ID, Windows Hello, Fingerprint) to your account." %}
+                                    {% trans "Enable 1-tap Fingerprint / Face ID login on this device for this account." %}
                                 </p>
                             </div>
 
-                            <!-- Multi-Account Browser Manager (User requested separate accounts support) -->
+                            <!-- Multi-Account Browser Passkeys -->
                             <div class="card border p-3 rounded-3">
                                 <div class="d-flex align-items-center justify-content-between mb-2">
                                     <h6 class="fw-bold mb-0 d-flex align-items-center gap-1.5">
                                         <i class="bi bi-people text-primary"></i>
-                                        <span>{% trans "All Biometric Accounts Saved on this Browser" %}</span>
+                                        <span>{% trans "Saved Biometric Accounts on this Browser" %}</span>
                                     </h6>
                                     <button type="button" class="btn btn-sm btn-outline-danger py-0.5 px-2" onclick="clearAllDeviceBiometrics()">
                                         <i class="bi bi-trash3 me-1"></i>{% trans "Clear All" %}
                                     </button>
                                 </div>
                                 <p class="text-muted small mb-3">
-                                    {% trans "Multiple users can have their own independent biometric passkeys on this device. Select or remove profiles below." %}
+                                    {% trans "Different accounts can have their own biometric passkey on this device." %}
                                 </p>
 
                                 <div id="multi-account-bio-list" class="d-flex flex-column gap-2">
                                     <!-- Injected via renderMultiAccountBioList() -->
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- ══════════════════════════════════════════════════════
-                             TAB 4: DISPLAY & THEME
-                             ══════════════════════════════════════════════════════ -->
-                        <div id="settings-tab-content-appearance" class="settings-tab-pane d-none">
-                            <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
-                                <div>
-                                    <h5 class="fw-bold mb-0">{% trans "Display & Theme Preferences" %}</h5>
-                                    <p class="text-muted small mb-0">{% trans "Customize interface appearance, color scheme, and typography." %}</p>
-                                </div>
-                            </div>
-
-                            <label class="form-label small fw-semibold mb-2">{% trans "Choose Interface Theme" %}</label>
-                            <div class="row g-3 mb-4">
-                                <div class="col-12 col-sm-4">
-                                    <div class="theme-card-option text-center" id="theme-card-light" onclick="setAppTheme('light')">
-                                        <i class="bi bi-sun-fill fs-2 text-warning mb-2 d-block"></i>
-                                        <h6 class="fw-bold mb-1">{% trans "Light Mode" %}</h6>
-                                        <p class="text-muted small mb-0">{% trans "Clean daylight contrast" %}</p>
-                                    </div>
-                                </div>
-                                <div class="col-12 col-sm-4">
-                                    <div class="theme-card-option text-center" id="theme-card-dark" onclick="setAppTheme('dark')">
-                                        <i class="bi bi-moon-stars-fill fs-2 text-primary mb-2 d-block"></i>
-                                        <h6 class="fw-bold mb-1">{% trans "Dark Mode" %}</h6>
-                                        <p class="text-muted small mb-0">{% trans "Low eye strain & OLED" %}</p>
-                                    </div>
-                                </div>
-                                <div class="col-12 col-sm-4">
-                                    <div class="theme-card-option text-center" id="theme-card-auto" onclick="setAppTheme('auto')">
-                                        <i class="bi bi-laptop fs-2 text-success mb-2 d-block"></i>
-                                        <h6 class="fw-bold mb-1">{% trans "System Auto" %}</h6>
-                                        <p class="text-muted small mb-0">{% trans "Follows device OS" %}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <hr class="my-4" style="border-color: var(--border-color);">
-
-                            <h6 class="fw-bold mb-2">{% trans "Interface Density" %}</h6>
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="compactUiToggle" onchange="toggleCompactUI(this.checked)">
-                                <label class="form-check-label small" for="compactUiToggle">
-                                    {% trans "Compact density mode (condensed table rows and smaller padding)" %}
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- ══════════════════════════════════════════════════════
-                             TAB 5: NOTIFICATION PREFERENCES
-                             ══════════════════════════════════════════════════════ -->
-                        <div id="settings-tab-content-notifications" class="settings-tab-pane d-none">
-                            <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
-                                <div>
-                                    <h5 class="fw-bold mb-0">{% trans "Notification Alerts & Audio Preferences" %}</h5>
-                                    <p class="text-muted small mb-0">{% trans "Control what notifications you receive in real time." %}</p>
-                                </div>
-                            </div>
-
-                            <div class="d-flex flex-column gap-3 mb-4">
-                                <div class="d-flex align-items-center justify-content-between p-3 rounded-3 border bg-body">
-                                    <div class="me-3">
-                                        <h6 class="fw-bold mb-1"><i class="bi bi-truck text-success me-1.5"></i>{% trans "Live Driver GPS & Truck Arrival Alerts" %}</h6>
-                                        <p class="text-muted small mb-0">{% trans "Receive real-time push alerts when a municipal collection vehicle is approaching your pickup point." %}</p>
-                                    </div>
-                                    <div class="form-check form-switch fs-5">
-                                        <input class="form-check-input" type="checkbox" id="prefGpsAlerts" checked onchange="saveNotificationPref()">
-                                    </div>
-                                </div>
-
-                                <div class="d-flex align-items-center justify-content-between p-3 rounded-3 border bg-body">
-                                    <div class="me-3">
-                                        <h6 class="fw-bold mb-1"><i class="bi bi-check-circle text-primary me-1.5"></i>{% trans "Request Status Updates" %}</h6>
-                                        <p class="text-muted small mb-0">{% trans "Instant notifications when your waste pickup request is assigned, in-progress, or completed." %}</p>
-                                    </div>
-                                    <div class="form-check form-switch fs-5">
-                                        <input class="form-check-input" type="checkbox" id="prefStatusAlerts" checked onchange="saveNotificationPref()">
-                                    </div>
-                                </div>
-
-                                <div class="d-flex align-items-center justify-content-between p-3 rounded-3 border bg-body">
-                                    <div class="me-3">
-                                        <h6 class="fw-bold mb-1"><i class="bi bi-volume-up text-warning me-1.5"></i>{% trans "Audible Sound Chime" %}</h6>
-                                        <p class="text-muted small mb-0">{% trans "Play a gentle notification chime sound when new live updates arrive." %}</p>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="testNotificationSound()">
-                                            <i class="bi bi-play-fill"></i> {% trans "Test Sound" %}
-                                        </button>
-                                        <div class="form-check form-switch fs-5 mb-0">
-                                            <input class="form-check-input" type="checkbox" id="prefSoundAlerts" checked onchange="saveNotificationPref()">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- ══════════════════════════════════════════════════════
-                             TAB 6: DATA & PRIVACY CENTER
-                             ══════════════════════════════════════════════════════ -->
-                        <div id="settings-tab-content-privacy" class="settings-tab-pane d-none">
-                            <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
-                                <div>
-                                    <h5 class="fw-bold mb-0">{% trans "Data, Privacy & Account Center" %}</h5>
-                                    <p class="text-muted small mb-0">{% trans "Export your account data archive, clear local cache, and manage active sessions." %}</p>
-                                </div>
-                            </div>
-
-                            <div class="card border p-3 rounded-3 mb-3">
-                                <h6 class="fw-bold mb-1"><i class="bi bi-download text-success me-1.5"></i>{% trans "Export & Download Account Data" %}</h6>
-                                <p class="text-muted small mb-3">
-                                    {% trans "Download a complete JSON archive of your personal profile, waste collection requests history, and complaint records." %}
-                                </p>
-                                <div>
-                                    <button type="button" class="btn btn-outline-success btn-sm px-3 py-2 fw-semibold" onclick="exportMyDataArchive(this)">
-                                        <i class="bi bi-file-earmark-arrow-down me-1.5"></i>{% trans "Export My Data (JSON)" %}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="card border p-3 rounded-3 mb-3">
-                                <h6 class="fw-bold mb-1"><i class="bi bi-database text-info me-1.5"></i>{% trans "Clear Browser Cache & Offline Storage" %}</h6>
-                                <p class="text-muted small mb-3">
-                                    {% trans "Removes stored guest tokens, offline map cache, and temporary interface states without logging you out." %}
-                                </p>
-                                <div>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm px-3 py-2 fw-semibold" onclick="clearClientCache()">
-                                        <i class="bi bi-arrow-clockwise me-1.5"></i>{% trans "Clear Device Storage" %}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="card border border-danger-subtle bg-danger-subtle bg-opacity-10 p-3 rounded-3">
-                                <h6 class="fw-bold text-danger mb-1"><i class="bi bi-box-arrow-right me-1.5"></i>{% trans "Sign Out of Safha Sahar" %}</h6>
-                                <p class="text-muted small mb-3">
-                                    {% trans "End your active session on this device." %}
-                                </p>
-                                <div>
-                                    <button type="button" class="btn btn-danger btn-sm px-3 py-2 fw-semibold" onclick="confirmSignOut()">
-                                        <i class="bi bi-box-arrow-right me-1.5"></i>{% trans "Sign Out" %}
-                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -602,7 +346,7 @@
 
     // ── Tab Switching ────────────────────────────────────────────────────────
     window.switchSettingsTab = function(tabName) {
-        const tabs = ['profile', 'security', 'biometrics', 'appearance', 'notifications', 'privacy'];
+        const tabs = ['profile', 'security', 'biometrics'];
         tabs.forEach(t => {
             const btn = document.getElementById('tab-btn-' + t);
             const pane = document.getElementById('settings-tab-content-' + t);
@@ -618,10 +362,9 @@
         window.location.hash = tabName;
     };
 
-    // Auto-select tab based on URL hash
     function checkInitialTab() {
         const hash = (window.location.hash || '').replace('#', '');
-        const valid = ['profile', 'security', 'biometrics', 'appearance', 'notifications', 'privacy'];
+        const valid = ['profile', 'security', 'biometrics'];
         if (valid.includes(hash)) {
             switchSettingsTab(hash);
         } else {
@@ -633,7 +376,6 @@
     // ── Profile Photo & Edit ────────────────────────────────────────────────
     const picInput = document.getElementById('profile-pic-input');
     const picPreview = document.getElementById('profile-pic-preview');
-    const sidebarAvatar = document.getElementById('sidebar-preview-avatar');
     const profileForm = document.getElementById('profile-form');
 
     if (picInput) {
@@ -643,7 +385,6 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 picPreview.src = e.target.result;
-                if (sidebarAvatar) sidebarAvatar.src = e.target.result;
             };
             reader.readAsDataURL(file);
         });
@@ -683,7 +424,6 @@
                             window.updateNavbarAvatar(newPicUrl || picPreview.src);
                         }
 
-                        // Update biometric account profile cache if enrolled
                         updateBiometricProfileAvatar(newPicUrl || picPreview.src);
                     } else {
                         showToast(gettext('Failed to update profile.'), 'danger');
@@ -824,7 +564,7 @@
         if (!isSupported) {
             if (badge) {
                 badge.className = 'badge bg-secondary bg-opacity-10 text-secondary px-3 py-1.5 rounded-pill small';
-                badge.textContent = gettext('Not Supported on this Browser');
+                badge.textContent = gettext('Not Supported');
             }
             if (statusText) statusText.textContent = gettext('WebAuthn biometrics unavailable.');
             if (actionsDiv) actionsDiv.innerHTML = `<button class="btn btn-sm btn-secondary disabled">${gettext('Unavailable')}</button>`;
@@ -835,10 +575,10 @@
         if (isCurrentEnrolled) {
             if (badge) {
                 badge.className = 'badge bg-success bg-opacity-10 text-success px-3 py-1.5 rounded-pill small';
-                badge.innerHTML = '<i class="bi bi-shield-check me-1"></i>' + gettext('Active on this Device');
+                badge.innerHTML = '<i class="bi bi-shield-check me-1"></i>' + gettext('Active');
             }
             if (statusText) statusText.textContent = gettext('Enrolled: ') + (accounts[CURRENT_USER].enrolledAt ? new Date(accounts[CURRENT_USER].enrolledAt).toLocaleDateString() : gettext('Active'));
-            if (descEl) descEl.textContent = gettext('You can sign in with 1-tap Fingerprint / Face ID from the login screen on this device without typing your password.');
+            if (descEl) descEl.textContent = gettext('You can sign in with 1-tap Fingerprint / Face ID from the login screen on this device.');
             if (actionsDiv) {
                 actionsDiv.innerHTML = `
                     <button type="button" class="btn btn-outline-info btn-sm fw-semibold" onclick="testCurrentBiometricSensor()">
@@ -854,7 +594,7 @@
                 badge.className = 'badge bg-info bg-opacity-10 text-info px-3 py-1.5 rounded-pill small';
                 badge.innerHTML = '<i class="bi bi-check-circle me-1"></i>' + gettext('Sensor Ready');
             }
-            if (statusText) statusText.textContent = gettext('Not yet enabled for this account.');
+            if (statusText) statusText.textContent = gettext('Not enabled for this account.');
             if (actionsDiv) {
                 actionsDiv.innerHTML = `
                     <button type="button" class="btn btn-success btn-sm px-3 py-1.5 fw-semibold shadow-xs" onclick="enrollCurrentAccountBiometric(this)">
@@ -897,9 +637,8 @@
                     });
                 }
 
-                // Obtain signed server token for this account
                 const res = await authFetch('/auth/biometric-register-token/', { method: 'POST' });
-                if (!res || !res.ok) throw new Error('Could not obtain biometric auth token from server.');
+                if (!res || !res.ok) throw new Error('Could not obtain biometric auth token.');
 
                 const data = await res.json();
                 const accounts = getBioAccounts();
@@ -916,14 +655,14 @@
                 saveBioAccounts(accounts);
                 localStorage.setItem('ss_last_biometric_user', CURRENT_USER);
 
-                showToast(gettext('Biometrics (Fingerprint / Face ID) successfully enrolled for this account!'), 'success');
+                showToast(gettext('Biometrics enrolled successfully!'), 'success');
                 checkBiometricsSection();
             } catch (err) {
                 console.warn('Biometric enroll notice:', err);
                 if (err.name === 'NotAllowedError') {
                     showToast(gettext('Biometric sensor cancelled or permission denied.'), 'warning');
                 } else {
-                    showToast(gettext('Biometric registration completed for this browser.'), 'success');
+                    showToast(gettext('Biometrics enabled for this browser.'), 'success');
                     checkBiometricsSection();
                 }
             }
@@ -944,7 +683,7 @@
                     }
                 });
             }
-            showToast(gettext('Sensor verified successfully! Your biometric passkey is working.'), 'success');
+            showToast(gettext('Sensor verified successfully!'), 'success');
         } catch (e) {
             showToast(gettext('Biometric prompt cancelled.'), 'info');
         }
@@ -953,7 +692,7 @@
     window.removeCurrentAccountBiometric = async function() {
         const ok = await showConfirmDialog({
             title: gettext('Disable Biometrics?'),
-            message: gettext('Are you sure you want to remove biometric authentication for this account on this device?'),
+            message: gettext('Are you sure you want to remove biometric authentication for this account?'),
             confirmText: gettext('Remove'),
             cancelText: gettext('Cancel'),
             confirmBtnClass: 'btn-danger',
@@ -982,7 +721,7 @@
         const accounts = getBioAccounts();
         delete accounts[username];
         saveBioAccounts(accounts);
-        showToast(`${gettext('Profile')} @${username} ${gettext('removed from device.')}`, 'info');
+        showToast(`${gettext('Profile')} @${username} ${gettext('removed.')}`, 'info');
         checkBiometricsSection();
     };
 
@@ -1023,7 +762,7 @@
             html += `
                 <div class="d-flex align-items-center justify-content-between p-2.5 rounded-3 border bg-body">
                     <div class="d-flex align-items-center gap-2.5 overflow-hidden">
-                        <img src="${avatarSrc}" width="34" height="34" class="rounded-circle border" style="object-fit:cover;">
+                        <img src="${avatarSrc}" width="32" height="32" class="rounded-circle border" style="object-fit:cover;">
                         <div class="overflow-hidden">
                             <div class="fw-bold small text-truncate d-flex align-items-center gap-1.5">
                                 <span>${acc.displayName || acc.username}</span>
@@ -1040,120 +779,6 @@
         });
         listDiv.innerHTML = html;
     }
-
-    // ── Display & Theme Logic ────────────────────────────────────────────────
-    window.setAppTheme = function(theme) {
-        let applied = theme;
-        if (theme === 'auto') {
-            applied = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
-        }
-        document.documentElement.setAttribute('data-theme', applied);
-        try { localStorage.setItem('safhasahar_theme', theme); } catch (e) {}
-
-        if (typeof applyThemeIcon === 'function') {
-            applyThemeIcon(applied);
-        }
-
-        updateThemeCardState(theme);
-        showToast(`${gettext('Theme set to')} ${theme.toUpperCase()}`, 'info');
-    };
-
-    function updateThemeCardState(theme) {
-        ['light', 'dark', 'auto'].forEach(t => {
-            const el = document.getElementById('theme-card-' + t);
-            if (el) {
-                if (t === theme) el.classList.add('active');
-                else el.classList.remove('active');
-            }
-        });
-    }
-
-    function initThemeState() {
-        const saved = localStorage.getItem('safhasahar_theme') || 'light';
-        updateThemeCardState(saved);
-    }
-    initThemeState();
-
-    window.toggleCompactUI = function(isCompact) {
-        if (isCompact) {
-            document.body.classList.add('compact-mode');
-            localStorage.setItem('ss_compact_ui', 'true');
-        } else {
-            document.body.classList.remove('compact-mode');
-            localStorage.removeItem('ss_compact_ui');
-        }
-    };
-    if (localStorage.getItem('ss_compact_ui') === 'true') {
-        const toggle = document.getElementById('compactUiToggle');
-        if (toggle) toggle.checked = true;
-        document.body.classList.add('compact-mode');
-    }
-
-    // ── Notifications Preferences & Sound Synthesizer ───────────────────────
-    window.saveNotificationPref = function() {
-        const prefs = {
-            gps: document.getElementById('prefGpsAlerts')?.checked ?? true,
-            status: document.getElementById('prefStatusAlerts')?.checked ?? true,
-            sound: document.getElementById('prefSoundAlerts')?.checked ?? true,
-        };
-        localStorage.setItem('ss_notif_prefs', JSON.stringify(prefs));
-        showToast(gettext('Notification preferences saved!'), 'success');
-    };
-
-    window.testNotificationSound = function() {
-        try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-            osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
-
-            gain.gain.setValueAtTime(0.15, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-
-            osc.start();
-            osc.stop(ctx.currentTime + 0.35);
-            showToast(gettext('Playing alert chime...'), 'info');
-        } catch (e) {
-            showToast(gettext('Audio preview unavailable.'), 'warning');
-        }
-    };
-
-    // ── Export & Privacy Center ─────────────────────────────────────────────
-    window.exportMyDataArchive = async function(btn) {
-        await withButtonBusy(eventButton(btn), gettext('Preparing Download...'), async () => {
-            const success = await downloadFile('/auth/export-data/', `account_data_${CURRENT_USER}.json`);
-            if (success) {
-                showToast(gettext('Data archive downloaded successfully!'), 'success');
-            }
-        });
-    };
-
-    window.clearClientCache = function() {
-        localStorage.removeItem('guest_claim_tokens');
-        sessionStorage.clear();
-        showToast(gettext('Client offline cache cleared.'), 'info');
-    };
-
-    window.confirmSignOut = async function() {
-        const ok = await showConfirmDialog({
-            title: gettext('Sign Out?'),
-            message: gettext('Are you sure you want to end your current session?'),
-            confirmText: gettext('Sign Out'),
-            confirmBtnClass: 'btn-danger',
-            icon: 'bi-box-arrow-right',
-            iconColor: '#dc2626',
-            iconBg: '#fee2e2'
-        });
-        if (ok && typeof logout === 'function') {
-            logout();
-        }
-    };
 
     checkBiometricsSection();
 })();
