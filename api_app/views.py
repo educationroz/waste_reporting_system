@@ -7,6 +7,7 @@ import tempfile
 from .backup_utils import BACKUP_DIR as BACKUP_DIR_FOR_UPLOADS
 from .backup_utils import BackupError, verify_backup_file
 from django.conf import settings
+from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.core.management import call_command

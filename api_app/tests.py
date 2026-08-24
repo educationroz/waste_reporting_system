@@ -364,3 +364,31 @@ class AdminLogDeletionAPITest(TestCase):
         response = self.client.post('/api/admin-logs/clear_all/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(AdminLog.objects.count(), 0)
+
+
+class SystemSettingsBrandingAPITest(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username='branding_admin',
+            password='StrongPass123!',
+            role='admin',
+            is_staff=True,
+            is_superadmin=True,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+
+    def test_save_and_get_branding(self):
+        payload = {
+            'site_name': 'Pokhara Safha Sahar',
+            'site_tagline': 'Smart Municipal Waste System',
+            'contact_email': 'contact@pokhara.gov.np',
+            'contact_phone': '061-520000',
+        }
+        save_resp = self.client.post('/api/system-settings/save_branding/', payload, format='multipart')
+        self.assertEqual(save_resp.status_code, 200)
+        self.assertEqual(save_resp.json()['data']['site_name'], 'Pokhara Safha Sahar')
+
+        get_resp = self.client.get('/api/system-settings/get_branding/')
+        self.assertEqual(get_resp.status_code, 200)
+        self.assertEqual(get_resp.json()['site_name'], 'Pokhara Safha Sahar')
