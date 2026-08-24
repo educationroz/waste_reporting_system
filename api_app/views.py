@@ -590,7 +590,7 @@ class DriverViewSet(viewsets.ModelViewSet):
     CRUD for driver profiles.
     Drivers can update their own location. Admins manage all.
     """
-    queryset = Driver.objects.select_related('user', 'vehicle').all()
+    queryset = Driver.objects.select_related('user', 'vehicle').order_by('-id')
     serializer_class = DriverSerializer
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [filters.SearchFilter]
@@ -2013,7 +2013,7 @@ class RouteViewSet(viewsets.ModelViewSet):
 
 class ScheduleViewSet(viewsets.ModelViewSet):
     """Recurring collection schedules. Admin manages, all read."""
-    queryset = Schedule.objects.select_related('driver__user', 'vehicle').all()
+    queryset = Schedule.objects.select_related('driver__user', 'vehicle').order_by('-id')
     serializer_class = ScheduleSerializer
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [filters.SearchFilter]
@@ -2189,7 +2189,7 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
     System-wide settings management.
     Create, read, update, delete settings. Admin-only.
     """
-    queryset = SystemSettings.objects.all()
+    queryset = SystemSettings.objects.all().order_by('key')
     serializer_class = SystemSettingsSerializer
     permission_classes = [IsAuthenticated, IsAdminUser]
     lookup_field = 'key'
