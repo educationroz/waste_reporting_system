@@ -14,6 +14,9 @@
                 <p class="text-muted small mb-0">{{ SITE_TAGLINE|default:"Live Waste Reporting System" }}</p>
             </div>
 
+            <!-- Fixed Role: Regular User -->
+            <input type="hidden" id="role" value="user">
+
             <!-- Step Progress Indicator -->
             <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
                 <div class="d-flex align-items-center gap-1.5 small fw-semibold" id="step1-indicator">
@@ -23,7 +26,7 @@
                 <div class="step-line" id="step-divider-line"></div>
                 <div class="d-flex align-items-center gap-1.5 small fw-semibold text-muted" id="step2-indicator">
                     <span class="step-badge" id="step2-badge">2</span>
-                    <span id="step2-label">{% trans "Password & Role" %}</span>
+                    <span id="step2-label">{% trans "Set Password" %}</span>
                 </div>
             </div>
 
@@ -73,19 +76,9 @@
             </div>
 
             <!-- ══════════════════════════════════════════════════════════════
-                 STEP 2: Role & Password Security
-                 ══════════════════════════════════════════════════════════════ -->
+                 STEP 2: Password Security (Fixed Citizen/User)
+                 ══════════════════════════════════════════════════════ -->
             <div id="reg-step-2" class="d-none">
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">{% trans "Account Role *" %}</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light"><i class="bi bi-person-badge"></i></span>
-                        <select id="role" class="form-select">
-                            <option value="user" selected>{% trans "Regular User / Citizen" %}</option>
-                        </select>
-                    </div>
-                </div>
-
                 <div class="mb-3">
                     <label class="form-label small fw-semibold">{% trans "Password *" %}</label>
                     <div class="position-relative">
@@ -280,7 +273,7 @@ window.doRegister = async function() {
         username: document.getElementById('username').value.trim(),
         email: document.getElementById('email').value.trim(),
         phone: document.getElementById('phone').value.trim(),
-        role: document.getElementById('role').value,
+        role: document.getElementById('role').value || 'user',
         password: document.getElementById('password').value,
         password2: document.getElementById('password2').value,
     };
@@ -482,92 +475,100 @@ async function handleGoogleCredential(response) {
 }
 
 // Enter key order
-document.getElementById('username').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        document.getElementById('email').focus();
-    }
-});
+const uname = document.getElementById('username');
+if (uname) {
+    uname.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const em = document.getElementById('email');
+            if (em) em.focus();
+        }
+    });
+}
 
-document.getElementById('email').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        document.getElementById('phone').focus();
-    }
-});
+const emEl = document.getElementById('email');
+if (emEl) {
+    emEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const ph = document.getElementById('phone');
+            if (ph) ph.focus();
+        }
+    });
+}
 
-document.getElementById('phone').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        goToStep2();
-    }
-});
+const phEl = document.getElementById('phone');
+if (phEl) {
+    phEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            goToStep2();
+        }
+    });
+}
 
-document.getElementById('password').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        document.getElementById('password2').focus();
-    }
-});
+const pwdEl = document.getElementById('password');
+if (pwdEl) {
+    pwdEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const pwd2 = document.getElementById('password2');
+            if (pwd2) pwd2.focus();
+        }
+    });
+}
 
-document.getElementById('password2').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        doRegister();
-    }
-});
+const pwd2El = document.getElementById('password2');
+if (pwd2El) {
+    pwd2El.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            doRegister();
+        }
+    });
+}
 
-function handlePasswordInput() {
+window.handlePasswordInput = function() {
     const pwdInput = document.getElementById('password');
     const icon = document.getElementById('toggle-password-icon');
-    if (pwdInput.value.length > 0) {
-        icon.style.display = 'block';
-    } else {
-        icon.style.display = 'none';
+    if (pwdInput && icon) {
+        icon.style.display = pwdInput.value.length > 0 ? 'block' : 'none';
     }
-}
-window.handlePasswordInput = handlePasswordInput;
+};
 
-function togglePassword() {
+window.togglePassword = function() {
     const pwdInput = document.getElementById('password');
     const icon = document.getElementById('toggle-password-icon');
+    if (!pwdInput || !icon) return;
     if (pwdInput.type === 'password') {
         pwdInput.type = 'text';
-        icon.classList.remove('bi-eye');
-        icon.classList.add('bi-eye-slash');
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
     } else {
         pwdInput.type = 'password';
-        icon.classList.remove('bi-eye-slash');
-        icon.classList.add('bi-eye');
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
     }
-}
-window.togglePassword = togglePassword;
+};
 
-function handlePassword2Input() {
+window.handlePassword2Input = function() {
     const pwdInput = document.getElementById('password2');
     const icon = document.getElementById('toggle-password2-icon');
-    if (pwdInput.value.length > 0) {
-        icon.style.display = 'block';
-    } else {
-        icon.style.display = 'none';
+    if (pwdInput && icon) {
+        icon.style.display = pwdInput.value.length > 0 ? 'block' : 'none';
     }
-}
-window.handlePassword2Input = handlePassword2Input;
+};
 
-function togglePassword2() {
+window.togglePassword2 = function() {
     const pwdInput = document.getElementById('password2');
     const icon = document.getElementById('toggle-password2-icon');
+    if (!pwdInput || !icon) return;
     if (pwdInput.type === 'password') {
         pwdInput.type = 'text';
-        icon.classList.remove('bi-eye');
-        icon.classList.add('bi-eye-slash');
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
     } else {
         pwdInput.type = 'password';
-        icon.classList.remove('bi-eye-slash');
-        icon.classList.add('bi-eye');
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
     }
-}
-window.togglePassword2 = togglePassword2;
+};
 })();
 </script>
 {% endblock %}
