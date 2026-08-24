@@ -102,3 +102,21 @@ class BiometricAuthTest(TestCase):
             content_type='application/json'
         )
         self.assertEqual(login_resp.status_code, 401)
+
+    def test_export_user_data_download(self):
+        self.client.force_login(self.user)
+        resp = self.client.get('/auth/export-data/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('application/json', resp['Content-Type'])
+        self.assertIn('attachment;', resp['Content-Disposition'])
+        data = resp.json()
+        self.assertEqual(data['account_info']['username'], 'bio_user')
+        self.assertIn('waste_requests', data)
+        self.assertIn('complaints', data)
+
+    def test_settings_page_routes(self):
+        self.client.force_login(self.user)
+        for url in ['/profile/', '/settings/']:
+            resp = self.client.get(url)
+            self.assertEqual(resp.status_code, 200)
+            self.assertContains(resp, 'Personal Settings')

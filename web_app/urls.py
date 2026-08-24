@@ -35,6 +35,7 @@ urlpatterns = [
     path('login/',    LoginPageView.as_view(),    name='login'),
     path('logout/',   web_logout,                 name='web-logout'),
     path('profile/', ProfilePageView.as_view(), name='profile'),
+    path('settings/', ProfilePageView.as_view(), name='personal-settings'),
     path('register/', RegisterPageView.as_view(), name='register'),
     # Password reset (pages only — the actual reset logic lives in
     # auth_app's /auth/password-reset/ and /auth/password-reset-confirm/

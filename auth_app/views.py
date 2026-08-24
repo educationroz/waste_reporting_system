@@ -2,8 +2,10 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
+from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.http import HttpResponse
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -110,11 +112,19 @@ class BiometricRegisterTokenView(APIView):
     def post(self, request):
         signer = TimestampSigner(salt='biometric-auth')
         signed_token = signer.sign(f"{request.user.id}:{request.user.username}")
+        user = request.user
+        profile_pic_url = user.profile_picture.url if getattr(user, 'profile_picture', None) else ''
+        role_display = user.get_role_display() if hasattr(user, 'get_role_display') else getattr(user, 'role', '')
         return Response({
             'message': 'Biometric token generated.',
             'token': signed_token,
-            'username': request.user.username,
-            'user_id': request.user.id,
+            'username': user.username,
+            'user_id': user.id,
+            'email': user.email,
+            'role': getattr(user, 'role', ''),
+            'role_display': role_display,
+            'full_name': user.get_full_name() or user.username,
+            'profile_picture': profile_pic_url,
         })
 
 
@@ -146,6 +156,8 @@ class BiometricLoginView(APIView):
 
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
 
+        profile_pic_url = user.profile_picture.url if getattr(user, 'profile_picture', None) else ''
+        role_display = user.get_role_display() if hasattr(user, 'get_role_display') else getattr(user, 'role', '')
         return Response({
             'message': 'Biometric login successful.',
             'user': {
@@ -153,8 +165,70 @@ class BiometricLoginView(APIView):
                 'username': user.username,
                 'email': user.email,
                 'role': getattr(user, 'role', ''),
+                'role_display': role_display,
+                'full_name': user.get_full_name() or user.username,
+                'profile_picture': profile_pic_url,
             },
         })
+
+
+class ExportUserDataView(APIView):
+    """Allows user to export and download their complete profile, waste requests, and complaints."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        from api_app.models import WasteRequest, Complaint
+
+        user_data = {
+            'exported_at': timezone.now().isoformat(),
+            'account_info': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'phone': getattr(user, 'phone', ''),
+                'address': getattr(user, 'address', ''),
+                'role': getattr(user, 'role', ''),
+                'is_verified': getattr(user, 'is_verified', False),
+                'date_joined': user.created_at.isoformat() if hasattr(user, 'created_at') else None,
+            },
+            'waste_requests': [],
+            'complaints': [],
+        }
+
+        reqs = WasteRequest.objects.filter(user=user).order_by('-created_at')
+        for r in reqs:
+            user_data['waste_requests'].append({
+                'id': r.id,
+                'waste_type': r.waste_type,
+                'status': r.status,
+                'pickup_address': r.pickup_address,
+                'latitude': float(r.latitude) if r.latitude else None,
+                'longitude': float(r.longitude) if r.longitude else None,
+                'notes': r.notes,
+                'created_at': r.created_at.isoformat() if r.created_at else None,
+                'completed_at': r.completed_at.isoformat() if r.completed_at else None,
+            })
+
+        complaints = Complaint.objects.filter(user=user).order_by('-created_at')
+        for c in complaints:
+            user_data['complaints'].append({
+                'id': c.id,
+                'complaint_type': c.complaint_type,
+                'title': c.title,
+                'description': c.description,
+                'status': c.status,
+                'created_at': c.created_at.isoformat() if c.created_at else None,
+                'resolved_at': c.resolved_at.isoformat() if c.resolved_at else None,
+            })
+
+        response = HttpResponse(
+            _json.dumps(user_data, indent=2),
+            content_type='application/json'
+        )
+        filename = f"safhasahar_account_{user.username}_{timezone.now().strftime('%Y%m%d')}.json"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
 
 @method_decorator(csrf_exempt, name='dispatch')

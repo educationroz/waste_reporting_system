@@ -537,3 +537,39 @@ nav.navbar {
         font-size: 0.85rem;
     }
 }
+
+/* Compact UI mode */
+body.compact-mode .table td,
+body.compact-mode .table th {
+    padding: 0.35rem 0.5rem !important;
+    font-size: 0.85rem !important;
+}
+
+body.compact-mode .card-body {
+    padding: 0.85rem !important;
+}
+
+body.compact-mode .form-control,
+body.compact-mode .form-select {
+    padding: 0.35rem 0.65rem !important;
+    font-size: 0.875rem !important;
+}
+
+/* Auth Pages Background */
+.auth-page-bg {
+    background-color: var(--bg-body, #f8f9fa);
+}
+
+[data-theme="dark"] .bg-light-subtle,
+[data-theme="dark"] .bg-body {
+    background-color: var(--bg-input, #24282d) !important;
+    color: var(--text-primary, #e9ecef) !important;
+}
+
+[data-theme="dark"] .stat-mini-card,
+[data-theme="dark"] .bio-acc-item,
+[data-theme="dark"] .theme-card-option {
+    background-color: var(--bg-card, #1e2125);
+    border-color: var(--border-color, #343a40);
+    color: var(--text-primary, #e9ecef);
+}

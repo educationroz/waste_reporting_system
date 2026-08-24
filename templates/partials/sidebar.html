@@ -1,15 +1,16 @@
 {% load static %}
+{% load i18n %}
 
 <div class="card shadow-sm border-0 sidebar-card">
     <div class="card-body">
         <div class="sidebar-header">
-            <button type="button" class="sidebar-toggle-btn" onclick="toggleSidebarMenu()">
+            <button type="button" class="sidebar-toggle-btn" onclick="toggleSidebarMenu()" aria-label="{% trans 'Toggle Sidebar' %}">
                 <i class="bi bi-list"></i>
             </button>
-            <a href="{% url 'admin-dashboard' %}" class="sidebar-brand-logo">
-                <img src="{% static 'web_app/image/SafhaSahar.png' %}" class="sidebar-logo-img">
-                <span class="sidebar-logo-text">
-                    <span class="fw-semibold" style="color: #56dd59;">Safha</span> <span class="fw-semibold" style="color: #56dd59;">Sahar</span>
+            <a href="{% if user.role == 'admin' %}{% url 'admin-dashboard' %}{% elif user.role == 'driver' %}{% url 'driver-dashboard' %}{% else %}{% url 'home' %}{% endif %}" class="sidebar-brand-logo d-flex align-items-center gap-2 text-decoration-none">
+                <img src="{% if SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{% static 'web_app/image/SafhaSahar.png' %}{% endif %}" class="sidebar-logo-img" alt="{% trans 'Logo' %}" style="object-fit: contain;">
+                <span class="sidebar-logo-text fw-semibold" style="color: #25be27;">
+                    {{ SITE_NAME|default:"Safha Sahar" }}
                 </span>
             </a>
         </div>

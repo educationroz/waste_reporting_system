@@ -5,15 +5,13 @@
 {% block title %}{% trans "Register — Waste Collection" %}{% endblock %}
 
 {% block content %}
-<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light py-4 px-2 px-sm-3">
-    <div class="card shadow-sm w-100 auth-card" style="max-width:440px">
+<div class="min-vh-100 d-flex align-items-center justify-content-center auth-page-bg py-4 px-2 px-sm-3">
+    <div class="card shadow-sm w-100 auth-card" style="max-width:460px">
         <div class="card-body p-3 p-sm-4">
             <div class="text-center mb-4">
                 <img src="{% if SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{% static 'web_app/image/SafhaSahar.png' %}{% endif %}" alt="{% trans 'Logo' %}" width="90" height="90" class="d-inline-block align-text-top mb-1" style="object-fit: contain;">
                 <h4 class="mt-2 fw-bold">{% trans "Create Account" %}</h4>
-                <p class="text-muted small mb-0">{{ SITE_TAGLINE|default:"Waste Collection System" }}</p>
-            </div>
-                <p class="text-muted small mb-0">{{ SITE_TAGLINE|default:"Waste Collection System" }}</p>
+                <p class="text-muted small mb-0">{{ SITE_TAGLINE|default:"Live Waste Reporting System" }}</p>
             </div>
 
             <div id="error-alert" class="alert alert-danger d-none"></div>
@@ -31,51 +29,52 @@
 
             <div class="row g-2">
                 <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label">{% trans "Username *" %}</label>
-                    <input type="text" id="username" class="form-control" autofocus>
+                    <label class="form-label small fw-semibold">{% trans "Username *" %}</label>
+                    <input type="text" id="username" class="form-control" placeholder="{% trans 'Choose username' %}" autofocus>
                 </div>
                 <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label">{% trans "Email *" %}</label>
-                    <input type="email" id="email" class="form-control">
+                    <label class="form-label small fw-semibold">{% trans "Email *" %}</label>
+                    <input type="email" id="email" class="form-control" placeholder="{% trans 'name@example.com' %}">
                 </div>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">{% trans "Phone" %}</label>
-                <input type="tel" id="phone" class="form-control">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">{% trans "Role *" %}</label>
-                <select id="role" class="form-select">
-                    <option value="user">{% trans "Regular User" %}</option>
-                    {% comment %} <option value="driver">{% trans "Driver" %}</option> {% endcomment %}
-                </select>
             </div>
             <div class="row g-2">
                 <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label">{% trans "Password *" %}</label>
+                    <label class="form-label small fw-semibold">{% trans "Phone" %}</label>
+                    <input type="tel" id="phone" class="form-control" placeholder="{% trans '98XXXXXXXX' %}">
+                </div>
+                <div class="col-12 col-sm-6 mb-3">
+                    <label class="form-label small fw-semibold">{% trans "Role *" %}</label>
+                    <select id="role" class="form-select">
+                        <option value="user" selected>{% trans "Regular User / Citizen" %}</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row g-2">
+                <div class="col-12 col-sm-6 mb-3">
+                    <label class="form-label small fw-semibold">{% trans "Password *" %}</label>
                     <div class="position-relative">
-                        <input type="password" id="password" class="form-control pe-5" oninput="handlePasswordInput()">
+                        <input type="password" id="password" class="form-control pe-5" placeholder="{% trans 'Min. 8 characters' %}" oninput="handlePasswordInput()">
                         <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
                             id="toggle-password-icon" style="cursor: pointer; display: none;" onclick="togglePassword()"></i>
                     </div>
                 </div>
                 <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label">{% trans "Confirm Password *" %}</label>
+                    <label class="form-label small fw-semibold">{% trans "Confirm Password *" %}</label>
                     <div class="position-relative">
-                        <input type="password" id="password2" class="form-control pe-5" oninput="handlePassword2Input()">
+                        <input type="password" id="password2" class="form-control pe-5" placeholder="{% trans 'Re-type password' %}" oninput="handlePassword2Input()">
                         <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
                             id="toggle-password2-icon" style="cursor: pointer; display: none;" onclick="togglePassword2()"></i>
                     </div>
                 </div>
             </div>
 
-            <button class="btn btn-success w-100" id="reg-btn" onclick="doRegister()">
+            <button class="btn btn-success w-100 py-2 fw-semibold" id="reg-btn" onclick="doRegister()">
                 <span id="reg-text">{% trans "Create Account" %}</span>
                 <span id="reg-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
             </button>
 
             <p class="text-center mt-3 mb-0 small">
-                {% trans "Already have an account?" %} <a href="{% url 'login' %}" id="signin-link" class="text-success fw-medium">{% trans "Sign in" %}</a>
+                {% trans "Already have an account?" %} <a href="{% url 'login' %}" id="signin-link" class="text-success fw-semibold text-decoration-none">{% trans "Sign in" %}</a>
             </p>
         </div>
     </div>
@@ -85,8 +84,13 @@
 {% block extra_js %}
 <style>
     .auth-card {
-        border-radius: 14px;
+        border-radius: 16px;
         border: 1px solid rgba(0,0,0,0.06);
+        background: var(--bg-card, #ffffff);
+        color: var(--text-primary, #212529);
+    }
+    .auth-page-bg {
+        background-color: var(--bg-body, #f8f9fa);
     }
     .google-btn-wrapper {
         width: 100% !important;
@@ -154,19 +158,32 @@ window.doRegister = async function() {
     };
 
     if (!payload.username || !payload.email || !payload.password) {
-        errDiv.textContent = 'Username, email and password are required.';
+        errDiv.textContent = gettext('Username, email and password are required.');
         errDiv.classList.remove('d-none');
         return;
     }
 
     if (!emailRegex.test(payload.email)) {
-        errDiv.textContent = 'Please enter a valid email address.';
+        errDiv.textContent = gettext('Please enter a valid email address.');
         errDiv.classList.remove('d-none');
         return;
     }
 
+    if (payload.password.length < 8) {
+        errDiv.textContent = gettext('Password must be at least 8 characters long.');
+        errDiv.classList.remove('d-none');
+        return;
+    }
+
+    if (payload.password !== payload.password2) {
+        errDiv.textContent = gettext('Passwords do not match.');
+        errDiv.classList.remove('d-none');
+        return;
+    }
+
+    btn.disabled = true;
     spinner.classList.remove('d-none');
-    text.textContent = 'Creating...';
+    text.textContent = gettext('Creating...');
 
     try {
         const res = await fetch('/auth/register/', {
@@ -181,10 +198,9 @@ window.doRegister = async function() {
         const data = await res.json();
 
         if (res.ok) {
-            sucDiv.textContent = data.message || 'Account created! Please check your email to verify your account before logging in.';
+            sucDiv.textContent = data.message || gettext('Account created! Please check your email to verify your account before logging in.');
             sucDiv.classList.remove('d-none');
-            btn.disabled = true;
-            text.textContent = 'Check your email';
+            text.textContent = gettext('Check your email');
 
             setTimeout(() => {
                 const params = new URLSearchParams(window.location.search);
@@ -194,16 +210,18 @@ window.doRegister = async function() {
             }, 3000);
         } else {
             const msgs = Object.entries(data).map(([k,v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('<br>');
-            errDiv.innerHTML = msgs || 'Registration failed.';
+            errDiv.innerHTML = msgs || gettext('Registration failed.');
             errDiv.classList.remove('d-none');
+            btn.disabled = false;
         }
     } catch (e) {
-        errDiv.textContent = 'Network error: ' + e.message;
+        errDiv.textContent = gettext('Network error: ') + e.message;
         errDiv.classList.remove('d-none');
+        btn.disabled = false;
     } finally {
         spinner.classList.add('d-none');
         if (!btn.disabled) {
-            text.textContent = 'Create Account';
+            text.textContent = gettext('Create Account');
         }
     }
 };
@@ -239,7 +257,7 @@ function getCookie(name) {
 function getOptimalGoogleButtonWidth() {
     const fullBtn = document.getElementById('reg-btn');
     const cardBody = document.querySelector('.auth-card .card-body') || document.querySelector('.card-body');
-    let width = 300;
+    let width = 320;
     if (fullBtn && fullBtn.offsetWidth > 0) {
         width = fullBtn.offsetWidth;
     } else if (cardBody && cardBody.clientWidth > 0) {
@@ -328,11 +346,11 @@ async function handleGoogleCredential(response) {
             };
             window.location.href = redirectMap[role] || '/dashboard/';
         } else {
-            errDiv.textContent = data.error || 'Google sign-in failed.';
+            errDiv.textContent = data.error || gettext('Google sign-in failed.');
             errDiv.classList.remove('d-none');
         }
     } catch (e) {
-        errDiv.textContent = 'Network error: ' + e.message;
+        errDiv.textContent = gettext('Network error: ') + e.message;
         errDiv.classList.remove('d-none');
     }
 }

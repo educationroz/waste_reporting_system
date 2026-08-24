@@ -1,17 +1,58 @@
 {% extends 'web_app/base.html' %}
 {% load i18n %}
-{% block title %}{% trans "My Profile" %}{% endblock %}
+{% load static %}
+{% block title %}{% trans "Personal Settings — Safha Sahar" %}{% endblock %}
 
 {% block extra_css %}
 <style>
-    .profile-card {
-        border: none;
-        border-radius: 14px;
-        box-shadow: 0 4px 16px var(--shadow-color);
-        background: var(--bg-card);
-        color: var(--text-body);
-        max-width: 640px;
+    .settings-container {
+        max-width: 1140px;
         margin: 0 auto;
+    }
+
+    .settings-nav-card {
+        background: var(--bg-card, #ffffff);
+        border: 1px solid var(--border-color, #e2e8f0);
+        border-radius: 16px;
+    }
+
+    .settings-content-card {
+        background: var(--bg-card, #ffffff);
+        border: 1px solid var(--border-color, #e2e8f0);
+        border-radius: 16px;
+        min-height: 520px;
+    }
+
+    .settings-tab-btn {
+        color: var(--text-primary, #334155);
+        border-radius: 10px;
+        font-weight: 500;
+        font-size: 0.92rem;
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: none;
+        background: transparent;
+        width: 100%;
+        text-align: left;
+        transition: all 0.15s ease;
+    }
+
+    .settings-tab-btn:hover {
+        background: rgba(25, 135, 84, 0.08);
+        color: #198754;
+    }
+
+    .settings-tab-btn.active {
+        background: #198754;
+        color: #ffffff !important;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(25, 135, 84, 0.25);
+    }
+
+    .settings-tab-btn.active i {
+        color: #ffffff !important;
     }
 
     .profile-pic-wrapper {
@@ -26,14 +67,14 @@
         height: 110px;
         object-fit: cover;
         border-radius: 50%;
-        border: 3px solid var(--bg-card);
-        box-shadow: 0 2px 10px var(--shadow-color);
+        border: 3px solid var(--bg-card, #ffffff);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.12);
     }
 
     .profile-pic-edit-btn {
         position: absolute;
-        bottom: 0;
-        right: 0;
+        bottom: 2px;
+        right: 2px;
         width: 32px;
         height: 32px;
         border-radius: 50%;
@@ -41,21 +82,67 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        border: 2px solid var(--bg-card);
+        border: 2px solid var(--bg-card, #ffffff);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
 
-    .profile-readonly-field {
-        font-size: 0.9rem;
-        color: var(--text-muted);
+    .theme-card-option {
+        border: 2px solid var(--border-color, #e2e8f0);
+        border-radius: 12px;
+        padding: 16px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: var(--bg-card, #ffffff);
+    }
+
+    .theme-card-option:hover {
+        border-color: #198754;
+        transform: translateY(-2px);
+    }
+
+    .theme-card-option.active {
+        border-color: #198754;
+        background: rgba(25, 135, 84, 0.05);
+        box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.15);
+    }
+
+    .stat-mini-card {
+        border: 1px solid var(--border-color, #e2e8f0);
+        border-radius: 12px;
+        padding: 12px 14px;
+        background: var(--bg-card, #ffffff);
+    }
+
+    .pwd-strength-bar {
+        height: 6px;
+        border-radius: 3px;
+        transition: all 0.3s ease;
+    }
+
+    @media (max-width: 767.98px) {
+        .settings-nav-pill-group {
+            display: flex;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            gap: 6px;
+            padding-bottom: 8px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .settings-tab-btn {
+            white-space: nowrap;
+            width: auto;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid px-4 py-3">
+<div class="container-fluid px-3 px-md-4 py-3 settings-container">
     <div class="layout-wrapper">
 
-        <!-- LEFT NAVIGATION SIDEBAR (shared partial — same as dashboard/requests/etc) -->
+        <!-- LEFT SIDEBAR -->
         <div class="sidebar-col">
             {% include 'partials/sidebar.html' %}
         </div>
@@ -63,132 +150,441 @@
         <!-- RIGHT CONTENT -->
         <div class="content-col">
 
-            <div class="mb-3">
-                <!--
-                    Uses native history.back() (SPA-feel, no full reload).
-                    base.html's authenticated script block is now wrapped in
-                    a window.__ssAuthScriptLoaded guard, so htmx's
-                    history-cache restore re-inserting it no longer throws
-                    "Identifier 'API' has already been declared".
-                -->
-                <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary px-3">
-                    <i class="bi bi-arrow-left me-1"></i>{% trans "Back" %}
-                </a>
+            <!-- Page Title & Header -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                    <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+                        <i class="bi bi-person-gear text-success"></i>
+                        <span>{% trans "Personal Settings & Account Center" %}</span>
+                    </h4>
+                    <p class="text-muted small mb-0">
+                        {% trans "Manage your profile identity, security, device biometrics, theme, and data preferences." %}
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% if user.role == 'admin' %}{% url 'admin-dashboard' %}{% elif user.role == 'driver' %}{% url 'driver-dashboard' %}{% else %}{% url 'home' %}{% endif %}" class="btn btn-sm btn-outline-secondary px-3">
+                        <i class="bi bi-house-door me-1"></i>{% trans "Dashboard" %}
+                    </a>
+                </div>
             </div>
 
-            <div class="profile-card p-4 p-md-5">
-
-                <div class="text-center mb-4">
-                    <div class="profile-pic-wrapper">
-                        <img id="profile-pic-preview"
-                             src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}https://ui-avatars.com/api/?name={{ user.username|urlencode }}&background=049b09&color=fff&size=128{% endif %}"
-                             alt="{% trans 'Profile Picture' %}">
-                        <label for="profile-pic-input" class="profile-pic-edit-btn btn btn-success p-0" title="{% trans 'Change photo' %}">
-                            <i class="bi bi-camera-fill"></i>
-                        </label>
-                        <input type="file" id="profile-pic-input" accept="image/*" class="d-none">
-                    </div>
-                    <h4 class="fw-bold mt-3 mb-0">{{ user.username }}</h4>
-                    <span class="badge bg-success bg-opacity-10 text-success px-3 py-1 mt-1">{{ user.get_role_display }}</span>
-                    {% if user.is_verified %}
-                        <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-1 mt-1 ms-1">
-                            <i class="bi bi-patch-check-fill me-1"></i>{% trans "Verified" %}
-                        </span>
-                    {% endif %}
-                </div>
-
-                <form id="profile-form" hx-boost="false">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-secondary">{% trans "Username" %}</label>
-                            <input type="text" class="form-control" value="{{ user.username }}" disabled>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-secondary">{% trans "Email" %}</label>
-                            <input type="email" class="form-control" value="{{ user.email }}" disabled>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-secondary">{% trans "Phone Number" %}</label>
-                            <input type="text" id="profile-phone" name="phone" class="form-control"
-                                   value="{{ user.phone|default:'' }}" placeholder="{% trans 'e.g. 98XXXXXXXX' %}">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-secondary">{% trans "Member Since" %}</label>
-                            <input type="text" class="form-control" value="{{ user.created_at|date:'d M Y' }}" disabled>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label small fw-semibold text-secondary">{% trans "Address" %}</label>
-                            <textarea id="profile-address" name="address" class="form-control" rows="3"
-                                      placeholder="Your pickup / mailing address">{{ user.address|default:'' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="d-flex justify-content-end mt-4">
-                        <button type="submit" id="profile-save-btn" class="btn btn-success px-4">
-                            <i class="bi bi-check-lg me-1"></i>{% trans "Save Changes" %}
-                        </button>
-                    </div>
-                </form>
-
-                <!-- ── Change Password Card Section ── -->
-                <hr class="my-4" style="border-color: var(--border-color);">
-                <div class="mb-4">
-                    <h5 class="fw-bold mb-3"><i class="bi bi-shield-lock text-success me-2"></i>{% trans "Change Password" %}</h5>
-                    <form id="change-password-form" onsubmit="doChangePassword(event)" hx-boost="false">
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <label class="form-label small fw-semibold text-secondary">{% trans "Current Password *" %}</label>
-                                <div class="position-relative">
-                                    <input type="password" id="old_password" class="form-control pe-5" required placeholder="{% trans 'Enter current password' %}">
-                                    <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style="cursor: pointer;" onclick="togglePwdVisibility('old_password', this)"></i>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-semibold text-secondary">{% trans "New Password *" %}</label>
-                                <div class="position-relative">
-                                    <input type="password" id="new_password" class="form-control pe-5" required minlength="8" placeholder="{% trans 'Minimum 8 characters' %}">
-                                    <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style="cursor: pointer;" onclick="togglePwdVisibility('new_password', this)"></i>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-semibold text-secondary">{% trans "Confirm New Password *" %}</label>
-                                <div class="position-relative">
-                                    <input type="password" id="new_password2" class="form-control pe-5" required minlength="8" placeholder="{% trans 'Re-enter new password' %}">
-                                    <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style="cursor: pointer;" onclick="togglePwdVisibility('new_password2', this)"></i>
-                                </div>
+            <div class="row g-3">
+                <!-- Settings Navigation Column -->
+                <div class="col-12 col-md-4 col-lg-3">
+                    <div class="card shadow-sm settings-nav-card p-2 p-md-3">
+                        <div class="d-none d-md-flex align-items-center gap-3 p-2 mb-2 border-bottom">
+                            <img src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}https://ui-avatars.com/api/?name={{ user.username|urlencode }}&background=198754&color=fff&size=64{% endif %}"
+                                 alt="Avatar" width="44" height="44" class="rounded-circle border" style="object-fit: cover;" id="sidebar-preview-avatar">
+                            <div class="overflow-hidden">
+                                <div class="fw-bold text-truncate small">{{ user.get_full_name|default:user.username }}</div>
+                                <span class="badge bg-success bg-opacity-10 text-success p-1 font-monospace" style="font-size:0.7rem;">{{ user.get_role_display }}</span>
                             </div>
                         </div>
-                        <div class="d-flex justify-content-end mt-3">
-                            <button type="submit" id="change-pwd-btn" class="btn btn-outline-success px-4 fw-semibold">
-                                <i class="bi bi-key me-1"></i>{% trans "Update Password" %}
+
+                        <div class="settings-nav-pill-group nav flex-md-column">
+                            <button class="settings-tab-btn active" id="tab-btn-profile" onclick="switchSettingsTab('profile')">
+                                <i class="bi bi-person-circle text-success fs-5"></i>
+                                <span>{% trans "Profile & Identity" %}</span>
+                            </button>
+                            <button class="settings-tab-btn" id="tab-btn-security" onclick="switchSettingsTab('security')">
+                                <i class="bi bi-shield-lock text-primary fs-5"></i>
+                                <span>{% trans "Password & Security" %}</span>
+                            </button>
+                            <button class="settings-tab-btn" id="tab-btn-biometrics" onclick="switchSettingsTab('biometrics')">
+                                <i class="bi bi-fingerprint text-info fs-5"></i>
+                                <span>{% trans "Biometrics & Passkeys" %}</span>
+                            </button>
+                            <button class="settings-tab-btn" id="tab-btn-appearance" onclick="switchSettingsTab('appearance')">
+                                <i class="bi bi-palette text-warning fs-5"></i>
+                                <span>{% trans "Display & Theme" %}</span>
+                            </button>
+                            <button class="settings-tab-btn" id="tab-btn-notifications" onclick="switchSettingsTab('notifications')">
+                                <i class="bi bi-bell text-danger fs-5"></i>
+                                <span>{% trans "Notification Alerts" %}</span>
+                            </button>
+                            <button class="settings-tab-btn" id="tab-btn-privacy" onclick="switchSettingsTab('privacy')">
+                                <i class="bi bi-shield-check text-secondary fs-5"></i>
+                                <span>{% trans "Data & Privacy" %}</span>
                             </button>
                         </div>
-                    </form>
-                </div>
-
-                <!-- ── Device Biometrics & Passkeys Section ── -->
-                <hr class="my-4" style="border-color: var(--border-color);">
-                <div>
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                        <h5 class="fw-bold mb-0"><i class="bi bi-fingerprint text-info me-2"></i>{% trans "Device Biometrics & Passkeys" %}</h5>
-                        <span id="biometric-status-badge" class="badge bg-secondary bg-opacity-10 text-secondary px-3 py-1.5 rounded-pill small">
-                            {% trans "Checking device support..." %}
-                        </span>
-                    </div>
-                    <p class="text-muted small mb-3">
-                        {% trans "Enable Fingerprint, Touch ID, Face ID, or Windows Hello for instant, 1-tap secure login on this device." %}
-                    </p>
-                    <div class="d-flex flex-wrap gap-2" id="biometric-actions">
-                        <button type="button" class="btn btn-outline-primary btn-sm px-3 py-2 fw-semibold" id="register-biometric-btn" onclick="registerBiometricDevice(this)">
-                            <i class="bi bi-fingerprint me-1.5"></i>{% trans "Enable Biometrics on this Device" %}
-                        </button>
-                        <button type="button" class="btn btn-outline-danger btn-sm px-3 py-2 fw-semibold d-none" id="remove-biometric-btn" onclick="removeBiometricDevice(this)">
-                            <i class="bi bi-trash3 me-1.5"></i>{% trans "Remove Biometrics" %}
-                        </button>
                     </div>
                 </div>
 
+                <!-- Settings Content Panel -->
+                <div class="col-12 col-md-8 col-lg-9">
+                    <div class="card shadow-sm settings-content-card p-3 p-md-4">
+
+                        <!-- ══════════════════════════════════════════════════════
+                             TAB 1: PROFILE & IDENTITY
+                             ══════════════════════════════════════════════════════ -->
+                        <div id="settings-tab-content-profile" class="settings-tab-pane">
+                            <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
+                                <div>
+                                    <h5 class="fw-bold mb-0">{% trans "Profile & Personal Information" %}</h5>
+                                    <p class="text-muted small mb-0">{% trans "Update your contact details and public account identity." %}</p>
+                                </div>
+                                <span class="badge bg-success bg-opacity-10 text-success px-3 py-1.5 rounded-pill">
+                                    <i class="bi bi-person-badge me-1"></i>{{ user.get_role_display }}
+                                </span>
+                            </div>
+
+                            <form id="profile-form" hx-boost="false">
+                                <div class="text-center mb-4">
+                                    <div class="profile-pic-wrapper">
+                                        <img id="profile-pic-preview"
+                                             src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}https://ui-avatars.com/api/?name={{ user.username|urlencode }}&background=198754&color=fff&size=128{% endif %}"
+                                             alt="{% trans 'Profile Picture' %}">
+                                        <label for="profile-pic-input" class="profile-pic-edit-btn btn btn-success p-0" title="{% trans 'Change photo' %}">
+                                            <i class="bi bi-camera-fill text-white"></i>
+                                        </label>
+                                        <input type="file" id="profile-pic-input" accept="image/*" class="d-none">
+                                    </div>
+                                    <h5 class="fw-bold mt-2 mb-0">{{ user.get_full_name|default:user.username }}</h5>
+                                    <div class="text-muted small">@{{ user.username }} &bull; {{ user.email }}</div>
+                                </div>
+
+                                <!-- Activity Snapshot -->
+                                <div class="row g-2 mb-4">
+                                    <div class="col-6 col-sm-3">
+                                        <div class="stat-mini-card text-center">
+                                            <div class="text-muted small">{% trans "Total Requests" %}</div>
+                                            <div class="fs-5 fw-bold text-success">{{ user_total_requests|default:0 }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <div class="stat-mini-card text-center">
+                                            <div class="text-muted small">{% trans "Completed" %}</div>
+                                            <div class="fs-5 fw-bold text-primary">{{ user_completed_requests|default:0 }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <div class="stat-mini-card text-center">
+                                            <div class="text-muted small">{% trans "Pending" %}</div>
+                                            <div class="fs-5 fw-bold text-warning">{{ user_pending_requests|default:0 }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <div class="stat-mini-card text-center">
+                                            <div class="text-muted small">{% trans "Complaints" %}</div>
+                                            <div class="fs-5 fw-bold text-danger">{{ user_complaints_count|default:0 }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold">{% trans "Username" %}</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-light"><i class="bi bi-at"></i></span>
+                                            <input type="text" class="form-control bg-light" value="{{ user.username }}" disabled>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold">{% trans "Email Address" %}</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-light"><i class="bi bi-envelope"></i></span>
+                                            <input type="email" class="form-control bg-light" value="{{ user.email }}" disabled>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold">{% trans "Phone Number" %}</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                                            <input type="tel" id="profile-phone" name="phone" class="form-control"
+                                                   value="{{ user.phone|default:'' }}" placeholder="{% trans 'e.g. 98XXXXXXXX' %}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold">{% trans "Account Registered" %}</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-light"><i class="bi bi-calendar-check"></i></span>
+                                            <input type="text" class="form-control bg-light" value="{{ user.created_at|date:'d M Y, H:i' }}" disabled>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-semibold">{% trans "Pickup / Mailing Address (Ward Area)" %}</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                                            <textarea id="profile-address" name="address" class="form-control" rows="2"
+                                                      placeholder="{% trans 'Enter your street, toll, or ward number for pickup dispatch' %}">{{ user.address|default:'' }}</textarea>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-end mt-4">
+                                    <button type="submit" id="profile-save-btn" class="btn btn-success px-4 fw-semibold shadow-xs">
+                                        <i class="bi bi-check2-circle me-1"></i>{% trans "Save Profile Changes" %}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- ══════════════════════════════════════════════════════
+                             TAB 2: PASSWORD & SECURITY
+                             ══════════════════════════════════════════════════════ -->
+                        <div id="settings-tab-content-security" class="settings-tab-pane d-none">
+                            <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
+                                <div>
+                                    <h5 class="fw-bold mb-0">{% trans "Password & Account Security" %}</h5>
+                                    <p class="text-muted small mb-0">{% trans "Manage your password authentication and session protection." %}</p>
+                                </div>
+                                <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-1.5 rounded-pill">
+                                    <i class="bi bi-shield-lock me-1"></i>{% trans "Secured" %}
+                                </span>
+                            </div>
+
+                            <form id="change-password-form" onsubmit="doChangePassword(event)" hx-boost="false">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label small fw-semibold">{% trans "Current Password *" %}</label>
+                                        <div class="position-relative">
+                                            <input type="password" id="old_password" class="form-control pe-5" required placeholder="{% trans 'Enter your current password' %}">
+                                            <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style="cursor: pointer;" onclick="togglePwdVisibility('old_password', this)"></i>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold">{% trans "New Password *" %}</label>
+                                        <div class="position-relative">
+                                            <input type="password" id="new_password" class="form-control pe-5" required minlength="8" placeholder="{% trans 'Minimum 8 characters' %}" oninput="checkPwdStrength(this.value)">
+                                            <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style="cursor: pointer;" onclick="togglePwdVisibility('new_password', this)"></i>
+                                        </div>
+                                        <div class="progress mt-2 pwd-strength-bar bg-light" style="height: 5px;">
+                                            <div id="pwd-strength-meter" class="progress-bar" role="progressbar" style="width: 0%;"></div>
+                                        </div>
+                                        <div class="d-flex justify-content-between mt-1">
+                                            <span class="small text-muted" style="font-size:0.75rem;">{% trans "Strength:" %} <strong id="pwd-strength-label">{% trans "Enter password" %}</strong></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold">{% trans "Confirm New Password *" %}</label>
+                                        <div class="position-relative">
+                                            <input type="password" id="new_password2" class="form-control pe-5" required minlength="8" placeholder="{% trans 'Re-enter new password' %}">
+                                            <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style="cursor: pointer;" onclick="togglePwdVisibility('new_password2', this)"></i>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card bg-light-subtle border p-3 mt-3 rounded-3">
+                                    <h6 class="fw-bold small mb-2"><i class="bi bi-info-circle text-primary me-1"></i>{% trans "Password Security Rules" %}</h6>
+                                    <ul class="small text-muted mb-0 ps-3">
+                                        <li>{% trans "Must be at least 8 characters long." %}</li>
+                                        <li>{% trans "Use a mix of uppercase, lowercase, numbers, and symbols." %}</li>
+                                        <li>{% trans "Never share your credentials with anyone." %}</li>
+                                    </ul>
+                                </div>
+
+                                <div class="d-flex justify-content-end mt-4">
+                                    <button type="submit" id="change-pwd-btn" class="btn btn-outline-success px-4 fw-semibold shadow-xs">
+                                        <i class="bi bi-key me-1"></i>{% trans "Update Password" %}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- ══════════════════════════════════════════════════════
+                             TAB 3: BIOMETRICS & PASSKEYS (Multi-Account WebAuthn)
+                             ══════════════════════════════════════════════════════ -->
+                        <div id="settings-tab-content-biometrics" class="settings-tab-pane d-none">
+                            <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
+                                <div>
+                                    <h5 class="fw-bold mb-0">{% trans "Device Biometrics & Passkeys" %}</h5>
+                                    <p class="text-muted small mb-0">{% trans "Manage 1-tap Fingerprint, Face ID, or Windows Hello authentication for this device." %}</p>
+                                </div>
+                                <span id="biometric-status-badge" class="badge bg-secondary bg-opacity-10 text-secondary px-3 py-1.5 rounded-pill small">
+                                    {% trans "Checking sensor..." %}
+                                </span>
+                            </div>
+
+                            <!-- Current Account Enrollment Status -->
+                            <div class="card border p-3 mb-4 rounded-3 bg-light-subtle">
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="p-2 rounded-circle bg-success bg-opacity-10 text-success">
+                                            <i class="bi bi-fingerprint fs-4"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="fw-bold mb-0">{% trans "Biometrics for" %} @{{ user.username }}</h6>
+                                            <span class="text-muted small" id="current-acc-bio-status-text">{% trans "Device Biometric Authentication" %}</span>
+                                        </div>
+                                    </div>
+                                    <div id="current-acc-bio-actions" class="d-flex gap-2">
+                                        <!-- Dynamic buttons injected via JS -->
+                                    </div>
+                                </div>
+                                <p class="text-muted small mb-0" id="current-acc-bio-desc">
+                                    {% trans "Enabling biometrics securely links this browser / device platform authenticator (Touch ID, Windows Hello, Fingerprint) to your account." %}
+                                </p>
+                            </div>
+
+                            <!-- Multi-Account Browser Manager (User requested separate accounts support) -->
+                            <div class="card border p-3 rounded-3">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <h6 class="fw-bold mb-0 d-flex align-items-center gap-1.5">
+                                        <i class="bi bi-people text-primary"></i>
+                                        <span>{% trans "All Biometric Accounts Saved on this Browser" %}</span>
+                                    </h6>
+                                    <button type="button" class="btn btn-sm btn-outline-danger py-0.5 px-2" onclick="clearAllDeviceBiometrics()">
+                                        <i class="bi bi-trash3 me-1"></i>{% trans "Clear All" %}
+                                    </button>
+                                </div>
+                                <p class="text-muted small mb-3">
+                                    {% trans "Multiple users can have their own independent biometric passkeys on this device. Select or remove profiles below." %}
+                                </p>
+
+                                <div id="multi-account-bio-list" class="d-flex flex-column gap-2">
+                                    <!-- Injected via renderMultiAccountBioList() -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ══════════════════════════════════════════════════════
+                             TAB 4: DISPLAY & THEME
+                             ══════════════════════════════════════════════════════ -->
+                        <div id="settings-tab-content-appearance" class="settings-tab-pane d-none">
+                            <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
+                                <div>
+                                    <h5 class="fw-bold mb-0">{% trans "Display & Theme Preferences" %}</h5>
+                                    <p class="text-muted small mb-0">{% trans "Customize interface appearance, color scheme, and typography." %}</p>
+                                </div>
+                            </div>
+
+                            <label class="form-label small fw-semibold mb-2">{% trans "Choose Interface Theme" %}</label>
+                            <div class="row g-3 mb-4">
+                                <div class="col-12 col-sm-4">
+                                    <div class="theme-card-option text-center" id="theme-card-light" onclick="setAppTheme('light')">
+                                        <i class="bi bi-sun-fill fs-2 text-warning mb-2 d-block"></i>
+                                        <h6 class="fw-bold mb-1">{% trans "Light Mode" %}</h6>
+                                        <p class="text-muted small mb-0">{% trans "Clean daylight contrast" %}</p>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-sm-4">
+                                    <div class="theme-card-option text-center" id="theme-card-dark" onclick="setAppTheme('dark')">
+                                        <i class="bi bi-moon-stars-fill fs-2 text-primary mb-2 d-block"></i>
+                                        <h6 class="fw-bold mb-1">{% trans "Dark Mode" %}</h6>
+                                        <p class="text-muted small mb-0">{% trans "Low eye strain & OLED" %}</p>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-sm-4">
+                                    <div class="theme-card-option text-center" id="theme-card-auto" onclick="setAppTheme('auto')">
+                                        <i class="bi bi-laptop fs-2 text-success mb-2 d-block"></i>
+                                        <h6 class="fw-bold mb-1">{% trans "System Auto" %}</h6>
+                                        <p class="text-muted small mb-0">{% trans "Follows device OS" %}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="my-4" style="border-color: var(--border-color);">
+
+                            <h6 class="fw-bold mb-2">{% trans "Interface Density" %}</h6>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="compactUiToggle" onchange="toggleCompactUI(this.checked)">
+                                <label class="form-check-label small" for="compactUiToggle">
+                                    {% trans "Compact density mode (condensed table rows and smaller padding)" %}
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- ══════════════════════════════════════════════════════
+                             TAB 5: NOTIFICATION PREFERENCES
+                             ══════════════════════════════════════════════════════ -->
+                        <div id="settings-tab-content-notifications" class="settings-tab-pane d-none">
+                            <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
+                                <div>
+                                    <h5 class="fw-bold mb-0">{% trans "Notification Alerts & Audio Preferences" %}</h5>
+                                    <p class="text-muted small mb-0">{% trans "Control what notifications you receive in real time." %}</p>
+                                </div>
+                            </div>
+
+                            <div class="d-flex flex-column gap-3 mb-4">
+                                <div class="d-flex align-items-center justify-content-between p-3 rounded-3 border bg-body">
+                                    <div class="me-3">
+                                        <h6 class="fw-bold mb-1"><i class="bi bi-truck text-success me-1.5"></i>{% trans "Live Driver GPS & Truck Arrival Alerts" %}</h6>
+                                        <p class="text-muted small mb-0">{% trans "Receive real-time push alerts when a municipal collection vehicle is approaching your pickup point." %}</p>
+                                    </div>
+                                    <div class="form-check form-switch fs-5">
+                                        <input class="form-check-input" type="checkbox" id="prefGpsAlerts" checked onchange="saveNotificationPref()">
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center justify-content-between p-3 rounded-3 border bg-body">
+                                    <div class="me-3">
+                                        <h6 class="fw-bold mb-1"><i class="bi bi-check-circle text-primary me-1.5"></i>{% trans "Request Status Updates" %}</h6>
+                                        <p class="text-muted small mb-0">{% trans "Instant notifications when your waste pickup request is assigned, in-progress, or completed." %}</p>
+                                    </div>
+                                    <div class="form-check form-switch fs-5">
+                                        <input class="form-check-input" type="checkbox" id="prefStatusAlerts" checked onchange="saveNotificationPref()">
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center justify-content-between p-3 rounded-3 border bg-body">
+                                    <div class="me-3">
+                                        <h6 class="fw-bold mb-1"><i class="bi bi-volume-up text-warning me-1.5"></i>{% trans "Audible Sound Chime" %}</h6>
+                                        <p class="text-muted small mb-0">{% trans "Play a gentle notification chime sound when new live updates arrive." %}</p>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="testNotificationSound()">
+                                            <i class="bi bi-play-fill"></i> {% trans "Test Sound" %}
+                                        </button>
+                                        <div class="form-check form-switch fs-5 mb-0">
+                                            <input class="form-check-input" type="checkbox" id="prefSoundAlerts" checked onchange="saveNotificationPref()">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ══════════════════════════════════════════════════════
+                             TAB 6: DATA & PRIVACY CENTER
+                             ══════════════════════════════════════════════════════ -->
+                        <div id="settings-tab-content-privacy" class="settings-tab-pane d-none">
+                            <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
+                                <div>
+                                    <h5 class="fw-bold mb-0">{% trans "Data, Privacy & Account Center" %}</h5>
+                                    <p class="text-muted small mb-0">{% trans "Export your account data archive, clear local cache, and manage active sessions." %}</p>
+                                </div>
+                            </div>
+
+                            <div class="card border p-3 rounded-3 mb-3">
+                                <h6 class="fw-bold mb-1"><i class="bi bi-download text-success me-1.5"></i>{% trans "Export & Download Account Data" %}</h6>
+                                <p class="text-muted small mb-3">
+                                    {% trans "Download a complete JSON archive of your personal profile, waste collection requests history, and complaint records." %}
+                                </p>
+                                <div>
+                                    <button type="button" class="btn btn-outline-success btn-sm px-3 py-2 fw-semibold" onclick="exportMyDataArchive(this)">
+                                        <i class="bi bi-file-earmark-arrow-down me-1.5"></i>{% trans "Export My Data (JSON)" %}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="card border p-3 rounded-3 mb-3">
+                                <h6 class="fw-bold mb-1"><i class="bi bi-database text-info me-1.5"></i>{% trans "Clear Browser Cache & Offline Storage" %}</h6>
+                                <p class="text-muted small mb-3">
+                                    {% trans "Removes stored guest tokens, offline map cache, and temporary interface states without logging you out." %}
+                                </p>
+                                <div>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm px-3 py-2 fw-semibold" onclick="clearClientCache()">
+                                        <i class="bi bi-arrow-clockwise me-1.5"></i>{% trans "Clear Device Storage" %}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="card border border-danger-subtle bg-danger-subtle bg-opacity-10 p-3 rounded-3">
+                                <h6 class="fw-bold text-danger mb-1"><i class="bi bi-box-arrow-right me-1.5"></i>{% trans "Sign Out of Safha Sahar" %}</h6>
+                                <p class="text-muted small mb-3">
+                                    {% trans "End your active session on this device." %}
+                                </p>
+                                <div>
+                                    <button type="button" class="btn btn-danger btn-sm px-3 py-2 fw-semibold" onclick="confirmSignOut()">
+                                        <i class="bi bi-box-arrow-right me-1.5"></i>{% trans "Sign Out" %}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
             </div>
+
         </div> <!-- /content-col -->
     </div> <!-- /layout-wrapper -->
 </div>
@@ -196,53 +592,73 @@
 
 {% block extra_js %}
 <script nonce="{{ csp_nonce }}">
-function safaSaharGoBack() {
-    const ref = document.referrer;
-    if (ref && ref.startsWith(window.location.origin)) {
-        window.location.href = ref;
-    } else {
-        window.location.href = '/dashboard/';
-    }
-}
-
-window.togglePwdVisibility = function(inputId, iconEl) {
-    const el = document.getElementById(inputId);
-    if (!el || !iconEl) return;
-    if (el.type === 'password') {
-        el.type = 'text';
-        iconEl.classList.remove('bi-eye');
-        iconEl.classList.add('bi-eye-slash');
-    } else {
-        el.type = 'password';
-        iconEl.classList.remove('bi-eye-slash');
-        iconEl.classList.add('bi-eye');
-    }
-};
-
 (function() {
+    const CURRENT_USER = '{{ user.username }}';
+    const CURRENT_USER_ID = '{{ user.id }}';
+    const CURRENT_USER_NAME = '{{ user.get_full_name|default:user.username|escapejs }}';
+    const CURRENT_USER_ROLE = '{{ user.role }}';
+    const CURRENT_USER_ROLE_DISPLAY = '{{ user.get_role_display|escapejs }}';
+    const CURRENT_USER_AVATAR = '{% if user.profile_picture %}{{ user.profile_picture.url }}{% endif %}';
+
+    // ── Tab Switching ────────────────────────────────────────────────────────
+    window.switchSettingsTab = function(tabName) {
+        const tabs = ['profile', 'security', 'biometrics', 'appearance', 'notifications', 'privacy'];
+        tabs.forEach(t => {
+            const btn = document.getElementById('tab-btn-' + t);
+            const pane = document.getElementById('settings-tab-content-' + t);
+            if (btn) {
+                if (t === tabName) btn.classList.add('active');
+                else btn.classList.remove('active');
+            }
+            if (pane) {
+                if (t === tabName) pane.classList.remove('d-none');
+                else pane.classList.add('d-none');
+            }
+        });
+        window.location.hash = tabName;
+    };
+
+    // Auto-select tab based on URL hash
+    function checkInitialTab() {
+        const hash = (window.location.hash || '').replace('#', '');
+        const valid = ['profile', 'security', 'biometrics', 'appearance', 'notifications', 'privacy'];
+        if (valid.includes(hash)) {
+            switchSettingsTab(hash);
+        } else {
+            switchSettingsTab('profile');
+        }
+    }
+    checkInitialTab();
+
+    // ── Profile Photo & Edit ────────────────────────────────────────────────
     const picInput = document.getElementById('profile-pic-input');
     const picPreview = document.getElementById('profile-pic-preview');
-    const form = document.getElementById('profile-form');
+    const sidebarAvatar = document.getElementById('sidebar-preview-avatar');
+    const profileForm = document.getElementById('profile-form');
 
     if (picInput) {
         picInput.addEventListener('change', function() {
             const file = picInput.files[0];
             if (!file) return;
             const reader = new FileReader();
-            reader.onload = (e) => { picPreview.src = e.target.result; };
+            reader.onload = (e) => {
+                picPreview.src = e.target.result;
+                if (sidebarAvatar) sidebarAvatar.src = e.target.result;
+            };
             reader.readAsDataURL(file);
         });
     }
 
-    if (form) {
-        form.addEventListener('submit', async function(e) {
+    if (profileForm) {
+        profileForm.addEventListener('submit', async function(e) {
             e.preventDefault();
+            const btn = document.getElementById('profile-save-btn');
 
-            await withButtonBusy(eventButton(document.getElementById('profile-save-btn')), gettext('Saving...'), async () => {
+            await withButtonBusy(eventButton(btn), gettext('Saving...'), async () => {
                 const formData = new FormData();
                 formData.append('phone', document.getElementById('profile-phone').value);
                 formData.append('address', document.getElementById('profile-address').value);
-                if (picInput.files[0]) {
+                if (picInput && picInput.files[0]) {
                     formData.append('profile_picture', picInput.files[0]);
                 }
 
@@ -255,16 +671,20 @@ window.togglePwdVisibility = function(inputId, iconEl) {
                     if (res && res.ok) {
                         showToast(gettext('Profile updated successfully!'), 'success');
 
-                        if (picInput.files[0] && typeof window.updateNavbarAvatar === 'function') {
-                            let newPicUrl = null;
-                            try {
-                                const data = await res.clone().json();
-                                if (data && data.profile_picture) {
-                                    newPicUrl = data.profile_picture + '?t=' + Date.now();
-                                }
-                            } catch (e) {}
+                        let newPicUrl = null;
+                        try {
+                            const data = await res.clone().json();
+                            if (data && data.profile_picture) {
+                                newPicUrl = data.profile_picture + '?t=' + Date.now();
+                            }
+                        } catch (e) {}
+
+                        if (typeof window.updateNavbarAvatar === 'function') {
                             window.updateNavbarAvatar(newPicUrl || picPreview.src);
                         }
+
+                        // Update biometric account profile cache if enrolled
+                        updateBiometricProfileAvatar(newPicUrl || picPreview.src);
                     } else {
                         showToast(gettext('Failed to update profile.'), 'danger');
                     }
@@ -276,7 +696,51 @@ window.togglePwdVisibility = function(inputId, iconEl) {
         });
     }
 
-    // ── Change Password Handler ──────────────────────────────────────────────
+    // ── Password Visibility & Strength ──────────────────────────────────────
+    window.togglePwdVisibility = function(inputId, iconEl) {
+        const el = document.getElementById(inputId);
+        if (!el || !iconEl) return;
+        if (el.type === 'password') {
+            el.type = 'text';
+            iconEl.classList.replace('bi-eye', 'bi-eye-slash');
+        } else {
+            el.type = 'password';
+            iconEl.classList.replace('bi-eye-slash', 'bi-eye');
+        }
+    };
+
+    window.checkPwdStrength = function(pwd) {
+        const meter = document.getElementById('pwd-strength-meter');
+        const label = document.getElementById('pwd-strength-label');
+        if (!meter || !label) return;
+
+        let score = 0;
+        if (pwd.length >= 8) score += 25;
+        if (pwd.length >= 12) score += 15;
+        if (/[A-Z]/.test(pwd)) score += 20;
+        if (/[0-9]/.test(pwd)) score += 20;
+        if (/[^A-Za-z0-9]/.test(pwd)) score += 20;
+
+        meter.style.width = score + '%';
+        if (score === 0) {
+            meter.className = 'progress-bar';
+            label.textContent = gettext('Enter password');
+            label.className = 'small text-muted';
+        } else if (score < 40) {
+            meter.className = 'progress-bar bg-danger';
+            label.textContent = gettext('Weak');
+            label.className = 'small text-danger fw-bold';
+        } else if (score < 70) {
+            meter.className = 'progress-bar bg-warning';
+            label.textContent = gettext('Fair');
+            label.className = 'small text-warning fw-bold';
+        } else {
+            meter.className = 'progress-bar bg-success';
+            label.textContent = gettext('Strong');
+            label.className = 'small text-success fw-bold';
+        }
+    };
+
     window.doChangePassword = async function(e) {
         if (e) e.preventDefault();
         const old_password = document.getElementById('old_password').value;
@@ -286,6 +750,11 @@ window.togglePwdVisibility = function(inputId, iconEl) {
 
         if (!old_password || !new_password || !new_password2) {
             showToast(gettext('All password fields are required.'), 'warning');
+            return;
+        }
+
+        if (new_password.length < 8) {
+            showToast(gettext('Password must be at least 8 characters.'), 'warning');
             return;
         }
 
@@ -308,10 +777,11 @@ window.togglePwdVisibility = function(inputId, iconEl) {
 
                 const data = await res.json();
                 if (res.ok) {
-                    showToast(gettext('Password changed successfully!'), 'success');
+                    showToast(gettext('Password updated successfully!'), 'success');
                     document.getElementById('change-password-form').reset();
+                    checkPwdStrength('');
                 } else {
-                    const msg = data.old_password || data.new_password || data.error || gettext('Failed to change password.');
+                    const msg = data.old_password || data.new_password || data.error || gettext('Failed to update password.');
                     showToast(Array.isArray(msg) ? msg.join(', ') : msg, 'danger');
                 }
             } catch (err) {
@@ -320,116 +790,171 @@ window.togglePwdVisibility = function(inputId, iconEl) {
         });
     };
 
-    // ── Biometrics & Passkeys Integration (WebAuthn) ─────────────────────────
-    async function checkBiometricSupport() {
-        const badge = document.getElementById('biometric-status-badge');
-        const regBtn = document.getElementById('register-biometric-btn');
-        const remBtn = document.getElementById('remove-biometric-btn');
+    // ── Multi-Account Biometrics & WebAuthn Management ──────────────────────
+    function getBioAccounts() {
+        try {
+            return JSON.parse(localStorage.getItem('ss_biometric_accounts') || '{}');
+        } catch (e) { return {}; }
+    }
 
-        const isEnabled = localStorage.getItem('ss_biometric_enabled') === 'true';
+    function saveBioAccounts(accounts) {
+        try {
+            localStorage.setItem('ss_biometric_accounts', JSON.stringify(accounts));
+        } catch (e) {}
+    }
 
-        if (window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()) {
-            if (isEnabled) {
-                if (badge) {
-                    badge.className = 'badge bg-success bg-opacity-10 text-success px-3 py-1.5 rounded-pill small';
-                    badge.innerHTML = '<i class="bi bi-shield-check me-1"></i>' + gettext('Biometrics Active on this Device');
-                }
-                if (regBtn) regBtn.classList.add('d-none');
-                if (remBtn) remBtn.classList.remove('d-none');
-            } else {
-                if (badge) {
-                    badge.className = 'badge bg-info bg-opacity-10 text-info px-3 py-1.5 rounded-pill small';
-                    badge.innerHTML = '<i class="bi bi-check-circle me-1"></i>' + gettext('Device Supported');
-                }
-                if (regBtn) regBtn.classList.remove('d-none');
-                if (remBtn) remBtn.classList.add('d-none');
-            }
-        } else {
-            if (badge) {
-                badge.className = 'badge bg-secondary bg-opacity-10 text-secondary px-3 py-1.5 rounded-pill small';
-                badge.textContent = gettext('Biometrics not supported on this browser');
-            }
-            if (regBtn) regBtn.disabled = true;
+    function updateBiometricProfileAvatar(newUrl) {
+        const accounts = getBioAccounts();
+        if (accounts[CURRENT_USER]) {
+            accounts[CURRENT_USER].avatar = newUrl;
+            saveBioAccounts(accounts);
         }
     }
 
-    window.registerBiometricDevice = async function(btn) {
-        if (!window.PublicKeyCredential) {
-            showToast(gettext('WebAuthn biometrics is not supported in this browser.'), 'warning');
+    async function checkBiometricsSection() {
+        const badge = document.getElementById('biometric-status-badge');
+        const statusText = document.getElementById('current-acc-bio-status-text');
+        const actionsDiv = document.getElementById('current-acc-bio-actions');
+        const descEl = document.getElementById('current-acc-bio-desc');
+
+        const isSupported = window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        const accounts = getBioAccounts();
+        const isCurrentEnrolled = !!(accounts[CURRENT_USER] && accounts[CURRENT_USER].token);
+
+        if (!isSupported) {
+            if (badge) {
+                badge.className = 'badge bg-secondary bg-opacity-10 text-secondary px-3 py-1.5 rounded-pill small';
+                badge.textContent = gettext('Not Supported on this Browser');
+            }
+            if (statusText) statusText.textContent = gettext('WebAuthn biometrics unavailable.');
+            if (actionsDiv) actionsDiv.innerHTML = `<button class="btn btn-sm btn-secondary disabled">${gettext('Unavailable')}</button>`;
+            renderMultiAccountBioList();
             return;
         }
 
+        if (isCurrentEnrolled) {
+            if (badge) {
+                badge.className = 'badge bg-success bg-opacity-10 text-success px-3 py-1.5 rounded-pill small';
+                badge.innerHTML = '<i class="bi bi-shield-check me-1"></i>' + gettext('Active on this Device');
+            }
+            if (statusText) statusText.textContent = gettext('Enrolled: ') + (accounts[CURRENT_USER].enrolledAt ? new Date(accounts[CURRENT_USER].enrolledAt).toLocaleDateString() : gettext('Active'));
+            if (descEl) descEl.textContent = gettext('You can sign in with 1-tap Fingerprint / Face ID from the login screen on this device without typing your password.');
+            if (actionsDiv) {
+                actionsDiv.innerHTML = `
+                    <button type="button" class="btn btn-outline-info btn-sm fw-semibold" onclick="testCurrentBiometricSensor()">
+                        <i class="bi bi-shield-lock me-1"></i>${gettext('Test Sensor')}
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm fw-semibold" onclick="removeCurrentAccountBiometric()">
+                        <i class="bi bi-trash3 me-1"></i>${gettext('Disable')}
+                    </button>
+                `;
+            }
+        } else {
+            if (badge) {
+                badge.className = 'badge bg-info bg-opacity-10 text-info px-3 py-1.5 rounded-pill small';
+                badge.innerHTML = '<i class="bi bi-check-circle me-1"></i>' + gettext('Sensor Ready');
+            }
+            if (statusText) statusText.textContent = gettext('Not yet enabled for this account.');
+            if (actionsDiv) {
+                actionsDiv.innerHTML = `
+                    <button type="button" class="btn btn-success btn-sm px-3 py-1.5 fw-semibold shadow-xs" onclick="enrollCurrentAccountBiometric(this)">
+                        <i class="bi bi-fingerprint me-1.5"></i>${gettext('Enable Biometrics')}
+                    </button>
+                `;
+            }
+        }
+
+        renderMultiAccountBioList();
+    }
+
+    window.enrollCurrentAccountBiometric = async function(btn) {
         await withButtonBusy(eventButton(btn), gettext('Enrolling...'), async () => {
             try {
-                const challenge = new Uint8Array(32);
-                window.crypto.getRandomValues(challenge);
-                const userIdBytes = new TextEncoder().encode('{{ user.id }}');
+                if (window.PublicKeyCredential) {
+                    const challenge = new Uint8Array(32);
+                    window.crypto.getRandomValues(challenge);
+                    const userIdBytes = new TextEncoder().encode(CURRENT_USER_ID);
 
-                const credential = await navigator.credentials.create({
-                    publicKey: {
-                        challenge: challenge,
-                        rp: { name: '{{ SITE_NAME|default:"SafhaSahar" }}', id: window.location.hostname },
-                        user: {
-                            id: userIdBytes,
-                            name: '{{ user.username }}',
-                            displayName: '{{ user.get_full_name|default:user.username }}'
-                        },
-                        pubKeyCredParams: [
-                            { type: 'public-key', alg: -7 },
-                            { type: 'public-key', alg: -257 }
-                        ],
-                        authenticatorSelection: {
-                            authenticatorAttachment: 'platform',
-                            userVerification: 'required'
-                        },
-                        timeout: 60000
-                    }
-                });
-
-                try {
-                    const tokenRes = await authFetch('/auth/biometric-register-token/', { method: 'POST' });
-                    if (tokenRes && tokenRes.ok) {
-                        const tokenData = await tokenRes.json();
-                        if (tokenData && tokenData.token) {
-                            localStorage.setItem('ss_biometric_auth_token', tokenData.token);
+                    await navigator.credentials.create({
+                        publicKey: {
+                            challenge: challenge,
+                            rp: { name: '{{ SITE_NAME|default:"SafhaSahar" }}', id: window.location.hostname },
+                            user: {
+                                id: userIdBytes,
+                                name: CURRENT_USER,
+                                displayName: CURRENT_USER_NAME
+                            },
+                            pubKeyCredParams: [
+                                { type: 'public-key', alg: -7 },
+                                { type: 'public-key', alg: -257 }
+                            ],
+                            authenticatorSelection: {
+                                authenticatorAttachment: 'platform',
+                                userVerification: 'required'
+                            },
+                            timeout: 60000
                         }
-                    }
-                } catch (e) {
-                    console.warn('Token fetch error:', e);
+                    });
                 }
 
-                localStorage.setItem('ss_biometric_enabled', 'true');
-                localStorage.setItem('ss_biometric_user', '{{ user.username }}');
-                showToast(gettext('Biometrics (Fingerprint / Face ID) successfully enrolled on this device!'), 'success');
-                checkBiometricSupport();
+                // Obtain signed server token for this account
+                const res = await authFetch('/auth/biometric-register-token/', { method: 'POST' });
+                if (!res || !res.ok) throw new Error('Could not obtain biometric auth token from server.');
+
+                const data = await res.json();
+                const accounts = getBioAccounts();
+                accounts[CURRENT_USER] = {
+                    username: CURRENT_USER,
+                    displayName: CURRENT_USER_NAME,
+                    role: CURRENT_USER_ROLE,
+                    role_display: CURRENT_USER_ROLE_DISPLAY,
+                    avatar: data.profile_picture || CURRENT_USER_AVATAR || '',
+                    token: data.token,
+                    enrolledAt: new Date().toISOString(),
+                    device: 'Platform Authenticator'
+                };
+                saveBioAccounts(accounts);
+                localStorage.setItem('ss_last_biometric_user', CURRENT_USER);
+
+                showToast(gettext('Biometrics (Fingerprint / Face ID) successfully enrolled for this account!'), 'success');
+                checkBiometricsSection();
             } catch (err) {
-                console.warn('Biometrics enrollment notice:', err);
+                console.warn('Biometric enroll notice:', err);
                 if (err.name === 'NotAllowedError') {
                     showToast(gettext('Biometric sensor cancelled or permission denied.'), 'warning');
                 } else {
-                    try {
-                        const tokenRes = await authFetch('/auth/biometric-register-token/', { method: 'POST' });
-                        if (tokenRes && tokenRes.ok) {
-                            const tokenData = await tokenRes.json();
-                            if (tokenData && tokenData.token) {
-                                localStorage.setItem('ss_biometric_auth_token', tokenData.token);
-                            }
-                        }
-                    } catch (e) {}
-                    localStorage.setItem('ss_biometric_enabled', 'true');
-                    localStorage.setItem('ss_biometric_user', '{{ user.username }}');
-                    showToast(gettext('Biometrics configured for this browser device.'), 'success');
-                    checkBiometricSupport();
+                    showToast(gettext('Biometric registration completed for this browser.'), 'success');
+                    checkBiometricsSection();
                 }
             }
         });
     };
 
-    window.removeBiometricDevice = async function() {
+    window.testCurrentBiometricSensor = async function() {
+        try {
+            if (window.PublicKeyCredential) {
+                const challenge = new Uint8Array(32);
+                window.crypto.getRandomValues(challenge);
+                await navigator.credentials.get({
+                    publicKey: {
+                        challenge: challenge,
+                        rpId: window.location.hostname,
+                        userVerification: 'required',
+                        timeout: 60000
+                    }
+                });
+            }
+            showToast(gettext('Sensor verified successfully! Your biometric passkey is working.'), 'success');
+        } catch (e) {
+            showToast(gettext('Biometric prompt cancelled.'), 'info');
+        }
+    };
+
+    window.removeCurrentAccountBiometric = async function() {
         const ok = await showConfirmDialog({
             title: gettext('Disable Biometrics?'),
-            message: gettext('Are you sure you want to remove biometric authentication from this device?'),
-            confirmText: gettext('Remove Biometrics'),
+            message: gettext('Are you sure you want to remove biometric authentication for this account on this device?'),
+            confirmText: gettext('Remove'),
             cancelText: gettext('Cancel'),
             confirmBtnClass: 'btn-danger',
             icon: 'bi-fingerprint',
@@ -438,14 +963,199 @@ window.togglePwdVisibility = function(inputId, iconEl) {
         });
         if (!ok) return;
 
-        localStorage.removeItem('ss_biometric_enabled');
-        localStorage.removeItem('ss_biometric_user');
-        localStorage.removeItem('ss_biometric_auth_token');
-        showToast(gettext('Biometrics removed from this device.'), 'info');
-        checkBiometricSupport();
+        const accounts = getBioAccounts();
+        delete accounts[CURRENT_USER];
+        saveBioAccounts(accounts);
+        showToast(gettext('Biometrics removed for this account.'), 'info');
+        checkBiometricsSection();
     };
 
-    checkBiometricSupport();
+    window.removeAccountBioByIndex = async function(username) {
+        const ok = await showConfirmDialog({
+            title: gettext('Remove Biometric Profile?'),
+            message: `${gettext('Remove biometric access for')} @${username}?`,
+            confirmText: gettext('Remove'),
+            confirmBtnClass: 'btn-danger'
+        });
+        if (!ok) return;
+
+        const accounts = getBioAccounts();
+        delete accounts[username];
+        saveBioAccounts(accounts);
+        showToast(`${gettext('Profile')} @${username} ${gettext('removed from device.')}`, 'info');
+        checkBiometricsSection();
+    };
+
+    window.clearAllDeviceBiometrics = async function() {
+        const ok = await showConfirmDialog({
+            title: gettext('Clear All Passkeys?'),
+            message: gettext('This will remove all stored biometric accounts from this browser.'),
+            confirmText: gettext('Clear All'),
+            confirmBtnClass: 'btn-danger'
+        });
+        if (!ok) return;
+
+        localStorage.removeItem('ss_biometric_accounts');
+        localStorage.removeItem('ss_last_biometric_user');
+        localStorage.removeItem('ss_biometric_user');
+        localStorage.removeItem('ss_biometric_auth_token');
+        localStorage.removeItem('ss_biometric_enabled');
+        showToast(gettext('All device biometrics cleared.'), 'info');
+        checkBiometricsSection();
+    };
+
+    function renderMultiAccountBioList() {
+        const listDiv = document.getElementById('multi-account-bio-list');
+        if (!listDiv) return;
+        const accounts = getBioAccounts();
+        const usernames = Object.keys(accounts);
+
+        if (usernames.length === 0) {
+            listDiv.innerHTML = `<div class="text-muted small py-2 text-center">${gettext('No accounts currently enrolled on this device.')}</div>`;
+            return;
+        }
+
+        let html = '';
+        usernames.forEach(u => {
+            const acc = accounts[u];
+            const isCurrent = u === CURRENT_USER;
+            const avatarSrc = acc.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(acc.username)}&background=198754&color=fff&size=64`;
+            html += `
+                <div class="d-flex align-items-center justify-content-between p-2.5 rounded-3 border bg-body">
+                    <div class="d-flex align-items-center gap-2.5 overflow-hidden">
+                        <img src="${avatarSrc}" width="34" height="34" class="rounded-circle border" style="object-fit:cover;">
+                        <div class="overflow-hidden">
+                            <div class="fw-bold small text-truncate d-flex align-items-center gap-1.5">
+                                <span>${acc.displayName || acc.username}</span>
+                                ${isCurrent ? '<span class="badge bg-success bg-opacity-10 text-success" style="font-size:0.65rem;">' + gettext('Current') + '</span>' : ''}
+                            </div>
+                            <div class="text-muted small" style="font-size:0.75rem;">@${acc.username} &bull; <span class="text-capitalize">${acc.role_display || acc.role || 'user'}</span></div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline-danger btn-sm py-0.5 px-2" onclick="removeAccountBioByIndex('${u}')" title="${gettext('Remove')}">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            `;
+        });
+        listDiv.innerHTML = html;
+    }
+
+    // ── Display & Theme Logic ────────────────────────────────────────────────
+    window.setAppTheme = function(theme) {
+        let applied = theme;
+        if (theme === 'auto') {
+            applied = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', applied);
+        try { localStorage.setItem('safhasahar_theme', theme); } catch (e) {}
+
+        if (typeof applyThemeIcon === 'function') {
+            applyThemeIcon(applied);
+        }
+
+        updateThemeCardState(theme);
+        showToast(`${gettext('Theme set to')} ${theme.toUpperCase()}`, 'info');
+    };
+
+    function updateThemeCardState(theme) {
+        ['light', 'dark', 'auto'].forEach(t => {
+            const el = document.getElementById('theme-card-' + t);
+            if (el) {
+                if (t === theme) el.classList.add('active');
+                else el.classList.remove('active');
+            }
+        });
+    }
+
+    function initThemeState() {
+        const saved = localStorage.getItem('safhasahar_theme') || 'light';
+        updateThemeCardState(saved);
+    }
+    initThemeState();
+
+    window.toggleCompactUI = function(isCompact) {
+        if (isCompact) {
+            document.body.classList.add('compact-mode');
+            localStorage.setItem('ss_compact_ui', 'true');
+        } else {
+            document.body.classList.remove('compact-mode');
+            localStorage.removeItem('ss_compact_ui');
+        }
+    };
+    if (localStorage.getItem('ss_compact_ui') === 'true') {
+        const toggle = document.getElementById('compactUiToggle');
+        if (toggle) toggle.checked = true;
+        document.body.classList.add('compact-mode');
+    }
+
+    // ── Notifications Preferences & Sound Synthesizer ───────────────────────
+    window.saveNotificationPref = function() {
+        const prefs = {
+            gps: document.getElementById('prefGpsAlerts')?.checked ?? true,
+            status: document.getElementById('prefStatusAlerts')?.checked ?? true,
+            sound: document.getElementById('prefSoundAlerts')?.checked ?? true,
+        };
+        localStorage.setItem('ss_notif_prefs', JSON.stringify(prefs));
+        showToast(gettext('Notification preferences saved!'), 'success');
+    };
+
+    window.testNotificationSound = function() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+            osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
+
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start();
+            osc.stop(ctx.currentTime + 0.35);
+            showToast(gettext('Playing alert chime...'), 'info');
+        } catch (e) {
+            showToast(gettext('Audio preview unavailable.'), 'warning');
+        }
+    };
+
+    // ── Export & Privacy Center ─────────────────────────────────────────────
+    window.exportMyDataArchive = async function(btn) {
+        await withButtonBusy(eventButton(btn), gettext('Preparing Download...'), async () => {
+            const success = await downloadFile('/auth/export-data/', `account_data_${CURRENT_USER}.json`);
+            if (success) {
+                showToast(gettext('Data archive downloaded successfully!'), 'success');
+            }
+        });
+    };
+
+    window.clearClientCache = function() {
+        localStorage.removeItem('guest_claim_tokens');
+        sessionStorage.clear();
+        showToast(gettext('Client offline cache cleared.'), 'info');
+    };
+
+    window.confirmSignOut = async function() {
+        const ok = await showConfirmDialog({
+            title: gettext('Sign Out?'),
+            message: gettext('Are you sure you want to end your current session?'),
+            confirmText: gettext('Sign Out'),
+            confirmBtnClass: 'btn-danger',
+            icon: 'bi-box-arrow-right',
+            iconColor: '#dc2626',
+            iconBg: '#fee2e2'
+        });
+        if (ok && typeof logout === 'function') {
+            logout();
+        }
+    };
+
+    checkBiometricsSection();
 })();
 </script>
 {% endblock %}
