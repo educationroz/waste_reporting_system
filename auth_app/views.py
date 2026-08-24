@@ -22,6 +22,7 @@ from .serializers import (
     UserSerializer,
 )
 from django.contrib.auth import authenticate
+from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 from .tokens import email_verification_token
 
 import json as _json
@@ -100,6 +101,60 @@ class SessionLoginView(APIView):
                 },
             })
         return Response({'error': 'Invalid credentials.'}, status=400)
+
+
+class BiometricRegisterTokenView(APIView):
+    """Generates a secure signed token for biometric authentication on the current device."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        signer = TimestampSigner(salt='biometric-auth')
+        signed_token = signer.sign(f"{request.user.id}:{request.user.username}")
+        return Response({
+            'message': 'Biometric token generated.',
+            'token': signed_token,
+            'username': request.user.username,
+            'user_id': request.user.id,
+        })
+
+
+class BiometricLoginView(APIView):
+    """Passwordless login using device biometric verification."""
+    permission_classes = [AllowAny]
+    throttle_scope = 'session_login'
+
+    def post(self, request):
+        username = request.data.get('username')
+        token = request.data.get('token')
+
+        if not username or not token:
+            return Response({'error': 'Username and biometric token required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        signer = TimestampSigner(salt='biometric-auth')
+        try:
+            unsigned_value = signer.unsign(token, max_age=60 * 60 * 24 * 90)
+            user_id_str, token_username = unsigned_value.split(':', 1)
+        except (BadSignature, SignatureExpired, ValueError):
+            return Response({'error': 'Biometric token expired or invalid. Please sign in with password to re-enable.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if token_username.lower() != username.strip().lower():
+            return Response({'error': 'Biometric token user mismatch.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        user = User.objects.filter(id=user_id_str, username__iexact=username).first()
+        if not user or not user.is_active:
+            return Response({'error': 'Account not found or inactive.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+
+        return Response({
+            'message': 'Biometric login successful.',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'role': getattr(user, 'role', ''),
+            },
+        })
 
 
 @method_decorator(csrf_exempt, name='dispatch')

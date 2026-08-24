@@ -386,10 +386,16 @@ function checkDeviceBiometrics() {
 
 window.doBiometricLogin = async function() {
     const user = localStorage.getItem('ss_biometric_user');
+    const token = localStorage.getItem('ss_biometric_auth_token');
+
     if (!user) {
-        showToast(gettext('Please sign in with your credentials first to enable biometrics.'), 'info');
+        showToast(gettext('Please sign in with password first to enable biometric login on this device.'), 'info');
         return;
     }
+
+    const btn = document.getElementById('biometric-login-btn');
+    const errDiv = document.getElementById('error-alert');
+    if (errDiv) errDiv.classList.add('d-none');
 
     try {
         if (window.PublicKeyCredential) {
@@ -404,18 +410,52 @@ window.doBiometricLogin = async function() {
                 }
             });
         }
-        const usernameInput = document.getElementById('username');
-        if (usernameInput) usernameInput.value = user;
-        const passwordInput = document.getElementById('password');
-        if (passwordInput && !passwordInput.value) {
-            passwordInput.focus();
-            showToast(gettext('Biometrics verified for ') + user + '! ' + gettext('Enter password to continue.'), 'success');
+
+        // Biometric sensor verified! Perform passwordless session login
+        if (btn) btn.disabled = true;
+        showToast(gettext('Biometrics verified! Signing in...'), 'info');
+
+        const res = await fetch('/auth/biometric-login/', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ username: user, token: token }),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            const role = data.user?.role || '';
+            if (role === 'user') {
+                await claimGuestRequests();
+            }
+
+            const redirectMap = {
+                admin: '/admin-dashboard/',
+                driver: '/driver-dashboard/',
+                user: '/',
+            };
+
+            window.location.href = redirectMap[role] || '/dashboard/';
         } else {
-            doLogin();
+            // If token expired/invalid, autofill username and request password
+            const usernameInput = document.getElementById('username');
+            if (usernameInput) usernameInput.value = user;
+            const passwordInput = document.getElementById('password');
+            if (passwordInput) passwordInput.focus();
+            if (errDiv) {
+                errDiv.textContent = data.error || gettext('Biometric token expired. Please enter password.');
+                errDiv.classList.remove('d-none');
+            }
+            showToast(data.error || gettext('Biometric verification failed.'), 'danger');
         }
     } catch (e) {
         console.warn('Biometric verify note:', e);
-        showToast(gettext('Biometric authentication cancelled.'), 'warning');
+        showToast(gettext('Biometric sensor cancelled or not recognized.'), 'warning');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 };
 

@@ -386,18 +386,36 @@ window.togglePwdVisibility = function(inputId, iconEl) {
                     }
                 });
 
-                if (credential) {
-                    localStorage.setItem('ss_biometric_enabled', 'true');
-                    localStorage.setItem('ss_biometric_user', '{{ user.username }}');
-                    showToast(gettext('Biometrics (Fingerprint / Face ID) successfully enrolled on this device!'), 'success');
-                    checkBiometricSupport();
+                try {
+                    const tokenRes = await authFetch('/auth/biometric-register-token/', { method: 'POST' });
+                    if (tokenRes && tokenRes.ok) {
+                        const tokenData = await tokenRes.json();
+                        if (tokenData && tokenData.token) {
+                            localStorage.setItem('ss_biometric_auth_token', tokenData.token);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Token fetch error:', e);
                 }
+
+                localStorage.setItem('ss_biometric_enabled', 'true');
+                localStorage.setItem('ss_biometric_user', '{{ user.username }}');
+                showToast(gettext('Biometrics (Fingerprint / Face ID) successfully enrolled on this device!'), 'success');
+                checkBiometricSupport();
             } catch (err) {
                 console.warn('Biometrics enrollment notice:', err);
                 if (err.name === 'NotAllowedError') {
                     showToast(gettext('Biometric sensor cancelled or permission denied.'), 'warning');
                 } else {
-                    // Save enabled device token
+                    try {
+                        const tokenRes = await authFetch('/auth/biometric-register-token/', { method: 'POST' });
+                        if (tokenRes && tokenRes.ok) {
+                            const tokenData = await tokenRes.json();
+                            if (tokenData && tokenData.token) {
+                                localStorage.setItem('ss_biometric_auth_token', tokenData.token);
+                            }
+                        }
+                    } catch (e) {}
                     localStorage.setItem('ss_biometric_enabled', 'true');
                     localStorage.setItem('ss_biometric_user', '{{ user.username }}');
                     showToast(gettext('Biometrics configured for this browser device.'), 'success');
@@ -422,6 +440,7 @@ window.togglePwdVisibility = function(inputId, iconEl) {
 
         localStorage.removeItem('ss_biometric_enabled');
         localStorage.removeItem('ss_biometric_user');
+        localStorage.removeItem('ss_biometric_auth_token');
         showToast(gettext('Biometrics removed from this device.'), 'info');
         checkBiometricSupport();
     };

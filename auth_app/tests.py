@@ -68,3 +68,37 @@ class DriverProfileSyncTest(TestCase):
 
         self.assertEqual(User.objects.filter(role='driver').count(), 1)
         self.assertTrue(Driver.objects.filter(user=driver_user).exists())
+
+
+class BiometricAuthTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='bio_user',
+            email='bio@example.com',
+            password='StrongPass123!',
+            role='user',
+        )
+
+    def test_biometric_token_registration_and_passwordless_login(self):
+        self.client.force_login(self.user)
+        reg_resp = self.client.post('/auth/biometric-register-token/')
+        self.assertEqual(reg_resp.status_code, 200)
+        token = reg_resp.json()['token']
+
+        # Logout and perform biometric login
+        self.client.logout()
+        login_resp = self.client.post(
+            '/auth/biometric-login/',
+            data=json.dumps({'username': 'bio_user', 'token': token}),
+            content_type='application/json'
+        )
+        self.assertEqual(login_resp.status_code, 200)
+        self.assertEqual(login_resp.json()['user']['username'], 'bio_user')
+
+    def test_biometric_login_with_invalid_token_fails(self):
+        login_resp = self.client.post(
+            '/auth/biometric-login/',
+            data=json.dumps({'username': 'bio_user', 'token': 'tampered_token_xyz'}),
+            content_type='application/json'
+        )
+        self.assertEqual(login_resp.status_code, 401)
