@@ -34,3 +34,19 @@ class AdminLogsViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['page_obj'].number, response.context['paginator'].num_pages)
 
+
+class AdminSettingsViewTest(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username='settings_admin',
+            password='Password123!',
+            role='admin',
+            is_staff=True,
+            is_superadmin=True,
+        )
+        self.client.force_login(self.admin)
+
+    def test_admin_settings_view_loads(self):
+        response = self.client.get('/management/settings/')
+        self.assertEqual(response.status_code, 200)
+
