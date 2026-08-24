@@ -109,15 +109,11 @@
         min-height: 44px;
         width: 100% !important;
     }
-    #g_id_signin_container .S9gUrf-YoZ4jf,
     #g_id_signin_container > div,
-    #g_id_signin_container div[class*="L5Fo6c"],
-    #g_id_signin_container div[id*="gsi_"] {
+    #g_id_signin_container iframe {
         margin-left: auto !important;
         margin-right: auto !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
+        display: block !important;
     }
 
     .bio-acc-item {
@@ -267,16 +263,19 @@
         }
     };
 
-    // ── Google Sign-In ───────────────────────────────────────────────────────────
+    // ── Google Sign-In (Unified Singleton) ──────────────────────────────────────
     function getOptimalGoogleButtonWidth() {
+        const fullBtn = document.getElementById('login-btn');
         const cardBody = document.querySelector('.auth-card .card-body') || document.querySelector('.card-body');
         let width = 320;
-        if (cardBody && cardBody.clientWidth > 0) {
+        if (fullBtn && fullBtn.offsetWidth > 0) {
+            width = fullBtn.offsetWidth;
+        } else if (cardBody && cardBody.clientWidth > 0) {
             const padLeft = parseInt(window.getComputedStyle(cardBody).paddingLeft, 10) || 16;
             const padRight = parseInt(window.getComputedStyle(cardBody).paddingRight, 10) || 16;
             width = cardBody.clientWidth - padLeft - padRight;
         }
-        return Math.max(220, Math.min(380, Math.floor(width)));
+        return Math.max(200, Math.min(400, Math.floor(width)));
     }
 
     function renderGoogleButton() {
@@ -298,43 +297,9 @@
         );
     }
 
-    function initGoogleSignIn() {
-        if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
-            setTimeout(initGoogleSignIn, 150);
-            return;
-        }
-        const clientId = '{{ GOOGLE_CLIENT_ID|default:"" }}'.trim();
-        if (!clientId) {
-            console.warn('Google OAuth client_id is empty or not configured.');
-            return;
-        }
-        if (!window.__gsiLoginInitialized) {
-            google.accounts.id.initialize({
-                client_id: clientId,
-                callback: handleGoogleCredential,
-                auto_select: false,
-                use_fedcm_for_button: true,
-            });
-            window.__gsiLoginInitialized = true;
-        }
-        renderGoogleButton();
-        setTimeout(renderGoogleButton, 100);
-        setTimeout(renderGoogleButton, 350);
-    }
-
-    if (!window._gsiLoginResizeBound) {
-        window.addEventListener('resize', () => {
-            if (window._gLoginResizeTimer) clearTimeout(window._gLoginResizeTimer);
-            window._gLoginResizeTimer = setTimeout(renderGoogleButton, 200);
-        });
-        window._gsiLoginResizeBound = true;
-    }
-
-    initGoogleSignIn();
-
-    async function handleGoogleCredential(response) {
+    window.handleGoogleCredential = async function(response) {
         const errDiv = document.getElementById('error-alert');
-        errDiv.classList.add('d-none');
+        if (errDiv) errDiv.classList.add('d-none');
 
         try {
             const res = await fetch('/auth/google-login/', {
@@ -361,14 +326,56 @@
                 };
                 window.location.href = redirectMap[role] || '/dashboard/';
             } else {
-                errDiv.textContent = data.error || gettext('Google sign-in failed.');
-                errDiv.classList.remove('d-none');
+                if (errDiv) {
+                    errDiv.textContent = data.error || gettext('Google sign-in failed.');
+                    errDiv.classList.remove('d-none');
+                }
             }
         } catch (e) {
-            errDiv.textContent = gettext('Network error: ') + e.message;
-            errDiv.classList.remove('d-none');
+            if (errDiv) {
+                errDiv.textContent = gettext('Network error: ') + e.message;
+                errDiv.classList.remove('d-none');
+            }
         }
+    };
+
+    function initGoogleSignIn() {
+        if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
+            setTimeout(initGoogleSignIn, 150);
+            return;
+        }
+        const clientId = '{{ GOOGLE_CLIENT_ID|default:"" }}'.trim();
+        if (!clientId) {
+            console.warn('Google OAuth client_id is empty or not configured.');
+            return;
+        }
+        if (!window.__gsiGlobalInitialized) {
+            google.accounts.id.initialize({
+                client_id: clientId,
+                callback: function(resp) {
+                    if (typeof window.handleGoogleCredential === 'function') {
+                        window.handleGoogleCredential(resp);
+                    }
+                },
+                auto_select: false,
+                use_fedcm_for_button: true,
+            });
+            window.__gsiGlobalInitialized = true;
+        }
+        renderGoogleButton();
+        setTimeout(renderGoogleButton, 100);
+        setTimeout(renderGoogleButton, 350);
     }
+
+    if (!window._gsiGlobalResizeBound) {
+        window.addEventListener('resize', () => {
+            if (window._gGlobalResizeTimer) clearTimeout(window._gGlobalResizeTimer);
+            window._gGlobalResizeTimer = setTimeout(renderGoogleButton, 200);
+        });
+        window._gsiGlobalResizeBound = true;
+    }
+
+    initGoogleSignIn();
 
     // Enter shortcut
     const uname = document.getElementById('username');
@@ -419,7 +426,6 @@
             accounts = JSON.parse(localStorage.getItem('ss_biometric_accounts') || '{}');
         } catch (e) { accounts = {}; }
 
-        // Migrate legacy keys if present
         const legacyUser = localStorage.getItem('ss_biometric_user');
         const legacyToken = localStorage.getItem('ss_biometric_auth_token');
         const legacyEnabled = localStorage.getItem('ss_biometric_enabled') === 'true';
