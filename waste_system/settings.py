@@ -6,12 +6,25 @@ pip install python-decouple
 
 from pathlib import Path
 from datetime import timedelta
+
+from django.core.exceptions import ImproperlyConfigured
 from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='change-me-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
+# A development-only fallback keeps a fresh checkout usable. Production must
+# explicitly inject a unique key; accepting a known default would let anyone
+# forge Django-signed data if DEBUG were accidentally disabled.
+SECRET_KEY = config('SECRET_KEY', default='')
+_INSECURE_SECRET_KEYS = {'', 'change-me-in-production', 'replace-with-a-unique-random-secret-key'}
+if SECRET_KEY in _INSECURE_SECRET_KEYS:
+    if not DEBUG:
+        raise ImproperlyConfigured(
+            'SECRET_KEY must be set to a unique, non-placeholder value when DEBUG=False.'
+        )
+    SECRET_KEY = 'development-only-insecure-secret-key-not-for-production'
+
 ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='localhost,127.0.0.1,testserver,0.0.0.0,.e2b.app').split(',') if h.strip()]
 
 # Whether registration should do a live DNS/MX lookup on the email domain.
