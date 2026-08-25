@@ -200,8 +200,6 @@ CACHES = {
 # ─── Custom User Model ────────────────────────────────────────────────────────
 AUTH_USER_MODEL = 'auth_app.User'
 
-<<<<<<< HEAD
-=======
 # NOTE: GOOGLE_OAUTH_CLIENT_ID is defined once, above, with default=''. A second
 # assignment used to sit here without a default, silently overriding it and
 # hard-crashing at import time whenever the variable was unset — which is why a
@@ -209,7 +207,6 @@ AUTH_USER_MODEL = 'auth_app.User'
 # handles the empty case by returning 503 "not configured", which is the right
 # behaviour: an unconfigured optional integration should disable itself, not
 # take down the whole site.
->>>>>>> b89a62fbbe93201c3b4ab2be297aacb3c0f1ba4d
 
 # ─── Password Validation ──────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
