@@ -10,6 +10,7 @@
             {% csrf_token %}
             <div class="text-center mb-4">
 <<<<<<< HEAD
+<<<<<<< HEAD
                  <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="{% trans 'Logo' %}" width="90" height="90" class="d-inline-block align-text-top mb-1">
                 <h4 class="mt-2 fw-bold">{% trans "SignIn" %}</h4>
                 <p class="text-muted small mb-0">{% trans "Smart Waste Collection System" %}</p>
@@ -18,6 +19,11 @@
                 <h4 class="mt-2 fw-bold">{% trans "Sign In" %}</h4>
                 <p class="text-muted small mb-0">{{ SITE_TAGLINE|default:"Live Waste Reporting System" }}</p>
 >>>>>>> b12e838a28545fa91a18a463920ceb5b8946f4ad
+=======
+                 <img src="{% if SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{% static 'web_app/image/SafhaSahar.png' %}{% endif %}" alt="{% trans 'Logo' %}" width="90" height="90" class="d-inline-block align-text-top mb-1" style="object-fit: contain;">
+                <h4 class="mt-2 fw-bold">{% trans "Sign In" %}</h4>
+                <p class="text-muted small mb-0">{{ SITE_TAGLINE|default:"Live Waste Reporting System" }}</p>
+>>>>>>> 60fa51277fa148f1680c797bbabfa65dd31dbc56
             </div>
 
             <div id="error-alert" class="alert alert-danger d-none"></div>
