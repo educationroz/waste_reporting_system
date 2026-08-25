@@ -25,6 +25,7 @@
         min-height: 100% !important;
         background-color: var(--bg-card, #ffffff) !important;
         border-right: 1px solid var(--border-color, #e5e7eb) !important;
+        box-shadow: 4px 0 16px -12px var(--shadow-color-strong, rgba(0, 0, 0, 0.15));
         color: var(--text-primary, #1f2937) !important;
         overflow-y: auto;
         overflow-x: hidden;
@@ -94,53 +95,206 @@
 
     .sidebar-logo-text { white-space: nowrap; }
 
-    /* FIX: nav-link had no explicit color in its default (non-active,
-       non-hover) state, so it fell back to Bootstrap's built-in link
-       color (a hardcoded blue) instead of following the theme. This
-       happened to look okay in light mode by coincidence, but in dark
-       mode the text stayed that same hardcoded blue instead of switching
-       to the light theme text color — causing the illegible/mismatched
-       sidebar text. Added color: var(--text-primary) here so it now
-       follows the theme in both modes. */
-    .sidebar-card .nav-link {
+    /* ══════════════════════════════════════════════════════════════
+       PREMIUM SIDEBAR NAVIGATION
+       Grouped sections with micro-labels, icons inside uniform rounded
+       tiles, green accent bar + pill on the active item, and a pinned
+       profile card at the bottom. Colors keep following the theme
+       variables (light/dark) — only the design/layout changed.
+       ══════════════════════════════════════════════════════════════ */
+    .sidebar-card .card-body {
+        display: flex;
+        flex-direction: column;
+        min-height: 100%;
+        padding: 1rem 0.75rem !important;
+    }
+
+    .sidebar-nav { flex: 1 1 auto; }
+
+    /* ── Group section labels ── */
+    .sidebar-section {
+        margin-bottom: 0.4rem;
+    }
+    .sidebar-section-label {
+        display: block;
+        font-size: 0.66rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--text-muted, #6c757d);
+        padding: 0.55rem 0.85rem 0.3rem;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    /* ── Nav item: icon tile + text ── */
+    .sidebar-nav-item {
         display: flex;
         align-items: center;
-        padding: 0.65rem 0.75rem;
-        border-radius: 8px;
-        font-size: 0.88rem;
+        gap: 0.7rem;
+        padding: 0.42rem 0.7rem;
+        margin-bottom: 2px;
+        border-radius: 10px;
+        font-size: 0.875rem;
         font-weight: 500;
-        transition: all 0.2s ease;
+        color: var(--text-primary, #1f2937) !important;
         text-decoration: none;
         width: 100%;
         white-space: nowrap;
-        color: var(--text-primary, #1f2937) !important;
+        position: relative;
+        transition: background-color 0.18s ease, color 0.18s ease,
+                    transform 0.18s ease;
     }
-
-    /* FIX: icons inside nav-link inherited the same hardcoded Bootstrap
-       blue for the same reason — now uses the muted theme variable so
-       icons stay visually secondary to the text in both light and dark
-       mode, and switch correctly with theme toggle. */
-    .sidebar-card .nav-link i {
-        font-size: 1.15rem;
-        margin-right: 0.75rem;
-        min-width: 24px;
-        text-align: center;
-        flex-shrink: 0;
+    .sidebar-nav-item .sidebar-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        border-radius: 9px;
+        background: var(--bg-hover, #f1f3f5);
         color: var(--text-muted, #6c757d);
+        font-size: 1.05rem;
+        flex-shrink: 0;
+        transition: background-color 0.18s ease, color 0.18s ease,
+                    box-shadow 0.18s ease;
+    }
+    .sidebar-nav-item .sidebar-link-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
-    .sidebar-card .nav-link.active {
-        background-color: rgba(4, 155, 9, 0.12) !important;
-        color: #049b09 !important;
+    .sidebar-nav-item:hover:not(.active) {
+        background-color: var(--bg-hover, #f1f3f5);
+        color: var(--text-primary, #111827) !important;
+        transform: translateX(2px);
+    }
+    .sidebar-nav-item:hover:not(.active) .sidebar-icon {
+        background: rgba(4, 155, 9, 0.10);
+        color: var(--brand-green, #049b09);
+    }
+
+    /* Active: soft green pill + left accent bar + solid green icon tile */
+    .sidebar-nav-item.active {
+        background: rgba(4, 155, 9, 0.10) !important;
+        color: var(--brand-green, #049b09) !important;
         font-weight: 600;
     }
-    .sidebar-card .nav-link.active i {
-        color: #049b09 !important;
+    .sidebar-nav-item.active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 4px;
+        height: 58%;
+        border-radius: 0 4px 4px 0;
+        background: var(--brand-green, #049b09);
+    }
+    .sidebar-nav-item.active .sidebar-icon {
+        background: var(--brand-green, #049b09) !important;
+        color: #ffffff !important;
+        box-shadow: 0 2px 8px rgba(4, 155, 9, 0.35);
     }
 
-    .sidebar-card .nav-link:hover:not(.active) {
-        background-color: var(--bg-hover, #f3f4f6) !important;
-        color: var(--text-primary, #111827) !important;
+    /* ── Count badges (right aligned inside item) ── */
+    .sidebar-nav-item .sidebar-badge {
+        margin-left: auto;
+        min-width: 19px;
+        height: 19px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 6px;
+        border-radius: 10px;
+        background: #dc2626;
+        color: #ffffff;
+        font-size: 0.66rem;
+        font-weight: 700;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+
+    /* ── Logout item: red tint on hover ── */
+    .sidebar-nav-item.logout-item:hover:not(.active) {
+        color: #dc2626 !important;
+    }
+    .sidebar-nav-item.logout-item:hover:not(.active) .sidebar-icon {
+        background: rgba(220, 38, 38, 0.10);
+        color: #dc2626;
+    }
+
+    /* ── Pinned profile card (bottom of sidebar) ── */
+    .sidebar-profile {
+        margin-top: auto;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--border-color, #e5e7eb);
+    }
+    .sidebar-profile-link {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        padding: 0.45rem 0.7rem;
+        border-radius: 12px;
+        text-decoration: none;
+        color: var(--text-primary, #1f2937) !important;
+        transition: background-color 0.18s ease;
+    }
+    .sidebar-profile-link:hover {
+        background-color: var(--bg-hover, #f1f3f5);
+    }
+    .sidebar-avatar {
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, var(--brand-green, #049b09),
+                                    var(--brand-green-light, #56dd59));
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 0.95rem;
+        overflow: hidden;
+        flex-shrink: 0;
+        box-shadow: 0 2px 6px rgba(4, 155, 9, 0.30);
+    }
+    .sidebar-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .sidebar-profile-info {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+    .sidebar-profile-name {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 600;
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .sidebar-profile-role {
+        display: block;
+        font-size: 0.72rem;
+        color: var(--text-muted, #6c757d);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .sidebar-profile-gear {
+        margin-left: auto;
+        color: var(--text-muted, #6c757d);
+        font-size: 0.95rem;
+        flex-shrink: 0;
+    }
+    .sidebar-profile-link:hover .sidebar-profile-gear {
+        color: var(--brand-green, #049b09);
     }
 
     .content-col {
@@ -158,13 +312,17 @@
         }
 
         .layout-wrapper.collapsed .sidebar-card .card-body {
-            padding: 1rem 0.25rem !important;
+            padding: 1rem 0.3rem !important;
             align-items: center;
         }
 
         .layout-wrapper.collapsed .sidebar-logo-text,
         .layout-wrapper.collapsed .sidebar-link-text,
-        .layout-wrapper.collapsed .badge-text {
+        .layout-wrapper.collapsed .badge-text,
+        .layout-wrapper.collapsed .sidebar-section-label,
+        .layout-wrapper.collapsed .sidebar-profile-info,
+        .layout-wrapper.collapsed .sidebar-profile-gear,
+        .layout-wrapper.collapsed .sidebar-badge {
             display: none !important;
         }
 
@@ -189,27 +347,39 @@
             margin: 0 auto !important;
         }
 
-        .layout-wrapper.collapsed .sidebar-card .nav-link {
+        .layout-wrapper.collapsed .sidebar-nav-item {
             justify-content: center !important;
-            padding: 0.6rem !important;
-            width: 42px;
-            height: 42px;
+            padding: 0.35rem !important;
+            width: 44px;
+            height: 44px;
             margin-left: auto;
             margin-right: auto;
+            margin-bottom: 4px;
+            gap: 0;
+        }
+        .layout-wrapper.collapsed .sidebar-nav-item:hover {
+            transform: none;
+        }
+        .layout-wrapper.collapsed .sidebar-nav-item.active::before {
+            display: none;
         }
 
-        .layout-wrapper.collapsed .sidebar-card .nav-link i {
-            margin-right: 0 !important;
-            font-size: 1.2rem !important;
-            min-width: auto !important;
+        .layout-wrapper.collapsed .sidebar-nav-item .sidebar-icon {
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
+            border-radius: 9px;
+            font-size: 1.1rem !important;
         }
 
-        .layout-wrapper.collapsed .sidebar-card .nav-link.active {
-            background-color: #049b09 !important;
-            border-radius: 10px;
+        .layout-wrapper.collapsed .sidebar-profile-link {
+            justify-content: center !important;
+            padding: 0.35rem !important;
         }
-        .layout-wrapper.collapsed .sidebar-card .nav-link.active i {
-            color: #ffffff !important;
+        .layout-wrapper.collapsed .sidebar-avatar {
+            width: 38px;
+            height: 38px;
+            min-width: 38px;
         }
     }
 
@@ -221,13 +391,17 @@
         }
 
         .layout-wrapper:not(.mobile-open) .sidebar-card .card-body {
-            padding: 1rem 0.25rem !important;
+            padding: 1rem 0.3rem !important;
             align-items: center;
         }
 
         .layout-wrapper:not(.mobile-open) .sidebar-logo-text,
         .layout-wrapper:not(.mobile-open) .sidebar-link-text,
-        .layout-wrapper:not(.mobile-open) .badge-text {
+        .layout-wrapper:not(.mobile-open) .badge-text,
+        .layout-wrapper:not(.mobile-open) .sidebar-section-label,
+        .layout-wrapper:not(.mobile-open) .sidebar-profile-info,
+        .layout-wrapper:not(.mobile-open) .sidebar-profile-gear,
+        .layout-wrapper:not(.mobile-open) .sidebar-badge {
             display: none !important;
         }
 
@@ -242,18 +416,36 @@
             width: 100%;
         }
 
-        .layout-wrapper:not(.mobile-open) .sidebar-card .nav-link {
+        .layout-wrapper:not(.mobile-open) .sidebar-nav-item {
             justify-content: center !important;
-            width: 42px;
-            height: 42px;
-            padding: 0.6rem !important;
-            margin: 0 auto;
+            width: 44px;
+            height: 44px;
+            padding: 0.35rem !important;
+            margin: 0 auto 4px;
+            gap: 0;
+        }
+        .layout-wrapper:not(.mobile-open) .sidebar-nav-item:hover {
+            transform: none;
+        }
+        .layout-wrapper:not(.mobile-open) .sidebar-nav-item.active::before {
+            display: none;
+        }
+        .layout-wrapper:not(.mobile-open) .sidebar-nav-item .sidebar-icon {
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
+            border-radius: 9px;
+            font-size: 1.1rem !important;
         }
 
-        .layout-wrapper:not(.mobile-open) .sidebar-card .nav-link i {
-            margin-right: 0 !important;
-            font-size: 1.2rem !important;
-            min-width: auto !important;
+        .layout-wrapper:not(.mobile-open) .sidebar-profile-link {
+            justify-content: center !important;
+            padding: 0.35rem !important;
+        }
+        .layout-wrapper:not(.mobile-open) .sidebar-avatar {
+            width: 38px;
+            height: 38px;
+            min-width: 38px;
         }
 
         /* When mobile menu opens via .mobile-open class */
@@ -263,12 +455,15 @@
         }
 
         .layout-wrapper.mobile-open .sidebar-card .card-body {
-            padding: 1rem 0.5rem !important;
+            padding: 1rem 0.75rem !important;
             align-items: flex-start;
         }
 
         .layout-wrapper.mobile-open .sidebar-logo-text,
-        .layout-wrapper.mobile-open .sidebar-link-text {
+        .layout-wrapper.mobile-open .sidebar-link-text,
+        .layout-wrapper.mobile-open .sidebar-section-label,
+        .layout-wrapper.mobile-open .sidebar-profile-info,
+        .layout-wrapper.mobile-open .sidebar-profile-gear {
             display: inline !important;
         }
 
@@ -284,17 +479,16 @@
             flex-direction: row;
         }
 
-        .layout-wrapper.mobile-open .sidebar-card .nav-link {
+        .layout-wrapper.mobile-open .sidebar-nav-item {
             justify-content: flex-start !important;
             width: 100%;
             height: auto;
-            padding: 0.65rem 0.75rem !important;
-            margin: 0;
+            padding: 0.42rem 0.7rem !important;
+            margin: 0 0 2px 0;
         }
 
-        .layout-wrapper.mobile-open .sidebar-card .nav-link i {
-            margin-right: 0.75rem !important;
-            min-width: 24px !important;
+        .layout-wrapper.mobile-open .sidebar-nav-item .sidebar-icon {
+            margin-right: 0.7rem;
         }
 
         .sidebar-backdrop {

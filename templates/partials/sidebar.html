@@ -22,5 +22,23 @@
         {% else %}
             {% include "partials/sidebar_user.html" %}
         {% endif %}
+
+        <!-- Pinned Profile Card -->
+        <div class="sidebar-profile">
+            <a href="{% url 'personal-settings' %}" class="sidebar-profile-link" title="{% trans 'Personal Settings' %}">
+                <span class="sidebar-avatar">
+                    {% if user.profile_picture %}
+                        <img src="{{ user.profile_picture.url }}" alt="{{ user.username }}">
+                    {% else %}
+                        {{ user.username|slice:":1"|upper }}
+                    {% endif %}
+                </span>
+                <span class="sidebar-profile-info">
+                    <span class="sidebar-profile-name">{{ user.get_full_name|default:user.username }}</span>
+                    <span class="sidebar-profile-role">{{ user.get_role_display }}</span>
+                </span>
+                <i class="bi bi-gear sidebar-profile-gear"></i>
+            </a>
+        </div>
     </div>
 </div>

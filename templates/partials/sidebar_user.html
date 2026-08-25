@@ -1,19 +1,32 @@
 {% load static %}
 {% load i18n %}
-<a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active bg-success{% endif %} mb-2 d-flex align-items-center">
-    <i class="bi bi-house me-2"></i><span class="sidebar-link-text">{% trans "Dashboard" %}</span>
-</a>
-<a href="{% url 'user-requests' %}" class="nav-link {% if request.resolver_match.url_name == 'user-requests' %}active bg-success{% endif %} mb-2 d-flex align-items-center">
-    <i class="bi bi-clock-history me-2"></i><span class="sidebar-link-text">{% trans "My Requests" %}</span>
-</a>
-<a href="{% url 'user-recycle-bin' %}" class="nav-link {% if request.resolver_match.url_name == 'user-recycle-bin' %}active bg-success{% endif %} mb-2 d-flex align-items-center">
-    <i class="bi bi-recycle me-2"></i>
-    <span class="sidebar-link-text">{% trans "Recycle Bin" %}</span>
-    <span id="recycle-bin-badge" class="badge rounded-pill bg-danger ms-auto d-none"></span>
-</a>
-<a href="{% url 'notifications' %}" class="nav-link {% if request.resolver_match.url_name == 'notifications' %}active bg-success{% endif %} mb-2 d-flex align-items-center">
-    <i class="bi bi-bell me-2"></i><span class="sidebar-link-text">{% trans "Notifications" %}</span>
-</a>
-<a href="#" onclick="logout(); return false;" class="nav-link mb-2 d-flex align-items-center">
-    <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-link-text">{% trans "Logout" %}</span>
-</a>
+<div class="sidebar-nav">
+    <div class="sidebar-section">
+        <span class="sidebar-section-label">{% trans "Main" %}</span>
+        <a href="{% url 'home' %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+            <span class="sidebar-icon"><i class="bi bi-house"></i></span>
+            <span class="sidebar-link-text">{% trans "Dashboard" %}</span>
+        </a>
+        <a href="{% url 'user-requests' %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'user-requests' %}active{% endif %}">
+            <span class="sidebar-icon"><i class="bi bi-clock-history"></i></span>
+            <span class="sidebar-link-text">{% trans "My Requests" %}</span>
+        </a>
+        <a href="{% url 'user-recycle-bin' %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'user-recycle-bin' %}active{% endif %}">
+            <span class="sidebar-icon"><i class="bi bi-recycle"></i></span>
+            <span class="sidebar-link-text">{% trans "Recycle Bin" %}</span>
+            <span id="recycle-bin-badge" class="sidebar-badge badge-text d-none"></span>
+        </a>
+    </div>
+
+    <div class="sidebar-section">
+        <span class="sidebar-section-label">{% trans "Account" %}</span>
+        <a href="{% url 'notifications' %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}">
+            <span class="sidebar-icon"><i class="bi bi-bell"></i></span>
+            <span class="sidebar-link-text">{% trans "Notifications" %}</span>
+        </a>
+        <a href="#" onclick="logout(); return false;" class="sidebar-nav-item logout-item">
+            <span class="sidebar-icon"><i class="bi bi-box-arrow-right"></i></span>
+            <span class="sidebar-link-text">{% trans "Logout" %}</span>
+        </a>
+    </div>
+</div>
