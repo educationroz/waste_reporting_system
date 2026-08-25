@@ -385,73 +385,50 @@
 
     /* ── MOBILE VIEW COLLAPSE & EXPAND BEHAVIOR ── */
     @media (max-width: 767.98px) {
+        /* Collapsed (default) mobile state — SATRI-style: only the
+           hamburger toggle button stays visible. Logo, nav items and the
+           profile card are hidden entirely (not shrunk to icons), so the
+           sidebar column takes almost no width and page content gets
+           nearly the full screen. Everything reappears once opened. */
         .layout-wrapper:not(.mobile-open) .sidebar-col {
-            flex: 0 0 72px;
-            max-width: 72px;
+            flex: 0 0 52px;
+            max-width: 52px;
         }
 
         .layout-wrapper:not(.mobile-open) .sidebar-card .card-body {
-            padding: 1rem 0.3rem !important;
+            padding: 0.75rem 0.25rem !important;
             align-items: center;
         }
 
-        .layout-wrapper:not(.mobile-open) .sidebar-logo-text,
-        .layout-wrapper:not(.mobile-open) .sidebar-link-text,
-        .layout-wrapper:not(.mobile-open) .badge-text,
-        .layout-wrapper:not(.mobile-open) .sidebar-section-label,
-        .layout-wrapper:not(.mobile-open) .sidebar-profile-info,
-        .layout-wrapper:not(.mobile-open) .sidebar-profile-gear,
-        .layout-wrapper:not(.mobile-open) .sidebar-badge {
+        .layout-wrapper:not(.mobile-open) .sidebar-brand-logo,
+        .layout-wrapper:not(.mobile-open) .sidebar-nav,
+        .layout-wrapper:not(.mobile-open) .sidebar-profile {
             display: none !important;
         }
 
         .layout-wrapper:not(.mobile-open) .sidebar-header {
-            flex-direction: column;
-            gap: 8px;
-            padding: 0 0 1rem 0 !important;
+            justify-content: center;
+            border-bottom: none;
+            margin-bottom: 0;
+            padding: 0 !important;
         }
 
-        .layout-wrapper:not(.mobile-open) .sidebar-brand-logo {
-            justify-content: center !important;
-            width: 100%;
-        }
-
-        .layout-wrapper:not(.mobile-open) .sidebar-nav-item {
-            justify-content: center !important;
-            width: 44px;
-            height: 44px;
-            padding: 0.35rem !important;
-            margin: 0 auto 4px;
-            gap: 0;
-        }
-        .layout-wrapper:not(.mobile-open) .sidebar-nav-item:hover {
-            transform: none;
-        }
-        .layout-wrapper:not(.mobile-open) .sidebar-nav-item.active::before {
-            display: none;
-        }
-        .layout-wrapper:not(.mobile-open) .sidebar-nav-item .sidebar-icon {
-            width: 34px;
-            height: 34px;
-            min-width: 34px;
-            border-radius: 9px;
-            font-size: 1.1rem !important;
-        }
-
-        .layout-wrapper:not(.mobile-open) .sidebar-profile-link {
-            justify-content: center !important;
-            padding: 0.35rem !important;
-        }
-        .layout-wrapper:not(.mobile-open) .sidebar-avatar {
-            width: 38px;
-            height: 38px;
-            min-width: 38px;
-        }
-
-        /* When mobile menu opens via .mobile-open class */
+        /* When mobile menu opens via .mobile-open class — SATRI-style:
+           the sidebar becomes a fixed overlay drawer that sits ON TOP of
+           the content (not a push that squeezes it), with a dim backdrop
+           behind it. Taking it out of flow with position:fixed also means
+           .content-col (flex:1 1 auto) automatically reclaims the full
+           width again — no extra override needed there. */
         .layout-wrapper.mobile-open .sidebar-col {
-            flex: 0 0 240px;
+            position: fixed;
+            top: var(--navbar-height, 60px);
+            left: 0;
+            flex: none;
+            width: 240px;
             max-width: 240px;
+            height: calc(100vh - var(--navbar-height, 60px));
+            z-index: 1050; /* above navbar (1030) and backdrop */
+            box-shadow: 8px 0 24px -8px var(--shadow-color-strong, rgba(0, 0, 0, 0.35));
         }
 
         .layout-wrapper.mobile-open .sidebar-card .card-body {
@@ -491,12 +468,30 @@
             margin-right: 0.7rem;
         }
 
+        /* .sidebar-backdrop sits at <body> level (see base.html), NOT as a
+           real DOM sibling of .layout-wrapper (that's nested deep inside
+           #content-app), so a `.layout-wrapper.mobile-open ~ .sidebar-backdrop`
+           combinator can never match. toggleSidebarMenu() in base.html now
+           toggles this .active class directly instead. */
         .sidebar-backdrop {
             display: none;
         }
-        
-        .layout-wrapper.mobile-open ~ .sidebar-backdrop {
-            display: block !important;
+
+        .sidebar-backdrop.active {
+            display: block;
+            position: fixed;
+            top: var(--navbar-height, 60px);
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 1040; /* below the drawer (1050), above content */
+            animation: sidebar-backdrop-fade 0.2s ease;
+        }
+
+        @keyframes sidebar-backdrop-fade {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         /* Content area was using the same 1.5rem padding as desktop,

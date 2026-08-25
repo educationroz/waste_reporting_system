@@ -961,18 +961,52 @@ if (!window.__ssAuthScriptLoaded) {
         console.warn('htmx history cache unavailable (likely browser storage blocking) — navigation still works normally:', evt.detail);
     });
 
-   // Dynamic Sidebar Toggle for Both Mobile & Desktop
-function toggleSidebarMenu() {
-    const wrapper = document.querySelector(".layout-wrapper");
-    if (!wrapper) return;
+   // Dynamic Sidebar Toggle for Both Mobile & Desktop — SATRI-style:
+   //   Desktop: starts collapsed (icon rail) by default, remembered across
+   //            visits via localStorage, same as the theme preference.
+   //   Mobile:  always starts as a collapsed rail; opening it slides in a
+   //            fixed overlay drawer (not a push) with a dim backdrop.
+   // .layout-wrapper lives inside #content-app, so it gets re-rendered on
+   // every htmx navigation — the state has to be re-applied after every
+   // swap, not just once on first load.
+   function applySidebarState() {
+       const wrapper = document.querySelector(".layout-wrapper");
+       const backdrop = document.getElementById('sidebar-backdrop');
+       if (!wrapper) return;
 
-    if (window.innerWidth < 768) {
-        wrapper.classList.toggle("mobile-open");
-    } else {
-        wrapper.classList.toggle("collapsed");
-        wrapper.classList.remove("mobile-open");
-    }
-}
+       if (window.innerWidth < 768) {
+           wrapper.classList.remove('mobile-open');
+           if (backdrop) backdrop.classList.remove('active');
+       } else {
+           let saved;
+           try { saved = localStorage.getItem('safhasahar_sidebar_collapsed'); } catch (e) { saved = null; }
+           const collapsed = saved === null ? true : saved === 'true'; // default: collapsed
+           wrapper.classList.toggle('collapsed', collapsed);
+           wrapper.classList.remove('mobile-open');
+           if (backdrop) backdrop.classList.remove('active');
+       }
+   }
+
+   function toggleSidebarMenu() {
+       const wrapper = document.querySelector(".layout-wrapper");
+       if (!wrapper) return;
+       const backdrop = document.getElementById('sidebar-backdrop');
+
+       if (window.innerWidth < 768) {
+           const opening = !wrapper.classList.contains("mobile-open");
+           wrapper.classList.toggle("mobile-open", opening);
+           if (backdrop) backdrop.classList.toggle('active', opening);
+       } else {
+           const collapsing = !wrapper.classList.contains("collapsed");
+           wrapper.classList.toggle("collapsed", collapsing);
+           wrapper.classList.remove("mobile-open");
+           if (backdrop) backdrop.classList.remove('active');
+           try { localStorage.setItem('safhasahar_sidebar_collapsed', String(collapsing)); } catch (e) {}
+       }
+   }
+
+   document.addEventListener('DOMContentLoaded', applySidebarState);
+   document.body.addEventListener('htmx:afterSwap', applySidebarState);
 
 function toggleNavQuickMenu() {
     const menu = document.getElementById('navQuickMenu');
