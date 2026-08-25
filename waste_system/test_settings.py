@@ -6,6 +6,14 @@ output readable. Run with::
     python manage.py test --settings=waste_system.test_settings
 """
 
+import os
+
+# The shipping settings intentionally fail closed with DEBUG=False. Tests use
+# their isolated configuration and do not exercise HTTPS redirects, so opt in
+# before importing the base settings rather than weakening the production
+# default.
+os.environ['DEBUG'] = 'True'
+
 from .settings import *  # noqa: F401,F403
 
 # Application loggers stay silent so a failure trace isn't buried in INFO

@@ -48,5 +48,6 @@ DEBUG=False SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe
   python manage.py check --deploy
 ```
 
-The application now refuses to start with a missing or placeholder Django
-secret key when `DEBUG=False`.
+The application now fails closed: `DEBUG` defaults to `False`, and it refuses
+to start with a missing or placeholder Django secret key when `DEBUG=False`.
+Local development must explicitly set `DEBUG=True` in an untracked `.env` file.

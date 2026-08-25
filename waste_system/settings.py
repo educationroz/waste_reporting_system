@@ -12,7 +12,10 @@ from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DEBUG = config('DEBUG', default=True, cast=bool)
+# Fail closed: local development must opt in with DEBUG=True in an untracked
+# .env file. Leaving this enabled by default exposes detailed error pages and
+# disables the HTTPS, HSTS, and secure-cookie settings below.
+DEBUG = config('DEBUG', default=False, cast=bool)
 # A development-only fallback keeps a fresh checkout usable. Production must
 # explicitly inject a unique key; accepting a known default would let anyone
 # forge Django-signed data if DEBUG were accidentally disabled.
