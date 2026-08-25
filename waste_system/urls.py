@@ -20,12 +20,9 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.decorators.cache import cache_page
 from django.views.i18n import JavaScriptCatalog
-<<<<<<< HEAD
-=======
 
 from waste_system.health import healthz, healthz_live
 
->>>>>>> 60fa51277fa148f1680c797bbabfa65dd31dbc56
 urlpatterns = [
     # ── Health checks ────────────────────────────────────────────────────────
     # Registered first so they can never be shadowed by the catch-all
