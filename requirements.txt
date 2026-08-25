@@ -14,7 +14,7 @@ constantly==23.10.4
 cryptography==47.0.0
 daphne==4.2.1
 dj-database-url==0.5.0
-Django==6.0.4
+Django>=5.1.0,<6.0.0
 django-cors-headers==4.9.0
 django-jazzmin==3.0.5
 djangorestframework==3.17.1
@@ -34,7 +34,7 @@ MarkupSafe==3.0.3
 mpmath==1.3.0
 msgpack==1.1.2
 networkx==3.6.1
-numpy==2.5.2
+numpy>=2.0.0
 oauthlib==3.3.1
 packaging==26.2
 pillow==12.2.0
@@ -49,12 +49,16 @@ pyOpenSSL==26.1.0
 python-dateutil==2.9.0.post0
 python-decouple==3.8
 python-magic==0.4.27
+<<<<<<< HEAD
 # Windows-only wheel: it bundles the libmagic DLL that python-magic needs.
 # Without this marker `pip install -r requirements.txt` fails outright on
 # Linux/macOS (including CI runners), because no sdist or wheel is published
 # for those platforms. On Linux install the system library instead:
 #     apt-get install -y libmagic1
 python-magic-bin==0.4.14; sys_platform == "win32"
+=======
+python-magic-bin==0.4.14; sys_platform == 'win32'
+>>>>>>> b12e838a28545fa91a18a463920ceb5b8946f4ad
 pytz==2026.3.post1
 redis==7.4.0
 requests==2.34.2

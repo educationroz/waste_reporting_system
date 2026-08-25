@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='change-me-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='localhost,127.0.0.1,testserver,0.0.0.0,.e2b.app').split(',') if h.strip()]
 
 # Whether registration should do a live DNS/MX lookup on the email domain.
 # Defaults to "on in production, off in development". It is exposed as its own
@@ -85,6 +85,7 @@ TEMPLATES = [
                 # attribute and the language switcher in base.html.
                 'django.template.context_processors.i18n',
                 'web_app.context_processors.google_client_id',
+                'web_app.context_processors.system_branding',
                 # Exposes {{ csp_nonce }} so inline <script> tags can carry a
                 # per-request nonce and survive the strict CSP.
                 'waste_system.security.csp_nonce',

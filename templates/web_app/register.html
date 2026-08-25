@@ -5,75 +5,126 @@
 {% block title %}{% trans "Register — Waste Collection" %}{% endblock %}
 
 {% block content %}
-<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light py-4 px-2 px-sm-3">
+<div class="min-vh-100 d-flex align-items-center justify-content-center auth-page-bg py-4 px-2 px-sm-3">
     <div class="card shadow-sm w-100 auth-card" style="max-width:440px">
         <div class="card-body p-3 p-sm-4">
+<<<<<<< HEAD
             <div class="text-center mb-4">
                 <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="{% trans 'Logo' %}" width="90" height="90" class="d-inline-block align-text-top mb-1">
                 <h4 class="mt-2 fw-bold">{% trans "Create Account" %}</h4>
                 <p class="text-muted small mb-0">{% trans "Smart Waste Collection System" %}</p>
+=======
+            <div class="text-center mb-3">
+                <img src="{% if SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{% static 'web_app/image/SafhaSahar.png' %}{% endif %}" alt="{% trans 'Logo' %}" width="80" height="80" class="d-inline-block align-text-top mb-1" style="object-fit: contain;">
+                <h4 class="mt-2 fw-bold mb-1">{% trans "Create Account" %}</h4>
+                <p class="text-muted small mb-0">{{ SITE_TAGLINE|default:"Live Waste Reporting System" }}</p>
+>>>>>>> b12e838a28545fa91a18a463920ceb5b8946f4ad
             </div>
 
-            <div id="error-alert" class="alert alert-danger d-none"></div>
-            <div id="success-alert" class="alert alert-success d-none"></div>
-
-            <div class="google-btn-wrapper w-100 d-flex justify-content-center mb-3">
-                <div id="g_id_signin_container" class="w-100 d-flex justify-content-center"></div>
-            </div>
-
-            <div class="d-flex align-items-center mb-3">
-                <hr class="flex-grow-1">
-                <span class="px-2 text-muted small">{% trans "or register with email" %}</span>
-                <hr class="flex-grow-1">
-            </div>
-
-            <div class="row g-2">
-                <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label">{% trans "Username *" %}</label>
-                    <input type="text" id="username" class="form-control" autofocus>
+            <!-- Step Progress Indicator -->
+            <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
+                <div class="d-flex align-items-center gap-1.5 small fw-semibold" id="step1-indicator">
+                    <span class="step-badge active" id="step1-badge">1</span>
+                    <span class="text-success" id="step1-label">{% trans "Basic Details" %}</span>
                 </div>
-                <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label">{% trans "Email *" %}</label>
-                    <input type="email" id="email" class="form-control">
+                <div class="step-line" id="step-divider-line"></div>
+                <div class="d-flex align-items-center gap-1.5 small fw-semibold text-muted" id="step2-indicator">
+                    <span class="step-badge" id="step2-badge">2</span>
+                    <span id="step2-label">{% trans "Role & Password" %}</span>
                 </div>
             </div>
-            <div class="mb-3">
-                <label class="form-label">{% trans "Phone" %}</label>
-                <input type="tel" id="phone" class="form-control">
+
+            <div id="error-alert" class="alert alert-danger d-none py-2 small"></div>
+            <div id="success-alert" class="alert alert-success d-none py-2 small"></div>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 STEP 1: Basic & Contact Info
+                 ══════════════════════════════════════════════════════════════ -->
+            <div id="reg-step-1">
+                <div class="google-btn-wrapper w-100 d-flex justify-content-center mb-3">
+                    <div id="g_id_signin_container" class="w-100 d-flex justify-content-center"></div>
+                </div>
+
+                <div class="d-flex align-items-center mb-3">
+                    <hr class="flex-grow-1">
+                    <span class="px-2 text-muted small">{% trans "or register with email" %}</span>
+                    <hr class="flex-grow-1">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">{% trans "Username *" %}</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+                        <input type="text" id="username" class="form-control" placeholder="{% trans 'Choose a username' %}" autofocus>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">{% trans "Email Address *" %}</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="bi bi-envelope"></i></span>
+                        <input type="email" id="email" class="form-control" placeholder="{% trans 'name@example.com' %}">
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label small fw-semibold">{% trans "Phone Number" %} <span class="text-muted fw-normal">({% trans "Optional" %})</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="bi bi-telephone"></i></span>
+                        <input type="tel" id="phone" class="form-control" placeholder="{% trans '98XXXXXXXX' %}">
+                    </div>
+                </div>
+
+                <button class="btn btn-success w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-1 shadow-xs" type="button" id="btn-goto-step2" onclick="goToStep2()">
+                    <span>{% trans "Next" %}</span>
+                    <i class="bi bi-arrow-right"></i>
+                </button>
             </div>
-            <div class="mb-3">
-                <label class="form-label">{% trans "Role *" %}</label>
-                <select id="role" class="form-select">
-                    <option value="user">{% trans "Regular User" %}</option>
-                    {% comment %} <option value="driver">{% trans "Driver" %}</option> {% endcomment %}
-                </select>
-            </div>
-            <div class="row g-2">
-                <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label">{% trans "Password *" %}</label>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 STEP 2: Role & Password Security (Locked Citizen Role)
+                 ══════════════════════════════════════════════════════════════ -->
+            <div id="reg-step-2" class="d-none">
+                <!-- Locked Role Field -->
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">{% trans "Role" %}</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light text-muted"><i class="bi bi-person-badge"></i></span>
+                        <input type="text" class="form-control bg-light text-secondary fw-semibold" value="{% trans 'Regular User / Citizen' %}" readonly disabled style="cursor: not-allowed;">
+                        <span class="input-group-text bg-light text-muted" title="{% trans 'Fixed for public registration' %}"><i class="bi bi-lock-fill text-muted"></i></span>
+                    </div>
+                    <input type="hidden" id="role" value="user">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">{% trans "Password *" %}</label>
                     <div class="position-relative">
-                        <input type="password" id="password" class="form-control pe-5" oninput="handlePasswordInput()">
+                        <input type="password" id="password" class="form-control pe-5" placeholder="{% trans 'Min. 8 characters' %}" oninput="handlePasswordInput()">
                         <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
                             id="toggle-password-icon" style="cursor: pointer; display: none;" onclick="togglePassword()"></i>
                     </div>
                 </div>
-                <div class="col-12 col-sm-6 mb-3">
-                    <label class="form-label">{% trans "Confirm Password *" %}</label>
+
+                <div class="mb-4">
+                    <label class="form-label small fw-semibold">{% trans "Confirm Password *" %}</label>
                     <div class="position-relative">
-                        <input type="password" id="password2" class="form-control pe-5" oninput="handlePassword2Input()">
+                        <input type="password" id="password2" class="form-control pe-5" placeholder="{% trans 'Re-enter password' %}" oninput="handlePassword2Input()">
                         <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
-                            id="toggle-password2-icon" style="cursor: pointer; display: none;" onclick="togglePassword2()"></i>
+                            id="toggle-password-icon" style="cursor: pointer; display: none;" onclick="togglePassword2()"></i>
                     </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary px-3 py-2 fw-semibold" onclick="goToStep1()">
+                        <i class="bi bi-arrow-left me-1"></i>{% trans "Back" %}
+                    </button>
+                    <button class="btn btn-success flex-grow-1 py-2 fw-semibold shadow-xs" id="reg-btn" type="button" onclick="doRegister()">
+                        <span id="reg-text">{% trans "Create Account" %}</span>
+                        <span id="reg-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
+                    </button>
                 </div>
             </div>
 
-            <button class="btn btn-success w-100" id="reg-btn" onclick="doRegister()">
-                <span id="reg-text">{% trans "Create Account" %}</span>
-                <span id="reg-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
-            </button>
-
             <p class="text-center mt-3 mb-0 small">
-                {% trans "Already have an account?" %} <a href="{% url 'login' %}" id="signin-link" class="text-success fw-medium">{% trans "Sign in" %}</a>
+                {% trans "Already have an account?" %} <a href="{% url 'login' %}" id="signin-link" class="text-success fw-semibold text-decoration-none">{% trans "Sign in" %}</a>
             </p>
         </div>
     </div>
@@ -83,8 +134,39 @@
 {% block extra_js %}
 <style>
     .auth-card {
-        border-radius: 14px;
+        border-radius: 16px;
         border: 1px solid rgba(0,0,0,0.06);
+        background: var(--bg-card, #ffffff);
+        color: var(--text-primary, #212529);
+    }
+    .auth-page-bg {
+        background-color: var(--bg-body, #f8f9fa);
+    }
+    .step-badge {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        background-color: #e2e8f0;
+        color: #64748b;
+        font-weight: 700;
+        transition: all 0.2s ease;
+    }
+    .step-badge.active {
+        background-color: #198754;
+        color: #ffffff;
+    }
+    .step-line {
+        width: 32px;
+        height: 2px;
+        background-color: #e2e8f0;
+        transition: all 0.2s ease;
+    }
+    .step-line.active {
+        background-color: #198754;
     }
     .google-btn-wrapper {
         width: 100% !important;
@@ -93,6 +175,8 @@
         align-items: center !important;
         margin: 0 auto 0.5rem auto !important;
         text-align: center !important;
+        min-height: 44px !important;
+        height: 44px !important;
         overflow: hidden !important;
     }
     #g_id_signin_container {
@@ -101,18 +185,15 @@
         align-items: center !important;
         margin: 0 auto !important;
         text-align: center !important;
-        min-height: 44px;
+        min-height: 44px !important;
+        height: 44px !important;
         width: 100% !important;
     }
-    #g_id_signin_container .S9gUrf-YoZ4jf,
     #g_id_signin_container > div,
-    #g_id_signin_container div[class*="L5Fo6c"],
-    #g_id_signin_container div[id*="gsi_"] {
+    #g_id_signin_container iframe {
         margin-left: auto !important;
         margin-right: auto !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
+        display: block !important;
     }
 
     /* Remove browser default eye / clear icon */
@@ -134,6 +215,65 @@
 (function() {
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+// ── Multi-Step Form Navigation ──────────────────────────────────────────────
+window.goToStep2 = function() {
+    const errDiv = document.getElementById('error-alert');
+    errDiv.classList.add('d-none');
+
+    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
+
+    if (!username) {
+        errDiv.textContent = gettext('Please enter a username.');
+        errDiv.classList.remove('d-none');
+        document.getElementById('username').focus();
+        return;
+    }
+
+    if (!email) {
+        errDiv.textContent = gettext('Please enter your email address.');
+        errDiv.classList.remove('d-none');
+        document.getElementById('email').focus();
+        return;
+    }
+
+    if (!emailRegex.test(email)) {
+        errDiv.textContent = gettext('Please enter a valid email address.');
+        errDiv.classList.remove('d-none');
+        document.getElementById('email').focus();
+        return;
+    }
+
+    // Switch panels
+    document.getElementById('reg-step-1').classList.add('d-none');
+    document.getElementById('reg-step-2').classList.remove('d-none');
+
+    // Update progress indicator
+    document.getElementById('step-divider-line').classList.add('active');
+    document.getElementById('step2-badge').classList.add('active');
+    document.getElementById('step2-indicator').classList.remove('text-muted');
+    document.getElementById('step2-indicator').classList.add('text-success');
+
+    setTimeout(() => {
+        const pwd = document.getElementById('password');
+        if (pwd) pwd.focus();
+    }, 50);
+};
+
+window.goToStep1 = function() {
+    const errDiv = document.getElementById('error-alert');
+    errDiv.classList.add('d-none');
+
+    document.getElementById('reg-step-2').classList.add('d-none');
+    document.getElementById('reg-step-1').classList.remove('d-none');
+
+    document.getElementById('step-divider-line').classList.remove('active');
+    document.getElementById('step2-badge').classList.remove('active');
+    document.getElementById('step2-indicator').classList.add('text-muted');
+    document.getElementById('step2-indicator').classList.remove('text-success');
+};
+
+// ── Registration Submission ─────────────────────────────────────────────────
 window.doRegister = async function() {
     const errDiv = document.getElementById('error-alert');
     const sucDiv = document.getElementById('success-alert');
@@ -142,29 +282,44 @@ window.doRegister = async function() {
     const btn = document.getElementById('reg-btn');
     errDiv.classList.add('d-none');
     sucDiv.classList.add('d-none');
+
     const payload = {
         username: document.getElementById('username').value.trim(),
         email: document.getElementById('email').value.trim(),
         phone: document.getElementById('phone').value.trim(),
-        role: document.getElementById('role').value,
+        role: document.getElementById('role').value || 'user',
         password: document.getElementById('password').value,
         password2: document.getElementById('password2').value,
     };
 
-    if (!payload.username || !payload.email || !payload.password) {
-        errDiv.textContent = 'Username, email and password are required.';
+    if (!payload.username || !payload.email) {
+        goToStep1();
+        errDiv.textContent = gettext('Username and email are required.');
         errDiv.classList.remove('d-none');
         return;
     }
 
-    if (!emailRegex.test(payload.email)) {
-        errDiv.textContent = 'Please enter a valid email address.';
+    if (!payload.password || !payload.password2) {
+        errDiv.textContent = gettext('Please enter and confirm your password.');
         errDiv.classList.remove('d-none');
         return;
     }
 
+    if (payload.password.length < 8) {
+        errDiv.textContent = gettext('Password must be at least 8 characters long.');
+        errDiv.classList.remove('d-none');
+        return;
+    }
+
+    if (payload.password !== payload.password2) {
+        errDiv.textContent = gettext('Passwords do not match.');
+        errDiv.classList.remove('d-none');
+        return;
+    }
+
+    btn.disabled = true;
     spinner.classList.remove('d-none');
-    text.textContent = 'Creating...';
+    text.textContent = gettext('Creating...');
 
     try {
         const res = await fetch('/auth/register/', {
@@ -179,10 +334,9 @@ window.doRegister = async function() {
         const data = await res.json();
 
         if (res.ok) {
-            sucDiv.textContent = data.message || 'Account created! Please check your email to verify your account before logging in.';
+            sucDiv.textContent = data.message || gettext('Account created! Please check your email to verify your account before logging in.');
             sucDiv.classList.remove('d-none');
-            btn.disabled = true;
-            text.textContent = 'Check your email';
+            text.textContent = gettext('Check your email');
 
             setTimeout(() => {
                 const params = new URLSearchParams(window.location.search);
@@ -192,16 +346,18 @@ window.doRegister = async function() {
             }, 3000);
         } else {
             const msgs = Object.entries(data).map(([k,v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('<br>');
-            errDiv.innerHTML = msgs || 'Registration failed.';
+            errDiv.innerHTML = msgs || gettext('Registration failed.');
             errDiv.classList.remove('d-none');
+            btn.disabled = false;
         }
     } catch (e) {
-        errDiv.textContent = 'Network error: ' + e.message;
+        errDiv.textContent = gettext('Network error: ') + e.message;
         errDiv.classList.remove('d-none');
+        btn.disabled = false;
     } finally {
         spinner.classList.add('d-none');
         if (!btn.disabled) {
-            text.textContent = 'Create Account';
+            text.textContent = gettext('Create Account');
         }
     }
 };
@@ -233,11 +389,11 @@ function getCookie(name) {
     }
 })();
 
-// ── Google Sign-In ───────────────────────────────────────────────────────────
+// ── Google Sign-In (Unified Singleton & Zero-Flicker) ──────────────────────
 function getOptimalGoogleButtonWidth() {
-    const fullBtn = document.getElementById('reg-btn');
+    const fullBtn = document.getElementById('btn-goto-step2') || document.getElementById('reg-btn');
     const cardBody = document.querySelector('.auth-card .card-body') || document.querySelector('.card-body');
-    let width = 300;
+    let width = 320;
     if (fullBtn && fullBtn.offsetWidth > 0) {
         width = fullBtn.offsetWidth;
     } else if (cardBody && cardBody.clientWidth > 0) {
@@ -245,14 +401,41 @@ function getOptimalGoogleButtonWidth() {
         const padRight = parseInt(window.getComputedStyle(cardBody).paddingRight, 10) || 16;
         width = cardBody.clientWidth - padLeft - padRight;
     }
-    return Math.max(220, Math.min(380, Math.floor(width)));
+    return Math.max(200, Math.min(400, Math.floor(width)));
+}
+
+function ensureGoogleSdkInit() {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) return false;
+    const clientId = '{{ GOOGLE_CLIENT_ID|default:"" }}'.trim();
+    if (!clientId) return false;
+
+    if (!window.__gsiGlobalInitialized) {
+        google.accounts.id.initialize({
+            client_id: clientId,
+            callback: function(resp) {
+                if (typeof window.handleGoogleCredential === 'function') {
+                    window.handleGoogleCredential(resp);
+                }
+            },
+            auto_select: false,
+            use_fedcm_for_button: true,
+        });
+        window.__gsiGlobalInitialized = true;
+    }
+    return true;
 }
 
 function renderGoogleButton() {
     const container = document.getElementById('g_id_signin_container');
-    if (!container || typeof google === 'undefined' || !google.accounts || !google.accounts.id) return;
+    if (!container || !ensureGoogleSdkInit()) return;
+
     const btnWidth = getOptimalGoogleButtonWidth();
+    if (container.dataset.renderedWidth === String(btnWidth) && container.querySelector('iframe')) {
+        return;
+    }
+
     container.innerHTML = '';
+    container.dataset.renderedWidth = String(btnWidth);
     google.accounts.id.renderButton(
         container,
         {
@@ -267,43 +450,9 @@ function renderGoogleButton() {
     );
 }
 
-function initGoogleSignIn() {
-    if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
-        setTimeout(initGoogleSignIn, 150);
-        return;
-    }
-    const clientId = '{{ GOOGLE_CLIENT_ID|default:"" }}'.trim();
-    if (!clientId) {
-        console.warn('Google OAuth client_id is empty or not configured.');
-        return;
-    }
-    if (!window.__gsiRegisterInitialized) {
-        google.accounts.id.initialize({
-            client_id: clientId,
-            callback: handleGoogleCredential,
-            auto_select: false,
-            use_fedcm_for_button: true,
-        });
-        window.__gsiRegisterInitialized = true;
-    }
-    renderGoogleButton();
-    setTimeout(renderGoogleButton, 100);
-    setTimeout(renderGoogleButton, 350);
-}
-
-if (!window._gsiRegResizeBound) {
-    window.addEventListener('resize', () => {
-        if (window._gRegResizeTimer) clearTimeout(window._gRegResizeTimer);
-        window._gRegResizeTimer = setTimeout(renderGoogleButton, 200);
-    });
-    window._gsiRegResizeBound = true;
-}
-
-initGoogleSignIn();
-
-async function handleGoogleCredential(response) {
+window.handleGoogleCredential = async function(response) {
     const errDiv = document.getElementById('error-alert');
-    errDiv.classList.add('d-none');
+    if (errDiv) errDiv.classList.add('d-none');
 
     try {
         const res = await fetch('/auth/google-login/', {
@@ -326,86 +475,137 @@ async function handleGoogleCredential(response) {
             };
             window.location.href = redirectMap[role] || '/dashboard/';
         } else {
-            errDiv.textContent = data.error || 'Google sign-in failed.';
-            errDiv.classList.remove('d-none');
+            if (errDiv) {
+                errDiv.textContent = data.error || gettext('Google sign-in failed.');
+                errDiv.classList.remove('d-none');
+            }
         }
     } catch (e) {
-        errDiv.textContent = 'Network error: ' + e.message;
-        errDiv.classList.remove('d-none');
+        if (errDiv) {
+            errDiv.textContent = gettext('Network error: ') + e.message;
+            errDiv.classList.remove('d-none');
+        }
     }
+};
+
+function initGoogleSignIn() {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
+        setTimeout(initGoogleSignIn, 80);
+        return;
+    }
+    ensureGoogleSdkInit();
+    renderGoogleButton();
 }
+
+if (!window._gsiGlobalResizeBound) {
+    window.addEventListener('resize', () => {
+        if (window._gGlobalResizeTimer) clearTimeout(window._gGlobalResizeTimer);
+        window._gGlobalResizeTimer = setTimeout(() => {
+            const container = document.getElementById('g_id_signin_container');
+            if (container) delete container.dataset.renderedWidth;
+            renderGoogleButton();
+        }, 150);
+    });
+    window._gsiGlobalResizeBound = true;
+}
+
+initGoogleSignIn();
 
 // Enter key order
-const fieldOrder = ['username', 'email', 'phone', 'role', 'password', 'password2'];
+const uname = document.getElementById('username');
+if (uname) {
+    uname.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const em = document.getElementById('email');
+            if (em) em.focus();
+        }
+    });
+}
 
-fieldOrder.forEach((id, idx) => {
-    const el = document.getElementById(id);
-    if (el) {
-        el.addEventListener('keydown', e => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const nextId = fieldOrder[idx + 1];
-                if (nextId) {
-                    document.getElementById(nextId).focus();
-                } else {
-                    doRegister();
-                }
-            }
-        });
-    }
-});
+const emEl = document.getElementById('email');
+if (emEl) {
+    emEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const ph = document.getElementById('phone');
+            if (ph) ph.focus();
+        }
+    });
+}
 
-function handlePasswordInput() {
+const phEl = document.getElementById('phone');
+if (phEl) {
+    phEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            goToStep2();
+        }
+    });
+}
+
+const pwdEl = document.getElementById('password');
+if (pwdEl) {
+    pwdEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const pwd2 = document.getElementById('password2');
+            if (pwd2) pwd2.focus();
+        }
+    });
+}
+
+const pwd2El = document.getElementById('password2');
+if (pwd2El) {
+    pwd2El.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            doRegister();
+        }
+    });
+}
+
+window.handlePasswordInput = function() {
     const pwdInput = document.getElementById('password');
     const icon = document.getElementById('toggle-password-icon');
-    if (pwdInput.value.length > 0) {
-        icon.style.display = 'block';
-    } else {
-        icon.style.display = 'none';
+    if (pwdInput && icon) {
+        icon.style.display = pwdInput.value.length > 0 ? 'block' : 'none';
     }
-}
-window.handlePasswordInput = handlePasswordInput;
+};
 
-function togglePassword() {
+window.togglePassword = function() {
     const pwdInput = document.getElementById('password');
     const icon = document.getElementById('toggle-password-icon');
+    if (!pwdInput || !icon) return;
     if (pwdInput.type === 'password') {
         pwdInput.type = 'text';
-        icon.classList.remove('bi-eye');
-        icon.classList.add('bi-eye-slash');
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
     } else {
         pwdInput.type = 'password';
-        icon.classList.remove('bi-eye-slash');
-        icon.classList.add('bi-eye');
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
     }
-}
-window.togglePassword = togglePassword;
+};
 
-function handlePassword2Input() {
+window.handlePassword2Input = function() {
     const pwdInput = document.getElementById('password2');
     const icon = document.getElementById('toggle-password2-icon');
-    if (pwdInput.value.length > 0) {
-        icon.style.display = 'block';
-    } else {
-        icon.style.display = 'none';
+    if (pwdInput && icon) {
+        icon.style.display = pwdInput.value.length > 0 ? 'block' : 'none';
     }
-}
-window.handlePassword2Input = handlePassword2Input;
+};
 
-function togglePassword2() {
+window.togglePassword2 = function() {
     const pwdInput = document.getElementById('password2');
     const icon = document.getElementById('toggle-password2-icon');
+    if (!pwdInput || !icon) return;
     if (pwdInput.type === 'password') {
         pwdInput.type = 'text';
-        icon.classList.remove('bi-eye');
-        icon.classList.add('bi-eye-slash');
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
     } else {
         pwdInput.type = 'password';
-        icon.classList.remove('bi-eye-slash');
-        icon.classList.add('bi-eye');
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
     }
-}
-window.togglePassword2 = togglePassword2;
+};
 })();
 </script>
 {% endblock %}

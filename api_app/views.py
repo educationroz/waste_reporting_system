@@ -7,6 +7,7 @@ import tempfile
 from .backup_utils import BACKUP_DIR as BACKUP_DIR_FOR_UPLOADS
 from .backup_utils import BackupError, verify_backup_file
 from django.conf import settings
+from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.core.management import call_command
@@ -592,7 +593,7 @@ class DriverViewSet(viewsets.ModelViewSet):
     CRUD for driver profiles.
     Drivers can update their own location. Admins manage all.
     """
-    queryset = Driver.objects.select_related('user', 'vehicle').all()
+    queryset = Driver.objects.select_related('user', 'vehicle').order_by('-id')
     serializer_class = DriverSerializer
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [filters.SearchFilter]
@@ -2015,7 +2016,7 @@ class RouteViewSet(viewsets.ModelViewSet):
 
 class ScheduleViewSet(viewsets.ModelViewSet):
     """Recurring collection schedules. Admin manages, all read."""
-    queryset = Schedule.objects.select_related('driver__user', 'vehicle').all()
+    queryset = Schedule.objects.select_related('driver__user', 'vehicle').order_by('-id')
     serializer_class = ScheduleSerializer
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [filters.SearchFilter]
@@ -2191,7 +2192,7 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
     System-wide settings management.
     Create, read, update, delete settings. Admin-only.
     """
-    queryset = SystemSettings.objects.all()
+    queryset = SystemSettings.objects.all().order_by('key')
     serializer_class = SystemSettingsSerializer
     permission_classes = [IsAuthenticated, IsAdminUser]
     lookup_field = 'key'
@@ -2207,6 +2208,62 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         _log_admin_action(self.request, 'delete', 'SystemSettings', instance, f'Deleted setting {instance.key}')
         instance.delete()
+
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def get_branding(self, request):
+        """Public endpoint to get site branding (name, logo, tagline, contact)."""
+        setting = SystemSettings.objects.filter(key='site_branding').first()
+        data = setting.value if setting and isinstance(setting.value, dict) else {
+            'site_name': 'SafhaSahar',
+            'site_tagline': 'Live Waste Reporting System',
+            'site_logo': '',
+            'contact_email': '',
+            'contact_phone': '',
+        }
+        return Response(data)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser], parser_classes=[MultiPartParser, FormParser, JSONParser])
+    def save_branding(self, request):
+        """Admin saves site name, tagline, logo upload, contact info dynamically."""
+        site_name = request.data.get('site_name', '').strip()
+        site_tagline = request.data.get('site_tagline', '').strip()
+        contact_email = request.data.get('contact_email', '').strip()
+        contact_phone = request.data.get('contact_phone', '').strip()
+        logo_file = request.FILES.get('logo')
+
+        setting, _ = SystemSettings.objects.get_or_create(
+            key='site_branding',
+            defaults={'value': {}, 'description': 'System branding and identity'}
+        )
+
+        current_val = setting.value if isinstance(setting.value, dict) else {}
+        if site_name: current_val['site_name'] = site_name
+        if site_tagline: current_val['site_tagline'] = site_tagline
+        if contact_email is not None: current_val['contact_email'] = contact_email
+        if contact_phone is not None: current_val['contact_phone'] = contact_phone
+
+        if logo_file:
+            from django.core.files.storage import default_storage
+            ext = os.path.splitext(logo_file.name)[1].lower() or '.png'
+            file_path = default_storage.save(f'branding/custom_logo{ext}', logo_file)
+            logo_url = settings.MEDIA_URL + file_path
+            current_val['site_logo'] = logo_url
+
+        setting.value = current_val
+        setting.updated_by = request.user
+        setting.save()
+
+        # Invalidate cache
+        cache.delete('site_branding_name')
+        cache.delete('site_branding_logo')
+        cache.delete('site_branding_tagline')
+
+        _log_admin_action(request, 'update', 'SystemSettings', setting, f'Updated site branding: {site_name}')
+
+        return Response({
+            'message': 'Branding settings saved successfully!',
+            'data': current_val
+        })
 
  
 def _csv_safe(value):

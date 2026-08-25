@@ -192,10 +192,34 @@ class LoginPageView(TemplateView):
         return ctx  
      
 class ProfilePageView(LoginRequiredMixin, TemplateView):
-    """Renders the logged-in user's profile page. Data comes straight from
-    request.user (no extra queries needed) — editing (phone/address/photo)
-    happens client-side via auth_app's existing /auth/profile/ PATCH endpoint."""
+    """Renders the logged-in user's Personal Settings & Profile center.
+    Multi-tab Facebook/Modern SaaS layout: Profile Info, Security & Password,
+    Device Biometrics & Passkeys, Theme & Display, Notification Preferences, Data & Privacy."""
     template_name = 'web_app/profile.html'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        user = self.request.user
+        
+        ctx['user_total_requests'] = WasteRequest.objects.filter(user=user).count()
+        ctx['user_completed_requests'] = WasteRequest.objects.filter(user=user, status='completed').count()
+        ctx['user_pending_requests'] = WasteRequest.objects.filter(
+            user=user, status__in=['pending', 'assigned', 'in_progress']
+        ).count()
+        ctx['user_complaints_count'] = Complaint.objects.filter(user=user).count()
+        
+        if user.role == 'driver':
+            driver = Driver.objects.filter(user=user).first()
+            if driver:
+                ctx['driver_profile'] = driver
+                ctx['driver_assigned_count'] = WasteRequest.objects.filter(
+                    driver=driver, status__in=['assigned', 'in_progress']
+                ).count()
+                ctx['driver_completed_count'] = WasteRequest.objects.filter(
+                    driver=driver, status='completed'
+                ).count()
+        
+        return ctx
 
 
 class RegisterPageView(TemplateView):

@@ -35,6 +35,7 @@ class AdminLogsViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['page_obj'].number, response.context['paginator'].num_pages)
 
+<<<<<<< HEAD
 =======
 """Tests for security response headers and page rendering.
 
@@ -248,3 +249,21 @@ class PageSmokeTests(TestCase):
         devanagari = re.findall(r'[\u0900-\u097F]+', body)
         self.assertGreater(len(devanagari), 50, 'dashboard did not render in Nepali')
 >>>>>>> b89a62fbbe93201c3b4ab2be297aacb3c0f1ba4d
+=======
+
+class AdminSettingsViewTest(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username='settings_admin',
+            password='Password123!',
+            role='admin',
+            is_staff=True,
+            is_superadmin=True,
+        )
+        self.client.force_login(self.admin)
+
+    def test_admin_settings_view_loads(self):
+        response = self.client.get('/management/settings/')
+        self.assertEqual(response.status_code, 200)
+
+>>>>>>> b12e838a28545fa91a18a463920ceb5b8946f4ad

@@ -5,23 +5,53 @@
 
 {% block content %}
 <div class="min-vh-100 d-flex align-items-center justify-content-center auth-page-bg px-2 px-sm-3 py-4">
-    <div class="card shadow-sm w-100 auth-card" style="max-width:400px">
+    <div class="card shadow-sm w-100 auth-card" style="max-width:420px">
         <div class="card-body p-3 p-sm-4">
             {% csrf_token %}
             <div class="text-center mb-4">
+<<<<<<< HEAD
                  <img src="{% static 'web_app/image/SafhaSahar.png' %}" alt="{% trans 'Logo' %}" width="90" height="90" class="d-inline-block align-text-top mb-1">
                 <h4 class="mt-2 fw-bold">{% trans "SignIn" %}</h4>
                 <p class="text-muted small mb-0">{% trans "Smart Waste Collection System" %}</p>
+=======
+                 <img src="{% if SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{% static 'web_app/image/SafhaSahar.png' %}{% endif %}" alt="{% trans 'Logo' %}" width="90" height="90" class="d-inline-block align-text-top mb-1" style="object-fit: contain;">
+                <h4 class="mt-2 fw-bold">{% trans "Sign In" %}</h4>
+                <p class="text-muted small mb-0">{{ SITE_TAGLINE|default:"Live Waste Reporting System" }}</p>
+>>>>>>> b12e838a28545fa91a18a463920ceb5b8946f4ad
             </div>
 
             <div id="error-alert" class="alert alert-danger d-none"></div>
 
+            <!-- Device Biometric Multi-Account Quick Login Section -->
+            <div id="biometric-login-wrapper" class="d-none mb-3 p-3 rounded-3 border bg-light-subtle">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="small fw-bold text-success d-flex align-items-center gap-1">
+                        <i class="bi bi-shield-check"></i> {% trans "Quick Biometric Login" %}
+                    </span>
+                    <span class="badge bg-success bg-opacity-10 text-success small" id="bio-device-tag">{% trans "Passkey" %}</span>
+                </div>
+
+                <!-- Account Selector Container -->
+                <div id="bio-account-picker" class="mb-2"></div>
+
+                <button type="button" class="btn btn-success w-100 fw-semibold d-flex align-items-center justify-content-center gap-2 py-2 shadow-xs" id="biometric-login-btn" onclick="doBiometricLogin()">
+                    <i class="bi bi-fingerprint fs-5"></i>
+                    <span id="bio-btn-label">{% trans "Sign in with Fingerprint / Face ID" %}</span>
+                </button>
+            </div>
+
+            <div id="bio-divider" class="d-none align-items-center mb-3">
+                <hr class="flex-grow-1">
+                <span class="px-2 text-muted small">{% trans "or sign in with password" %}</span>
+                <hr class="flex-grow-1">
+            </div>
+
             <div class="mb-3">
-                <label class="form-label">{% trans "Username" %}</label>
+                <label class="form-label small fw-semibold">{% trans "Username" %}</label>
                 <input type="text" id="username" class="form-control" placeholder="{% trans 'Enter username' %}" autofocus required>
             </div>
             <div class="mb-3">
-                <label class="form-label">{% trans "Password" %}</label>
+                <label class="form-label small fw-semibold">{% trans "Password" %}</label>
                 <div class="position-relative">
                     <input type="password" id="password" class="form-control pe-5" placeholder="{% trans 'Enter password' %}" required
                         oninput="handlePasswordInput()">
@@ -29,7 +59,7 @@
                         id="toggle-password-icon" style="cursor: pointer; display: none;" onclick="togglePassword()"></i>
                 </div>
             </div>
-            <button class="btn btn-success w-100" id="login-btn" onclick="doLogin()">
+            <button class="btn btn-success w-100 py-2 fw-semibold" id="login-btn" onclick="doLogin()">
                 <span id="login-text">{% trans "Sign In" %}</span>
                 <span id="login-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
             </button>
@@ -45,11 +75,11 @@
             </div>
 
             <p class="text-center mt-3 mb-0">
-                <a href="{% url 'forgot-password' %}" class="small text-decoration-none" style="color:#27ae60;">{% trans "Forgot password?" %}</a>
+                <a href="{% url 'forgot-password' %}" class="small text-decoration-none text-success fw-medium">{% trans "Forgot password?" %}</a>
             </p>
 
             <p class="text-center mt-2 mb-0 small">
-                {% trans "Don't have an account?" %} <a href="{% url 'register' %}" id="register-link" class="text-success fw-medium">{% trans "Register" %}</a>
+                {% trans "Don't have an account?" %} <a href="{% url 'register' %}" id="register-link" class="text-success fw-semibold text-decoration-none">{% trans "Register" %}</a>
             </p>
         </div>
     </div>
@@ -59,8 +89,13 @@
 {% block extra_js %}
 <style>
     .auth-card {
-        border-radius: 14px;
+        border-radius: 16px;
         border: 1px solid rgba(0,0,0,0.06);
+        background: var(--bg-card, #ffffff);
+        color: var(--text-primary, #212529);
+    }
+    .auth-page-bg {
+        background-color: var(--bg-body, #f8f9fa);
     }
     .google-btn-wrapper {
         width: 100% !important;
@@ -69,6 +104,8 @@
         align-items: center !important;
         margin: 0 auto 0.5rem auto !important;
         text-align: center !important;
+        min-height: 44px !important;
+        height: 44px !important;
         overflow: hidden !important;
     }
     #g_id_signin_container {
@@ -77,18 +114,28 @@
         align-items: center !important;
         margin: 0 auto !important;
         text-align: center !important;
-        min-height: 44px;
+        min-height: 44px !important;
+        height: 44px !important;
         width: 100% !important;
     }
-    #g_id_signin_container .S9gUrf-YoZ4jf,
     #g_id_signin_container > div,
-    #g_id_signin_container div[class*="L5Fo6c"],
-    #g_id_signin_container div[id*="gsi_"] {
+    #g_id_signin_container iframe {
         margin-left: auto !important;
         margin-right: auto !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
+        display: block !important;
+    }
+
+    .bio-acc-item {
+        border: 1px solid var(--border-color, #e2e8f0);
+        border-radius: 10px;
+        padding: 8px 12px;
+        background: var(--bg-card, #ffffff);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .bio-acc-item:hover, .bio-acc-item.selected {
+        border-color: #198754;
+        background-color: rgba(25, 135, 84, 0.05);
     }
 
     /* Chrome, Safari, modern Edge eye button hide */
@@ -108,262 +155,463 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <script nonce="{{ csp_nonce }}">
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        document.cookie.split(';').forEach(cookie => {
-            const c = cookie.trim();
-            if (c.startsWith(name + '=')) {
-                cookieValue = decodeURIComponent(c.slice(name.length + 1));
+(function() {
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            document.cookie.split(';').forEach(cookie => {
+                const c = cookie.trim();
+                if (c.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(c.slice(name.length + 1));
+                }
+            });
+        }
+        return cookieValue;
+    }
+
+    // ── Guest claim-link backup (email) ─────────────────────────────────────────
+    (function handleClaimTokenFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const claimToken = params.get('claim_token');
+        if (!claimToken) return;
+
+        const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
+        if (!tokens.includes(claimToken)) {
+            tokens.push(claimToken);
+            localStorage.setItem('guest_claim_tokens', JSON.stringify(tokens));
+        }
+
+        const registerLink = document.getElementById('register-link');
+        if (registerLink) {
+            const url = new URL(registerLink.href, window.location.origin);
+            url.searchParams.set('claim_token', claimToken);
+            registerLink.href = url.toString();
+        }
+    })();
+
+    async function claimGuestRequests() {
+        const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
+        if (!tokens.length) return;
+
+        try {
+            const res = await fetch('/api/waste-requests/claim_guest_requests/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ guest_tokens: tokens }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.claimed > 0) {
+                    localStorage.removeItem('guest_claim_tokens');
+                }
             }
-        });
-    }
-    return cookieValue;
-}
-
-// ── Guest claim-link backup (email) ─────────────────────────────────────────
-(function handleClaimTokenFromUrl() {
-    const params = new URLSearchParams(window.location.search);
-    const claimToken = params.get('claim_token');
-    if (!claimToken) return;
-
-    const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
-    if (!tokens.includes(claimToken)) {
-        tokens.push(claimToken);
-        localStorage.setItem('guest_claim_tokens', JSON.stringify(tokens));
+        } catch (e) {
+            console.warn('Guest claim failed', e);
+        }
     }
 
-    const registerLink = document.getElementById('register-link');
-    if (registerLink) {
-        const url = new URL(registerLink.href, window.location.origin);
-        url.searchParams.set('claim_token', claimToken);
-        registerLink.href = url.toString();
-    }
-})();
+    window.doLogin = async function() {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const errDiv = document.getElementById('error-alert');
+        const btn = document.getElementById('login-btn');
+        const spinner = document.getElementById('login-spinner');
+        const text = document.getElementById('login-text');
 
-async function claimGuestRequests() {
-    const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
-    if (!tokens.length) return;
+        errDiv.classList.add('d-none');
+        if (!username || !password) {
+            errDiv.textContent = gettext('Username and password required.');
+            errDiv.classList.remove('d-none');
+            return;
+        }
 
-    try {
-        const res = await fetch('/api/waste-requests/claim_guest_requests/', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-            body: JSON.stringify({ guest_tokens: tokens }),
-        });
-        if (res.ok) {
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+        text.textContent = gettext('Signing in...');
+
+        try {
+            const res = await fetch('/auth/session-login/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ username, password }),
+            });
             const data = await res.json();
-            if (data.claimed > 0) {
-                localStorage.removeItem('guest_claim_tokens');
+
+            if (res.ok) {
+                const role = data.user?.role || '';
+                if (role === 'user') {
+                    await claimGuestRequests();
+                }
+
+                const redirectMap = {
+                    admin: '/admin-dashboard/',
+                    driver: '/driver-dashboard/',
+                    user: '/',
+                };
+
+                window.location.href = redirectMap[role] || '/dashboard/';
+            } else {
+                errDiv.textContent = data.detail || data.error || JSON.stringify(data);
+                errDiv.classList.remove('d-none');
             }
-        }
-    } catch (e) {
-        console.warn('Guest claim failed', e);
-    }
-}
-
-async function doLogin() {
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value;
-    const errDiv = document.getElementById('error-alert');
-    const btn = document.getElementById('login-btn');
-    const spinner = document.getElementById('login-spinner');
-    const text = document.getElementById('login-text');
-
-    errDiv.classList.add('d-none');
-    if (!username || !password) {
-        errDiv.textContent = 'Username and password required.';
-        errDiv.classList.remove('d-none');
-        return;
-    }
-
-    btn.disabled = true;
-    spinner.classList.remove('d-none');
-    text.textContent = 'Signing in...';
-
-    try {
-        const res = await fetch('/auth/session-login/', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-            body: JSON.stringify({ username, password }),
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-            const role = data.user?.role || '';
-            if (role === 'user') {
-                await claimGuestRequests();
-            }
-
-            const redirectMap = {
-                admin: '/admin-dashboard/',
-                driver: '/driver-dashboard/',
-                user: '/',
-            };
-
-            window.location.href = redirectMap[role] || '/dashboard/';
-        } else {
-            errDiv.textContent = data.detail || data.error || JSON.stringify(data);
+        } catch(e) {
+            errDiv.textContent = gettext('Network error: ') + e.message;
             errDiv.classList.remove('d-none');
+        } finally {
+            btn.disabled = false;
+            spinner.classList.add('d-none');
+            text.textContent = gettext('Sign In');
         }
-    } catch(e) {
-        errDiv.textContent = 'Network error: ' + e.message;
-        errDiv.classList.remove('d-none');
-    } finally {
-        btn.disabled = false;
-        spinner.classList.add('d-none');
-        text.textContent = 'Sign In';
-    }
-}
+    };
 
-// ── Google Sign-In ───────────────────────────────────────────────────────────
-function getOptimalGoogleButtonWidth() {
-    const fullBtn = document.getElementById('login-btn');
-    const cardBody = document.querySelector('.auth-card .card-body') || document.querySelector('.card-body');
-    let width = 300;
-    if (fullBtn && fullBtn.offsetWidth > 0) {
-        width = fullBtn.offsetWidth;
-    } else if (cardBody && cardBody.clientWidth > 0) {
-        const padLeft = parseInt(window.getComputedStyle(cardBody).paddingLeft, 10) || 16;
-        const padRight = parseInt(window.getComputedStyle(cardBody).paddingRight, 10) || 16;
-        width = cardBody.clientWidth - padLeft - padRight;
-    }
-    return Math.max(220, Math.min(380, Math.floor(width)));
-}
-
-function renderGoogleButton() {
-    const container = document.getElementById('g_id_signin_container');
-    if (!container || typeof google === 'undefined' || !google.accounts || !google.accounts.id) return;
-    const btnWidth = getOptimalGoogleButtonWidth();
-    container.innerHTML = '';
-    google.accounts.id.renderButton(
-        container,
-        {
-            type: 'standard',
-            theme: 'outline',
-            size: 'large',
-            width: btnWidth,
-            text: 'signin_with',
-            shape: 'rectangular',
-            logo_alignment: 'left',
+    // ── Google Sign-In (Unified Singleton & Zero-Flicker) ──────────────────────
+    function getOptimalGoogleButtonWidth() {
+        const fullBtn = document.getElementById('login-btn');
+        const cardBody = document.querySelector('.auth-card .card-body') || document.querySelector('.card-body');
+        let width = 320;
+        if (fullBtn && fullBtn.offsetWidth > 0) {
+            width = fullBtn.offsetWidth;
+        } else if (cardBody && cardBody.clientWidth > 0) {
+            const padLeft = parseInt(window.getComputedStyle(cardBody).paddingLeft, 10) || 16;
+            const padRight = parseInt(window.getComputedStyle(cardBody).paddingRight, 10) || 16;
+            width = cardBody.clientWidth - padLeft - padRight;
         }
-    );
-}
+        return Math.max(200, Math.min(400, Math.floor(width)));
+    }
 
-function initGoogleSignIn() {
-    if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
-        setTimeout(initGoogleSignIn, 150);
-        return;
+    function ensureGoogleSdkInit() {
+        if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) return false;
+        const clientId = '{{ GOOGLE_CLIENT_ID|default:"" }}'.trim();
+        if (!clientId) return false;
+
+        if (!window.__gsiGlobalInitialized) {
+            google.accounts.id.initialize({
+                client_id: clientId,
+                callback: function(resp) {
+                    if (typeof window.handleGoogleCredential === 'function') {
+                        window.handleGoogleCredential(resp);
+                    }
+                },
+                auto_select: false,
+                use_fedcm_for_button: true,
+            });
+            window.__gsiGlobalInitialized = true;
+        }
+        return true;
     }
-    const clientId = '{{ GOOGLE_CLIENT_ID|default:"" }}'.trim();
-    if (!clientId) {
-        console.warn('Google OAuth client_id is empty or not configured.');
-        return;
+
+    function renderGoogleButton() {
+        const container = document.getElementById('g_id_signin_container');
+        if (!container || !ensureGoogleSdkInit()) return;
+
+        const btnWidth = getOptimalGoogleButtonWidth();
+        if (container.dataset.renderedWidth === String(btnWidth) && container.querySelector('iframe')) {
+            return;
+        }
+
+        container.innerHTML = '';
+        container.dataset.renderedWidth = String(btnWidth);
+        google.accounts.id.renderButton(
+            container,
+            {
+                type: 'standard',
+                theme: 'outline',
+                size: 'large',
+                width: btnWidth,
+                text: 'signin_with',
+                shape: 'rectangular',
+                logo_alignment: 'left',
+            }
+        );
     }
-    if (!window.__gsiLoginInitialized) {
-        google.accounts.id.initialize({
-            client_id: clientId,
-            callback: handleGoogleCredential,
-            auto_select: false,
-            use_fedcm_for_button: true,
+
+    window.handleGoogleCredential = async function(response) {
+        const errDiv = document.getElementById('error-alert');
+        if (errDiv) errDiv.classList.add('d-none');
+
+        try {
+            const res = await fetch('/auth/google-login/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ credential: response.credential }),
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                const role = data.user?.role || '';
+                if (role === 'user') {
+                    await claimGuestRequests();
+                }
+
+                const redirectMap = {
+                    admin: '/admin-dashboard/',
+                    driver: '/driver-dashboard/',
+                    user: '/',
+                };
+                window.location.href = redirectMap[role] || '/dashboard/';
+            } else {
+                if (errDiv) {
+                    errDiv.textContent = data.error || gettext('Google sign-in failed.');
+                    errDiv.classList.remove('d-none');
+                }
+            }
+        } catch (e) {
+            if (errDiv) {
+                errDiv.textContent = gettext('Network error: ') + e.message;
+                errDiv.classList.remove('d-none');
+            }
+        }
+    };
+
+    function initGoogleSignIn() {
+        if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
+            setTimeout(initGoogleSignIn, 80);
+            return;
+        }
+        ensureGoogleSdkInit();
+        renderGoogleButton();
+    }
+
+    if (!window._gsiGlobalResizeBound) {
+        window.addEventListener('resize', () => {
+            if (window._gGlobalResizeTimer) clearTimeout(window._gGlobalResizeTimer);
+            window._gGlobalResizeTimer = setTimeout(() => {
+                const container = document.getElementById('g_id_signin_container');
+                if (container) delete container.dataset.renderedWidth;
+                renderGoogleButton();
+            }, 150);
         });
-        window.__gsiLoginInitialized = true;
+        window._gsiGlobalResizeBound = true;
     }
-    renderGoogleButton();
-    setTimeout(renderGoogleButton, 100);
-    setTimeout(renderGoogleButton, 350);
-}
 
-if (!window._gsiLoginResizeBound) {
-    window.addEventListener('resize', () => {
-        if (window._gLoginResizeTimer) clearTimeout(window._gLoginResizeTimer);
-        window._gLoginResizeTimer = setTimeout(renderGoogleButton, 200);
-    });
-    window._gsiLoginResizeBound = true;
-}
+    initGoogleSignIn();
 
-initGoogleSignIn();
-
-async function handleGoogleCredential(response) {
-    const errDiv = document.getElementById('error-alert');
-    errDiv.classList.add('d-none');
-
-    try {
-        const res = await fetch('/auth/google-login/', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-            body: JSON.stringify({ credential: response.credential }),
+    // Enter shortcut
+    const uname = document.getElementById('username');
+    if (uname) {
+        uname.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const pwd = document.getElementById('password');
+                if (pwd) pwd.focus();
+            }
         });
-        const data = await res.json();
+    }
 
-        if (res.ok) {
-            const role = data.user?.role || '';
-            if (role === 'user') {
-                await claimGuestRequests();
+    const pwdEl = document.getElementById('password');
+    if (pwdEl) {
+        pwdEl.addEventListener('keydown', e => {
+            if (e.key === 'Enter') window.doLogin();
+        });
+    }
+
+    window.handlePasswordInput = function() {
+        const pwdInput = document.getElementById('password');
+        const icon = document.getElementById('toggle-password-icon');
+        if (pwdInput && icon) {
+            icon.style.display = pwdInput.value.length > 0 ? 'block' : 'none';
+        }
+    };
+
+    window.togglePassword = function() {
+        const pwdInput = document.getElementById('password');
+        const icon = document.getElementById('toggle-password-icon');
+        if (!pwdInput || !icon) return;
+        if (pwdInput.type === 'password') {
+            pwdInput.type = 'text';
+            icon.classList.replace('bi-eye', 'bi-eye-slash');
+        } else {
+            pwdInput.type = 'password';
+            icon.classList.replace('bi-eye-slash', 'bi-eye');
+        }
+    };
+
+    // ── Multi-Account Device Biometrics Management ──────────────────────────────
+    let selectedBioUser = null;
+
+    function getBiometricAccounts() {
+        let accounts = {};
+        try {
+            accounts = JSON.parse(localStorage.getItem('ss_biometric_accounts') || '{}');
+        } catch (e) { accounts = {}; }
+
+        const legacyUser = localStorage.getItem('ss_biometric_user');
+        const legacyToken = localStorage.getItem('ss_biometric_auth_token');
+        const legacyEnabled = localStorage.getItem('ss_biometric_enabled') === 'true';
+
+        if (legacyEnabled && legacyUser && legacyToken && !accounts[legacyUser]) {
+            accounts[legacyUser] = {
+                username: legacyUser,
+                token: legacyToken,
+                displayName: legacyUser,
+                role: 'user',
+                enrolledAt: new Date().toISOString()
+            };
+            try {
+                localStorage.setItem('ss_biometric_accounts', JSON.stringify(accounts));
+            } catch (e) {}
+        }
+
+        return accounts;
+    }
+
+    function checkDeviceBiometrics() {
+        const accounts = getBiometricAccounts();
+        const usernames = Object.keys(accounts);
+        const wrap = document.getElementById('biometric-login-wrapper');
+        const divider = document.getElementById('bio-divider');
+        const picker = document.getElementById('bio-account-picker');
+        const btnLabel = document.getElementById('bio-btn-label');
+
+        if (!wrap || usernames.length === 0) {
+            if (wrap) wrap.classList.add('d-none');
+            if (divider) divider.classList.add('d-none');
+            return;
+        }
+
+        wrap.classList.remove('d-none');
+        if (divider) {
+            divider.classList.remove('d-none');
+            divider.classList.add('d-flex');
+        }
+
+        const lastUser = localStorage.getItem('ss_last_biometric_user');
+        selectedBioUser = (lastUser && accounts[lastUser]) ? lastUser : usernames[0];
+
+        if (usernames.length === 1) {
+            const acc = accounts[usernames[0]];
+            const avatarSrc = acc.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(acc.username)}&background=198754&color=fff&size=64`;
+            if (picker) {
+                picker.innerHTML = `
+                    <div class="d-flex align-items-center gap-2 p-2 rounded bg-body">
+                        <img src="${avatarSrc}" width="36" height="36" class="rounded-circle border" style="object-fit:cover;">
+                        <div class="flex-grow-1 overflow-hidden">
+                            <div class="fw-bold text-truncate small">${acc.displayName || acc.username}</div>
+                            <div class="text-muted small" style="font-size:0.75rem;">@${acc.username} &bull; <span class="text-capitalize">${acc.role || 'user'}</span></div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (btnLabel) btnLabel.textContent = `${gettext('Sign in as')} ${acc.username}`;
+        } else {
+            let html = `<label class="form-label small text-muted mb-1">${gettext('Select enrolled account:')}</label><div class="d-flex flex-column gap-1.5 mb-1">`;
+            usernames.forEach(u => {
+                const acc = accounts[u];
+                const isSel = u === selectedBioUser;
+                const avatarSrc = acc.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(acc.username)}&background=198754&color=fff&size=64`;
+                html += `
+                    <div class="bio-acc-item d-flex align-items-center justify-content-between ${isSel ? 'selected' : ''}" onclick="selectBioAccount('${u}')">
+                        <div class="d-flex align-items-center gap-2 overflow-hidden">
+                            <img src="${avatarSrc}" width="30" height="30" class="rounded-circle border" style="object-fit:cover;">
+                            <div class="text-truncate">
+                                <span class="fw-semibold small">${acc.displayName || acc.username}</span>
+                                <span class="text-muted small ms-1" style="font-size:0.75rem;">(@${acc.username})</span>
+                            </div>
+                        </div>
+                        <span class="badge ${isSel ? 'bg-success' : 'bg-secondary bg-opacity-25 text-secondary'} rounded-pill small">${acc.role || 'user'}</span>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            if (picker) picker.innerHTML = html;
+            if (btnLabel) btnLabel.textContent = `${gettext('Sign in as')} ${selectedBioUser}`;
+        }
+    }
+
+    window.selectBioAccount = function(username) {
+        selectedBioUser = username;
+        localStorage.setItem('ss_last_biometric_user', username);
+        checkDeviceBiometrics();
+    };
+
+    window.doBiometricLogin = async function() {
+        const accounts = getBiometricAccounts();
+        const user = selectedBioUser || localStorage.getItem('ss_last_biometric_user') || Object.keys(accounts)[0];
+
+        if (!user || !accounts[user]) {
+            showToast(gettext('Please sign in with password first to register biometric access on this device.'), 'info');
+            return;
+        }
+
+        const token = accounts[user].token;
+        const btn = document.getElementById('biometric-login-btn');
+        const errDiv = document.getElementById('error-alert');
+        if (errDiv) errDiv.classList.add('d-none');
+
+        try {
+            if (window.PublicKeyCredential) {
+                const challenge = new Uint8Array(32);
+                window.crypto.getRandomValues(challenge);
+                await navigator.credentials.get({
+                    publicKey: {
+                        challenge: challenge,
+                        rpId: window.location.hostname,
+                        userVerification: 'required',
+                        timeout: 60000
+                    }
+                });
             }
 
-            const redirectMap = {
-                admin: '/admin-dashboard/',
-                driver: '/driver-dashboard/',
-                user: '/',
-            };
-            window.location.href = redirectMap[role] || '/dashboard/';
-        } else {
-            errDiv.textContent = data.error || 'Google sign-in failed.';
-            errDiv.classList.remove('d-none');
+            if (btn) btn.disabled = true;
+            showToast(gettext('Biometrics verified! Signing in...'), 'info');
+
+            const res = await fetch('/auth/biometric-login/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ username: user, token: token }),
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                localStorage.setItem('ss_last_biometric_user', user);
+                const role = data.user?.role || '';
+                if (role === 'user') {
+                    await claimGuestRequests();
+                }
+
+                const redirectMap = {
+                    admin: '/admin-dashboard/',
+                    driver: '/driver-dashboard/',
+                    user: '/',
+                };
+
+                window.location.href = redirectMap[role] || '/dashboard/';
+            } else {
+                const usernameInput = document.getElementById('username');
+                if (usernameInput) usernameInput.value = user;
+                const passwordInput = document.getElementById('password');
+                if (passwordInput) passwordInput.focus();
+                if (errDiv) {
+                    errDiv.textContent = data.error || gettext('Biometric token expired. Please enter your password.');
+                    errDiv.classList.remove('d-none');
+                }
+                showToast(data.error || gettext('Biometric verification failed.'), 'danger');
+            }
+        } catch (e) {
+            console.warn('Biometric verify note:', e);
+            showToast(gettext('Biometric sensor cancelled or not recognized.'), 'warning');
+        } finally {
+            if (btn) btn.disabled = false;
         }
-    } catch (e) {
-        errDiv.textContent = 'Network error: ' + e.message;
-        errDiv.classList.remove('d-none');
-    }
-}
+    };
 
-// Enter shortcut
-document.getElementById('username').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        document.getElementById('password').focus();
-    }
-});
-
-document.getElementById('password').addEventListener('keydown', e => {
-    if (e.key === 'Enter') doLogin();
-});
-
-function handlePasswordInput() {
-    const pwdInput = document.getElementById('password');
-    const icon = document.getElementById('toggle-password-icon');
-    if (pwdInput.value.length > 0) {
-        icon.style.display = 'block'; 
-    } else {
-        icon.style.display = 'none'; 
-    }
-}
-
-function togglePassword() {
-    const pwdInput = document.getElementById('password');
-    const icon = document.getElementById('toggle-password-icon');
-    if (pwdInput.type === 'password') {
-        pwdInput.type = 'text';
-        icon.classList.remove('bi-eye');
-        icon.classList.add('bi-eye-slash');
-    } else {
-        pwdInput.type = 'password';
-        icon.classList.remove('bi-eye-slash');
-        icon.classList.add('bi-eye');
-    }
-}
+    checkDeviceBiometrics();
+})();
 </script>
 {% endblock %}
