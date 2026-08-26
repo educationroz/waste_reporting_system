@@ -423,11 +423,21 @@
                             }
                         } catch (e) {}
 
+                        // FIX: navbar avatar update chai pahile bata thiyo. Sidebar
+                        // ma pani #sidebar-avatar-slot cha (partials/sidebar.html
+                        // ma), tyo bhane refresh nagaresamma purano nai dekhinthyo
+                        // kina ki kasaiले updateSidebarAvatar() call gareko thiyena.
+                        // Aba dubai avatar ekै patak, refresh nagari update huncha.
+                        const resolvedAvatar = newPicUrl || picPreview.src;
+
                         if (typeof window.updateNavbarAvatar === 'function') {
-                            window.updateNavbarAvatar(newPicUrl || picPreview.src);
+                            window.updateNavbarAvatar(resolvedAvatar);
+                        }
+                        if (typeof window.updateSidebarAvatar === 'function') {
+                            window.updateSidebarAvatar(resolvedAvatar);
                         }
 
-                        updateBiometricProfileAvatar(newPicUrl || picPreview.src);
+                        updateBiometricProfileAvatar(resolvedAvatar);
                     } else {
                         showToast(gettext('Failed to update profile.'), 'danger');
                     }

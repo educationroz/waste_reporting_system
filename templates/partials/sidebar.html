@@ -26,7 +26,15 @@
         <!-- Pinned Profile Card -->
         <div class="sidebar-profile">
             <a href="{% url 'personal-settings' %}" class="sidebar-profile-link" title="{% trans 'Personal Settings' %}">
-                <span class="sidebar-avatar">
+                <!--
+                    id="sidebar-avatar-slot" — mirrors #navbar-avatar-slot in
+                    base.html. profile.html's Save Changes handler already
+                    calls window.updateNavbarAvatar(url) on success; it should
+                    now ALSO call window.updateSidebarAvatar(url) (defined
+                    below) so both copies of the picture update instantly,
+                    with no full page reload needed.
+                -->
+                <span class="sidebar-avatar" id="sidebar-avatar-slot">
                     {% if user.profile_picture %}
                         <img src="{{ user.profile_picture.url }}" alt="{{ user.username }}">
                     {% else %}
@@ -42,3 +50,19 @@
         </div>
     </div>
 </div>
+
+<script nonce="{{ csp_nonce }}">
+    // Companion to window.updateNavbarAvatar() in base.html. `url` can be a
+    // real server URL or a local base64 data URL — either works since we
+    // just set it as the <img> src. Falls back to the "first letter"
+    // placeholder if no url is given (e.g. picture removed).
+    window.updateSidebarAvatar = function updateSidebarAvatar(url) {
+        const slot = document.getElementById('sidebar-avatar-slot');
+        if (!slot) return;
+        if (url) {
+            slot.innerHTML = '<img src="' + url + '" alt="{{ user.username|escapejs }}">';
+        } else {
+            slot.textContent = '{{ user.username|slice:":1"|upper|escapejs }}';
+        }
+    };
+</script>
