@@ -215,11 +215,10 @@ class ExportUserDataView(APIView):
             user_data['complaints'].append({
                 'id': c.id,
                 'complaint_type': c.complaint_type,
-                'title': c.title,
+                'subject': c.subject,
                 'description': c.description,
                 'status': c.status,
                 'created_at': c.created_at.isoformat() if c.created_at else None,
-                'resolved_at': c.resolved_at.isoformat() if c.resolved_at else None,
             })
 
         response = HttpResponse(
@@ -467,8 +466,16 @@ class PasswordResetConfirmView(APIView):
 
 
 class LogoutView(APIView):
-    """Logs out JWT/session users. Blacklists refresh token when provided."""
-    permission_classes = [AllowAny]
+    """Logs out JWT/session users. Blacklists refresh token when provided.
+
+    SECURITY: requires authentication. This endpoint mutates session/token
+    state (ends the caller's own session, blacklists their own refresh
+    token) — there's no legitimate reason for an anonymous caller to hit
+    it, and leaving it open is an unnecessary attack surface (e.g. in
+    combination with session-fixation attempts, or simply as noise for
+    anyone probing the API).
+    """
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         refresh_token = request.data.get('refresh')

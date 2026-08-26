@@ -294,16 +294,7 @@
                         </div>
                         <div class="col-12">
                             {% if not user.is_authenticated %}
-                            <div class="mb-3">
-                                <label class="form-label">
-                                    {% trans "Email" %} <span class="text-muted small fw-normal">{% trans "(optional)" %}</span>
-                                </label>
-                                <input type="email" id="guest-email" class="form-control"
-                                    placeholder="{% trans 'you@example.com' %}">
-                                <div class="form-text">
-                                    {% trans "We'll send you a link to claim this request later — a backup in case you clear your browser data or switch devices before signing in." %}
-                                </div>
-                            </div>
+                           
                             <div class="alert alert-light border small mb-2">
                                 <i class="bi bi-info-circle me-1"></i>
                                 {% trans "Want to Track your requests and get notifications?" %}

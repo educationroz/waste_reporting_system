@@ -286,7 +286,8 @@ class WasteRequest(models.Model):
         ]
 
     def __str__(self):
-        return f"Request #{self.id} - {self.user.username} ({self.status})"
+        username = self.user.username if self.user else "Guest"
+        return f"Request #{self.id} - {username} ({self.status})"
 
 
 class WasteRequestPhoto(models.Model):

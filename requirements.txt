@@ -49,16 +49,12 @@ pyOpenSSL==26.1.0
 python-dateutil==2.9.0.post0
 python-decouple==3.8
 python-magic==0.4.27
-<<<<<<< HEAD
 # Windows-only wheel: it bundles the libmagic DLL that python-magic needs.
 # Without this marker `pip install -r requirements.txt` fails outright on
 # Linux/macOS (including CI runners), because no sdist or wheel is published
 # for those platforms. On Linux install the system library instead:
 #     apt-get install -y libmagic1
 python-magic-bin==0.4.14; sys_platform == "win32"
-=======
-python-magic-bin==0.4.14; sys_platform == 'win32'
->>>>>>> b12e838a28545fa91a18a463920ceb5b8946f4ad
 pytz==2026.3.post1
 redis==7.4.0
 requests==2.34.2

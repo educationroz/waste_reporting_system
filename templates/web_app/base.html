@@ -166,10 +166,22 @@
 
         /* Locks the background page from scrolling while the mobile
            sidebar drawer (.mobile-open) is open — set/cleared by
-           toggleSidebarMenu()/applySidebarState() below. */
+           toggleSidebarMenu()/applySidebarState() below.
+
+           FIX: overflow:hidden alone does NOT stop touch-drag scrolling
+           on mobile Safari/Chrome — only mouse-wheel/scrollbar input.
+           That's what let the page behind the drawer keep scrolling on
+           touch, making the fixed drawer appear to "slide down" while
+           the content behind it moved up. Pinning body to position:fixed
+           at its current scroll offset (set via JS, see toggleSidebarMenu)
+           removes the scrollable surface entirely, which touch input
+           can't bypass. */
         body.sidebar-scroll-lock {
+            position: fixed !important;
+            left: 0;
+            right: 0;
+            width: 100%;
             overflow: hidden !important;
-            height: 100vh;
         }
     </style>
 
@@ -998,11 +1010,29 @@ if (!window.__ssAuthScriptLoaded) {
    // every htmx navigation — the state has to be re-applied after every
    // swap, not just once on first load.
    //
-   // Body scroll lock: while the mobile drawer overlay is open, the page
-   // behind the backdrop must not scroll (previously it did — you could
-   // drag/scroll the background content under the open drawer). Toggled
-   // here and always cleared in applySidebarState so a resize or htmx
-   // swap never leaves it stuck locked.
+   // Body scroll lock (mobile drawer): overflow:hidden on body does NOT
+   // stop touch-drag scrolling on mobile Safari/Chrome, only mouse-wheel
+   // input. That let the page behind the drawer keep scrolling on touch,
+   // which is what made the fixed drawer look like it was "sliding down"
+   // relative to the content sliding up behind it. The fix: pin body to
+   // position:fixed at its current scrollY (via the .sidebar-scroll-lock
+   // CSS above + the inline `top` offset set here), which removes the
+   // scrollable surface entirely — touch input has nothing to drag.
+   // window._sidebarScrollY remembers where we were so closing the
+   // drawer can restore the exact scroll position instead of jumping to 0.
+   function lockBackgroundScroll() {
+       window._sidebarScrollY = window.scrollY || window.pageYOffset || 0;
+       document.body.style.top = `-${window._sidebarScrollY}px`;
+       document.body.classList.add('sidebar-scroll-lock');
+   }
+
+   function unlockBackgroundScroll() {
+       if (!document.body.classList.contains('sidebar-scroll-lock')) return;
+       document.body.classList.remove('sidebar-scroll-lock');
+       document.body.style.top = '';
+       window.scrollTo(0, window._sidebarScrollY || 0);
+   }
+
    function applySidebarState() {
        const wrapper = document.querySelector(".layout-wrapper");
        const backdrop = document.getElementById('sidebar-backdrop');
@@ -1019,7 +1049,11 @@ if (!window.__ssAuthScriptLoaded) {
            wrapper.classList.remove('mobile-open');
            if (backdrop) backdrop.classList.remove('active');
        }
-       document.body.classList.remove('sidebar-scroll-lock');
+       // Any reset (resize, htmx swap, route change) always releases the
+       // scroll lock — otherwise a page re-render while the drawer was
+       // open would leave body pinned to position:fixed with no drawer
+       // left to justify it, silently breaking scroll on the new page.
+       unlockBackgroundScroll();
    }
 
    function toggleSidebarMenu() {
@@ -1031,13 +1065,17 @@ if (!window.__ssAuthScriptLoaded) {
            const opening = !wrapper.classList.contains("mobile-open");
            wrapper.classList.toggle("mobile-open", opening);
            if (backdrop) backdrop.classList.toggle('active', opening);
-           document.body.classList.toggle('sidebar-scroll-lock', opening);
+           if (opening) {
+               lockBackgroundScroll();
+           } else {
+               unlockBackgroundScroll();
+           }
        } else {
            const collapsing = !wrapper.classList.contains("collapsed");
            wrapper.classList.toggle("collapsed", collapsing);
            wrapper.classList.remove("mobile-open");
            if (backdrop) backdrop.classList.remove('active');
-           document.body.classList.remove('sidebar-scroll-lock');
+           unlockBackgroundScroll();
            try { localStorage.setItem('safhasahar_sidebar_collapsed', String(collapsing)); } catch (e) {}
        }
    }
