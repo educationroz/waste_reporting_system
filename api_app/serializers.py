@@ -209,6 +209,36 @@ class WasteRequestSerializer(serializers.ModelSerializer):
     #     return super().create(validated_data)
 
 
+class WasteRequestMinimalSerializer(serializers.ModelSerializer):
+    """
+    Lightweight WasteRequest representation for embedding inside other
+    serializers (e.g. NotificationSerializer.related_request_detail).
+
+    Deliberately does NOT include:
+      - guest_token: internal claim credential — leaking it would let
+        anyone who can see a notification steal/claim someone else's
+        guest-submitted request via claim_guest_requests.
+      - driver_detail / dropoff_checkpoint / extra_photos: these pull in
+        DriverSerializer -> VehicleSerializer and a full photo list, which
+        is exactly the nested chain that turns "list my notifications"
+        into hundreds of queries for a user with many notifications.
+
+    Only the fields a notification actually needs to show/link to the
+    related request are included here.
+    """
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    waste_type_display = serializers.CharField(source='get_waste_type_display', read_only=True)
+
+    class Meta:
+        model = WasteRequest
+        fields = (
+            'id', 'status', 'status_display',
+            'waste_type', 'waste_type_display',
+            'pickup_address', 'created_at',
+        )
+        read_only_fields = fields
+
+
 class RouteSerializer(serializers.ModelSerializer):
     driver_detail = DriverSerializer(source='driver', read_only=True)
     vehicle_detail = VehicleSerializer(source='vehicle', read_only=True)
@@ -254,7 +284,7 @@ class ScheduleSerializer(serializers.ModelSerializer):
 
 
 class NotificationSerializer(serializers.ModelSerializer):
-    related_request_detail = WasteRequestSerializer(
+    related_request_detail = WasteRequestMinimalSerializer(
         source='related_request', read_only=True
     )
     type_display = serializers.CharField(

@@ -4,8 +4,6 @@ from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
 from pathlib import Path
 import tempfile
-from .backup_utils import BACKUP_DIR as BACKUP_DIR_FOR_UPLOADS
-from .backup_utils import BackupError, verify_backup_file
 from django.conf import settings
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
@@ -284,6 +282,78 @@ def _notify_driver(driver, title, message, notification_type='info', related_req
     )
 
 
+def _bulk_notify_users(users_qs, title, message, notification_type='info'):
+    """
+    Shared batched implementation for broadcasting a Notification to many
+    users at once (used by _notify_all_users and _notify_admins).
+
+    Replaces the old N-queries-per-recipient pattern (one EXISTS duplicate
+    check + one INSERT per user) with:
+      1. ONE query to find which of these users already got this exact
+         notification in the last 30s (duplicate-spam guard, same window
+         _create_notification uses for single-recipient calls).
+      2. ONE bulk_create() for every remaining user.
+      3. One WS group_send per created notification — this part can't be
+         batched away since each user has their own channel-layer group,
+         but it's now the only remaining per-user cost, instead of
+         per-user DB round-trips too.
+
+    For 10,000 active users this turns ~20,000 DB queries into 2, so a
+    single checkpoint update (or any other broadcast) can no longer take
+    30+ seconds or exhaust DB connections.
+    """
+    recent_cutoff = timezone.now() - timedelta(seconds=30)
+
+    user_ids = list(users_qs.values_list('id', flat=True))
+    if not user_ids:
+        return []
+
+    already_notified_ids = set(
+        Notification.objects.filter(
+            user_id__in=user_ids,
+            title=title,
+            message=message,
+            created_at__gte=recent_cutoff,
+        ).values_list('user_id', flat=True)
+    )
+
+    to_create = [
+        Notification(
+            user_id=uid,
+            title=title,
+            message=message,
+            notification_type=notification_type,
+        )
+        for uid in user_ids
+        if uid not in already_notified_ids
+    ]
+    if not to_create:
+        logger.info(
+            f"[NOTIF SKIP] bulk broadcast skipped — all {len(user_ids)} "
+            f"recipient(s) already notified recently. title={title!r}"
+        )
+        return []
+
+    # bulk_create() returns objects with pk populated on backends that
+    # support RETURNING (Postgres, SQLite 3.35+, MySQL 8+) — which covers
+    # every backend Django officially supports for this. We need the pks
+    # back so _push_ws_notification can address each user's group.
+    created = Notification.objects.bulk_create(to_create)
+
+    for notification in created:
+        try:
+            _push_ws_notification(notification)
+        except Exception:
+            # One recipient's channel-layer hiccup must never stop the
+            # rest of the broadcast from delivering (best-effort — the DB
+            # rows are already committed either way).
+            logger.warning(
+                f'[NOTIF PUSH] bulk push failed for user_id={notification.user_id}, title={title!r}'
+            )
+
+    return created
+
+
 def _notify_all_users(title, message, notification_type='info'):
     """
     Broadcast a Notification (DB row + live WS push) to every active
@@ -291,13 +361,14 @@ def _notify_all_users(title, message, notification_type='info'):
     checkpoint changes and their map can react to it live.
     """
     User = get_user_model()
-    for user in User.objects.filter(is_active=True):
-        _create_notification(
-            user=user,
-            title=title,
-            message=message,
-            notification_type=notification_type,
-        )
+    _bulk_notify_users(
+        User.objects.filter(is_active=True),
+        title=title,
+        message=message,
+        notification_type=notification_type,
+    )
+
+
 def _notify_admins(title, message, notification_type='info'):
     """
     Notify every admin account (DB row + live WS push each). Used for
@@ -306,13 +377,12 @@ def _notify_admins(title, message, notification_type='info'):
     live via WebSocket instead of only refreshing on next page load.
     """
     User = get_user_model()
-    for admin_user in User.objects.filter(is_active=True, role='admin'):
-        _create_notification(
-            user=admin_user,
-            title=title,
-            message=message,
-            notification_type=notification_type,
-        )
+    _bulk_notify_users(
+        User.objects.filter(is_active=True, role='admin'),
+        title=title,
+        message=message,
+        notification_type=notification_type,
+    )
 
 class DatabaseBackupViewSet(viewsets.GenericViewSet):
     """Create, list, download, restore, and delete JSON database backups.
@@ -623,6 +693,14 @@ class DriverViewSet(viewsets.ModelViewSet):
         GET /api/drivers/public-locations/
 
         Public read-only driver location data for the Home map.
+
+        NOTE: This is an anonymous, unauthenticated endpoint — only return
+        fields that are safe for anyone on the internet to scrape. Phone
+        numbers were previously included here and have been removed; that
+        let anyone harvest every driver's personal contact info with zero
+        auth (privacy leak + social-engineering/spam risk). If the frontend
+        needs a "contact driver" feature, it should go through an
+        authenticated endpoint instead, not this public one.
         """
 
         drivers = (
@@ -643,7 +721,6 @@ class DriverViewSet(viewsets.ModelViewSet):
                 'current_longitude': str(driver.current_longitude),
                 'is_available': driver.is_available,
                 'vehicle_plate': driver.vehicle.plate_number if driver.vehicle else None,
-                'phone': getattr(driver.user, 'phone', '') or '',
             }
             for driver in drivers
         ]
@@ -1147,9 +1224,15 @@ class AdminUserDeleteView(APIView):
         _log_admin_action(request, 'delete', 'AdminUser', admin_user, f'Deleted admin account {username}')
         admin_user.delete()
 
+        # FIX: a 204 No Content response must not carry a body per the HTTP
+        # spec — some clients/proxies will error on or silently drop a body
+        # sent with 204, which made this endpoint's success message
+        # unreliable. Since we want the client to see the confirmation
+        # message, we return 200 OK instead of 204 (rather than dropping
+        # the body and keeping 204).
         return Response(
             {'message': f'Admin {username} deleted successfully.'},
-            status=status.HTTP_204_NO_CONTENT,
+            status=status.HTTP_200_OK,
         )
 
 class WasteRequestViewSet(viewsets.ModelViewSet):
@@ -2121,10 +2204,6 @@ class NotificationViewSet(viewsets.ModelViewSet):
         qs = Notification.objects.select_related(
             'user',
             'related_request',
-            'related_request__user',
-            'related_request__driver',
-            'related_request__driver__user',
-            'related_request__driver__vehicle',
         )
         # Admin ko lagi pani afnै account ko notification matra —
         # 'return qs' le sabai user ko personal notification samet
@@ -2132,6 +2211,11 @@ class NotificationViewSet(viewsets.ModelViewSet):
         # Checkpoint added/updated/removed jasto admin-wide broadcast
         # _notify_all_users() le admin lai afnै copy pahilehi diisakeko
         # huncha, tesैle yo filter le tiनীहरूलाई hataउँdaina.
+        #
+        # NOTE: related_request no longer needs driver/driver__user/
+        # driver__vehicle joins here — NotificationSerializer now embeds
+        # WasteRequestMinimalSerializer instead of the full
+        # WasteRequestSerializer, so those joins would just be dead weight.
         return qs.filter(user=user)
 
     @action(detail=False, methods=['patch'])

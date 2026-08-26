@@ -13,9 +13,6 @@ User = get_user_model()
 
 class BackupRestoreTests(APITestCase):
     def setUp(self):
-<<<<<<< HEAD
-        self.admin = User.objects.create_user(username='admin1', password='pw', role='admin', is_staff=True, is_superadmin=True)
-=======
         # Backup/restore is gated by IsSuperAdminUser, not just role='admin'.
         # Without is_superadmin these tests get a 403 and fail for the wrong
         # reason (they are asserting 400-level validation behaviour).
@@ -26,7 +23,6 @@ class BackupRestoreTests(APITestCase):
             is_staff=True,
             is_superadmin=True,
         )
->>>>>>> b89a62fbbe93201c3b4ab2be297aacb3c0f1ba4d
         self.client.force_authenticate(self.admin)
 
     def test_restore_without_confirm_flag_is_rejected(self):
@@ -47,11 +43,8 @@ class BackupRestoreTests(APITestCase):
         bad_file = SimpleUploadedFile('bad.json', b'not valid json{{{', content_type='application/json')
         response = self.client.post(
             '/api/database-backups/restore/',
-<<<<<<< HEAD
-=======
             # admin_password is required: restore re-confirms the operator's
             # own password so a left-open session can't wipe the database.
->>>>>>> b89a62fbbe93201c3b4ab2be297aacb3c0f1ba4d
             {'backup_file': bad_file, 'confirm': 'true', 'admin_password': 'pw'},
             format='multipart',
         )

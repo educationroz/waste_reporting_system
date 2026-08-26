@@ -4,7 +4,7 @@ Wire this into cron (e.g. nightly at 2am) or Celery beat so backups
 happen without anyone needing to click the button.
 """
 from django.core.management.base import BaseCommand
-from core.backup_utils import create_backup, cleanup_old_backups, BackupError
+from api_app.backup_utils import create_backup, cleanup_old_backups, BackupError
 
 
 class Command(BaseCommand):
