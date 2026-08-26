@@ -50,6 +50,7 @@ from .backup_utils import (
     list_backups,
     resolve_backup_path,
     restore_backup,
+    verify_backup_file,
 )
 
 
