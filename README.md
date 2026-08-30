@@ -192,9 +192,9 @@ All under `/api/`. Auth via `Authorization: Bearer <access>` (JWT) or session.
 
 ## Created by
 
-[![GitHub](https://img.shields.io/badge/GitHub-Aayush%20Kasai-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Aayushkassey)
+[![GitHub](https://img.shields.io/badge/GitHub-Aayush%20KC-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Aayushkassey)
 
-[![GitHub](https://img.shields.io/badge/GitHub-Education%20Roz-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/educationroz)
+[![GitHub](https://img.shields.io/badge/GitHub-Roj%20Thapa%20Magar-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/educationroz)
 
 ---
 
