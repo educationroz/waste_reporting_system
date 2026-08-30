@@ -74,7 +74,7 @@ waste_reporting_system/
 
 ```bash
 # 1. Clone & enter
-git clone [https://github.com/educationroz/waste_reporting_system.git]
+git clone https://github.com/educationroz/waste_reporting_system.git
 cd waste_reporting_system
 
 # 2. Create a virtual environment
@@ -187,6 +187,13 @@ All under `/api/`. Auth via `Authorization: Bearer <access>` (JWT) or session.
 - `QUICK_REFERENCE_GUIDE.md` — endpoint & workflow reference
 - `ADMIN_DASHBOARD.md` / `ADMIN_IMPLEMENTATION_SUMMARY.md` — admin panel docs
 - `ROUTE_OPTIMIZATION_GUIDE.md` — route planning engine
+
+---
+
+## Created by
+
+- [Aayush KC](https://github.com/Aayushkassey) — Full Stack Django & ML
+- [Roz Thapa Mage](https://github.com/educationroz) — Full Stack Django
 
 ---
 
