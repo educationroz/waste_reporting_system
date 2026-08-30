@@ -192,8 +192,9 @@ All under `/api/`. Auth via `Authorization: Bearer <access>` (JWT) or session.
 
 ## Created by
 
-- [Aayush KC](https://github.com/Aayushkassey) — Full Stack Django & ML
-- [Roz Thapa Mage](https://github.com/educationroz) — Full Stack Django
+[![GitHub](https://img.shields.io/badge/GitHub-Aayush%20Kasai-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Aayushkassey)
+
+[![GitHub](https://img.shields.io/badge/GitHub-Education%20Roz-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/educationroz)
 
 ---
 
