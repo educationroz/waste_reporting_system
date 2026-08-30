@@ -70,15 +70,50 @@ class WasteRequestConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
             if self.user.role not in ('admin', 'driver'):
                 await self.send(json.dumps({'type': 'error', 'message': 'Permission denied.'}))
                 return
+            result = await self.resolve_request_broadcast(data.get('request_id'))
+            if result is None:
+                await self.send(json.dumps({'type': 'error', 'message': 'Request not found.'}))
+                return
+            if result.get('error'):
+                await self.send(json.dumps({'type': 'error', 'message': result['error']}))
+                return
             await self.channel_layer.group_send(
                 self.GROUP_NAME,
                 {
                     'type': 'broadcast_request_update',
-                    'request_id': data.get('request_id'),
-                    'status': data.get('status'),
-                    'updated_by': self.user.username,
+                    'request_id': result['request_id'],
+                    'status': result['status'],
+                    'updated_by': result['updated_by'],
                 }
             )
+
+    @database_sync_to_async
+    def resolve_request_broadcast(self, request_id):
+        """Validate that the sender may broadcast about this request.
+
+        The client-supplied 'status' is never trusted: we re-read the row from
+        the DB so a driver cannot push a fake "completed" for a request that
+        isn't theirs (or that didn't actually change). Admins may broadcast any
+        request; drivers only ones assigned to them.
+        """
+        from .models import WasteRequest
+        try:
+            req = WasteRequest.objects.select_related('driver', 'driver__user').get(pk=request_id)
+        except (WasteRequest.DoesNotExist, ValueError, TypeError):
+            return None
+        is_admin = self.user.role == 'admin'
+        is_assigned_driver = (
+            self.user.role == 'driver'
+            and req.driver is not None
+            and req.driver.user_id == self.user.id
+        )
+        if not (is_admin or is_assigned_driver):
+            return {'error': 'You can only broadcast updates for requests assigned to you.'}
+        return {
+            'request_id': req.id,
+            'status': req.status,
+            'updated_by': self.user.username,
+        }
 
     async def broadcast_request_update(self, event):
         """Called when group_send fires 'broadcast_request_update'."""
@@ -141,8 +176,21 @@ class DriverLocationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
         if lat is None or lng is None:
             return
 
+        # Reject junk/out-of-range coordinates before they touch the DB — a
+        # malicious or buggy socket could otherwise store nan/infinite/absurd
+        # values that corrupt the admin map (same guard as update_location).
+        try:
+            lat_f = float(lat)
+            lng_f = float(lng)
+        except (TypeError, ValueError):
+            return
+        if not (-90.0 <= lat_f <= 90.0) or not (-180.0 <= lng_f <= 180.0):
+            return
+        lat_f = round(lat_f, 6)
+        lng_f = round(lng_f, 6)
+
         # Save to DB and get driver details
-        driver_info = await self.save_driver_location(lat, lng)
+        driver_info = await self.save_driver_location(lat_f, lng_f)
         
         if driver_info:
             # Broadcast to all (admins watching the map)
@@ -152,8 +200,8 @@ class DriverLocationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
                     'type': 'driver_location_update',
                     'driver_id': driver_info['id'],
                     'driver_name': driver_info['driver_name'],
-                    'latitude': str(lat),
-                    'longitude': str(lng),
+                    'latitude': str(lat_f),
+                    'longitude': str(lng_f),
                     'vehicle_plate': driver_info.get('vehicle_plate'),
                     'is_available': driver_info.get('is_available', True),
                     'phone': driver_info.get('phone', ''),
@@ -161,6 +209,10 @@ class DriverLocationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
             )
 
     async def driver_location_update(self, event):
+        # Only admins see the driver's phone number; regular users get the
+        # live position without personal contact info. The phone may appear
+        # anyway for admins only because admin_dashboard reads `data.phone`.
+        include_phone = self.user.is_authenticated and self.user.role == 'admin'
         await self.send(json.dumps({
             'type': 'driver_location',
             'driver_id': event.get('driver_id'),
@@ -169,7 +221,7 @@ class DriverLocationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
             'longitude': str(event.get('longitude', '')),
             'vehicle_plate': event.get('vehicle_plate') or '',
             'is_available': event.get('is_available', True),
-            'phone': event.get('phone', ''),
+            'phone': event.get('phone', '') if include_phone else '',
         }))
 
     async def route_update(self, event):

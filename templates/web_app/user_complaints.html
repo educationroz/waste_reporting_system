@@ -1,0 +1,93 @@
+{% extends 'web_app/base.html' %}
+{% load i18n %}
+{% block title %}{% trans "My Complaints" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .nav-pills .nav-link:not(.active):hover {
+        background-color: #f8f9fa;
+        color: #198754 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3">
+    <div class="layout-wrapper">
+
+        {% if user.is_authenticated and user.role == 'user' %}
+        <div class="sidebar-col">
+            {% include 'partials/sidebar.html' %}
+        </div>
+        {% endif %}
+
+        <div class="content-col">
+
+            <h2 class="mb-4"><i class="bi bi-megaphone text-success me-2"></i>{% trans "My Complaints" %}</h2>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>{% trans "Type" %}</th>
+                                    <th>{% trans "Subject" %}</th>
+                                    <th>{% trans "Status" %}</th>
+                                    <th>{% trans "Admin Response" %}</th>
+                                    <th>{% trans "Filed" %}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for c in complaints %}
+                                <tr>
+                                    <td>{{ c.id }}</td>
+                                    <td>{{ c.get_complaint_type_display }}</td>
+                                    <td>{{ c.subject|default:"—" }}</td>
+                                    <td>
+                                        <span class="badge
+                                            {% if c.status == 'completed' %}bg-success
+                                            {% elif c.status == 'pending' %}bg-warning text-dark
+                                            {% else %}bg-info{% endif %}">
+                                            {{ c.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="small text-muted">{{ c.admin_response|default:"—" }}</td>
+                                    <td class="small text-muted">{{ c.created_at|date:"d M Y, H:i" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="6" class="text-center text-muted py-4">{% trans "You haven't filed any complaints yet." %}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {% if is_paginated %}
+            <nav class="mt-3" aria-label="{% trans 'Complaints pagination' %}">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">&laquo;</a></li>
+                    {% endif %}
+                    {% for num in page_obj.paginator.elided_page_range %}
+                    {% if num == page_obj.number %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                    {% elif num == page_obj.paginator.ELLIPSIS %}
+                    <li class="page-item disabled"><span class="page-link">{{ num }}</span></li>
+                    {% else %}
+                    <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+                    {% endif %}
+                    {% endfor %}
+                    {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">&raquo;</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

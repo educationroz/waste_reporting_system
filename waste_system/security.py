@@ -214,5 +214,6 @@ class SecurityHeadersMiddleware:
         # COOP must be 'same-origin-allow-popups' so Google OAuth / GIS popup
         # can communicate with window.opener.
         response.setdefault('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
+        response.setdefault('Cross-Origin-Resource-Policy', 'same-origin')
         response.setdefault('X-Content-Type-Options', 'nosniff')
         return response

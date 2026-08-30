@@ -688,7 +688,20 @@ if (!window.__ssAuthScriptLoaded) {
                 console.error('Failed to close notification socket:', e);
             }
         }
-        window.location.href = '/logout/';
+        // web_logout is now POST-only (GET could be weaponized as a forced
+        // logout via <img>), so the "clean redirect" step posts a CSRF-bearing
+        // form instead of window.location navigation.
+        const f = document.createElement('form');
+        f.method = 'post';
+        f.action = '/logout/';
+        f.style.display = 'none';
+        const csrf = document.createElement('input');
+        csrf.type = 'hidden';
+        csrf.name = 'csrfmiddlewaretoken';
+        csrf.value = getCookie('csrftoken') || '';
+        f.appendChild(csrf);
+        document.body.appendChild(f);
+        f.submit();
     };
 
     function refreshNotifBadge() {

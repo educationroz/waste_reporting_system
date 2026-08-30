@@ -4,14 +4,23 @@ Full project settings. Uses python-decouple for .env management.
 pip install python-decouple
 """
 
-from pathlib import Path
+import sys
 from datetime import timedelta
+from pathlib import Path
+
 from decouple import config
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='change-me-in-production')
-DEBUG = config('DEBUG', default=True, cast=bool)
+# Required, no default: a missing SECRET_KEY must break startup loudly rather
+# than silently fall back to a value someone could use to forge sessions. Copy
+# .env.example to .env locally; set a real random secret in production.
+SECRET_KEY = config('SECRET_KEY')
+# Never default to DEBUG=True. If a production .env omits DEBUG, the safer
+# outcome is a site that looks broken (no static/media) rather than one that
+# leaks tracebacks and disables the HTTPS hardening block below.
+DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = [
     h.strip()
     for h in config(
@@ -55,6 +64,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # must be first
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # serves STATIC_ROOT in production
     'django.contrib.sessions.middleware.SessionMiddleware',
     # Must come after SessionMiddleware (reads the user's saved language from
     # the session) and before CommonMiddleware (which needs the active
@@ -144,6 +154,11 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_SSL_REDIRECT = True
+    # A plain-HTTP load-balancer probe must get 200, not a 301 to https — most
+    # LBs score a redirect as "unhealthy". Exemption is deliberately narrow:
+    # only the two probe paths escape the redirect. (Wired to match the
+    # docstrings in waste_system/health.py and the SslRedirectExemptionTests.)
+    SECURE_REDIRECT_EXEMPT = [r'^healthz$', r'^healthz/live$']
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 # ─── Database ─────────────────────────────────────────────────────────────────
@@ -176,6 +191,17 @@ else:  # SQLite (default for development)
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+    # Production must never silently run on SQLite: no concurrent-write
+    # safety, no real backup story. Refuse to start instead of pretending.
+    # 'test'/'pytest' in sys.argv exempts `manage.py test` (which forces
+    # DEBUG=False) so CI can run the suite without a Postgres instance.
+    if not DEBUG and not any(tool in sys.argv[0:1] or tool in sys.argv[1:2]
+                             for tool in ('test', 'pytest')):
+        raise ImproperlyConfigured(
+            'DB_ENGINE defaults to sqlite3, which is not safe in production. '
+            'Set DB_ENGINE=postgresql (plus DB_NAME/DB_USER/DB_PASSWORD/'
+            'DB_HOST/DB_PORT) in the environment.'
+        )
 
 GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID', default='')
 # ─── Caching ───────────────────────────────────────────────────────────────────
@@ -241,6 +267,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
         # Generic global caps — apply to *every* DRF view by default unless
@@ -364,6 +391,14 @@ LOGGING = {
     },
 }
 
+# ─── Health checks ──────────────────────────────────────────────────────────
+# /healthz readiness + /healthz/live liveness probes (waste_system/health.py).
+# HEALTHCHECK_DETAIL is OFF by default: the probes are unauthenticated, so
+# exception *messages* stay internal. Flip it to True for a deployment while
+# debugging, then turn it back off.
+HEALTHCHECK_TIMEOUT = 2.0          # seconds per dependency probe (below LB timeout)
+HEALTHCHECK_DETAIL = False         # redact exception text in /healthz responses
+
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
@@ -387,7 +422,9 @@ LANGUAGES = [
 ]
 # django-admin makemessages / compilemessages read and write .po/.mo files here.
 LOCALE_PATHS = [BASE_DIR / 'locale']
-TIME_ZONE = 'UTC'
+# End-users are municipal staff/citizens in Nepal: store in UTC (USE_TZ=True
+# keeps the DB canonical) but display in Kathmandu time.
+TIME_ZONE = 'Asia/Kathmandu'
 USE_I18N = True
 USE_TZ = True
 
@@ -398,6 +435,27 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# WhiteNoise serves /static/ in production, where Django's dev static handler
+# is switched off (urls.py only mounts it when DEBUG is True). Compressed but
+# NOT hashed (CompressedStaticFilesStorage, not ManifestStaticFilesStorage):
+# hashing would rename files and silently 404 the hardcoded static paths a few
+# inline scripts use. Requires `python manage.py collectstatic --noinput` at
+# deploy time (run.sh does this).
+STORAGES = {
+    # 'default' is REQUIRED — Django 5.2 raises InvalidStorageError if missing.
+    # The default backend is FileSystemStorage, i.e. uploads go to MEDIA_ROOT.
+    # (FileField/ImageField and default_storage all consult this key.)
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
+    },
+}
+# /media/ (uploaded photos, licence PDFs) is still served by Django only in
+# DEBUG. In production, nginx (or a CDN/S3) must alias it — see the deploy
+# notes in HEALTHCHECK.md.
 
 # ─── File Upload Security ─────────────────────────────────────────────────────
 # Per-photo cap — validators.py's MAX_IMAGE_SIZE reads this value directly

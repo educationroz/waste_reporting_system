@@ -1,9 +1,9 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from email_validator import EmailNotValidError, validate_email
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from email_validator import validate_email, EmailNotValidError
 
 User = get_user_model()
 
@@ -62,7 +62,10 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({'password': 'Passwords do not match.'})
-        if User.objects.filter(email=attrs['email']).exists():
+        # Case-insensitive: User.save() lowercases email, so 'Foo@x.com' and
+        # 'foo@x.com' must be treated as the same account, not slipped past an
+        # exact-match filter that can't see the normalized stored value.
+        if User.objects.filter(email__iexact=attrs['email']).exists():
             raise serializers.ValidationError({'email': 'Email already in use.'})
         return attrs
 
@@ -96,7 +99,14 @@ class UserSerializer(serializers.ModelSerializer):
             'role', 'phone', 'address', 'profile_picture',
             'is_verified', 'date_joined',
         )
-        read_only_fields = ('id', 'date_joined', 'is_verified')
+        read_only_fields = (
+            'id', 'date_joined', 'is_verified',
+            # role/username/email are identity-critical: only admins create/
+            # manage accounts (api_app.AdminUserCreateView/UpdateView), never a
+            # self-service PATCH. ProfileView uses this serializer, so a user
+            # could otherwise PATCH {"role": "admin"} and escalate to admin.
+            'role', 'username', 'email',
+        )
 
 
 class ChangePasswordSerializer(serializers.Serializer):

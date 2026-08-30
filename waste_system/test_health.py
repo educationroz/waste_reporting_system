@@ -115,7 +115,10 @@ class HealthzReadinessTests(TestCase):
         self.assertEqual(response.json()['checks']['channels']['status'], 'failed')
 
     def test_missing_channel_layer_is_a_failure(self):
-        with mock.patch('channels.layers.get_channel_layer', return_value=None):
+        # Detail forced ON here so the assertion can check the message text;
+        # the production default for HEALTHCHECK_DETAIL is now False.
+        with mock.patch('channels.layers.get_channel_layer', return_value=None), \
+             mock.patch.object(health, 'HEALTHCHECK_DETAIL', True):
             response = self.client.get('/healthz')
         self.assertEqual(response.status_code, 503)
         self.assertIn('no channel layer', response.json()['checks']['channels']['error'])

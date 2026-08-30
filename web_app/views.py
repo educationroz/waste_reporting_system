@@ -1,16 +1,29 @@
 import os
 
-from django.contrib.auth import get_user_model, logout as django_logout
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.auth import logout as django_logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.cache import cache
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.utils.translation import gettext as _
 from django.views import View
+from django.views.decorators.http import require_POST
 from django.views.generic import ListView, TemplateView
-from django.conf import settings
-from api_app.models import Driver, Notification, Route, Schedule, Vehicle, WasteRequest, Complaint
+
+from api_app.models import (
+    Complaint,
+    Driver,
+    Notification,
+    Route,
+    Schedule,
+    Vehicle,
+    WasteRequest,
+)
 
 User = get_user_model()
 
@@ -69,8 +82,12 @@ class HomeView(TemplateView):
         ).select_related('user', 'driver__user').order_by('-created_at')[:100]
 
         public_data = []
+        # Anonymous visitors get location + category only — never the reporter's
+        # full pickup_address, username, or the assigned driver's name (PII).
+        # Logged-in users keep them for the community map.
+        is_guest_visitor = not (user.is_authenticated and user.role in ('user', 'admin', 'driver'))
         for req in qs:
-            public_data.append({
+            entry = {
                 'id': req.id,
                 'latitude': float(req.latitude),
                 'longitude': float(req.longitude),
@@ -78,10 +95,12 @@ class HomeView(TemplateView):
                 'status_display': req.get_status_display(),
                 'waste_type': req.waste_type,
                 'waste_type_display': req.get_waste_type_display(),
-                'pickup_address': req.pickup_address or '',
-                'username': req.user.username if req.user else 'Unknown',
-                'driver_name': req.driver.user.username if req.driver and req.driver.user else None,
-            })
+            }
+            if not is_guest_visitor:
+                entry['pickup_address'] = req.pickup_address or ''
+                entry['username'] = req.user.username if req.user else 'Unknown'
+                entry['driver_name'] = req.driver.user.username if req.driver and req.driver.user else None
+            public_data.append(entry)
         ctx['public_requests'] = public_data
 
         if user.is_authenticated and user.role == 'user':
@@ -132,9 +151,7 @@ class UserRecycleBinView(LoginRequiredMixin, ListView):
 
 
 class UserComplaintListView(LoginRequiredMixin, ListView):
-    # NOTE: this currently renders home.html — likely should be
-    # 'web_app/user_complaints.html' unless that's intentional.
-    template_name = 'web_app/home.html'
+    template_name = 'web_app/user_complaints.html'
     context_object_name = 'complaints'
     paginate_by = 10
 
@@ -357,15 +374,9 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
         return ctx
 
 
-from django.db.models import Q
-from django.utils.dateparse import parse_date
-from django.views.generic import ListView
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import redirect
-
-
 class AdminRequestListView(LoginRequiredMixin, ListView):
     model = WasteRequest
+    template_name = 'web_app/admin_requests.html'
     context_object_name = 'requests'
     paginate_by = 20
 
@@ -373,11 +384,6 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         if request.user.is_authenticated and request.user.role != 'admin':
             return redirect_by_role(request.user)
         return super().dispatch(request, *args, **kwargs)
-
-    def get_template_names(self):
-        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return ['web_app/partials/admin_requests_table.html']
-        return ['web_app/admin_requests.html']
 
     def get_queryset(self):
         qs = WasteRequest.objects.select_related('user', 'driver__user') \
@@ -742,6 +748,11 @@ def redirect_by_role(user):
     return redirect(role_redirect.get(user.role, '/'))
 
 
+@require_POST
 def web_logout(request):
+    # GET would let any <img src="/logout/"> (or a naive link) silently kill a
+    # session. Requiring POST + CSRF makes forced logout impossible for a
+    # third-party page. The UI already POSTs /auth/logout/ first and then
+    # submits a POST form to this endpoint as its clean redirect.
     django_logout(request)
     return redirect('/login/')

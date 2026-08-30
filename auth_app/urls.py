@@ -1,6 +1,23 @@
 from django.urls import path
 
-from .views import *
+from .views import (
+    BiometricLoginView,
+    BiometricRegisterTokenView,
+    ChangePasswordView,
+    CustomTokenObtainPairView,
+    CustomTokenRefreshView,
+    ExportUserDataView,
+    GoogleLoginView,
+    LogoutView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
+    ProfileView,
+    RegisterView,
+    ResendVerificationEmailView,
+    SessionLoginView,
+    UserListView,
+    VerifyEmailView,
+)
 
 urlpatterns = [
     path('login/',           CustomTokenObtainPairView.as_view(),  name='auth-login'),

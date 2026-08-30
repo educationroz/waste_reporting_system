@@ -1,20 +1,26 @@
+import json as _json
+import urllib.parse as _urlparse
+import urllib.request as _urlrequest
+
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.contrib.auth import authenticate, get_user_model, login
+from django.contrib.auth import logout as django_logout
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
-from django.utils import timezone
-from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.http import HttpResponse
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth import login, logout as django_logout
+
 from .serializers import (
     ChangePasswordSerializer,
     CustomTokenObtainPairSerializer,
@@ -23,13 +29,7 @@ from .serializers import (
     RegisterSerializer,
     UserSerializer,
 )
-from django.contrib.auth import authenticate
-from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 from .tokens import email_verification_token
-
-import json as _json
-import urllib.parse as _urlparse
-import urllib.request as _urlrequest
 
 User = get_user_model()
 
@@ -178,7 +178,7 @@ class ExportUserDataView(APIView):
 
     def get(self, request):
         user = request.user
-        from api_app.models import WasteRequest, Complaint
+        from api_app.models import Complaint, WasteRequest
 
         user_data = {
             'exported_at': timezone.now().isoformat(),
@@ -235,6 +235,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     """Login — returns access + refresh tokens plus user info."""
     serializer_class = CustomTokenObtainPairSerializer
     permission_classes = [AllowAny]
+    throttle_scope = 'login'
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -246,6 +247,7 @@ class CustomTokenRefreshView(TokenRefreshView):
     lifetime without bouncing the user to the login page.
     """
     permission_classes = [AllowAny]
+    throttle_scope = 'token_refresh'
 
 
 class GoogleLoginView(APIView):
@@ -273,8 +275,8 @@ class GoogleLoginView(APIView):
         # --- verify the token with Google -------------------------------
         payload = None
         try:
-            from google.oauth2 import id_token as google_id_token
             from google.auth.transport import requests as google_requests
+            from google.oauth2 import id_token as google_id_token
             payload = google_id_token.verify_oauth2_token(
                 credential, google_requests.Request(), client_id
             )
@@ -283,7 +285,10 @@ class GoogleLoginView(APIView):
                 url = f'{self.GOOGLE_TOKENINFO_URL}?{_urlparse.urlencode({"id_token": credential})}'
                 with _urlrequest.urlopen(url, timeout=10) as resp:
                     payload = _json.loads(resp.read().decode('utf-8'))
-                if payload.get('aud') != client_id and payload.get('azp') != client_id:
+                # Require aud to match our client_id. `azp` ("authorized
+                # presenter") can legitimately differ from the audience in some
+                # flows, so accepting an azp-only match weakened the check.
+                if payload.get('aud') != client_id:
                     return Response({'error': 'This Google token was not issued for this application.'},
                                     status=status.HTTP_401_UNAUTHORIZED)
             except Exception:
@@ -358,6 +363,7 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    throttle_scope = 'register'
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -378,6 +384,7 @@ class RegisterView(generics.CreateAPIView):
 class VerifyEmailView(APIView):
     """Confirms a user's email from the link sent at registration."""
     permission_classes = [AllowAny]
+    throttle_scope = 'verify_email'
 
     def get(self, request, uidb64, token):
         try:
@@ -398,17 +405,16 @@ class VerifyEmailView(APIView):
 class ResendVerificationEmailView(APIView):
     """Re-sends the verification email for an unverified account."""
     permission_classes = [AllowAny]
+    throttle_scope = 'resend_verification'
 
     def post(self, request):
         email = request.data.get('email')
-        try:
-            user = User.objects.get(email__iexact=email)
-        except User.DoesNotExist:
-            # Don't reveal whether the email exists.
+        user = User.objects.filter(email__iexact=email).first()
+        if user is None or user.is_verified:
+            # One identical message for "no such account" AND "already
+            # verified" — otherwise this endpoint is an oracle that lets
+            # anyone confirm whether any email is registered on the site.
             return Response({'message': 'If that account exists and is unverified, an email has been sent.'})
-
-        if user.is_verified:
-            return Response({'message': 'This account is already verified.'})
 
         send_verification_email(user, request)
         return Response({'message': 'If that account exists and is unverified, an email has been sent.'})
@@ -417,6 +423,7 @@ class ResendVerificationEmailView(APIView):
 class PasswordResetRequestView(APIView):
     """Step 1 of forgot-password: submit an email, get a reset link emailed."""
     permission_classes = [AllowAny]
+    throttle_scope = 'password_reset_request'
 
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
@@ -430,9 +437,8 @@ class PasswordResetRequestView(APIView):
             {'message': 'If an account with that email exists, a password reset link has been sent.'}
         )
 
-        try:
-            user = User.objects.get(email__iexact=email)
-        except User.DoesNotExist:
+        user = User.objects.filter(email__iexact=email).first()
+        if user is None:
             return generic_response
 
         send_password_reset_email(user, request)
@@ -442,6 +448,7 @@ class PasswordResetRequestView(APIView):
 class PasswordResetConfirmView(APIView):
     """Step 2 of forgot-password: submit uid/token from the email plus a new password."""
     permission_classes = [AllowAny]
+    throttle_scope = 'password_reset_confirm'
 
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
@@ -476,6 +483,7 @@ class LogoutView(APIView):
     anyone probing the API).
     """
     permission_classes = [IsAuthenticated]
+    throttle_scope = 'logout'
 
     def post(self, request):
         refresh_token = request.data.get('refresh')
@@ -502,6 +510,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 class ChangePasswordView(APIView):
     """Change password. Requires current password for verification."""
     permission_classes = [IsAuthenticated]
+    throttle_scope = 'change_password'
 
     def post(self, request):
         serializer = ChangePasswordSerializer(

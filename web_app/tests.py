@@ -136,7 +136,9 @@ class CSPHeaderTests(TestCase):
         expected = {
             'X-Content-Type-Options': 'nosniff',
             'Referrer-Policy': 'strict-origin-when-cross-origin',
-            'Cross-Origin-Opener-Policy': 'same-origin',
+            # same-origin-allow-popups (not same-origin): the Google OAuth popup
+            # must be able to reach window.opener to hand the token back.
+            'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
             'Cross-Origin-Resource-Policy': 'same-origin',
         }
         for header, value in expected.items():

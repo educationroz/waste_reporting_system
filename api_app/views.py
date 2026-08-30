@@ -1,38 +1,66 @@
-import os
 import math
-from datetime import datetime, timedelta, timezone as dt_timezone
+import os
+import tempfile
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-import tempfile
+
+from asgiref.sync import async_to_sync
+from channels.exceptions import InvalidChannelLayerError
+from channels.layers import get_channel_layer  # type: ignore
 from django.conf import settings
-from django.core.cache import cache
 from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
-from django.core.management import call_command
+from django.contrib.auth.password_validation import validate_password
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import F, Q
 from django.http import FileResponse
 from django.utils import timezone
-from asgiref.sync import async_to_sync
-from channels.exceptions import InvalidChannelLayerError
-from channels.layers import get_channel_layer # type: ignore
-from rest_framework import filters, status, viewsets # type: ignore
-from rest_framework.decorators import action # type: ignore
-from rest_framework.permissions import AllowAny, IsAuthenticated # type: ignore
-from rest_framework.response import Response # type: ignore
+from rest_framework import filters, status, viewsets  # type: ignore
+from rest_framework.decorators import action  # type: ignore
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import (  # type: ignore
+    FormParser,
+    JSONParser,
+    MultiPartParser,
+)
+from rest_framework.permissions import AllowAny, IsAuthenticated  # type: ignore
+from rest_framework.response import Response  # type: ignore
 from rest_framework.views import APIView
 
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser # type: ignore
-from .models import (
-    AdminLog, Bin, Checkpoint, Complaint, Driver, Notification, Route, Schedule,
-    SystemSettings, Vehicle, WasteRequest, WasteRequestPhoto,
+from .backup_utils import (
+    BackupError,
+    create_backup,
+    list_backups,
+    resolve_backup_path,
+    restore_backup,
+    verify_backup_file,
 )
-from rest_framework.pagination import PageNumberPagination
-from .permissions import IsAdminOrReadOnly, IsAdminUser, IsOwnerOrAdmin, IsSuperAdminUser
+from .models import (
+    AdminLog,
+    Bin,
+    Checkpoint,
+    Complaint,
+    Driver,
+    Notification,
+    Route,
+    Schedule,
+    SystemSettings,
+    Vehicle,
+    WasteRequest,
+    WasteRequestPhoto,
+)
+from .permissions import (
+    IsAdminOrReadOnly,
+    IsAdminUser,
+    IsOwnerOrAdmin,
+    IsSuperAdminUser,
+)
 from .serializers import (
     AdminLogSerializer,
     BinSerializer,
     CheckpointSerializer,
+    ComplaintSerializer,
     DriverSerializer,
     NotificationSerializer,
     RouteSerializer,
@@ -40,19 +68,8 @@ from .serializers import (
     SystemSettingsSerializer,
     VehicleSerializer,
     WasteRequestSerializer,
-    ComplaintSerializer,
 )
-from .validators import validate_image_file, sanitize_image, compress_image
-from .backup_utils import (
-    BackupError,
-    BACKUP_DIR as BACKUP_DIR_FOR_UPLOADS,
-    create_backup,
-    list_backups,
-    resolve_backup_path,
-    restore_backup,
-    verify_backup_file,
-)
-
+from .validators import compress_image, sanitize_image, validate_image_file
 
 try:
     CHANNEL_LAYER = get_channel_layer()
@@ -61,7 +78,31 @@ except InvalidChannelLayerError:
 
 User = get_user_model()
 
+
+def _parse_bool(value, default=False):
+    """Strict boolean parser for client-supplied data.
+
+    bool('false') is True in Python — a classic footgun that would PROMOTE
+    someone to superadmin. Accept only real booleans and the literal strings
+    true/false/1/0/yes/no/on/off (case-insensitive). Anything else fails
+    closed to `default`.
+    """
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in ('true', '1', 'yes', 'on'):
+            return True
+        if v in ('false', '0', 'no', 'off'):
+            return False
+    return default
+
 import logging
+
 logger = logging.getLogger('notif_debug')
 # NOTE: no logging.basicConfig() here. Calling it at import time reconfigures
 # the ROOT logger for the entire process — it overrode Django's own logging
@@ -74,6 +115,7 @@ backup_logger = logging.getLogger('backup')  # same logger name as backup_utils.
 # थ्रेसहोल्ड (मिटरमा) भन्दा टाढा भए suspicious मानिन्छ — admin लाई flag देखाइन्छ।
 COMPLETION_DISTANCE_THRESHOLD_METERS = 500
 import csv
+
 from django.http import HttpResponse
 
 
@@ -167,38 +209,6 @@ def _log_admin_action(request, action_type, content_type, obj, description=''):
         object_description=description or str(obj),
         ip_address=request.META.get('REMOTE_ADDR'),
         user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
-    )
-
-
-def send_guest_claim_email(waste_request, request):
-    """
-    Backup path for claiming a guest-submitted request: the primary claim
-    mechanism is the 'guest_token' saved client-side in localStorage
-    (guest_claim_tokens), which is auto-claimed on next login/register. That
-    breaks if the guest clears browser data or switches devices before
-    registering — so if they optionally gave an email at submission time,
-    email them a direct claim link carrying the same guest_token as a
-    'claim_token' URL param. login.html reads that param and merges it into
-    guest_claim_tokens before the existing post-login claim call runs, so no
-    separate backend endpoint is needed for the link itself.
-    Follows the same send_mail pattern as auth_app.views.send_verification_email.
-    """
-    claim_path = f'/login/?claim_token={waste_request.guest_token}'
-    claim_url = request.build_absolute_uri(claim_path)
-
-    send_mail(
-        subject='Your pickup request — claim it to track online',
-        message=(
-            f'Hi,\n\n'
-            f'Thanks for submitting pickup request #{waste_request.id}.\n\n'
-            f'To track its status and get notifications, log in (or register, then log in) '
-            f'using the link below and it will automatically be linked to your account:\n'
-            f'{claim_url}\n\n'
-            f'If you already claimed this request, you can ignore this email.'
-        ),
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[waste_request.guest_email],
-        fail_silently=True,
     )
 
 
@@ -682,6 +692,60 @@ class DriverViewSet(viewsets.ModelViewSet):
         driver = serializer.save()
         _log_admin_action(self.request, 'update', 'Driver', driver, f'Updated driver {driver.user.username}')
 
+    @action(
+        detail=False,
+        methods=['post'],
+        permission_classes=[IsAuthenticated, IsAdminUser],
+        url_path='create-account',
+    )
+    def create_account(self, request):
+        """POST /api/drivers/create-account/
+
+        Admin-only: create an ACTIVE driver user (role='driver'). The
+        sync_driver_profile signal creates the linked Driver row automatically.
+
+        Previously admin_drivers.html misused the PUBLIC /auth/register/
+        endpoint, which forces role='user' + is_active=False — so "Add Driver"
+        produced an account nobody could log into and no Driver profile.
+        """
+        username = (request.data.get('username') or '').strip()
+        email = (request.data.get('email') or '').strip()
+        password = request.data.get('password') or ''
+        phone = (request.data.get('phone') or '').strip() or None
+        address = (request.data.get('address') or '').strip() or None
+
+        if not username or not password:
+            return Response({'error': 'username and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(username__iexact=username).exists():
+            return Response({'error': 'Username already in use.'}, status=status.HTTP_400_BAD_REQUEST)
+        if email and User.objects.filter(email__iexact=email).exists():
+            return Response({'error': 'Email already in use.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_password(password)
+        except Exception as exc:
+            messages = []
+            for item in exc:
+                messages.extend(item)
+            return Response({'error': 'Password not acceptable.', 'details': messages}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User(
+            username=username,
+            email=email,
+            role='driver',
+            is_active=True,
+            is_verified=True,  # admin vouches for this account — no email round-trip
+            phone=phone,
+            address=address,
+        )
+        user.set_password(password)
+        user.save()  # signal creates the Driver row
+        driver = Driver.objects.get(user=user)
+
+        _log_admin_action(request, 'create', 'Driver', driver, f'Created driver account {user.username}')
+        return Response(DriverSerializer(driver, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
     # 👇 ADD THIS
     @action(
         detail=False,
@@ -772,8 +836,25 @@ class DriverViewSet(viewsets.ModelViewSet):
                 {'error': 'latitude and longitude required.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        driver.current_latitude = lat
-        driver.current_longitude = lng
+        try:
+            lat_f = float(lat)
+            lng_f = float(lng)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'Invalid GPS coordinates.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not (-90.0 <= lat_f <= 90.0) or not (-180.0 <= lng_f <= 180.0):
+            return Response(
+                {'error': 'GPS coordinates out of range (lat -90..90, lng -180..180).'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        # ~1cm precision is plenty for tracking and avoids storing junk like
+        # float('nan')/huge exponents that would corrupt the public map.
+        lat_f = round(lat_f, 6)
+        lng_f = round(lng_f, 6)
+        driver.current_latitude = lat_f
+        driver.current_longitude = lng_f
         driver.save(update_fields=['current_latitude', 'current_longitude'])
 
         if CHANNEL_LAYER is not None:
@@ -783,14 +864,14 @@ class DriverViewSet(viewsets.ModelViewSet):
                     'type': 'driver_location_update',
                     'driver_id': driver.id,
                     'driver_name': driver.user.username,
-                    'latitude': str(lat),
-                    'longitude': str(lng),
+                    'latitude': str(lat_f),
+                    'longitude': str(lng_f),
                     'vehicle_plate': driver.vehicle.plate_number if driver.vehicle else '',
                     'is_available': driver.is_available,
                     'phone': getattr(driver.user, 'phone', '') or '',
                 }
             )
-        return Response({'message': 'Location updated.', 'latitude': lat, 'longitude': lng})
+        return Response({'message': 'Location updated.', 'latitude': lat_f, 'longitude': lng_f})
 
     @action(detail=True, methods=['post', 'patch'], permission_classes=[IsAuthenticated])
     def broadcast_gps_status(self, request, pk=None):
@@ -1078,10 +1159,25 @@ class CheckpointViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        checkpoints = list(Checkpoint.objects.filter(id__in=ids))
+        # Coerce defensively: non-numeric ids used to blow up the call below
+        # (int('foo') → ValueError → 500). Drop junk, keep numeric strings/int.
+        clean_ids = []
+        for raw in ids:
+            try:
+                clean_ids.append(int(raw))
+            except (TypeError, ValueError):
+                continue
+        clean_ids = list(dict.fromkeys(clean_ids))  # dedupe, keep order
+        if not clean_ids:
+            return Response(
+                {'error': 'ids must be a list of numeric checkpoint ids.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        checkpoints = list(Checkpoint.objects.filter(id__in=clean_ids))
         found_ids = [ch.id for ch in checkpoints]
         names = [ch.name for ch in checkpoints]
-        missing_ids = [int(i) for i in ids if int(i) not in found_ids]
+        missing_ids = [i for i in clean_ids if i not in found_ids]
 
         with transaction.atomic():
             Checkpoint.objects.filter(id__in=found_ids).delete()
@@ -1116,8 +1212,9 @@ class AdminUserCreateView(APIView):
         first_name = request.data.get('first_name', '')
         last_name = request.data.get('last_name', '')
         # Only reachable by a superadmin (permission_classes above), so it's
-        # safe to let the requester set this flag directly on create.
-        is_superadmin = bool(request.data.get('is_superadmin', False))
+        # safe to let the requester set this flag directly on create. Strict
+        # parse: bool('false') is True, which would wrongly grant superadmin.
+        is_superadmin = _parse_bool(request.data.get('is_superadmin', False))
 
         if not username or not password:
             return Response(
@@ -1178,7 +1275,7 @@ class AdminUserUpdateView(APIView):
         # never on themselves — otherwise the last superadmin could lock
         # themselves out, or demote themselves mid-session by accident.
         if 'is_superadmin' in request.data and admin_user.id != request.user.id:
-            admin_user.is_superadmin = bool(request.data['is_superadmin'])
+            admin_user.is_superadmin = _parse_bool(request.data['is_superadmin'])
 
         new_password = request.data.get('password')
         if new_password:
@@ -1724,7 +1821,12 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             id__in=clean_ids, is_deleted=False, needs_manual_review=False,
         ).exclude(status__in=['completed', 'cancelled'])
         found_ids = list(eligible_qs.values_list('id', flat=True))
-        missing_ids = [i for i in clean_ids if not WasteRequest.objects.filter(id=i).exists()]
+        # One lookup for every requested id (instead of an exists() query per
+        # id — the old loop ran a SELECT per row = N+1).
+        matched_ids = set(
+            WasteRequest.objects.filter(id__in=clean_ids).values_list('id', flat=True)
+        )
+        missing_ids = [i for i in clean_ids if i not in matched_ids]
         ineligible_ids = [i for i in clean_ids if i not in found_ids and i not in missing_ids]
 
         updated = eligible_qs.update(driver=driver, status='assigned')
@@ -1884,6 +1986,7 @@ class RouteViewSet(viewsets.ModelViewSet):
         }
         """
         from django.db.utils import IntegrityError
+
         from .route_optimizer import generate_optimal_route
 
         driver_id = request.data.get('driver_id')
@@ -2181,7 +2284,10 @@ class ScheduleViewSet(viewsets.ModelViewSet):
             [
                 sch.id,
                 sch.zone_name,
-                sch.get_day_display() if hasattr(sch, 'get_day_display') else getattr(sch, 'day', ''),
+                # Field is day_of_week (PositiveSmallIntegerField) — the old
+                # get_day_display()/.day fallback never resolved, so the Day
+                # column was always blank in CSV exports.
+                sch.get_day_of_week_display() if sch.day_of_week is not None else '',
                 sch.get_frequency_display(),
                 sch.driver.user.username if sch.driver and sch.driver.user else '',
                 sch.vehicle.plate_number if sch.vehicle else '',
@@ -2198,7 +2304,17 @@ class NotificationViewSet(viewsets.ModelViewSet):
     """
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
+    # Notifications are created ONLY server-side (_create_notification/_notify_*).
+    # POST must stay in http_method_names because clear_all is a POST action,
+    # so a bare create is overridden below to 405 instead of dumping the client
+    # into an IntegrityError 500 (the serializer's user FK is read-only).
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
+
+    def create(self, request, *args, **kwargs):
+        return Response(
+            {'error': 'Notifications cannot be created via the API.'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
 
     def get_queryset(self):
         user = self.request.user
@@ -2221,9 +2337,10 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['patch'])
     def mark_all_read(self, request):
-        qs = Notification.objects.filter(is_read=False)
-        if request.user.role != 'admin':
-            qs = qs.filter(user=request.user)
+        # get_queryset() already scopes to the caller's own notifications
+        # (see the comment on it above) — querying Notification.objects
+        # directly here let an admin mark every user's notifications as read.
+        qs = self.get_queryset().filter(is_read=False)
         qs.update(is_read=True)
         return Response({'message': 'All notifications marked as read.'})
 
@@ -2255,6 +2372,28 @@ class AdminLogViewSet(viewsets.ModelViewSet):
     search_fields = ['action', 'content_type', 'admin_user__username']
     ordering_fields = ['created_at', 'action']
     http_method_names = ['get', 'post', 'delete', 'head', 'options']
+
+    def create(self, request, *args, **kwargs):
+        # The audit log is the record of what admin actions actually happened.
+        # Letting admins INSERT arbitrary rows (or edit existing ones) lets them
+        # fabricate evidence — refuse writes entirely. POST remains on
+        # http_method_names only because the bulk_delete/clear_all actions use it.
+        return Response(
+            {'error': 'Admin logs are read-only; entries are created by the system.'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+
+    def update(self, request, *args, **kwargs):
+        return Response(
+            {'error': 'Admin logs are read-only; entries are created by the system.'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response(
+            {'error': 'Admin logs are read-only; entries are created by the system.'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
 
     @action(detail=False, methods=['post', 'delete'])
     def bulk_delete(self, request):
@@ -2328,9 +2467,27 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
         if contact_phone is not None: current_val['contact_phone'] = contact_phone
 
         if logo_file:
+            # Logo uploads were previously written to MEDIA as-is with no
+            # extension/content check — an admin could drop an .html/.svg.payload
+            # into /media/branding/. Route it through the same defence-in-depth
+            # pipeline as complaint/request photos (size cap + real-MIME sniff +
+            # Pillow decode + re-encode) and force an allow-listed extension.
             from django.core.files.storage import default_storage
-            ext = os.path.splitext(logo_file.name)[1].lower() or '.png'
-            file_path = default_storage.save(f'branding/custom_logo{ext}', logo_file)
+
+            ext = os.path.splitext(logo_file.name or '')[1].lower()
+            allowed_logo_exts = ('.png', '.jpg', '.jpeg', '.gif', '.webp')
+            try:
+                validate_image_file(logo_file)
+                clean_logo = sanitize_image(logo_file)
+                clean_logo = compress_image(clean_logo)
+            except Exception:
+                return Response(
+                    {'error': 'Invalid image file. Upload a valid PNG, JPG, GIF or WebP (max 5MB).'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if ext not in allowed_logo_exts:
+                ext = '.png'  # sanitize_image() re-encodes anyway; use a safe name
+            file_path = default_storage.save(f'branding/custom_logo{ext}', clean_logo)
             logo_url = settings.MEDIA_URL + file_path
             current_val['site_logo'] = logo_url
 
@@ -2468,6 +2625,50 @@ class ComplaintViewSet(viewsets.ModelViewSet):
             logger.warning(f'[COMPLAINT UPDATE_STATUS] notification push failed for complaint={complaint.id}.')
  
         return Response(ComplaintSerializer(complaint, context={'request': request}).data)
+
+    # ────────────────────────────────────────────────────────────────────
+    # NEW: bulk_update_status — admin_complaints.html को "Bulk Update Status"
+    # button ले call गर्ने POST /api/complaints/bulk_update_status/.
+    # Pahile यो action थिएन, tesैle 404 aairaheko thiyo (frontend ले single
+    # update_status action थाहा pauna sakdaina). Payload: {ids: [...], status}.
+    # ────────────────────────────────────────────────────────────────────
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def bulk_update_status(self, request):
+        ids_param = request.data.get('ids')
+        new_status = request.data.get('status')
+        valid_statuses = [s[0] for s in Complaint.STATUS_CHOICES]
+
+        if not isinstance(ids_param, list) or not ids_param:
+            return Response({'error': 'ids (list) is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if new_status not in valid_statuses:
+            return Response({'error': f'Invalid status. Choose: {valid_statuses}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        complaints = list(self.get_queryset().filter(id__in=ids_param))
+        found_ids = {c.id for c in complaints}
+        missing_ids = [i for i in ids_param if i not in found_ids]
+
+        Complaint.objects.filter(id__in=[c.id for c in complaints]).update(
+            status=new_status,
+            updated_at=timezone.now(),
+        )
+
+        for complaint in complaints:
+            try:
+                _create_notification(
+                    user=complaint.user,
+                    title='Complaint Status Updated',
+                    message=f'Your complaint "{complaint.subject}" status changed to: {complaint.get_status_display()}.',
+                    notification_type='success' if new_status == 'completed' else 'info',
+                )
+            except Exception:
+                logger.warning(f'[COMPLAINT BULK UPDATE] notification push failed for complaint={complaint.id}.')
+
+        _log_admin_action(
+            request, 'status_change', 'Complaint', None,
+            f"Bulk status change → {new_status}: {[c.id for c in complaints]}"
+        )
+
+        return Response({'updated': len(complaints), 'missing_ids': missing_ids})
  
     # ────────────────────────────────────────────────────────────────────
     # NEW: bulk_export — admin_complaints.html को "Export (CSV)" button ले

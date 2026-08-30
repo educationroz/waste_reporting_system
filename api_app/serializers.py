@@ -1,9 +1,26 @@
 from django.contrib.auth import get_user_model
-from rest_framework import serializers # type: ignore
-from .validators import validate_image_file, validate_pdf_file, sanitize_image, compress_image
+from rest_framework import serializers  # type: ignore
+
 from .models import (
-    AdminLog, Bin, Checkpoint, Driver, Notification, Route, Schedule,
-    SystemSettings, Vehicle, VehicleType, WasteRequest, WasteRequestPhoto, Complaint,
+    AdminLog,
+    Bin,
+    Checkpoint,
+    Complaint,
+    Driver,
+    Notification,
+    Route,
+    Schedule,
+    SystemSettings,
+    Vehicle,
+    VehicleType,
+    WasteRequest,
+    WasteRequestPhoto,
+)
+from .validators import (
+    compress_image,
+    sanitize_image,
+    validate_image_file,
+    validate_pdf_file,
 )
 
 User = get_user_model()
@@ -130,6 +147,12 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             'severity', 'ml_confidence', 'needs_manual_review',
             'completion_latitude', 'completion_longitude',
             'completion_distance_meters', 'completion_flagged',
+            # Admin-only transitions. create is AllowAny, so leaving these
+            # writable let any anonymous visitor forge {"status": "completed",
+            # "driver": <id>} and skip the whole admin assignment + GPS
+            # completion pipeline. Updates must go through the dedicated
+            # update_status / assign_driver actions.
+            'status', 'driver',
         )
 
     def get_route_id(self, obj):
@@ -355,7 +378,14 @@ class ComplaintSerializer(serializers.ModelSerializer):
             'status', 'status_display', 'admin_response',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['user', 'created_at', 'updated_at']
+        read_only_fields = [
+            'user', 'created_at', 'updated_at',
+            # Complaint owners may not self-resolve: status/admin_response are
+            # moderated by admins (ComplaintViewSet.update_status). Leaving them
+            # writable let the reporter PATCH {"status": "completed"} and forge
+            # an official resolution.
+            'status', 'admin_response',
+        ]
         extra_kwargs = {
             'subject': {'required': False},  # auto-filled server-side if omitted
         }

@@ -653,7 +653,11 @@
 
         await withButtonBusy(eventButton(btn), 'Creating...', async () => {
         try {
-            const res = await fetch('/auth/register/', {
+            // FIX: अहिले /auth/register/ (public, forces role='user' +
+            // inactive account) मा नपठाएर admin-only create-account endpoint
+            // मा पठाइन्छ — yasle active login-garni driver user + Driver
+            // profile (signal bata auto) dubai bancha.
+            const res = await fetch('/api/drivers/create-account/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -664,8 +668,6 @@
                     username,
                     email,
                     password,
-                    password2,
-                    role: 'driver',
                     phone,
                     address,
                 }),
