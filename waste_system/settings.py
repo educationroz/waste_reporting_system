@@ -5,22 +5,36 @@ pip install python-decouple
 """
 
 import sys
-from datetime import timedelta
 from pathlib import Path
+from datetime import timedelta
 
-from decouple import config
 from django.core.exceptions import ImproperlyConfigured
+from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Required, no default: a missing SECRET_KEY must break startup loudly rather
-# than silently fall back to a value someone could use to forge sessions. Copy
-# .env.example to .env locally; set a real random secret in production.
-SECRET_KEY = config('SECRET_KEY')
-# Never default to DEBUG=True. If a production .env omits DEBUG, the safer
-# outcome is a site that looks broken (no static/media) rather than one that
-# leaks tracebacks and disables the HTTPS hardening block below.
+# Fail closed: local development must opt in with DEBUG=True in an untracked
+# .env file. Leaving this enabled by default exposes detailed error pages and
+# disables the HTTPS, HSTS, and secure-cookie settings below.
 DEBUG = config('DEBUG', default=False, cast=bool)
+
+# A development-only fallback keeps a fresh checkout usable. Production must
+# explicitly inject a unique key; accepting a known default would let anyone
+# forge Django-signed data if DEBUG were accidentally disabled.
+SECRET_KEY = config('SECRET_KEY', default='')
+_INSECURE_SECRET_KEYS = {
+    '',
+    'change-me-in-production',
+    'replace-with-a-unique-random-secret-key',
+    'change-me-to-a-random-secret',
+}
+if SECRET_KEY in _INSECURE_SECRET_KEYS:
+    if not DEBUG:
+        raise ImproperlyConfigured(
+            'SECRET_KEY must be set to a unique, non-placeholder value when DEBUG=False.'
+        )
+    SECRET_KEY = 'development-only-insecure-secret-key-not-for-production'
+
 ALLOWED_HOSTS = [
     h.strip()
     for h in config(
@@ -29,6 +43,7 @@ ALLOWED_HOSTS = [
     ).split(',')
     if h.strip()
 ]
+
 # Whether registration should do a live DNS/MX lookup on the email domain.
 # Defaults to "on in production, off in development". It is exposed as its own
 # setting (rather than being derived from DEBUG inline) because Django's test
