@@ -40,9 +40,13 @@ class ServiceWorkerView(View):
     """
 
     def get(self, request, *args, **kwargs):
-        sw_file_path = os.path.join(
-            settings.BASE_DIR, 'web_app', 'static', 'web_app', 'sw.js'
-        )
+        # sw.js lives in the committed static source (STATICFILES_DIRS[0]).
+        # This intentionally reads it straight off disk rather than through
+        # the staticfiles storage/finders, so /sw.js keeps serving the current
+        # committed source regardless of whether collectstatic/whitenoise has
+        # fingerprinted or moved files around in production.
+        sw_dir = settings.STATICFILES_DIRS[0] if settings.STATICFILES_DIRS else settings.BASE_DIR / 'static'
+        sw_file_path = os.path.join(str(sw_dir), 'web_app', 'js', 'sw.js')
         try:
             with open(sw_file_path, 'r', encoding='utf-8') as f:
                 content = f.read()

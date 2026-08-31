@@ -1151,5 +1151,24 @@ document.addEventListener('click', function (e) {
 })();
 </script>
 
+<script nonce="{{ csp_nonce }}">
+    // Register the app-shell service worker served at /sw.js (ServiceWorkerView)
+    // so previously visited pages still open on patchy mobile data. A failed
+    // registration must never break the page — only warn.
+    (function () {
+        if (!('serviceWorker' in navigator)) return;
+        // Service workers only run in secure contexts (https, or localhost).
+        if (location.protocol !== 'https:' &&
+            location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            return;
+        }
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js').catch(function (err) {
+                console.warn('Service worker registration failed:', err);
+            });
+        });
+    })();
+</script>
+
 </body>
 </html>

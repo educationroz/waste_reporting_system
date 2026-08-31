@@ -248,6 +248,37 @@ class PageSmokeTests(TestCase):
         devanagari = re.findall(r'[\u0900-\u097F]+', body)
         self.assertGreater(len(devanagari), 50, 'dashboard did not render in Nepali')
 
+class ServiceWorkerTests(TestCase):
+    """The app-shell service worker must actually be served and registered.
+
+    Regression guard: ServiceWorkerView reads sw.js straight off disk from the
+    committed static source, and base.html must register it onto '/' — a wrong
+    path on either side silently kills the offline/PWA shell.
+    """
+
+    def test_sw_js_is_served(self):
+        response = self.client.get('/sw.js')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/javascript')
+        # Served from the app root so the worker's default scope covers '/'.
+        self.assertEqual(response['Service-Worker-Allowed'], '/')
+
+    def test_sw_js_is_not_the_404_stub(self):
+        response = self.client.get('/sw.js')
+        self.assertGreater(len(response.content), 0)
+
+    def test_base_template_registers_the_worker(self):
+        response = self.client.get('/login/')
+        body = response.content.decode()
+        self.assertIn("navigator.serviceWorker.register('/sw.js')", body)
+
+    def test_sw_view_returns_404_when_source_missing(self):
+        from unittest import mock
+        with mock.patch('builtins.open', side_effect=FileNotFoundError):
+            response = self.client.get('/sw.js')
+        self.assertEqual(response.status_code, 404)
+
+
 class AdminSettingsViewTest(TestCase):
     def setUp(self):
         self.admin = User.objects.create_user(
