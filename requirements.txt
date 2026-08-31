@@ -17,6 +17,8 @@ dj-database-url==0.5.0
 Django>=5.1.0,<6.0.0
 django-cors-headers==4.9.0
 django-jazzmin==3.0.5
+django-redis==7.0.0
+django-storages[s3]==1.14.6
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 dnspython==2.8.0
@@ -60,6 +62,7 @@ redis==7.4.0
 requests==2.34.2
 requests-oauthlib==2.0.0
 s3transfer==0.19.2
+sentry-sdk==2.68.1
 service-identity==24.2.0
 setuptools==84.0.0
 six==1.17.0

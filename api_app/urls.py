@@ -15,6 +15,7 @@ from .views import (
     RouteViewSet,
     ScheduleViewSet,
     SystemSettingsViewSet,
+    ThumbnailView,
     VehicleViewSet,
     WasteRequestViewSet,
 )
@@ -37,6 +38,7 @@ urlpatterns = [
     path('auth/create-admin/', AdminUserCreateView.as_view(), name='create-admin'),
     path('auth/admin/<int:admin_id>/update/', AdminUserUpdateView.as_view(), name='update-admin'),
     path('auth/admin/<int:admin_id>/delete/', AdminUserDeleteView.as_view(), name='delete-admin'),
+    path('thumbnail/<str:size>/', ThumbnailView.as_view(), name='thumbnail'),
 
     path('', include(router.urls)),
 ]

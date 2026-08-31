@@ -6,7 +6,6 @@ from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login
 from django.contrib.auth import logout as django_logout
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.http import HttpResponse
 from django.utils import timezone
@@ -40,7 +39,11 @@ def send_verification_email(user, request):
     verify_path = f'/auth/verify-email/{uid}/{token}/'
     verify_url = request.build_absolute_uri(verify_path)
 
-    send_mail(
+    # Async: SMTP latency must not stall the registration request. Failures
+    # are logged, not raised (ResendVerificationEmailView still lets the user
+    # ask again if the mail never arrives).
+    from api_app.tasks import send_mail_async
+    send_mail_async(
         subject='Verify your email — Waste Collection',
         message=(
             f'Hi {user.username},\n\n'
@@ -49,8 +52,7 @@ def send_verification_email(user, request):
             f'If you did not create this account, you can ignore this email.'
         ),
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=False,
+        recipient_list=[user.email] if user.email else [],
     )
 
 
@@ -60,7 +62,8 @@ def send_password_reset_email(user, request):
     reset_path = f'/reset-password/{uid}/{token}/'
     reset_url = request.build_absolute_uri(reset_path)
 
-    send_mail(
+    from api_app.tasks import send_mail_async
+    send_mail_async(
         subject='Reset your password — Waste Collection',
         message=(
             f'Hi {user.username},\n\n'
@@ -70,8 +73,7 @@ def send_password_reset_email(user, request):
             f'If you did not request this, you can safely ignore this email — your password will not change.'
         ),
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=False,
+        recipient_list=[user.email] if user.email else [],
     )
 
 
@@ -93,6 +95,11 @@ class SessionLoginView(APIView):
         user = authenticate(username=username, password=password)
         if user:
             login(request, user)
+            from api_app.views import claim_guest_requests_by_email
+            try:
+                claim_guest_requests_by_email(user)
+            except Exception:
+                pass  # login must succeed even if the claim backup hiccups
             return Response({
                 'message': 'Session created.',
                 'user': {
@@ -155,6 +162,12 @@ class BiometricLoginView(APIView):
             return Response({'error': 'Account not found or inactive.'}, status=status.HTTP_401_UNAUTHORIZED)
 
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+
+        from api_app.views import claim_guest_requests_by_email
+        try:
+            claim_guest_requests_by_email(user)
+        except Exception:
+            pass  # biometric login must succeed even if the claim backup hiccups
 
         profile_pic_url = user.profile_picture.url if getattr(user, 'profile_picture', None) else ''
         role_display = user.get_role_display() if hasattr(user, 'get_role_display') else getattr(user, 'role', '')
@@ -345,6 +358,14 @@ class GoogleLoginView(APIView):
         # Django cannot infer which auth backend to record on the session.
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
 
+        # Google has verified the email, so it's safe to auto-claim guest
+        # reports dropped under this address.
+        from api_app.views import claim_guest_requests_by_email
+        try:
+            claim_guest_requests_by_email(user)
+        except Exception:
+            pass  # Google login must succeed even if the claim backup hiccups
+
         refresh = RefreshToken.for_user(user)
         refresh['username'] = user.username
         refresh['email'] = user.email
@@ -397,6 +418,15 @@ class VerifyEmailView(APIView):
             user.is_verified = True
             user.is_active = True
             user.save()
+
+            # Email is now cryptographically proven to belong to this user —
+            # claim any guest reports dropped under the same address.
+            from api_app.views import claim_guest_requests_by_email
+            try:
+                claim_guest_requests_by_email(user)
+            except Exception:
+                pass  # claim backup failing must never break email verification
+
             return Response({'message': 'Email verified successfully. You can now log in.'})
 
         return Response({'error': 'This verification link is invalid or has expired.'}, status=400)

@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
 {% load i18n %}
+{% load waste_filters %}
 {% block title %}{% trans "Driver Dashboard" %}{% endblock %}
 
 {% block extra_css %}
@@ -297,7 +298,7 @@
                                 <td>
                                     {% if req.photo %}
                                     <a href="{{ req.photo.url }}" target="_blank">
-                                        <img src="{{ req.photo.url }}" alt="{% trans 'photo' %}" class="history-photo-thumb">
+                                        <img src="{{ req.photo|thumbnail:'48x48' }}" alt="{% trans 'photo' %}" class="history-photo-thumb">
                                     </a>
                                     {% else %}
                                     <span class="text-muted small">—</span>

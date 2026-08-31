@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
 {% load i18n %}
+{% load waste_filters %}
 {% load static %}
 {% block title %}{% trans "Personal Settings — Safha Sahar" %}{% endblock %}
 
@@ -166,7 +167,7 @@
                                 <div class="text-center mb-4">
                                     <div class="profile-pic-wrapper">
                                         <img id="profile-pic-preview"
-                                             src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}https://ui-avatars.com/api/?name={{ user.username|urlencode }}&background=198754&color=fff&size=128{% endif %}"
+                                             src="{% if user.profile_picture %}{{ user.profile_picture|thumbnail:'180x180' }}{% else %}https://ui-avatars.com/api/?name={{ user.username|urlencode }}&background=198754&color=fff&size=128{% endif %}"
                                              alt="{% trans 'Profile Picture' %}">
                                         <label for="profile-pic-input" class="profile-pic-edit-btn btn btn-success p-0" title="{% trans 'Change photo' %}">
                                             <i class="bi bi-camera-fill text-white"></i>

@@ -1,5 +1,6 @@
 {% load static %}
 {% load i18n %}
+{% load waste_filters %}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
@@ -261,7 +262,7 @@
                         -->
                         <span id="navbar-avatar-slot" class="d-inline-flex align-items-center me-1">
                             {% if user.profile_picture %}
-                                <img id="navbar-profile-pic" src="{{ user.profile_picture.url }}" alt="{% trans 'Profile' %}" class="navbar-profile-pic">
+                                <img id="navbar-profile-pic" src="{{ user.profile_picture|thumbnail:'32x32' }}" alt="{% trans 'Profile' %}" class="navbar-profile-pic">
                             {% else %}
                                 <i class="bi bi-person-circle" id="navbar-profile-pic-placeholder"></i>
                             {% endif %}

@@ -27,6 +27,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'role': self.user.role,
             'phone': self.user.phone,
         }
+        # Claim-by-email backup: a successful password login is proof this
+        # account owns guest_email rows. A claim failure must never block an
+        # otherwise-valid login, so swallow errors here (already logged
+        # downstream in claim_guest_requests_by_email).
+        try:
+            from api_app.views import claim_guest_requests_by_email
+            claim_guest_requests_by_email(self.user)
+        except Exception:
+            pass
         return data
 
 

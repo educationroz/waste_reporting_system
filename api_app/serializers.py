@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import serializers  # type: ignore
 
@@ -22,6 +23,10 @@ from .validators import (
     validate_image_file,
     validate_pdf_file,
 )
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -123,6 +128,16 @@ class WasteRequestSerializer(serializers.ModelSerializer):
     # perform_create() from the 'extra_photos' multipart key, read-only here.
     extra_photos = WasteRequestPhotoSerializer(many=True, read_only=True)
 
+    # Claim-by-email backup: writable on create only (immutable afterwards),
+    # and never returned in responses so guest emails don't leak to drivers
+    # or admins reading the list endpoint.
+    guest_email = serializers.EmailField(
+        write_only=True, required=False, allow_blank=True, allow_null=True,
+    )
+    guest_token = serializers.CharField(
+        write_only=True, required=False, allow_blank=True,
+    )
+
     class Meta:
         model = WasteRequest
         fields = (
@@ -138,6 +153,7 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             'completion_distance_meters', 'completion_flagged',
             'severity', 'severity_display', 'ml_confidence', 'needs_manual_review',
             'guest_token',  # for guest submissions that can later be claimed
+            'guest_email',  # write-only backup claim channel (never exposed in responses)
             'scheduled_date', 'completed_at',
             'notes', 'created_at', 'updated_at',
             'route_id', 'route_status',
@@ -174,9 +190,24 @@ class WasteRequestSerializer(serializers.ModelSerializer):
              data (the classic "valid JPEG + payload glued on" polyglot
              trick). The ML model reads this clean copy, never the
              original upload.
-          3. Run the ML gatekeeper on the sanitized copy.
-          4. compress_image — resize/re-encode for storage, AFTER the ML
-             check has passed, so the classifier always sees full quality.
+          3. Run the ML gatekeeper on the sanitized copy — NOW ASYNC (see
+             below) so uploads don't freeze the web worker on CPU inference.
+          4. compress_image — resize/re-encode for storage after the ML
+             check ran, so the classifier always sees full quality.
+
+        Async ML behaviour:
+        - The fast, always-synchronous steps (validate/sanitize/compress)
+          still run here in the request.
+        - Inference is scheduled on the background pool (api_app/tasks.py).
+          We wait up to ``ML_FAST_PATH_TIMEOUT`` seconds for it: if it
+          resolves in time, a *confidently* non-waste photo is hard-rejected
+          here, and a confident positive attaches its severity/confidence to
+          the row immediately.
+        - If inference is slower than the timeout (heavy load / cold model),
+          the request is NOT blocked: we default the row to
+          ``needs_manual_review=True`` and stash the sanitized image bytes on
+          the serializer so the view can schedule a background classification
+          that fills in the real severity/confidence right after the save.
         """
         if not file:
             return file
@@ -184,17 +215,49 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         validate_image_file(file)  # raises on spoofed/corrupt/oversized files
         clean_file = sanitize_image(file)
 
-        from ml_models.waste_classifier.inference import predict_waste
-        result = predict_waste(clean_file)
-        clean_file.seek(0)  # PIL/model read the file — reset pointer before compressing
+        # Fast-path inference with a bounded wait.
+        result = None
+        try:
+            from io import BytesIO
 
-        if not result['is_waste']:
-            raise serializers.ValidationError(
-                "This doesn't look like waste. Please upload a valid waste photo."
-            )
+            from .tasks import submit
+            from ml_models.waste_classifier.inference import predict_waste
 
-        # Stash the ML result so validate() can attach it to validated_data below
+            bytes_io = BytesIO()
+            clean_file.seek(0)
+            for chunk in iter(lambda: clean_file.read(65536), b''):
+                bytes_io.write(chunk)
+            image_bytes = bytes_io.getvalue()
+            clean_file.seek(0)
+
+            timeout = getattr(settings, 'ML_FAST_PATH_TIMEOUT', 1.5)
+            future = submit(predict_waste, BytesIO(image_bytes))
+            if timeout > 0:
+                try:
+                    result = future.result(timeout=timeout)
+                except BaseException:
+                    # Inference did not finish within the fast-path window —
+                    # don't block the request; defer to background update.
+                    result = None
+            else:
+                result = future.result()
+        except Exception:
+            # Model missing / import error / any ML failure must not break
+            # citizen reporting. Flag for manual review and move on.
+            logger.exception('[ML] fast-path inference unavailable; flagging for review.')
+            result = None
+
+        if result is not None:
+            if not result.get('is_waste'):
+                raise serializers.ValidationError(
+                    "This doesn't look like waste. Please upload a valid waste photo."
+                )
+
+        # Default pending state until the background task fills in the truth.
+        # result is None exactly when inference deferred (timeout/error) —
+        # that is the only case needing a background classification.
         self._ml_result = result
+        self._ml_bytes = image_bytes if result is None else None
 
         clean_file.seek(0)
         compressed_file = compress_image(clean_file)  # shrink for storage, ML already ran
@@ -210,6 +273,11 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             if not (-180 <= data['longitude'] <= 180):
                 raise serializers.ValidationError({'longitude': 'Longitude must be between -180 and 180'})
 
+        if 'guest_email' in data and data['guest_email'] in (None, ''):
+            # Client sent an empty string — normalize to NULL so the db_index
+            # stays usable and unclaimed rows aren't stuffed with blanks.
+            data.pop('guest_email')
+
         if 'photo_latitude' in data and data['photo_latitude'] is not None:
             if not (-90 <= data['photo_latitude'] <= 90):
                 raise serializers.ValidationError({'photo_latitude': 'Latitude must be between -90 and 90'})
@@ -218,18 +286,33 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             if not (-180 <= data['photo_longitude'] <= 180):
                 raise serializers.ValidationError({'photo_longitude': 'Longitude must be between -180 and 180'})
 
-        # Attach ML gatekeeper result (set in validate_photo above) so it gets saved
+        # Attach ML gatekeeper result (set in validate_photo above) so it gets saved.
+        # When inference deferred to the background (pending), default to
+        # "needs_manual_review" so an admin catches anything inconclusive before
+        # the async result lands.
         ml_result = getattr(self, '_ml_result', None)
         if ml_result:
             data['severity'] = ml_result['severity']
             data['ml_confidence'] = ml_result['confidence']
             data['needs_manual_review'] = ml_result['needs_manual_review']
+        else:
+            data['severity'] = None
+            data['ml_confidence'] = None
+            data['needs_manual_review'] = True
 
         return data
 
     # def create(self, validated_data):
     #     validated_data['user'] = self.context['request'].user
     #     return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # guest_token/guest_email identify how the row may be claimed; once set
+        # at creation they are immutable — an authenticated user must NOT be
+        # able to re-point a request at their own token/email via PATCH.
+        validated_data.pop('guest_token', None)
+        validated_data.pop('guest_email', None)
+        return super().update(instance, validated_data)
 
 
 class WasteRequestMinimalSerializer(serializers.ModelSerializer):

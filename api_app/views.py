@@ -14,7 +14,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import F, Q
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
 from django.utils import timezone
 from rest_framework import filters, status, viewsets  # type: ignore
 from rest_framework.decorators import action  # type: ignore
@@ -1333,6 +1333,49 @@ class AdminUserDeleteView(APIView):
             status=status.HTTP_200_OK,
         )
 
+def claim_guest_requests_by_email(user):
+    """
+    Claim-by-email backup for guest submissions.
+
+    A guest can leave their email at submission time (guest_email). If they
+    later clear browser data or switch devices, the localStorage guest_token
+    is gone and the normal token-based claim can't run. This helper links any
+    still-unowned request whose guest_email matches the user's email to their
+    account, so registering/logging in with the same email recovers the
+    report automatically.
+
+    Safe to call on every register/login — it is a no-op when there is
+    nothing to claim, and a request already claimed by token won't be
+    claimed twice (the user__isnull=True filter excludes it).
+
+    Returns the number of requests newly claimed.
+    """
+    if user is None or not user.is_authenticated:
+        return 0
+    email = (user.email or '').strip()
+    if not email:
+        return 0
+
+    qs = WasteRequest.objects.filter(guest_email__iexact=email, user__isnull=True)
+    unowned = list(qs)
+    claimed_count = qs.update(user=user)
+
+    if claimed_count and unowned:
+        for wr in unowned:
+            _create_notification(
+                user=user,
+                title='Request Linked to Your Account',
+                message=f'Your previously submitted report #{wr.id} is now linked to your account.',
+                notification_type='success',
+                related_request=wr,
+            )
+        logger.info(
+            f'[CLAIM_BY_EMAIL] user={user.id} ({email!r}) claimed '
+            f'{claimed_count} guest request(s): {[wr.id for wr in unowned]}'
+        )
+    return claimed_count
+
+
 class WasteRequestViewSet(viewsets.ModelViewSet):
     """
     Waste pickup requests.
@@ -1416,6 +1459,21 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         user = self.request.user if self.request.user.is_authenticated else None
         waste_request = serializer.save(user=user)
 
+        # Async ML classification: when the fast-path inference deferred
+        # (timeout / model unavailable), the request row is already saved with
+        # needs_manual_review=True. Schedule the background task now so the
+        # real severity/confidence is written back as soon as inference runs.
+        ml_bytes = getattr(serializer, '_ml_bytes', None)
+        if ml_bytes:
+            try:
+                from .tasks import run_ml_classification_async, submit
+                submit(run_ml_classification_async, waste_request.id, ml_bytes)
+            except Exception:
+                logger.warning(
+                    f'[ML] could not schedule background classification for '
+                    f'request={waste_request.id}; left flagged for manual review.'
+                )
+
         extra_files = self.request.FILES.getlist('extra_photos')
         extra_lats = self.request.POST.getlist('extra_photos_latitude')
         extra_lngs = self.request.POST.getlist('extra_photos_longitude')
@@ -1449,6 +1507,40 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 self.request, 'create', 'WasteRequest', waste_request,
                 f'{user.username} submitted pickup request #{waste_request.id}{photo_note}'
             )
+
+        # Claim-by-email backup for anonymous submissions: when the guest left
+        # an email, send a short confirmation so they know the report is safe,
+        # and how to attach it to their account later even if the
+        # browser-stored guest_token is lost. Failures are logged by
+        # send_mail_async, never raised into the request.
+        guest_email = getattr(waste_request, 'guest_email', None)
+        if user is None and guest_email and settings.DEFAULT_FROM_EMAIL:
+            try:
+                from django.urls import reverse
+                register_url = self.request.build_absolute_uri(reverse('register'))
+                login_url = self.request.build_absolute_uri(reverse('login'))
+                from .tasks import send_mail_async
+                send_mail_async(
+                    subject=f'Your waste report #{waste_request.id} was received',
+                    message=(
+                        f'Namaste,\n\n'
+                        f'Your waste pickup report #{waste_request.id} was received and is being processed.\n\n'
+                        f'Want to track it? Register or sign in with this email address:\n'
+                        f'{register_url}\n\n'
+                        f'Already have an account? Sign in here:\n'
+                        f'{login_url}\n\n'
+                        f'Your report will be linked to your account automatically when you use the '
+                        f'same email.\n\n'
+                        f'Thank you for keeping your community clean.'
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[guest_email],
+                )
+            except Exception:
+                logger.warning(
+                    f'[GUEST MAIL] could not send confirmation for request={waste_request.id} '
+                    f'(guest email present but unroutable).'
+                )
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def assign_driver(self, request, pk=None):
@@ -2706,3 +2798,71 @@ class ComplaintViewSet(viewsets.ModelViewSet):
             for c in qs.iterator(chunk_size=500)
         )
         return _write_csv_response('complaints.csv', header, rows)
+
+
+class _ThumbnailSource:
+    """Minimal FileField stand-in so generate_thumbnail() can work off a
+    storage path (used by the public ThumbnailView for JS-rendered tables)."""
+
+    def __init__(self, name):
+        from django.core.files.storage import default_storage
+        self.name = name
+        self.storage = default_storage
+
+    @property
+    def url(self):
+        return self.storage.url(self.name)
+
+
+class ThumbnailView(APIView):
+    """
+    GET /api/thumbnail/<WxH>/?path=<media-relative path>
+
+    Public on-demand thumbnail endpoint for client-side rendered tables
+    (admin/driver dashboards fetch JSON and build <img> tags in JS, so they
+    can't use the server-side template filter). Generates a cached resized
+    copy and streams it.
+
+    Security:
+    - 'path' must be a storage-relative name that actually exists / opens as
+      an image via Pillow; path traversal is not possible because we never
+      join the value to a filesystem root ourselves — it goes straight to the
+      configured storage backend.
+    - Repeated requests are O(1): the copy is cached under thumbnails/.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []  # resource is public media, no auth needed
+    throttle_scope = 'anon'
+
+    def get(self, request, size):
+        import re
+
+        from django.http import FileResponse, Http404
+
+        from .thumbnails import get_or_create_thumbnail
+
+        if not re.fullmatch(r'\d+x\d+', size):
+            raise Http404('Invalid thumbnail size.')
+        width, height = (int(part) for part in size.split('x'))
+        if width <= 0 or height <= 0 or max(width, height) > 2000:
+            raise Http404('Invalid thumbnail size.')
+
+        path = (request.query_params.get('path') or '').strip()
+        if not path or path.startswith('/') or '..' in path.split('/'):
+            raise Http404('Invalid path.')
+
+        source = _ThumbnailSource(path)
+        stored_name = get_or_create_thumbnail(source, f'{width}x{height}')
+        if not stored_name:
+            raise Http404('Thumbnail not available.')
+
+        try:
+            with source.storage.open(stored_name, 'rb') as fh:
+                content = fh.read()
+        except Exception:
+            raise Http404('Thumbnail not available.')
+
+        content_type = 'image/png' if stored_name.endswith('.png') else 'image/jpeg'
+        response = HttpResponse(content, content_type=content_type)
+        response['Cache-Control'] = 'public, max-age=31536000, immutable'
+        return response

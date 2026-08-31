@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
 {% load i18n %}
+{% load waste_filters %}
 {% block title %}{% trans "My Requests" %}{% endblock %}
 
 {% block extra_css %}
@@ -64,7 +65,7 @@
                                     <td>
                                         {% if req.photo %}
                                         <a href="{{ req.photo.url }}" target="_blank">
-                                            <img src="{{ req.photo.url }}" alt="{% trans 'photo' %}"
+                                            <img src="{{ req.photo|thumbnail:'48x48' }}" alt="{% trans 'photo' %}"
                                                 style="height:48px;width:48px;object-fit:cover;border-radius:4px;">
                                         </a>
                                         {% else %}

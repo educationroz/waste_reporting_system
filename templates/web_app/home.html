@@ -1,5 +1,6 @@
 {% extends 'web_app/base.html' %}
 {% load i18n %}
+{% load waste_filters %}
 {% block title %}{% trans "Home" %}{% endblock %}
 
 {% block extra_css %}
@@ -292,6 +293,19 @@
                             <textarea id="description" class="form-control" rows="2"
                                 placeholder="Describe the garbage..."></textarea>
                         </div>
+                        {% if not user.is_authenticated %}
+                        <div class="col-12">
+                            <label class="form-label" for="guest-email">{% trans "Email (optional)" %}</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-envelope"></i></span>
+                                <input type="email" id="guest-email" class="form-control" autocomplete="email"
+                                    placeholder="{% trans 'name@example.com' %}">
+                            </div>
+                            <div class="form-text">
+                                {% trans "Leave your email and this report is safe even if you clear this browser or switch devices — register or sign in with the same email later and it will appear under your requests automatically." %}
+                            </div>
+                        </div>
+                        {% endif %}
                         <div class="col-12">
                             {% if not user.is_authenticated %}
                            
@@ -363,7 +377,7 @@
                                 <td>
                                     {% if req.photo %}
                                     <a href="{{ req.photo.url }}" target="_blank">
-                                        <img src="{{ req.photo.url }}" alt="{% trans 'photo' %}"
+                                        <img src="{{ req.photo|thumbnail:'36x36' }}" alt="{% trans 'photo' %}"
                                             style="height:36px;width:36px;object-fit:cover;border-radius:4px;">
                                     </a>
                                     {% else %}

@@ -4,6 +4,7 @@ Full project settings. Uses python-decouple for .env management.
 pip install python-decouple
 """
 
+import logging
 import sys
 from pathlib import Path
 from datetime import timedelta
@@ -219,31 +220,62 @@ else:  # SQLite (default for development)
         )
 
 GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID', default='')
-# ─── Caching ───────────────────────────────────────────────────────────────────
-# Default: In-memory cache for development. Switch to Redis for production.
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'waste-management-cache',
-        'OPTIONS': {
-            'MAX_ENTRIES': 10000
-        },
-        'KEY_PREFIX': 'waste_',
-        'TIMEOUT': 300,  # 5 minutes default
-    }
-}
+# ─── Redis base config (used by both CACHES and the Channels layer) ─────────
+# USE_REDIS=true in production is REQUIRED (see the guard below). In dev it's
+# optional — without it the app uses LocMemCache + the in-memory channel
+# layer, which is fine for a single dev process.
+USE_REDIS = config('USE_REDIS', default=False, cast=bool)
+REDIS_HOST = config('REDIS_HOST', default='127.0.0.1')
+REDIS_PORT = config('REDIS_PORT', default=6379, cast=int)
+REDIS_PASSWORD = config('REDIS_PASSWORD', default='')
+REDIS_DB = config('REDIS_DB', default=1, cast=int)
 
-# For production, replace above with Redis:
-# CACHES = {
-#     'default': {
-#         'BACKEND': 'django_redis.cache.RedisCache',
-#         'LOCATION': 'redis://127.0.0.1:6379/1',
-#         'OPTIONS': {
-#             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-#             'CONNECTION_POOL_KWARGS': {'max_connections': 50}
-#         }
-#     }
-# }
+
+def _redis_url():
+    host = REDIS_HOST or '127.0.0.1'
+    port = REDIS_PORT or 6379
+    db = REDIS_DB or 1
+    if REDIS_PASSWORD:
+        return f'redis://:{REDIS_PASSWORD}@{host}:{port}/{db}'
+    return f'redis://{host}:{port}/{db}'
+
+
+# ─── Caching ───────────────────────────────────────────────────────────────────
+# Development: in-memory cache. Production: Redis — SHARED across workers.
+# A per-worker LocMemCache silently breaks cache_utils (each worker writes its
+# own slice and reads a different one), so production REQUIRES Redis and the
+# guard below refuses to start without it (see the DB guard above for the
+# same pattern).
+CACHES = (
+    {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': _redis_url(),
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'CONNECTION_POOL_KWARGS': {'max_connections': 50},
+                # Strict: if Redis is down, fail loudly instead of silently
+                # degrading to a broken per-worker cache.
+                'IGNORE_EXCEPTIONS': False,
+            },
+            'KEY_PREFIX': 'waste_',
+            'TIMEOUT': 300,  # 5 minutes default
+        }
+    }
+    if USE_REDIS
+    else
+    {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'waste-management-cache',
+            'OPTIONS': {
+                'MAX_ENTRIES': 10000
+            },
+            'KEY_PREFIX': 'waste_',
+            'TIMEOUT': 300,  # 5 minutes default
+        }
+    }
+)
 
 # ─── Custom User Model ────────────────────────────────────────────────────────
 AUTH_USER_MODEL = 'auth_app.User'
@@ -317,17 +349,14 @@ SIMPLE_JWT = {
 
 # ─── Channels Layer ────────────────────────────────────────────────────────────
 # Redis backend requires Redis 5.0+ (BZPOPMIN support).
-# For local development, the project now safely falls back to the in-memory backend
-# when Redis support is unavailable or when USE_REDIS is not enabled.
-USE_REDIS = config('USE_REDIS', default=False, cast=bool)
-REDIS_HOST = config('REDIS_HOST', default='127.0.0.1')
-REDIS_PORT = config('REDIS_PORT', default=6379, cast=int)
-REDIS_PASSWORD = config('REDIS_PASSWORD', default='')
-
+# Production MUST use USE_REDIS=true (guard below); dev falls back to the
+# in-memory channel layer when USE_REDIS is off.
 if USE_REDIS:
     try:
         import channels_redis  # noqa: F401
     except ImportError:
+        if not DEBUG:
+            raise
         USE_REDIS = False
 
 if USE_REDIS:
@@ -340,6 +369,7 @@ if USE_REDIS:
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
                 'hosts': [redis_host_config],
+                'capacity': 1000,
             },
         },
     }
@@ -349,6 +379,23 @@ else:
             'BACKEND': 'channels.layers.InMemoryChannelLayer',
         },
     }
+
+# ─── Production guard: Redis is mandatory, not optional ───────────────────────
+# A per-process in-memory cache and in-memory channel layer look fine in dev
+# but silently break multi-worker deployments (each worker keeps its own
+# cache slice; notifications only reach clients on the same worker). Like the
+# SQLite guard above, refuse to start in production unless Redis is configured.
+# The 'test'/'pytest' clause exempts the test runner (which forces DEBUG=False).
+if not DEBUG and not USE_REDIS and not any(
+    tool in sys.argv[0:1] or tool in sys.argv[1:2]
+    for tool in ('test', 'pytest')
+):
+    raise ImproperlyConfigured(
+        'USE_REDIS must be true in production: a per-worker LocMemCache and '
+        'in-memory channel layer break caching and WebSocket notifications '
+        'across multiple workers. Set USE_REDIS=true (plus REDIS_HOST/'
+        'REDIS_PORT/REDIS_PASSWORD/REDIS_DB) in the environment.'
+    )
 
 # ─── WebSocket limits ─────────────────────────────────────────────────────────
 # DRF's throttles only run in the HTTP cycle, so WebSockets bypass them
@@ -382,16 +429,31 @@ WS_EXEMPT_STAFF = config('WS_EXEMPT_STAFF', default=False, cast=bool)
 # output stays readable.
 LOG_LEVEL = config('LOG_LEVEL', default='INFO' if DEBUG else 'WARNING')
 
+# Optional file handler for on-host log retention (e.g. set LOG_FILE=trace.log
+# in dev; leave empty in containers where stdout is aggregated instead). The
+# file holds exception-only records so it doesn't grow unbounded.
+LOG_FILE = config('LOG_FILE', default='')
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
+        # Human-readable for dev consoles…
         'simple': {'format': '{levelname} {name}: {message}', 'style': '{'},
+        # …and single-line JSON for prod / log aggregation.
+        'json': {
+            '()': 'waste_system.logging_config.JsonFormatter',
+        },
+    },
+    'filters': {
+        'exceptions_only': {
+            '()': 'waste_system.logging_config.ExceptionsOnlyFilter',
+        },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'simple',
+            'formatter': 'json' if not DEBUG else 'simple',
         },
     },
     'root': {'handlers': ['console'], 'level': 'WARNING'},
@@ -399,12 +461,58 @@ LOGGING = {
         # Application loggers.
         'notif_debug': {'handlers': ['console'], 'level': LOG_LEVEL, 'propagate': False},
         'backup': {'handlers': ['console'], 'level': LOG_LEVEL, 'propagate': False},
+        'api_app': {'handlers': ['console'], 'level': LOG_LEVEL, 'propagate': False},
         # django.request logs a WARNING for every 4xx. Those are normal here —
         # the test suite deliberately asserts 401/403/404 responses — so keep
         # them at ERROR to avoid drowning real problems.
         'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
     },
 }
+
+if LOG_FILE:
+    LOGGING['handlers']['file'] = {
+        'class': 'logging.handlers.RotatingFileHandler',
+        'filename': LOG_FILE,
+        'maxBytes': 10 * 1024 * 1024,   # 10MB
+        'backupCount': 3,
+        'formatter': 'json',
+        'filters': ['exceptions_only'],
+        'level': 'ERROR',
+    }
+    LOGGING['root']['handlers'] = ['console', 'file']
+    for _logger_cfg in LOGGING['loggers'].values():
+        if 'console' in _logger_cfg.get('handlers', []):
+            _logger_cfg['handlers'] = _logger_cfg['handlers'] + ['file']
+
+# ─── Error tracking (Sentry) ──────────────────────────────────────────────────
+# Optional, opt-in via SENTRY_DSN. When unset nothing is sent and the
+# sentry-sdk import is skipped entirely. When set, the Django integration
+# captures unhandled exceptions, logging records and release info so
+# production errors are visible without SSH-ing into the box.
+SENTRY_DSN = config('SENTRY_DSN', default='')
+
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
+
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[
+                DjangoIntegration(),
+                LoggingIntegration(
+                    level=logging.WARNING,       # capture warning+ via LoggingIntegration
+                    event_level=logging.ERROR,   # create an event for ERROR+ messages
+                ),
+            ],
+            traces_sample_rate=float(config('SENTRY_TRACES_SAMPLE_RATE', default=0.0)),
+            send_default_pii=True,               # user id/email in events to help triage
+            environment='production' if not DEBUG else 'development',
+        )
+    except ImportError:
+        # DSN set but sentry-sdk not installed yet — do not take the site down.
+        pass
 
 # ─── Health checks ──────────────────────────────────────────────────────────
 # /healthz readiness + /healthz/live liveness probes (waste_system/health.py).
@@ -448,8 +556,39 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Media storage backend: 'local' (FileSystemStorage under MEDIA_ROOT) or 's3'
+# (django-storages S3). Local is the default and fine for single-server;
+# 's3' enables horizontal scaling + a CDN edge. When MEDIA_BACKEND=s3 the
+# AWS_* variables are required and startup fails loudly if django-storages is
+# missing or the bucket name is empty.
+MEDIA_BACKEND = config('MEDIA_BACKEND', default='local')
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+if MEDIA_BACKEND == 's3':
+    try:
+        import storages  # noqa: F401
+    except ImportError:
+        if not DEBUG:
+            raise ImproperlyConfigured(
+                'MEDIA_BACKEND=s3 requires django-storages. Install with '
+                '`pip install -r requirements.txt` (it is already listed there).'
+            )
+    AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID', default='')
+    AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default='')
+    AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='')
+    AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='')
+    AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default='')  # MinIO / Backblaze / DigitalOcean
+    AWS_QUERYSTRING_AUTH = config('AWS_QUERYSTRING_AUTH', default=False, cast=bool)
+    AWS_S3_FILE_OVERWRITE = False
+
+    if not DEBUG and not AWS_STORAGE_BUCKET_NAME:
+        raise ImproperlyConfigured(
+            'MEDIA_BACKEND=s3 is set but AWS_STORAGE_BUCKET_NAME is empty. '
+            'Set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_STORAGE_BUCKET_NAME '
+            '(and AWS_S3_REGION_NAME) in the environment.'
+        )
 
 # WhiteNoise serves /static/ in production, where Django's dev static handler
 # is switched off (urls.py only mounts it when DEBUG is True). Compressed but
@@ -458,19 +597,21 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # inline scripts use. Requires `python manage.py collectstatic --noinput` at
 # deploy time (run.sh does this).
 STORAGES = {
-    # 'default' is REQUIRED — Django 5.2 raises InvalidStorageError if missing.
-    # The default backend is FileSystemStorage, i.e. uploads go to MEDIA_ROOT.
-    # (FileField/ImageField and default_storage all consult this key.)
     'default': {
-        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        'BACKEND': (
+            'storages.backends.s3.S3Storage'
+            if MEDIA_BACKEND == 's3'
+            else 'django.core.files.storage.FileSystemStorage'
+        ),
     },
     'staticfiles': {
         'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
     },
 }
-# /media/ (uploaded photos, licence PDFs) is still served by Django only in
-# DEBUG. In production, nginx (or a CDN/S3) must alias it — see the deploy
-# notes in HEALTHCHECK.md.
+# /media/ (uploaded photos, licence PDFs) is served by Django only in DEBUG.
+# In production with MEDIA_BACKEND=local, nginx (or a CDN) must alias it —
+# see the deploy notes in HEALTHCHECK.md. With MEDIA_BACKEND=s3 the files
+# live in the bucket and are served from there.
 
 # ─── File Upload Security ─────────────────────────────────────────────────────
 # Per-photo cap — validators.py's MAX_IMAGE_SIZE reads this value directly
@@ -480,9 +621,35 @@ STORAGES = {
 MAX_PHOTO_SIZE = 3 * 1024 * 1024          # 3MB per individual photo
 
 # Hard server-side cap on how many 'extra_photos' a single WasteRequest can
-# attach — views.py's WasteRequestViewSet.create() rejects anything over
-# this BEFORE the request is processed or any ML inference runs.
+# attach — views.py's WasteRequestViewSet.create() rejects anything over this
+# BEFORE the request is processed or any ML inference runs.
 MAX_EXTRA_PHOTOS = 5
+
+# ─── Async ML classification ────────────────────────────────────────────────
+# The ML waste classifier (torch + torchvision MobileNet) used to run
+# synchronously inside the upload request path, blocking the web worker for
+# the whole inference window. It now runs on a background thread pool
+# (api_app/tasks.py) so uploads return fast and the result is written back
+# asynchronously (flagged for admin review if inconclusive).
+#
+# ML_MAX_WORKERS:
+#   Number of background threads for inference. 0 disables background
+#   execution entirely (inference runs synchronously in the request, the old
+#   behaviour). Keep small — the model is CPU-bound; oversized pools only
+#   thrash caches. Default 2.
+#
+# ML_FAST_PATH_TIMEOUT:
+#   The serializer waits up to this many seconds for a fast inference result
+#   so that a *confidently* non-waste photo can still be hard-rejected at
+#   upload time. If inference takes longer (heavy load), the request returns
+#   immediately and the row is flagged needs_manual_review for an admin.
+ML_MAX_WORKERS = config('ML_MAX_WORKERS', default=2, cast=int)
+ML_FAST_PATH_TIMEOUT = config('ML_FAST_PATH_TIMEOUT', default=1.5, cast=float)
+
+# Emails (verification, password reset, notifications) are sent on a small
+# background pool so SMTP latency never blocks an HTTP request. 0 re-enables
+# synchronous sending.
+EMAIL_MAX_WORKERS = config('EMAIL_MAX_WORKERS', default=2, cast=int)
 
 # Reconciled against MAX_PHOTO_SIZE above: previously this was 5MB total
 # while each photo was independently allowed up to 5MB, so 2+ photos in one

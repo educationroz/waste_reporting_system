@@ -1,5 +1,6 @@
 {% load static %}
 {% load i18n %}
+{% load waste_filters %}
 
 <div class="card shadow-sm border-0 sidebar-card">
     <div class="card-body">
@@ -36,7 +37,7 @@
                 -->
                 <span class="sidebar-avatar" id="sidebar-avatar-slot">
                     {% if user.profile_picture %}
-                        <img src="{{ user.profile_picture.url }}" alt="{{ user.username }}">
+                        <img src="{{ user.profile_picture|thumbnail:'48x48' }}" alt="{{ user.username }}">
                     {% else %}
                         {{ user.username|slice:":1"|upper }}
                     {% endif %}
