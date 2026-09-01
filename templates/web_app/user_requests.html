@@ -5,11 +5,156 @@
 
 {% block extra_css %}
 <style>
-    /* sidebar layout/CSS ab partials/sidebar.html (ra base.html) bata
-       aauँcha, yaha duplicate gareko chaina. */
     .nav-pills .nav-link:not(.active):hover {
         background-color: #f8f9fa;
         color: #198754 !important;
+    }
+
+    /* ── Status Timeline ──────────────────────────────────────────── */
+    .status-timeline {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        position: relative;
+        margin: 8px 0 4px;
+        padding: 0;
+        flex-wrap: nowrap;
+    }
+    .status-timeline::before {
+        content: "";
+        position: absolute;
+        top: 14px;
+        left: 40px;
+        right: 40px;
+        height: 3px;
+        background: #e9ecef;
+        border-radius: 3px;
+    }
+    .timeline-step {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 20%;
+        text-align: center;
+        gap: 4px;
+    }
+    .timeline-dot {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #e9ecef;
+        border: 2px solid #ced4da;
+        color: #adb5bd;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+    }
+    .timeline-step.done .timeline-dot {
+        background: #198754;
+        border-color: #198754;
+        color: #fff;
+    }
+    .timeline-step.current .timeline-dot {
+        background: #0d6efd;
+        border-color: #0d6efd;
+        color: #fff;
+        box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.2);
+    }
+    .timeline-step.cancelled .timeline-dot {
+        background: #dc3545;
+        border-color: #dc3545;
+        color: #fff;
+    }
+    .timeline-label {
+        font-size: 0.72rem;
+        color: #6c757d;
+        line-height: 1.1;
+    }
+    .timeline-step.done .timeline-label,
+    .timeline-step.current .timeline-label {
+        color: #212529;
+        font-weight: 600;
+    }
+
+    /* ── Photo gallery thumbnails ─────────────────────────────────── */
+    .extra-photo-thumb {
+        width: 56px;
+        height: 56px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid var(--border-color, #dee2e6);
+        cursor: pointer;
+        transition: transform 0.15s ease;
+    }
+    .extra-photo-thumb:hover {
+        transform: scale(1.08);
+    }
+
+    /* ── Lightbox ─────────────────────────────────────────────────── */
+    .photo-lightbox {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 2400;
+        background: rgba(0, 0, 0, 0.85);
+        align-items: center;
+        justify-content: center;
+    }
+    .photo-lightbox.show {
+        display: flex;
+    }
+    .photo-lightbox img {
+        max-width: 92vw;
+        max-height: 86vh;
+        border-radius: 8px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+    .photo-lightbox .lightbox-close {
+        position: absolute;
+        top: 16px;
+        right: 20px;
+        font-size: 2rem;
+        color: #fff;
+        background: none;
+        border: none;
+        cursor: pointer;
+    }
+    .photo-lightbox .lightbox-nav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 2.2rem;
+        color: #fff;
+        background: rgba(255,255,255,0.12);
+        border: none;
+        border-radius: 50%;
+        width: 52px;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+    .photo-lightbox .lightbox-nav.prev { left: 16px; }
+    .photo-lightbox .lightbox-nav.next { right: 16px; }
+
+    /* ── modal photo gallery ──────────────────────────────────────── */
+    .gallery-modal-img {
+        width: 100%;
+        max-height: 260px;
+        object-fit: cover;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    /* ── Map modal ────────────────────────────────────────────────── */
+    #my-map {
+        height: 420px;
+        width: 100%;
+        border-radius: 10px;
     }
 </style>
 {% endblock %}
@@ -28,7 +173,56 @@
         <!-- ── २. मुख्य सामाग्री (Main Content Area) ── -->
         <div class="content-col">
 
-            <h2 class="mb-4"><i class="bi bi-clipboard text-success me-2"></i>{% trans "My Requests" %}</h2>
+            <div class="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 mb-3">
+                <div>
+                    <h2 class="mb-1 fw-bold text-dark"><i class="bi bi-clipboard text-success me-2"></i>{% trans "My Requests" %}</h2>
+                    <p class="text-muted mb-0">{% trans "Track, view photos, and manage your waste pickup requests." %}</p>
+                </div>
+                <div class="d-flex gap-2 flex-shrink-0">
+                    <button class="btn btn-outline-primary" id="openMapBtn" {% if not has_located_requests %}disabled{% endif %}>
+                        <i class="bi bi-geo-alt me-1"></i>{% trans "Map View" %}
+                    </button>
+                    <button class="btn btn-outline-danger" id="bulkDeleteBtn" disabled onclick="bulkSoftDelete()">
+                        <i class="bi bi-trash3 me-1"></i>{% trans "Delete Selected" %}
+                        <span id="bulkSelectedCount"></span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Search & Filter ────────────────────────────────────── -->
+            <form method="get" class="card shadow-sm mb-3" id="filterForm">
+                <div class="card-body py-3">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label small text-muted mb-1" for="searchInput">{% trans "Search" %}</label>
+                            <input type="text" class="form-control" id="searchInput" name="search"
+                                value="{{ current_search }}"
+                                placeholder="{% trans 'Address, description, or request ID...' %}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-1" for="statusSelect">{% trans "Status" %}</label>
+                            <select class="form-select" id="statusSelect" name="status">
+                                <option value="">{% trans "All Statuses" %}</option>
+                                {% for value, label in status_choices %}
+                                <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted mb-1" for="wasteTypeSelect">{% trans "Waste Type" %}</label>
+                            <select class="form-select" id="wasteTypeSelect" name="waste_type">
+                                <option value="">{% trans "All Types" %}</option>
+                                {% for value, label in waste_type_choices %}
+                                <option value="{{ value }}" {% if current_waste_type == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-success w-100"><i class="bi bi-search me-1"></i>{% trans "Filter" %}</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
 
             <!-- Requests Table -->
             <div class="card shadow-sm">
@@ -37,19 +231,30 @@
                         <table class="table table-hover mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
+                                    <th style="width:40px;">
+                                        <input type="checkbox" id="selectAllRows" class="form-check-input">
+                                    </th>
                                     <th>#</th>
                                     <th>{% trans "Waste Type" %}</th>
                                     <th>{% trans "Status" %}</th>
+                                    <th>{% trans "Progress" %}</th>
                                     <th>{% trans "Driver" %}</th>
-                                    <th>{% trans "Photo" %}</th>
+                                    <th>{% trans "Photos" %}</th>
                                     <th>{% trans "Scheduled" %}</th>
                                     <th>{% trans "Actions" %}</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="requests-tbody">
                                 {% for req in requests %}
                                 <tr id="request-row-{{ req.id }}">
-                                    <td>{{ req.id }}</td>
+                                    <td>
+                                        {% if req.status == 'pending' or req.status == 'cancelled' or req.status == 'completed' %}
+                                        <input type="checkbox" class="form-check-input row-checkbox" value="{{ req.id }}" data-deletable="1">
+                                        {% else %}
+                                        <input type="checkbox" class="form-check-input row-checkbox" value="{{ req.id }}" disabled>
+                                        {% endif %}
+                                    </td>
+                                    <td><a href="#" class="text-decoration-none" onclick="openDetailModal({{ req.id }}); return false;">#{{ req.id }}</a></td>
                                     <td>{{ req.get_waste_type_display }}</td>
                                     <td>
                                         <span class="badge
@@ -61,34 +266,57 @@
                                             {{ req.get_status_display }}
                                         </span>
                                     </td>
+                                    <td style="min-width:220px;">
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="openDetailModal({{ req.id }})">
+                                            <i class="bi bi-list-check me-1"></i>{% trans "Timeline" %}
+                                        </button>
+                                    </td>
                                     <td class="small">{{ req.driver.user.username|default:"—" }}</td>
                                     <td>
-                                        {% if req.photo %}
-                                        <a href="{{ req.photo.url }}" target="_blank">
+                                        <div class="d-flex align-items-center gap-1">
+                                            {% if req.photo %}
                                             <img src="{{ req.photo|thumbnail:'48x48' }}" alt="{% trans 'photo' %}"
-                                                style="height:48px;width:48px;object-fit:cover;border-radius:4px;">
-                                        </a>
-                                        {% else %}
-                                        <span class="text-muted small">—</span>
-                                        {% endif %}
+                                                class="extra-photo-thumb" style="height:48px;width:48px;"
+                                                onclick="openPhotoLightbox({{ req.id }}, 0)">
+                                            {% endif %}
+                                            {% with req.extra_photos.all as extras %}
+                                            {% if extras %}
+                                                <span class="badge bg-secondary ms-1" title="{{ extras|length }} {% trans 'more photo(s)' %}"
+                                                    onclick="openDetailModal({{ req.id }})" style="cursor:pointer;">
+                                                    +{{ extras|length }}
+                                                </span>
+                                            {% endif %}
+                                            {% endwith %}
+                                        </div>
                                     </td>
                                     <td class="small text-muted">{{ req.scheduled_date|date:"d M Y, H:i" }}</td>
                                     <td>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="openDetailModal({{ req.id }})" title="{% trans 'View details' %}">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
                                         {% if req.status == 'pending' %}
                                         <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest({{ req.id }}, this)">
                                             {% trans "Cancel" %}
                                         </button>
                                         {% elif req.status == 'completed' or req.status == 'cancelled' %}
                                         <button class="btn btn-sm btn-outline-danger" onclick="deleteRequest({{ req.id }}, this)">
-                                            <i class="bi bi-trash3"></i> {% trans "Delete" %}
+                                            <i class="bi bi-trash3"></i>
                                         </button>
-                                        {% else %}
-                                        —
                                         {% endif %}
                                     </td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="7" class="text-center text-muted py-3">{% trans "You haven't submitted any requests yet." %}</td></tr>
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted py-5">
+                                        {% if current_status or current_waste_type or current_search %}
+                                        <i class="bi bi-search fs-2 mb-2 d-block text-secondary"></i>
+                                        {% trans "No requests match your filters." %}
+                                        {% else %}
+                                        <i class="bi bi-clipboard fs-2 mb-2 d-block text-secondary"></i>
+                                        {% trans "You haven't submitted any requests yet." %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -96,19 +324,339 @@
                 </div>
             </div>
 
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <nav class="mt-3" aria-label="Page navigation">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_waste_type %}&waste_type={{ current_waste_type }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">{% trans "Previous" %}</a></li>
+                    {% endif %}
+                    <li class="page-item disabled"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_waste_type %}&waste_type={{ current_waste_type }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">{% trans "Next" %}</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
         </div> <!-- /मुख्य सामाग्री -->
     </div> <!-- /layout-wrapper -->
+</div>
+
+<!-- ── Detail / Timeline Modal ─────────────────────────────────────────── -->
+<div class="modal fade" id="requestDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px; background: var(--bg-card,#fff);">
+            <div class="modal-header border-0 pt-3 px-4">
+                <h5 class="modal-title fw-bold" id="detailModalTitle">{% trans "Request Details" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body px-4 pb-4" id="detailModalBody"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── My Requests Map Modal ──────────────────────────────────────────── -->
+<div class="modal fade" id="myRequestsMapModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px; background: var(--bg-card,#fff);">
+            <div class="modal-header border-0 pt-3 px-4">
+                <h5 class="modal-title fw-bold"><i class="bi bi-geo-alt text-success me-1"></i>{% trans "My Requests Map" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                {% if located_requests_json %}
+                <div id="my-map"></div>
+                <div class="d-flex flex-wrap gap-2 mt-2 small">
+                    <span class="badge bg-success">{% trans "Completed" %}</span>
+                    <span class="badge bg-warning text-dark">{% trans "Pending" %}</span>
+                    <span class="badge bg-info">{% trans "In Progress" %}</span>
+                    <span class="badge bg-primary">{% trans "Assigned" %}</span>
+                    <span class="badge bg-danger">{% trans "Cancelled" %}</span>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">{% trans "No located requests to show on the map." %}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Photo Lightbox ─────────────────────────────────────────────────── -->
+<div class="photo-lightbox" id="photoLightbox" onclick="closeLightbox()">
+    <button class="lightbox-close" onclick="event.stopPropagation(); closeLightbox()">&times;</button>
+    <button class="lightbox-nav prev" onclick="event.stopPropagation(); lightboxNav(-1)">&#10094;</button>
+    <img id="lightboxImg" src="" alt="{% trans 'Photo' %}">
+    <button class="lightbox-nav next" onclick="event.stopPropagation(); lightboxNav(1)">&#10095;</button>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script nonce="{{ csp_nonce }}">
 (function() {
+    // ── Server-rendered data for JS features ──────────────────────────
+    // Requests serialized for the detail modal + map (paginated page only
+    // includes the current page's rows). To map/show ALL of a user's
+    // requests we'd fetch the API; here we use the page rows for the map
+    // legend + detail modal.
+    const SOCIAL_STATUS_ORDER = ['pending', 'assigned', 'in_progress', 'completed'];
+    const STATUS_LABELS = {
+        pending: '{{ _("Pending")|escapejs }}', assigned: '{{ _("Assigned")|escapejs }}',
+        in_progress: '{{ _("In Progress")|escapejs }}', completed: '{{ _("Completed")|escapejs }}',
+        cancelled: '{{ _("Cancelled")|escapejs }}',
+    };
+
+    // Build a lightweight per-request lookup from the rendered rows.
+    // We re-read DOM rows because it's the source of truth and avoids an
+    // extra API round-trip; extra_photos are embedded as data attributes.
+    const requestsById = new Map();
+    document.querySelectorAll('#requests-tbody tr[id^="request-row-"]').forEach(function(row) {
+        const id = parseInt(row.id.replace('request-row-', ''), 10);
+        const statusEl = row.querySelector('.badge');
+        requestsById.set(id, {
+            id: id,
+            status: (statusEl && statusEl.dataset.status) || (function(){
+                const txt = statusEl ? statusEl.textContent.trim() : '';
+                const entry = Object.entries(STATUS_LABELS).find(([k,v]) => v === txt);
+                return entry ? entry[0] : 'pending';
+            })(),
+            scheduled: row.children[7] ? row.children[7].textContent.trim() : '',
+        });
+    });
+
+    // ── Status timeline rendering ─────────────────────────────────────
+    function statusStep(status) {
+        if (status === 'cancelled') return 'cancelled';
+        const idx = SOCIAL_STATUS_ORDER.indexOf(status);
+        return idx >= 0 ? idx : -1;
+    }
+
+    function renderTimeline(status) {
+        const currentIdx = statusStep(status);
+        let html = '<div class="status-timeline">';
+        SOCIAL_STATUS_ORDER.forEach(function(s, i) {
+            let cls = 'timeline-step';
+            let icon = 'bi-dot';
+            if (status === 'cancelled') {
+                cls += ' cancelled';
+                icon = 'bi-x-lg';
+            } else if (i < currentIdx) {
+                cls += ' done';
+                icon = 'bi-check-lg';
+            } else if (i === currentIdx) {
+                cls += ' current';
+                icon = i === 0 ? 'bi-send' : (i === 1 ? 'bi-person-check' : (i === 2 ? 'bi-truck' : 'bi-check-lg'));
+            }
+            html += '<div class="' + cls + '">';
+            html += '<div class="timeline-dot"><i class="bi ' + icon + '"></i></div>';
+            html += '<div class="timeline-label">' + (STATUS_LABELS[s] || s) + '</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+        if (status === 'cancelled') {
+            html += '<div class="alert alert-danger py-2 mt-2 small"><i class="bi bi-x-circle me-1"></i>' + gettext('This request was cancelled.') + '</div>';
+        } else if (currentIdx >= 0) {
+            const stepLabels = [gettext('Reported'), gettext('Driver assigned'), gettext('Collection in progress'), gettext('Waste collected')];
+            html += '<p class="text-muted small mt-2 mb-0"><i class="bi bi-info-circle me-1"></i>' + stepLabels[currentIdx] + '</p>';
+        }
+        return html;
+    }
+
+    // ── Detail modal ──────────────────────────────────────────────────
+    window.openDetailModal = async function(requestId) {
+        const body = document.getElementById('detailModalBody');
+        const title = document.getElementById('detailModalTitle');
+        if (!body) return;
+        title.textContent = gettext('Request') + ' #' + requestId;
+        body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-success" role="status"></div></div>';
+        const modalEl = document.getElementById('requestDetailModal');
+        const bsModal = new bootstrap.Modal(modalEl, {});
+        bsModal.show();
+
+        try {
+            const data = await API.get('/api/waste-requests/' + requestId + '/');
+            if (!data) { body.innerHTML = '<p class="text-danger">' + gettext('Failed to load request.') + '</p>'; return; }
+
+            // Timeline (from status)
+            const status = data.status || 'pending';
+            const timelineHtml = renderTimeline(status);
+
+            // Photos gallery: primary + extra
+            let galleryHtml = '';
+            const allPhotos = [];
+            if (data.photo) allPhotos.push(data.photo);
+            (data.extra_photos || []).forEach(function(p) { if (p && p.photo) allPhotos.push(p.photo); });
+            if (allPhotos.length) {
+                galleryHtml = '<div class="row g-2 mb-3">';
+                allPhotos.forEach(function(url, i) {
+                    galleryHtml += '<div class="col-3">';
+                    galleryHtml += '<img src="' + url + '" class="gallery-modal-img" onclick="openPhotoLightboxById(' + requestId + ',' + i + ')" alt="' + gettext('photo') + '">';
+                    galleryHtml += '</div>';
+                });
+                galleryHtml += '</div>';
+            } else {
+                galleryHtml = '<p class="text-muted small">' + gettext('No photos attached.') + '</p>';
+            }
+
+            // Store photos for this request so lightbox can navigate
+            window._detailPhotos = window._detailPhotos || {};
+            window._detailPhotos[requestId] = allPhotos;
+
+            body.innerHTML = `
+                ${timelineHtml}
+                <hr>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="small text-muted">${gettext('Waste Type')}</div>
+                        <div class="fw-semibold">${esc(data.waste_type_display || data.waste_type || '—')}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small text-muted">${gettext('Status')}</div>
+                        <div class="fw-semibold">${esc(data.status_display || data.status || '—')}</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="small text-muted">${gettext('Pickup Address')}</div>
+                        <div class="fw-semibold">${esc(data.pickup_address || '—')}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small text-muted">${gettext('Driver')}</div>
+                        <div class="fw-semibold">${esc((data.driver_detail && data.driver_detail.user && data.driver_detail.user.username) || data.driver || '—')}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small text-muted">${gettext('Severity')}</div>
+                        <div class="fw-semibold">${esc(data.severity_display || data.severity || '—')}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small text-muted">${gettext('Scheduled')}</div>
+                        <div class="fw-semibold">${esc(data.scheduled_date || '—')}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small text-muted">${gettext('Completed')}</div>
+                        <div class="fw-semibold">${esc(data.completed_at || '—')}</div>
+                    </div>
+                    ${data.description ? `<div class="col-12"><div class="small text-muted">${gettext('Description')}</div><div>${esc(data.description)}</div></div>` : ''}
+                    <div class="col-12">
+                        <div class="small text-muted mb-1">${gettext('Photos')}</div>
+                        ${galleryHtml}
+                    </div>
+                </div>`;
+            // Escape helper (available in this scope)
+            function esc(s) { return s == null ? '—' : String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+        } catch (e) {
+            console.error(e);
+            body.innerHTML = '<p class="text-danger">' + gettext('Error loading request details.') + '</p>';
+        }
+    };
+
+    // ── Photo lightbox (from request photo rows) ─────────────────────
+    window.openPhotoLightbox = function(requestId, index) {
+        const list = (window._detailPhotos && window._detailPhotos[requestId]) || [];
+        const imgs = document.querySelectorAll('#requests-tbody tr[id="request-row-' + requestId + '"] img, #requestDetailModal .gallery-modal-img');
+        list.push.apply(list, Array.from(imgs).map(function(i){ return i.getAttribute('src'); }).filter(Boolean));
+        window._detailPhotos[requestId] = list;
+        openLightboxAt(requestId, index);
+    };
+
+    window.openPhotoLightboxById = function(requestId, index) {
+        openLightboxAt(requestId, index);
+    };
+
+    let lbRequestId = null, lbIndex = 0;
+    function openLightboxAt(requestId, index) {
+        const list = (window._detailPhotos && window._detailPhotos[requestId]) || [];
+        if (!list.length) return;
+        lbRequestId = requestId;
+        lbIndex = index;
+        showLightboxImage();
+        document.getElementById('photoLightbox').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+    function showLightboxImage() {
+        const list = (window._detailPhotos && window._detailPhotos[lbRequestId]) || [];
+        if (!list.length) return;
+        document.getElementById('lightboxImg').src = list[lbIndex % list.length];
+    }
+    window.closeLightbox = function() {
+        document.getElementById('photoLightbox').classList.remove('show');
+        document.body.style.overflow = '';
+    };
+    window.lightboxNav = function(dir) {
+        const list = (window._detailPhotos && window._detailPhotos[lbRequestId]) || [];
+        if (!list.length) return;
+        lbIndex = (lbIndex + dir + list.length) % list.length;
+        showLightboxImage();
+    };
+    document.addEventListener('keydown', function(e) {
+        if (!document.getElementById('photoLightbox').classList.contains('show')) return;
+        if (e.key === 'Escape') closeLightbox();
+        if (e.key === 'ArrowLeft') window.lightboxNav(-1);
+        if (e.key === 'ArrowRight') window.lightboxNav(1);
+    });
+
+    // ── Bulk soft-delete ──────────────────────────────────────────────
+    const bulkBtn = document.getElementById('bulkDeleteBtn');
+    const selectAllChk = document.getElementById('selectAllRows');
+    function refreshBulkState() {
+        const checked = document.querySelectorAll('.row-checkbox:checked');
+        const count = checked.length;
+        if (bulkBtn) {
+            bulkBtn.disabled = count === 0;
+            document.getElementById('bulkSelectedCount').textContent = count ? '(' + count + ')' : '';
+        }
+    }
+    document.querySelectorAll('.row-checkbox').forEach(function(cb) {
+        cb.addEventListener('change', refreshBulkState);
+    });
+    if (selectAllChk) {
+        selectAllChk.addEventListener('change', function() {
+            document.querySelectorAll('.row-checkbox:not(:disabled)').forEach(function(cb) { cb.checked = selectAllChk.checked; });
+            refreshBulkState();
+        });
+    }
+
+    window.bulkSoftDelete = async function() {
+        const checked = Array.from(document.querySelectorAll('.row-checkbox:checked'));
+        if (!checked.length) return;
+        const ids = checked.map(function(cb){ return parseInt(cb.value, 10); });
+        const ok = await showConfirmDialog({
+            title: gettext('Delete Selected?'),
+            message: interpolate(gettext('Move %(v0)s request(s) to the Recycle Bin?'), {v0: ids.length}, true),
+            confirmText: gettext('Move to Recycle Bin'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-warning text-dark',
+            icon: 'bi-trash3-fill',
+            iconColor: '#d97706',
+            iconBg: '#fef3c7'
+        });
+        if (!ok) return;
+
+        await withButtonBusy(bulkBtn, 'Deleting...', async function() {
+            let okCount = 0, failCount = 0;
+            for (const id of ids) {
+                try {
+                    const res = await fetch('/api/waste-requests/' + id + '/soft_delete/', {
+                        method: 'PATCH',
+                        credentials: 'same-origin',
+                        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+                    });
+                    if (res.ok) okCount++; else failCount++;
+                } catch (e) { failCount++; }
+            }
+            if (failCount === 0) {
+                showToast(interpolate(gettext('%(v0)s request(s) moved to Recycle Bin.'), {v0: okCount}, true), 'success');
+                setTimeout(function(){ window.location.reload(); }, 800);
+            } else {
+                showToast(interpolate(gettext('Moved %(v0)s, failed %(v1)s.'), {v0: okCount, v1: failCount}, true), 'warning');
+            }
+        });
+    };
+
+    // ── Single actions (kept from original) ───────────────────────────
     function showEmptyStateIfNeeded() {
-        const tbody = document.querySelector('table tbody');
+        const tbody = document.querySelector('#requests-tbody');
         if (!tbody) return;
         if (!tbody.querySelector('tr[id^="request-row-"]')) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">${gettext('You haven\'t submitted any requests yet.')}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">${gettext('You haven\'t submitted any requests yet.')}</td></tr>`;
         }
     }
 
@@ -149,37 +697,90 @@
             iconBg: '#fee2e2'
         });
         if (!ok) return;
-
         await withButtonBusy(eventButton(btn), 'Deleting...', async () => {
         try {
             const res = await fetch(`/api/waste-requests/${requestId}/`, {
                 method: 'DELETE',
                 credentials: 'same-origin',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                },
+                headers: { 'X-CSRFToken': getCookie('csrftoken') },
             });
-
             if (res.ok) {
                 showToast(gettext('Request deleted.'), 'success');
                 const row = document.getElementById(`request-row-${requestId}`);
                 if (row) row.remove();
                 showEmptyStateIfNeeded();
             } else {
-                let errMsg = 'Failed to delete request.';
-                try {
-                    const data = await res.json();
-                    errMsg = typeof data === 'object'
-                        ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
-                        : String(data);
-                } catch (e) { /* body khali huna sakcha, ignore */ }
-                showToast(errMsg, 'danger');
+                showToast(gettext('Failed to delete request.'), 'danger');
             }
         } catch (e) {
             showToast(gettext('Network error: ') + e.message, 'danger');
         }
         });
     };
+
+    // ── Map view modal ────────────────────────────────────────────────
+    document.getElementById('openMapBtn').addEventListener('click', function() {
+        const modalEl = document.getElementById('myRequestsMapModal');
+        const bsModal = new bootstrap.Modal(modalEl, {});
+        bsModal.show();
+        initMyMap();
+    });
+
+    let myMap = null, myMapInit = false;
+    function ensureLeafletLoaded(onReady) {
+        if (typeof L !== 'undefined') { onReady(); return; }
+        if (window._leafletLoadPromise) { window._leafletLoadPromise.then(onReady).catch(function(){}); return; }
+        window._leafletLoadPromise = new Promise(function(resolve, reject) {
+            var script = document.createElement('script');
+            script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            script.async = true;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+        window._leafletLoadPromise.then(onReady).catch(function(){});
+    }
+
+    function initMyMap() {
+        if (myMapInit || typeof L === 'undefined') return;
+        myMapInit = true;
+        ensureLeafletLoaded(function() {
+            const mapEl = document.getElementById('my-map');
+            if (!mapEl || myMap) return;
+            myMap = L.map('my-map').setView([28.3949, 84.1240], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(myMap);
+
+            {% if located_requests_json %}
+            const located = {{ located_requests_json|safe }};
+            const bounds = [];
+            located.forEach(function(r) {
+                const lat = parseFloat(r.latitude), lng = parseFloat(r.longitude);
+                if (isNaN(lat) || isNaN(lng)) return;
+                const color = r.status === 'completed' ? 'green' :
+                              (r.status === 'in_progress' ? '#0dcaf0' :
+                              (r.status === 'assigned' ? '#0d6efd' :
+                              (r.status === 'cancelled' ? '#dc3545' : '#ffc107')));
+                const icon = L.divIcon({
+                    className: '',
+                    html: '<div style="background:' + color + ';width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.4);"></div>',
+                    iconSize: [16,16], iconAnchor: [8,8]
+                });
+                L.marker([lat, lng], { icon: icon })
+                    .bindPopup('<strong>#' + r.id + '</strong><br>' + (r.label || ''))
+                    .addTo(myMap);
+                bounds.push([lat, lng]);
+            });
+            if (bounds.length) myMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+            {% endif %}
+        });
+    }
+
+    // Clean up Leaflet when the modal closes to avoid map duplication on htmx nav
+    document.getElementById('myRequestsMapModal').addEventListener('hidden.bs.modal', function() {
+        if (myMap) { myMap.remove(); myMap = null; myMapInit = false; }
+    });
 })();
 </script>
 {% endblock %}

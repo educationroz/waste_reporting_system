@@ -1,3 +1,4 @@
+import json
 import math
 import os
 import tempfile
@@ -44,6 +45,7 @@ from .models import (
     Complaint,
     Driver,
     Notification,
+    PushSubscription,
     Route,
     Schedule,
     SystemSettings,
@@ -64,6 +66,7 @@ from .serializers import (
     ComplaintSerializer,
     DriverSerializer,
     NotificationSerializer,
+    PushSubscriptionSerializer,
     RouteSerializer,
     ScheduleSerializer,
     SystemSettingsSerializer,
@@ -268,6 +271,25 @@ def _create_notification(user, title, message, notification_type='info', related
         related_request=related_request,
     )
     _push_ws_notification(notification)
+
+    # Best-effort Web Push (VAPID) for this single recipient. Only fires when
+    # the user has registered a browser subscription AND VAPID keys are
+    # configured; never raises (see send_web_push). Deliberately NOT wired
+    # into _bulk_notify_users — those broadcasts can hit thousands of users
+    # and pushing per-user synchronously would serialize the request.
+    try:
+        send_web_push(
+            user,
+            title,
+            message,
+            url=(
+                '/api/waste-requests/{pk}/'.format(pk=related_request.pk)
+                if related_request else None
+            ),
+        )
+    except Exception:  # noqa: BLE001 - best-effort; the DB row is already committed
+        logger.warning(f'[NOTIF PUSH] web push failed for user={user.id}')
+
     return notification
 
 
@@ -2863,3 +2885,100 @@ class ThumbnailView(APIView):
         response = HttpResponse(content, content_type=content_type)
         response['Cache-Control'] = 'public, max-age=31536000, immutable'
         return response
+# ── Web Push (VAPID) helpers ────────────────────────────────────────────────
+
+def _vapid_claims():
+    """Return (claims_dict, sub) for the VAPID Authorization header, or None
+    (with a warning) when VAPID keys aren't configured in .env."""
+    private_key = settings.VAPID_PRIVATE_KEY
+    if not private_key or not settings.WEB_PUSH_ENABLED:
+        return None
+    try:
+        from py_vapid import b64urlencode
+    except Exception:
+        return None
+    return {
+        'aud': 'https://fcm.googleapis.com',
+        'sub': f'mailto:{settings.VAPID_ADMIN_EMAIL}',
+    }
+
+
+class PushSubscriptionViewSet(viewsets.ModelViewSet):
+    """Register/unregister a browser Web-Push (VAPID) subscription for the
+    current user. A user may hold several (one per browser/device)."""
+    serializer_class = PushSubscriptionSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        return PushSubscription.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        # Endpoint is unique per subscription; if the same browser re-subscribes
+        # we repoint it at this user instead of erroring (covers the case where
+        # a device is re-used after logout/login).
+        existing = PushSubscription.objects.filter(
+            endpoint=serializer.validated_data.get('endpoint')
+        ).first()
+        if existing:
+            if existing.user_id != self.request.user.id:
+                existing.user = self.request.user
+                existing.save(update_fields=['user'])
+            return
+        serializer.save(
+            user=self.request.user,
+            user_agent=self.request.META.get('HTTP_USER_AGENT', '')[:255],
+        )
+
+    @action(detail=False, methods=['get'])
+    def vapid_public(self, request):
+        """Return the public VAPID key so the browser can subscribe. Only sent
+        when VAPID keys are configured."""
+        if not settings.WEB_PUSH_ENABLED or not settings.VAPID_PUBLIC_KEY:
+            return Response({'enabled': False, 'public_key': None})
+        return Response({'enabled': True, 'public_key': settings.VAPID_PUBLIC_KEY})
+
+
+def send_web_push(user, title, body, url=None, icon=None):
+    """Best-effort push to every one of *user*'s registered subscriptions.
+    Never raises — push delivery is best-effort and fire-and-forget; failures
+    (unsubscribed endpoints, missing VAPID keys, offline Push Service) are
+    logged and skipped. Returns a dict of counts."""
+    if not settings.WEB_PUSH_ENABLED or not PushSubscription.objects.filter(user=user).exists():
+        return {'sent': 0, 'failed': 0, 'skipped': True}
+
+    from py_vapid import b64urlencode
+    from pywebpush import WebPushException, webpush
+
+    payload_json = json.dumps({
+        'title': title,
+        'body': body,
+        'url': url,
+        'icon': icon,
+    })
+
+    claims = _vapid_claims()
+    sent = failed = 0
+    for sub in PushSubscription.objects.filter(user=user):
+        subscription_info = {
+            'endpoint': sub.endpoint,
+            'keys': {'p256dh': sub.p256dh, 'auth': sub.auth},
+        }
+        try:
+            webpush(
+                subscription_info=subscription_info,
+                data=payload_json,
+                vapid_private_key=settings.VAPID_PRIVATE_KEY,
+                vapid_claims=claims,
+                ttl=120,
+            )
+            sent += 1
+        except WebPushException as exc:
+            # 404/410 = the endpoint is gone (user unsubscribed elsewhere);
+            # drop it so we stop wasting delivery attempts.
+            if exc.response is not None and exc.response.status_code in (404, 410):
+                sub.delete()
+            failed += 1
+        except Exception:
+            failed += 1
+    return {'sent': sent, 'failed': failed, 'skipped': False}

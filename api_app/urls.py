@@ -12,6 +12,7 @@ from .views import (
     DatabaseBackupViewSet,
     DriverViewSet,
     NotificationViewSet,
+    PushSubscriptionViewSet,
     RouteViewSet,
     ScheduleViewSet,
     SystemSettingsViewSet,
@@ -29,6 +30,7 @@ router.register('checkpoints',     CheckpointViewSet,   basename='checkpoint')
 router.register('routes',         RouteViewSet,        basename='route')
 router.register('schedules',      ScheduleViewSet,     basename='schedule')
 router.register('notifications',  NotificationViewSet, basename='notification')
+router.register('push-subscriptions', PushSubscriptionViewSet, basename='push-subscription')
 router.register('complaints',     ComplaintViewSet,    basename='complaint')
 router.register('admin-logs',     AdminLogViewSet,     basename='admin-log')
 router.register('system-settings', SystemSettingsViewSet, basename='system-setting')

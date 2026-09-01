@@ -30,6 +30,51 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
+// ── Web Push (VAPID) ──────────────────────────────────────────────────────
+// The backend sends a small JSON envelope via send_web_push(); parse it so we
+// can show a notification and, on click, open the right page. The title/body
+// can also arrive as plain text from services that only support string data.
+self.addEventListener('push', (event) => {
+    let data = {};
+    try {
+        data = event.data ? event.data.json() : {};
+    } catch (e) {
+        data = event.data ? { body: event.data.text() } : {};
+    }
+
+    const title = data.title || 'SafhaSahar';
+    const options = {
+        body: data.body || '',
+        icon: data.icon || '/static/web_app/image/SafhaSahar.png',
+        badge: '/static/web_app/image/SafhaSahar.png',
+        data: { url: data.url || '/' },
+        vibrate: [100, 50, 100],
+    };
+
+    event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Clicking the notification focuses an existing tab if possible, otherwise
+// opens the target URL (falls back to the app root).
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            for (const client of clientList) {
+                if ('focus' in client) {
+                    client.navigate(targetUrl).catch(() => client.focus());
+                    return;
+                }
+            }
+            if (self.clients.openWindow) {
+                return self.clients.openWindow(targetUrl);
+            }
+        })
+    );
+});
+
 // Fetch event
 self.addEventListener('fetch', (event) => {
     const req = event.request;

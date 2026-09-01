@@ -682,6 +682,25 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@wastesystem.local')
 
 
+# ── Web Push (VAPID) ─────────────────────────────────────────────────────────
+# Browser Web-Push via the standard Push API (works with Firefox/Chrome/Edge
+# push services and FCM-web alike — no Google account required).
+#   VAPID_PUBLIC_KEY  / VAPID_PRIVATE_KEY : a base64url-encoded VAPID keypair.
+#       Generate one with `python -m venv` + `pywebpush`'s CLI, or via:
+#         pip install py-vapid
+#         python -m py_vapid --gen  (prints keys to add to .env)
+#   VAPID_ADMIN_EMAIL : contact email embedded in Authorization headers the
+#       push service may use to reach you about abuse.
+#
+# When VAPID keys are absent the push endpoints stay available but refuse to
+# send (returns a helpful error) — so the UI degrades gracefully until keys
+# are configured.
+WEB_PUSH_ENABLED = config('WEB_PUSH_ENABLED', default=False, cast=bool)
+VAPID_PUBLIC_KEY = config('VAPID_PUBLIC_KEY', default='')
+VAPID_PRIVATE_KEY = config('VAPID_PRIVATE_KEY', default='')
+VAPID_ADMIN_EMAIL = config('VAPID_ADMIN_EMAIL', default='noreply@wastesystem.local')
+
+
 # Backup/restore configuration
 BACKUP_RETENTION_DAYS = 30          # local backups older than this get pruned by the scheduled command
 BACKUP_OFFSITE_ENABLED = False      # set True once S3 credentials below are configured

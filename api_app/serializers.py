@@ -11,6 +11,7 @@ from .models import (
     Complaint,
     Driver,
     Notification,
+    PushSubscription,
     Route,
     Schedule,
     SystemSettings,
@@ -482,3 +483,14 @@ class ComplaintSerializer(serializers.ModelSerializer):
         validate_image_file(file)
         clean_file = sanitize_image(file)
         return compress_image(clean_file)
+
+
+class PushSubscriptionSerializer(serializers.ModelSerializer):
+    """Serializer for a browser Web-Push subscription. The endpoint, p256dh
+    and auth values come verbatim from the Push API's getSubscription()
+    response and are opaque to us — the Push Service exchanges them when we
+    send."""
+    class Meta:
+        model = PushSubscription
+        fields = ('id', 'endpoint', 'p256dh', 'auth', 'created_at')
+        read_only_fields = ('id', 'created_at')

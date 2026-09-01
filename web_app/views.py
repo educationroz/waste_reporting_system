@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 
@@ -12,6 +13,7 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _
 from django.views import View
 from django.views.decorators.http import require_POST
@@ -131,15 +133,61 @@ class UserRequestListView(LoginRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        return (
+        qs = (
             WasteRequest.objects.filter(user=self.request.user, is_deleted=False)
             .select_related('driver__user')
+            .prefetch_related('extra_photos')
             .order_by('-created_at')
         )
+
+        status_filter = self.request.GET.get('status', '').strip()
+        waste_type_filter = self.request.GET.get('waste_type', '').strip()
+        search_query = self.request.GET.get('search', '').strip()
+
+        if status_filter in dict(WasteRequest.STATUS_CHOICES):
+            qs = qs.filter(status=status_filter)
+
+        if waste_type_filter in dict(WasteRequest.WASTE_TYPE_CHOICES):
+            qs = qs.filter(waste_type=waste_type_filter)
+
+        if search_query:
+            filters = Q(pickup_address__icontains=search_query) | Q(description__icontains=search_query)
+            if search_query.isdigit():
+                filters |= Q(id=int(search_query))
+            qs = qs.filter(filters)
+
+        return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['waste_type_choices'] = WasteRequest.WASTE_TYPE_CHOICES
+        ctx['status_choices'] = WasteRequest.STATUS_CHOICES
+        ctx['current_status'] = self.request.GET.get('status', '')
+        ctx['current_waste_type'] = self.request.GET.get('waste_type', '')
+        ctx['current_search'] = self.request.GET.get('search', '')
+
+        # Map view data: ALL of the user's located (non-deleted) requests,
+        # not just the current page. Markers show status colour + address.
+        located = (
+            WasteRequest.objects
+            .filter(user=self.request.user, is_deleted=False)
+            .exclude(latitude__isnull=True, photo_latitude__isnull=True)
+        )
+        located_data = []
+        for req in located:
+            lat = req.latitude if req.latitude is not None else req.photo_latitude
+            lng = req.longitude if req.longitude is not None else req.photo_longitude
+            if lat is None or lng is None:
+                continue
+            located_data.append({
+                'id': req.id,
+                'latitude': float(lat),
+                'longitude': float(lng),
+                'status': req.status,
+                'label': req.get_waste_type_display(),
+            })
+        ctx['located_requests_json'] = mark_safe(json.dumps(located_data))
+        ctx['has_located_requests'] = bool(located_data)
         return ctx
 
 

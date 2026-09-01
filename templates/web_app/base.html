@@ -624,6 +624,88 @@ if (!window.__ssAuthScriptLoaded) {
     };
     window.API = API;
 
+    // ─── Web Push (VAPID) subscription ─────────────────────────────────
+    // Registers this browser for push notifications (status updates while
+    // the tab/site is closed). Everything is guarded and best-effort: no push
+    // support, permission denied, or backend VAPID keys unset just silently
+    // skips. Runs after the app-shell service worker is available.
+    window.initWebPush = async function initWebPush() {
+        try {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
+
+            // Is push configured on the backend? (VAPID keys present)
+            const cfg = await API.get('/api/push-subscriptions/vapid_public/');
+            if (!cfg || !cfg.enabled || !cfg.public_key) return;
+
+            const registration = await navigator.serviceWorker.ready;
+            const appKey = urlBase64ToUint8Array(cfg.public_key);
+
+            let subscription = await registration.pushManager.getSubscription();
+            if (!subscription) {
+                // Autonomously ask for notification permission and subscribe.
+                // We never block the page on this — if the user denies it we
+                // simply remain unsubscribed (they can re-enable in the
+                // browser's site settings).
+                const permission = await Notification.requestPermission().catch(() => 'denied');
+                if (permission !== 'granted') return;
+                subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: appKey,
+                });
+            }
+
+            // Persist the subscription on the backend.
+            await API.post('/api/push-subscriptions/', {
+                endpoint: subscription.endpoint,
+                p256dh: base64urlToBase64(subscription.getKey('p256dh')),
+                auth: base64urlToBase64(subscription.getKey('auth')),
+            });
+
+            // Push services periodically rotate the subscription (endpoint/key
+            // change). When they do, quietly re-register it so pushes keep
+            // flowing instead of silently dying.
+            subscription.addEventListener('change', async function () {
+                const fresh = await registration.pushManager.getSubscription();
+                if (!fresh) return;
+                await API.post('/api/push-subscriptions/', {
+                    endpoint: fresh.endpoint,
+                    p256dh: base64urlToBase64(fresh.getKey('p256dh')),
+                    auth: base64urlToBase64(fresh.getKey('auth')),
+                });
+            });
+        } catch (e) {
+            // Best-effort: never surface errors for the push setup.
+            console.warn('Web push init skipped:', e);
+        }
+    };
+
+    let urlBase64ToUint8Array, base64urlToBase64;
+    function definePushHelpers() {
+        if (urlBase64ToUint8Array) return;
+        urlBase64ToUint8Array = function (base64String) {
+            const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+            return outputArray;
+        };
+        base64urlToBase64 = function (buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        };
+    }
+    definePushHelpers();
+
+    // Kick off once the service worker is registered (base.html registers it
+    // on window load) and the DOM has settled.
+    window.addEventListener('load', function () {
+        setTimeout(function () { window.initWebPush(); }, 1500);
+    });
+
     // ─── SECURITY: cookie-session auth, no tokens in localStorage ────────
     // The JWT access/refresh pair used to live in localStorage, which meant
     // any XSS anywhere on the site could read and exfiltrate it (localStorage
@@ -1167,6 +1249,105 @@ document.addEventListener('click', function (e) {
         navMenuEl.addEventListener('hidden.bs.collapse', setNavbarHeightVar);
     }
 })();
+</script>
+
+<script nonce="{{ csp_nonce }}">
+    // ── OFFLINE SUBMISSION QUEUE ──────────────────────────────────────────
+    // Stores small JSON request bodies (no binary photo files — see the note
+    // in home.html's submitRequest) in localStorage so a citizen can still
+    // submit a pickup request while offline, then replays them automatically
+    // the moment the network is back. Home.html calls OfflineQueue.enqueue()
+    // for both the "already known offline" and "connection dropped mid-flight"
+    // paths. Replays ride the Django session cookie (with the CSRF token, which
+    // we capture at enqueue time — cookie auth replays transparently).
+    // A failure here must never block the main flow, so every method swallows
+    // storage/parse errors and degrades gracefully.
+    (function () {
+        const QK = 'offlineRequestQueue';
+        const TIMEOUT = 12000;
+
+        function read() {
+            try {
+                const raw = localStorage.getItem(QK);
+                const arr = raw ? JSON.parse(raw) : [];
+                return Array.isArray(arr) ? arr : [];
+            } catch (e) {
+                return [];
+            }
+        }
+        function write(arr) {
+            try { localStorage.setItem(QK, JSON.stringify(arr)); }
+            catch (e) { /* storage full/unavailable — ignore */ }
+        }
+        function getCsrfHeader() {
+            return { 'X-CSRFToken': (window.getCookie ? window.getCookie('csrftoken') : '') };
+        }
+
+        async function flushOne(item) {
+            const headers = Object.assign({ 'Content-Type': 'application/json' }, item.headers || {}, getCsrfHeader());
+            const res = await fetch(item.url, {
+                method: item.method || 'POST',
+                credentials: 'same-origin',
+                headers: headers,
+                body: JSON.stringify(item.body || {}),
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res;
+        }
+
+        async function flush() {
+            let items = read();
+            if (!items.length) return;
+            const remaining = [];
+            let flushed = 0;
+            for (const item of items) {
+                try {
+                    await flushOne(item);
+                    flushed++;
+                } catch (e) {
+                    remaining.push(item); // keep for a later retry
+                }
+            }
+            write(remaining);
+            if (flushed) {
+                if (typeof window.showToast === 'function') {
+                    window.showToast(gettext('You\'re back online — submitted ') + flushed + (flushed === 1 ? ' saved request.' : ' saved requests.'), 'success');
+                }
+                if (typeof window.bumpStat === 'function') {
+                    window.bumpStat('stat-pending-count', -flushed);
+                }
+                if (typeof window.reloadRecentRequests === 'function') {
+                    try { window.reloadRecentRequests(); } catch (e) {}
+                }
+            }
+        }
+
+        window.OfflineQueue = {
+            enqueue: function (entry) {
+                try {
+                    const items = read();
+                    items.push(Object.assign({ id: Date.now() + Math.random(), ts: new Date().toISOString() }, entry));
+                    write(items);
+                } catch (e) {
+                    return Promise.reject(e);
+                }
+                // Don't block the caller; fire-and-forget a flush attempt.
+                if (navigator.onLine) { flush(); }
+                return Promise.resolve(true);
+            },
+            getPendingCount: function () {
+                try { return read().length; } catch (e) { return 0; }
+            },
+            flush: flush,
+        };
+
+        // Replay when the browser reports we're back online.
+        window.addEventListener('online', function () { flush(); });
+        // Also flush on page load in case the queue survived a tab close offline.
+        if (navigator.onLine) {
+            window.addEventListener('load', function () { setTimeout(flush, 800); });
+        }
+    })();
 </script>
 
 <script nonce="{{ csp_nonce }}">
