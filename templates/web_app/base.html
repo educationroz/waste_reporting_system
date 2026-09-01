@@ -962,10 +962,28 @@ if (!window.__ssAuthScriptLoaded) {
         }
     };
 
-    window.addEventListener('beforeunload', function() {
+    window.addEventListener('pagehide', function(event) {
         if (window._notifSocket) {
-            window._intentionalSocketClose = true;   // <-- yo line thap्नुहोस्
-            window._notifSocket.close();
+            window._intentionalSocketClose = true;
+            window._notifSocket.close(1000, event.persisted ? 'bfcache' : 'unload');
+        }
+        if (event.persisted) {
+            // Frozen into bfcache, not destroyed — remember to reconnect
+            // when (if) the user comes back to this exact page state.
+            window.__ssNotifNeedsReconnect = true;
+        }
+    });
+
+    window.addEventListener('pageshow', function(event) {
+        if (event.persisted && window.__ssNotifNeedsReconnect) {
+            // Restored from bfcache. The socket we closed in pagehide is
+            // gone for good — open a fresh one and resync the badges.
+            window.__ssNotifNeedsReconnect = false;
+            window._intentionalSocketClose = false;
+            connectNotifSocket();
+            refreshNotifBadge();
+            refreshRecycleBinBadge();
+            refreshComplaintsBadge();
         }
     });
 

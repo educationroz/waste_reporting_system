@@ -120,7 +120,6 @@ import csv
 
 def _haversine_meters(lat1, lng1, lat2, lng2):
     """Distance in meters between two lat/lng points (Haversine formula)."""
-    import math
     R = 6371000  # Earth radius in meters
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
@@ -370,7 +369,6 @@ def _notify_all_users(title, message, notification_type='info'):
     account — admin, driver, and regular user — so everyone hears about
     checkpoint changes and their map can react to it live.
     """
-    User = get_user_model()
     _bulk_notify_users(
         User.objects.filter(is_active=True),
         title=title,

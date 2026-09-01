@@ -303,26 +303,41 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
             # Use cached data
             ctx.update(cached_stats)
         else:
-            # Calculate statistics
-            stats = {}
-            stats['total_requests'] = WasteRequest.objects.count()
-            stats['pending_requests'] = WasteRequest.objects.filter(status='pending').count()
-            stats['assigned_requests_count'] = WasteRequest.objects.filter(status='assigned').count()
-            stats['in_progress_requests_count'] = WasteRequest.objects.filter(status='in_progress').count()
-            stats['completed_requests_count'] = WasteRequest.objects.filter(status='completed').count()
-            stats['cancelled_requests_count'] = WasteRequest.objects.filter(status='cancelled').count()
-            stats['overdue_requests'] = WasteRequest.objects.filter(
-                status__in=['pending', 'assigned'],
-                scheduled_date__lt=timezone.now()
-            ).count()
-            stats['active_drivers'] = Driver.objects.filter(is_available=True).count()
-            stats['total_drivers'] = Driver.objects.count()
-            stats['total_vehicles'] = Vehicle.objects.count()
-            stats['available_vehicles'] = Vehicle.objects.filter(status='available').count()
-            stats['vehicles_on_route'] = Vehicle.objects.filter(status='on_route').count()
-            stats['total_users'] = User.objects.filter(role='user').count()
-            stats['total_admin_users'] = User.objects.filter(role='admin').count()
-            
+            from django.db.models import Count, Q, Value
+            from django.db.models.functions import Lower
+
+            # Single aggregate query replaces 10+ individual .count() calls.
+            # The old pattern issued a separate SELECT COUNT(*) for each
+            # status/type combination — 10+ round-trips on every uncached
+            # dashboard load. This collapses them into ONE query.
+            waste_stats = WasteRequest.objects.aggregate(
+                total_requests=Count('id'),
+                pending_requests=Count('id', filter=Q(status='pending')),
+                assigned_requests_count=Count('id', filter=Q(status='assigned')),
+                in_progress_requests_count=Count('id', filter=Q(status='in_progress')),
+                completed_requests_count=Count('id', filter=Q(status='completed')),
+                cancelled_requests_count=Count('id', filter=Q(status='cancelled')),
+                overdue_requests=Count('id', filter=Q(
+                    status__in=['pending', 'assigned'],
+                    scheduled_date__lt=timezone.now(),
+                )),
+            )
+            driver_stats = Driver.objects.aggregate(
+                active_drivers=Count('id', filter=Q(is_available=True)),
+                total_drivers=Count('id'),
+            )
+            vehicle_stats = Vehicle.objects.aggregate(
+                total_vehicles=Count('id'),
+                available_vehicles=Count('id', filter=Q(status='available')),
+                vehicles_on_route=Count('id', filter=Q(status='on_route')),
+            )
+            user_stats = User.objects.aggregate(
+                total_users=Count('id', filter=Q(role='user')),
+                total_admin_users=Count('id', filter=Q(role='admin')),
+            )
+
+            stats = {**waste_stats, **driver_stats, **vehicle_stats, **user_stats}
+
             # Cache for 5 minutes (300 seconds)
             cache.set(cache_key, stats, 300)
             ctx.update(stats)
@@ -525,13 +540,24 @@ class DriverDashboardView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         user = self.request.user
-        driver, _ = Driver.objects.get_or_create(
-            user=user,
-            defaults={
-                'license_number': f'DRIVER-{user.id}',
-                'is_available': True,
-            },
-        )
+        try:
+            driver, _ = Driver.objects.get_or_create(
+                user=user,
+                defaults={
+                    'license_number': f'DRIVER-{user.id}',
+                    'is_available': True,
+                },
+            )
+        except Driver.MultipleObjectsReturned:
+            # Race condition: two concurrent requests both saw no Driver
+            # row and both called get_or_create, producing duplicates.
+            # Use the first one and delete the rest.
+            driver = Driver.objects.filter(user=user).order_by('id').first()
+        except Exception:
+            logger.exception(f'[DRIVER DASHBOARD] get_or_create failed for user={user.id}')
+            driver = Driver.objects.filter(user=user).first()
+            if not driver:
+                return redirect('/')
         ctx['driver'] = driver
         ctx['assigned_requests'] = (
             WasteRequest.objects.filter(driver=driver, status__in=['assigned', 'in_progress'])
