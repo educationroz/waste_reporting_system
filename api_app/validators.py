@@ -1,13 +1,17 @@
 import io
+import logging
+
 try:
     import magic
-except Exception:
+except Exception:  # noqa: BLE001 - libmagic is optional; fall back to byte sniffing
     magic = None
-from PIL import Image, UnidentifiedImageError
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.template.defaultfilters import filesizeformat
+from PIL import Image, UnidentifiedImageError
+
+logger = logging.getLogger(__name__)
 
 # Single source of truth for the per-photo size cap — settings.py sets
 # MAX_PHOTO_SIZE and also derives DATA_UPLOAD_MAX_MEMORY_SIZE /
@@ -37,13 +41,13 @@ def _sniff_image_mime(header):
     if magic is not None:
         try:
             return magic.from_buffer(header, mime=True)
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - libmagic failure falls back to magic-byte sniffing
+            logger.warning('[MIME] libmagic image sniff failed; falling back to magic bytes.')
     if header.startswith(b'\xff\xd8\xff'):
         return 'image/jpeg'
     if header.startswith(b'\x89PNG\r\n\x1a\n'):
         return 'image/png'
-    if header.startswith(b'GIF87a') or header.startswith(b'GIF89a'):
+    if header.startswith((b'GIF87a', b'GIF89a')):
         return 'image/gif'
     if header.startswith(b'RIFF') and len(header) >= 12 and header[8:12] == b'WEBP':
         return 'image/webp'
@@ -54,8 +58,8 @@ def _sniff_pdf_mime(header):
     if magic is not None:
         try:
             return magic.from_buffer(header, mime=True)
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - libmagic failure falls back to magic-byte sniffing
+            logger.warning('[MIME] libmagic pdf sniff failed; falling back to magic bytes.')
     if header.lstrip().startswith(b'%PDF-'):
         return 'application/pdf'
     return 'application/octet-stream'

@@ -1,7 +1,6 @@
 import math
-from decimal import Decimal
-from typing import List, Tuple, Dict
-from api_app.models import WasteRequest, Bin, Route, Driver
+
+from api_app.models import Bin, WasteRequest
 
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -21,7 +20,7 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     return R * c
 
 
-def get_location_coords(obj) -> Tuple[float, float]:
+def get_location_coords(obj) -> tuple[float, float]:
     """Extract latitude and longitude from a location object (WasteRequest or Bin)."""
     if isinstance(obj, WasteRequest):
         lat = obj.photo_latitude or obj.latitude
@@ -38,13 +37,13 @@ def get_location_coords(obj) -> Tuple[float, float]:
 class RouteOptimizer:
     """Optimizes waste pickup routes using nearest neighbor algorithm."""
     
-    def __init__(self, start_location: Tuple[float, float]):
+    def __init__(self, start_location: tuple[float, float]):
         """Initialize with driver's starting location."""
         self.start_lat, self.start_lon = start_location
         self.route_points = []
         self.total_distance = 0.0
     
-    def optimize_nearest_neighbor(self, locations: List[Tuple[int, str, float, float]]) -> List[Dict]:
+    def optimize_nearest_neighbor(self, locations: list[tuple[int, str, float, float]]) -> list[dict]:
         """
         Optimize route using nearest neighbor algorithm.
         
@@ -92,7 +91,7 @@ class RouteOptimizer:
         
         return optimized_route
     
-    def get_route_data(self) -> Dict:
+    def get_route_data(self) -> dict:
         """Get complete route data with waypoints and metadata."""
         return {
             'waypoints': self.route_points,
@@ -112,7 +111,7 @@ def get_depot_location():
         setting = SystemSettings.objects.get(key='depot_location')
         val = setting.value  # JSONField: {"latitude": 28.2096, "longitude": 83.9856}
         return (float(val['latitude']), float(val['longitude']))
-    except Exception:
+    except (SystemSettings.DoesNotExist, KeyError, TypeError, ValueError):
         return (28.2096, 83.9856)  # Default: Pokhara
 
 

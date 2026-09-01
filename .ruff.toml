@@ -1,0 +1,12 @@
+# Ruff configuration for the waste_reporting_system Django project.
+#
+# RUF012 (mutable class default) is disabled project-wide because Django & DRF
+# deliberately rely on mutable class attributes in canonical patterns —
+# e.g. `permission_classes = [IsAuthenticated]`, `filter_backends = [...]`,
+# `search_fields = [...]` on every ModelViewSet. The framework reads and
+# mutates these at class-definition time, so flagging them (or annotating
+# ~100 view attributes with typing.ClassVar) adds noise without any real
+# safety. All other rules remain active.
+
+[lint]
+ignore = ["RUF012"]

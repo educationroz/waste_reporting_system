@@ -1,4 +1,5 @@
 import json as _json
+import logging
 import urllib.parse as _urlparse
 import urllib.request as _urlrequest
 
@@ -29,6 +30,8 @@ from .serializers import (
     UserSerializer,
 )
 from .tokens import email_verification_token
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -98,8 +101,8 @@ class SessionLoginView(APIView):
             from api_app.views import claim_guest_requests_by_email
             try:
                 claim_guest_requests_by_email(user)
-            except Exception:
-                pass  # login must succeed even if the claim backup hiccups
+            except Exception:  # noqa: BLE001 - login must succeed even if the claim backup hiccups
+                logger.warning(f'[SESSION LOGIN] claim_guest_requests_by_email failed for user={user.id}.')
             return Response({
                 'message': 'Session created.',
                 'user': {
@@ -166,8 +169,8 @@ class BiometricLoginView(APIView):
         from api_app.views import claim_guest_requests_by_email
         try:
             claim_guest_requests_by_email(user)
-        except Exception:
-            pass  # biometric login must succeed even if the claim backup hiccups
+        except Exception:  # noqa: BLE001 - biometric login must succeed even if the claim backup hiccups
+            logger.warning(f'[BIOMETRIC LOGIN] claim_guest_requests_by_email failed for user={user.id}.')
 
         profile_pic_url = user.profile_picture.url if getattr(user, 'profile_picture', None) else ''
         role_display = user.get_role_display() if hasattr(user, 'get_role_display') else getattr(user, 'role', '')
@@ -293,7 +296,7 @@ class GoogleLoginView(APIView):
             payload = google_id_token.verify_oauth2_token(
                 credential, google_requests.Request(), client_id
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - fall through to tokeninfo endpoint below
             try:
                 url = f'{self.GOOGLE_TOKENINFO_URL}?{_urlparse.urlencode({"id_token": credential})}'
                 with _urlrequest.urlopen(url, timeout=10) as resp:
@@ -304,9 +307,8 @@ class GoogleLoginView(APIView):
                 if payload.get('aud') != client_id:
                     return Response({'error': 'This Google token was not issued for this application.'},
                                     status=status.HTTP_401_UNAUTHORIZED)
-            except Exception:
-                # Covers HTTP 400 (invalid/expired token) and network failures
-                # alike; never leak the raw error to the client.
+            except Exception:  # noqa: BLE001 - Covers HTTP 400 (invalid/expired token) and network failures alike
+                # never leak the raw error to the client.
                 return Response({'error': 'Could not verify Google account. Please try again.'},
                                 status=status.HTTP_401_UNAUTHORIZED)
 
@@ -363,8 +365,8 @@ class GoogleLoginView(APIView):
         from api_app.views import claim_guest_requests_by_email
         try:
             claim_guest_requests_by_email(user)
-        except Exception:
-            pass  # Google login must succeed even if the claim backup hiccups
+        except Exception:  # noqa: BLE001 - Google login must succeed even if the claim backup hiccups
+            logger.warning(f'[GOOGLE LOGIN] claim_guest_requests_by_email failed for user={user.id}.')
 
         refresh = RefreshToken.for_user(user)
         refresh['username'] = user.username
@@ -424,8 +426,8 @@ class VerifyEmailView(APIView):
             from api_app.views import claim_guest_requests_by_email
             try:
                 claim_guest_requests_by_email(user)
-            except Exception:
-                pass  # claim backup failing must never break email verification
+            except Exception:  # noqa: BLE001 - claim backup failing must never break email verification
+                logger.warning(f'[VERIFY EMAIL] claim_guest_requests_by_email failed for user={user.id}.')
 
             return Response({'message': 'Email verified successfully. You can now log in.'})
 
@@ -520,9 +522,8 @@ class LogoutView(APIView):
         if refresh_token:
             try:
                 RefreshToken(refresh_token).blacklist()
-            except Exception:
-                # Token may already be invalid/expired; continue with session logout.
-                pass
+            except Exception:  # noqa: BLE001 - token may already be invalid/expired
+                logger.warning(f'[LOGOUT] refresh token blacklist failed for user={request.user.id}.')
 
         django_logout(request)
         return Response({'message': 'Logged out successfully.'}, status=status.HTTP_200_OK)

@@ -1,6 +1,15 @@
 from django.contrib import admin
 
-from .models import Bin, Checkpoint, Driver, Notification, Route, Schedule, Vehicle, WasteRequest
+from .models import (
+    Bin,
+    Checkpoint,
+    Driver,
+    Notification,
+    Route,
+    Schedule,
+    Vehicle,
+    WasteRequest,
+)
 
 
 @admin.register(Vehicle)

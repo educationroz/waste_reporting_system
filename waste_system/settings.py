@@ -6,11 +6,11 @@ pip install python-decouple
 
 import logging
 import sys
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
 
-from django.core.exceptions import ImproperlyConfigured
 from decouple import config
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

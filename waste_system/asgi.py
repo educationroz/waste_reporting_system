@@ -4,6 +4,7 @@ Handles both HTTP and WebSocket connections via Channels.
 """
 
 import os
+
 import django
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'waste_system.settings')
@@ -13,8 +14,8 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.security.websocket import AllowedHostsOriginValidator
 from django.core.asgi import get_asgi_application
 
-from api_app.auth_middleware import SessionOrJWTAuthMiddlewareStack
 import api_app.routing
+from api_app.auth_middleware import SessionOrJWTAuthMiddlewareStack
 
 application = ProtocolTypeRouter({
     'http': get_asgi_application(),

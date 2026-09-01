@@ -1,13 +1,13 @@
 import datetime
-import tempfile
 from unittest.mock import patch
 
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase
 from rest_framework.test import APIClient, APITestCase
-from .views import _create_notification
+
 from .models import Notification, WasteRequest
+from .views import _create_notification
 
 User = get_user_model()
 

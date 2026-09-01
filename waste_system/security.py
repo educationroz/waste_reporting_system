@@ -55,7 +55,7 @@ def _shared_directives(is_secure: bool) -> list:
         f"font-src 'self' data: {fonts} {cdns}",
         # Map tiles are <img> loads; explicitly allow tile.openstreetmap.org
         f"img-src 'self' data: blob: https: {tiles}",
-        f"connect-src 'self' {ws_scheme} {cdns} {map_apis}",
+        f"connect-src 'self' {ws_scheme} {cdns} {map_apis} {tiles}",
         "frame-src 'self' https://accounts.google.com https://apis.google.com",
         "frame-ancestors 'self'",
         "form-action 'self'",

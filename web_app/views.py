@@ -1,3 +1,4 @@
+import logging
 import os
 
 from django.conf import settings
@@ -5,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth import logout as django_logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.cache import cache
+from django.core.paginator import EmptyPage
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import redirect
@@ -26,6 +28,8 @@ from api_app.models import (
 )
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 
 # ─── Service Worker ─────────────────────────────────────────────────────────
@@ -678,7 +682,7 @@ class AdminLogsView(LoginRequiredMixin, ListView):
         try:
             page_obj = paginator.page(page_number)
             return (paginator, page_obj, page_obj.object_list, page_obj.has_other_pages())
-        except Exception:
+        except EmptyPage:
             page_obj = paginator.page(1)
             return (paginator, page_obj, page_obj.object_list, page_obj.has_other_pages())
 

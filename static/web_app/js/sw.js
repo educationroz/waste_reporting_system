@@ -54,6 +54,15 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Only handle same-origin requests. Cross-origin resources (OpenStreetMap
+    // tiles, CDN scripts, Google fonts) must NOT be proxied or cached by the
+    // service worker: doing so triggers CSP connect-src blockages (fetch() in
+    // a SW is governed by connect-src, and third-party hosts aren't listed
+    // there) and bloats the cache with thousands of third-party files.
+    if (url.origin !== location.origin) {
+        return;
+    }
+
     // Full-page navigations: network-first
     if (req.mode === 'navigate') {
         event.respondWith(
@@ -71,7 +80,16 @@ self.addEventListener('fetch', (event) => {
                     return res;
                 })
                 .catch(() =>
-                    caches.match(req).then((cached) => cached || caches.match('/'))
+                    caches.match(req).then(
+                        (cached) =>
+                            cached ||
+                            caches.match('/') ||
+                            new Response('Offline', {
+                                status: 503,
+                                statusText: 'Service Unavailable',
+                                headers: { 'Content-Type': 'text/plain' },
+                            })
+                    )
                 )
         );
         return;

@@ -14,7 +14,7 @@ import os
 # default.
 os.environ['DEBUG'] = 'True'
 
-from .settings import *  # noqa: F401,F403
+from .settings import *
 
 # Application loggers stay silent so a failure trace isn't buried in INFO
 # chatter. api_app/views.py emits a notification line per push, which is
@@ -41,11 +41,11 @@ CHANNEL_LAYERS = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}
 # Throttling would make repeated requests in a test 429 unpredictably. The
 # rates cannot simply be emptied: DRF raises ImproperlyConfigured for any scope
 # a view references, so every existing key is kept and set very high instead.
-REST_FRAMEWORK = {  # noqa: F405
-    **REST_FRAMEWORK,  # noqa: F405
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,
     'DEFAULT_THROTTLE_RATES': {
         scope: '100000/day'
-        for scope in REST_FRAMEWORK.get('DEFAULT_THROTTLE_RATES', {})  # noqa: F405
+        for scope in REST_FRAMEWORK.get('DEFAULT_THROTTLE_RATES', {})
     },
 }
 

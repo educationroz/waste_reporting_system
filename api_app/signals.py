@@ -3,10 +3,11 @@ Django signals for cache invalidation and audit logging.
 Invalidates dashboard cache when data changes.
 """
 
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
+
 from .cache_utils import invalidate_dashboard_cache
-from .models import WasteRequest, Driver, Vehicle, Route
+from .models import Driver, Route, Vehicle, WasteRequest
 
 
 @receiver(post_save, sender=WasteRequest)

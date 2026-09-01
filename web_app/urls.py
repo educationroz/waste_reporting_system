@@ -1,29 +1,31 @@
 from django.urls import path
+
 from .views import (
     AdminComplaintListView,
     AdminDashboardView,
     AdminDriverListView,
+    AdminLogsView,
     AdminRequestListView,
     AdminScheduleListView,
-    AdminVehicleListView,
-    AdminUsersManagementView,
-    AdminLogsView,
     AdminSettingsView,
+    AdminUsersManagementView,
+    AdminVehicleListView,
     DriverDashboardView,
     ForgotPasswordPageView,
     HomeView,
     LoginPageView,
-    ProfilePageView,
     NotificationsView,
+    ProfilePageView,
     RegisterPageView,
     ResetPasswordPageView,
     RoutePlanningView,
     ServiceWorkerView,
+    UserComplaintListView,
     UserRecycleBinView,
     UserRequestListView,
-    UserComplaintListView,
     web_logout,
 )
+
 urlpatterns = [
     # Service worker — must be served at root ('/sw.js', not
     # '/static/web_app/sw.js') so its default scope covers the whole app.

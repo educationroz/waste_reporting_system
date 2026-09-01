@@ -21,12 +21,12 @@ dedupes the common duplicate work; cross-process duplication is limited to a
 one-time cost per unique file+size.
 """
 
+import hashlib
 import io
 import logging
 import threading
-import hashlib
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ def _parse_size(size):
 def _target_name(field_name, size_key, source_name):
     """Build a stable cache path inside MEDIA_ROOT/thumbnails/."""
     digest = hashlib.sha1(
-        f'{field_name}:{size_key}:{source_name}'.encode('utf-8')
+        f'{field_name}:{size_key}:{source_name}'.encode()
     ).hexdigest()[:16]
     base = source_name.rsplit('/', 1)[-1]
     return f'thumbnails/{size_key}/{digest}-{base}'
@@ -87,7 +87,7 @@ def get_or_create_thumbnail(file_field, size='100x100'):
     try:
         if storage.exists(target):
             return target
-    except Exception:
+    except Exception:  # noqa: BLE001 - storage glitch; fall through to regenerating
         logger.warning('[THUMB] storage.exists failed for %s', target)
 
     lock = _thumbnail_lock(target)
@@ -95,14 +95,14 @@ def get_or_create_thumbnail(file_field, size='100x100'):
         try:
             if storage.exists(target):
                 return target
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - race/tmpfs glitch; fall through to regenerating
+            logger.warning('[THUMB] storage.exists (locked) failed for %s', target)
 
         try:
             with storage.open(source_name, 'rb') as src:
                 img = Image.open(src)
                 img.load()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - any read/decode failure falls back to the original
             logger.warning('[THUMB] could not open source %s: %s', source_name, exc)
             return source_name  # fall back to the original on any failure
 
@@ -115,10 +115,10 @@ def get_or_create_thumbnail(file_field, size='100x100'):
 
         if src_ratio > target_ratio:
             new_h = src_h
-            new_w = int(round(new_h * target_ratio))
+            new_w = round(new_h * target_ratio)
         else:
             new_w = src_w
-            new_h = int(round(new_w / target_ratio))
+            new_h = round(new_w / target_ratio)
 
         left = (src_w - new_w) // 2
         top = (src_h - new_h) // 2
@@ -137,7 +137,7 @@ def get_or_create_thumbnail(file_field, size='100x100'):
 
         try:
             stored_name = storage.save(target, buffer)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - fall back to the original on any failure
             logger.warning('[THUMB] storage.save failed for %s: %s', target, exc)
             return file_field.name
         return stored_name
@@ -157,6 +157,6 @@ def generate_thumbnail(file_field, size='100x100'):
         return ''
     try:
         return file_field.storage.url(stored)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - template-safe fallback returns ''
         logger.warning('[THUMB] storage.url failed for %s: %s', stored, exc)
         return ''

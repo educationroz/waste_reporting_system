@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -6,6 +8,8 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -34,8 +38,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         try:
             from api_app.views import claim_guest_requests_by_email
             claim_guest_requests_by_email(self.user)
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - intentionally non-fatal; logged downstream
+            logger.warning(f'[TOKEN] guest request claim failed for user={self.user.id}.')
         return data
 
 

@@ -239,7 +239,7 @@ def check_redis():
     finally:
         try:
             client.close()
-        except Exception:  # noqa: BLE001 - never let cleanup fail the probe
+        except Exception:  # noqa: BLE001, S110 - never let cleanup fail the probe
             pass
 
 

@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import serializers  # type: ignore
@@ -23,8 +25,6 @@ from .validators import (
     validate_image_file,
     validate_pdf_file,
 )
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -220,8 +220,9 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         try:
             from io import BytesIO
 
-            from .tasks import submit
             from ml_models.waste_classifier.inference import predict_waste
+
+            from .tasks import submit
 
             bytes_io = BytesIO()
             clean_file.seek(0)
@@ -235,7 +236,7 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             if timeout > 0:
                 try:
                     result = future.result(timeout=timeout)
-                except BaseException:
+                except Exception:  # noqa: BLE001 - timeouts/errors defer to background update
                     # Inference did not finish within the fast-path window —
                     # don't block the request; defer to background update.
                     result = None
@@ -247,11 +248,10 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             logger.exception('[ML] fast-path inference unavailable; flagging for review.')
             result = None
 
-        if result is not None:
-            if not result.get('is_waste'):
-                raise serializers.ValidationError(
-                    "This doesn't look like waste. Please upload a valid waste photo."
-                )
+        if result is not None and not result.get('is_waste'):
+            raise serializers.ValidationError(
+                "This doesn't look like waste. Please upload a valid waste photo."
+            )
 
         # Default pending state until the background task fills in the truth.
         # result is None exactly when inference deferred (timeout/error) —
@@ -265,26 +265,22 @@ class WasteRequestSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """Validate latitude/longitude are within valid ranges, and attach ML result."""
-        if 'latitude' in data and data['latitude'] is not None:
-            if not (-90 <= data['latitude'] <= 90):
-                raise serializers.ValidationError({'latitude': 'Latitude must be between -90 and 90'})
+        if 'latitude' in data and data['latitude'] is not None and not (-90 <= data['latitude'] <= 90):
+            raise serializers.ValidationError({'latitude': 'Latitude must be between -90 and 90'})
 
-        if 'longitude' in data and data['longitude'] is not None:
-            if not (-180 <= data['longitude'] <= 180):
-                raise serializers.ValidationError({'longitude': 'Longitude must be between -180 and 180'})
+        if 'longitude' in data and data['longitude'] is not None and not (-180 <= data['longitude'] <= 180):
+            raise serializers.ValidationError({'longitude': 'Longitude must be between -180 and 180'})
 
         if 'guest_email' in data and data['guest_email'] in (None, ''):
             # Client sent an empty string — normalize to NULL so the db_index
             # stays usable and unclaimed rows aren't stuffed with blanks.
             data.pop('guest_email')
 
-        if 'photo_latitude' in data and data['photo_latitude'] is not None:
-            if not (-90 <= data['photo_latitude'] <= 90):
-                raise serializers.ValidationError({'photo_latitude': 'Latitude must be between -90 and 90'})
+        if 'photo_latitude' in data and data['photo_latitude'] is not None and not (-90 <= data['photo_latitude'] <= 90):
+            raise serializers.ValidationError({'photo_latitude': 'Latitude must be between -90 and 90'})
 
-        if 'photo_longitude' in data and data['photo_longitude'] is not None:
-            if not (-180 <= data['photo_longitude'] <= 180):
-                raise serializers.ValidationError({'photo_longitude': 'Longitude must be between -180 and 180'})
+        if 'photo_longitude' in data and data['photo_longitude'] is not None and not (-180 <= data['photo_longitude'] <= 180):
+            raise serializers.ValidationError({'photo_longitude': 'Longitude must be between -180 and 180'})
 
         # Attach ML gatekeeper result (set in validate_photo above) so it gets saved.
         # When inference deferred to the background (pending), default to

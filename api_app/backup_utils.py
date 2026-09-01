@@ -245,7 +245,8 @@ def list_backups():
     files = []
     for backup_path in sorted(BACKUP_DIR.glob('backup_*.json'), key=lambda p: p.stat().st_mtime, reverse=True):
         sha_path = BACKUP_DIR / f'{backup_path.name}.sha256'
-        from datetime import datetime, timezone as dt_timezone
+        from datetime import datetime
+        from datetime import timezone as dt_timezone
         created_ts = datetime.fromtimestamp(backup_path.stat().st_mtime, tz=dt_timezone.utc)
         files.append({
             'file_name': backup_path.name,

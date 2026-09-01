@@ -89,7 +89,7 @@ def main() -> None:
         server.sendmail(GMAIL_USER, [TO_ADDRESS], msg.as_string())
         print("EMAIL SENT SUCCESSFULLY")
         server.quit()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI util: handle any SMTP/network error gracefully
         # NEVER print the raw exception with credentials — show type + message only.
         print(f"FAILED: {type(e).__name__}: {e}")
 

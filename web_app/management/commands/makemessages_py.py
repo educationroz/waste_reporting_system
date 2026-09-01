@@ -31,15 +31,15 @@ from django.core.management.base import BaseCommand, CommandError
 
 # {% trans "x" %} / {% translate 'x' %}  (optionally "... as var")
 TRANS_RE = re.compile(
-    r'\{%\s*trans(?:late)?\s+(["\'])(.*?)\1\s*(?:as\s+\w+\s*)?%\}', re.S)
+    r'\{%\s*trans(?:late)?\s+(["\'])(.*?)\1\s*(?:as\s+\w+\s*)?%\}', re.DOTALL)
 # {% blocktrans %}x{% endblocktrans %}
 BLOCK_RE = re.compile(
-    r'\{%\s*blocktrans(?:late)?[^%]*%\}(.*?)\{%\s*endblocktrans(?:late)?\s*%\}', re.S)
+    r'\{%\s*blocktrans(?:late)?[^%]*%\}(.*?)\{%\s*endblocktrans(?:late)?\s*%\}', re.DOTALL)
 # gettext('x') in inline <script> blocks and .js files
 JS_RE = re.compile(r'\bgettext\(\s*(["\'])((?:[^"\'\\]|\\.)*?)\1\s*\)')
 # _('x') / gettext('x') / gettext_lazy('x') in Python
 PY_RE = re.compile(
-    r'\b(?:gettext_lazy|gettext|ugettext|_)\(\s*(["\'])((?:[^"\'\\]|\\.)*?)\1\s*\)', re.S)
+    r'\b(?:gettext_lazy|gettext|ugettext|_)\(\s*(["\'])((?:[^"\'\\]|\\.)*?)\1\s*\)', re.DOTALL)
 
 SKIP_DIRS = {'.venv', 'venv', 'env', 'node_modules', '__pycache__',
              'migrations', '.git', 'staticfiles', 'media', 'locale'}

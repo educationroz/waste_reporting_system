@@ -2,8 +2,13 @@
 #
 # Exposes GOOGLE_CLIENT_ID and system branding (site name, logo, tagline) to all templates.
 
+import logging
+
 from django.conf import settings
 from django.core.cache import cache
+from django.db.utils import DatabaseError
+
+logger = logging.getLogger(__name__)
 
 
 def google_client_id(request):
@@ -30,7 +35,8 @@ def system_branding(request):
                 site_name = 'SafhaSahar'
                 site_logo = ''
                 site_tagline = 'Live Waste Reporting System'
-        except Exception:
+        except DatabaseError:
+            logger.warning('system_branding: database unavailable; using defaults.')
             site_name = 'SafhaSahar'
             site_logo = ''
             site_tagline = 'Live Waste Reporting System'

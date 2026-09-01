@@ -1,9 +1,9 @@
 """
 Admin utilities for logging actions and managing audit trails.
 """
+
+
 from api_app.models import AdminLog
-from django.conf import settings
-import json
 
 
 def get_client_ip(request):
@@ -103,8 +103,9 @@ def get_admin_activity_summary(days=7):
     Returns:
         Dict with activity summary
     """
-    from django.utils import timezone
     from datetime import timedelta
+
+    from django.utils import timezone
     
     since = timezone.now() - timedelta(days=days)
     logs = AdminLog.objects.filter(created_at__gte=since)
@@ -143,8 +144,9 @@ def cleanup_old_logs(days=90):
     Returns:
         Tuple of (deleted_count, deleted_bytes_estimate)
     """
-    from django.utils import timezone
     from datetime import timedelta
+
+    from django.utils import timezone
     
     cutoff = timezone.now() - timedelta(days=days)
     logs = AdminLog.objects.filter(created_at__lt=cutoff)

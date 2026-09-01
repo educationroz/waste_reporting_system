@@ -1,6 +1,10 @@
 from django.urls import path
 
-from .consumers import DriverLocationConsumer, NotificationConsumer, WasteRequestConsumer
+from .consumers import (
+    DriverLocationConsumer,
+    NotificationConsumer,
+    WasteRequestConsumer,
+)
 
 websocket_urlpatterns = [
     path('ws/requests/',        WasteRequestConsumer.as_asgi()),

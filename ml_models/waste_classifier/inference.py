@@ -1,9 +1,10 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torchvision import models, transforms
-from PIL import Image
 import os
+
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from torch import nn
+from torchvision import models, transforms
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), 'gatekeeper_model.pth')
 

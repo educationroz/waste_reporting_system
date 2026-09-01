@@ -1,5 +1,6 @@
-from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.test import TestCase
+
 from api_app.models import AdminLog
 
 User = get_user_model()
@@ -241,9 +242,9 @@ class PageSmokeTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         body = response.content.decode()
-        body = re.sub(r'<!--.*?-->', '', body, flags=re.S)
-        body = re.sub(r'<script.*?</script>', '', body, flags=re.S)
-        body = re.sub(r'<style.*?</style>', '', body, flags=re.S)
+        body = re.sub(r'<!--.*?-->', '', body, flags=re.DOTALL)
+        body = re.sub(r'<script.*?</script>', '', body, flags=re.DOTALL)
+        body = re.sub(r'<style.*?</style>', '', body, flags=re.DOTALL)
 
         devanagari = re.findall(r'[\u0900-\u097F]+', body)
         self.assertGreater(len(devanagari), 50, 'dashboard did not render in Nepali')

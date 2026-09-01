@@ -1,7 +1,7 @@
 import math
 import os
 import tempfile
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -12,6 +12,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, Q
 from django.http import FileResponse, HttpResponse
@@ -115,8 +116,6 @@ backup_logger = logging.getLogger('backup')  # same logger name as backup_utils.
 # थ्रेसहोल्ड (मिटरमा) भन्दा टाढा भए suspicious मानिन्छ — admin लाई flag देखाइन्छ।
 COMPLETION_DISTANCE_THRESHOLD_METERS = 500
 import csv
-
-from django.http import HttpResponse
 
 
 def _haversine_meters(lat1, lng1, lat2, lng2):
@@ -354,7 +353,7 @@ def _bulk_notify_users(users_qs, title, message, notification_type='info'):
     for notification in created:
         try:
             _push_ws_notification(notification)
-        except Exception:
+        except Exception:  # noqa: BLE001 - best-effort broadcast; DB rows already committed
             # One recipient's channel-layer hiccup must never stop the
             # rest of the broadcast from delivering (best-effort — the DB
             # rows are already committed either way).
@@ -413,11 +412,11 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
     def backup(self, request):
         try:
             result = create_backup()
-        except BackupError as exc:
+        except BackupError:
             # create_backup() wraps the real exception in its BackupError
             # message (e.g. "Backup failed: <raw exc>") — that detail is
             # only useful to us, not the client.
-            backup_logger.exception('Database backup creation failed: %s', exc)
+            backup_logger.exception('Database backup creation failed.')
             return Response(
                 {'error': 'Backup failed. Please check server logs or try again.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -484,7 +483,7 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
                     ip_address=request.META.get('REMOTE_ADDR'),
                     user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
                 )
-            except Exception as log_exc:
+            except Exception as log_exc:  # noqa: BLE001 - audit-log write must not break restore flow
                 backup_logger.warning('Failed to log rejected restore password check: %s', log_exc)
             return Response(
                 {'error': 'Incorrect password. Restore was cancelled for your protection.'},
@@ -515,7 +514,7 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
                 ip_address=request.META.get('REMOTE_ADDR'),
                 user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
             )
-        except Exception as log_exc:
+        except Exception as log_exc:  # noqa: BLE001 - audit-log write must not break restore flow
             backup_logger.warning('Failed to log restore attempt: %s', log_exc)
 
         # BUG FIX (T3.1): this used to stage the file, run its OWN manual
@@ -573,7 +572,7 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
                         ip_address=request.META.get('REMOTE_ADDR'),
                         user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
                     )
-                except Exception as log_exc:
+                except Exception as log_exc:  # noqa: BLE001 - audit-log write must not mask the real failure
                     backup_logger.warning('Failed to log restore failure: %s', log_exc)
 
                 # Pre-flush validation failures (bad JSON / not a fixture /
@@ -630,7 +629,7 @@ class DatabaseBackupViewSet(viewsets.GenericViewSet):
                     ip_address=request.META.get('REMOTE_ADDR'),
                     user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
                 )
-        except Exception as log_exc:
+        except Exception as log_exc:  # noqa: BLE001 - audit-log write must not break the restore response
             backup_logger.warning('Post-restore admin-log write failed: %s', log_exc)
 
         return Response({
@@ -724,7 +723,7 @@ class DriverViewSet(viewsets.ModelViewSet):
 
         try:
             validate_password(password)
-        except Exception as exc:
+        except ValidationError as exc:
             messages = []
             for item in exc:
                 messages.extend(item)
@@ -889,8 +888,8 @@ class DriverViewSet(viewsets.ModelViewSet):
                 driver.current_latitude = lat
                 driver.current_longitude = lng
                 driver.save(update_fields=['current_latitude', 'current_longitude'])
-            except Exception:
-                pass
+            except Exception:  # noqa: BLE001 - GPS broadcast should degrade gracefully
+                logger.warning(f'[GPS] failed to persist driver location for driver={driver.id}.')
 
         plate = driver.vehicle.plate_number if driver.vehicle else 'Vehicle'
         driver_name = driver.user.username
@@ -1468,7 +1467,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             try:
                 from .tasks import run_ml_classification_async, submit
                 submit(run_ml_classification_async, waste_request.id, ml_bytes)
-            except Exception:
+            except Exception:  # noqa: BLE001 - scheduling must not break report submission
                 logger.warning(
                     f'[ML] could not schedule background classification for '
                     f'request={waste_request.id}; left flagged for manual review.'
@@ -1486,7 +1485,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 validate_image_file(photo_file)
                 clean_file = sanitize_image(photo_file)
                 clean_file = compress_image(clean_file)
-            except Exception:
+            except Exception:  # noqa: BLE001 - a bad photo must not break the whole report
                 logger.warning(
                     f'[EXTRA PHOTO SKIP] request={waste_request.id} idx={idx} '
                     f'rejected during validation/sanitize/compress — skipping this photo only.'
@@ -1536,7 +1535,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[guest_email],
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - an unroutable guest email must not fail the report
                 logger.warning(
                     f'[GUEST MAIL] could not send confirmation for request={waste_request.id} '
                     f'(guest email present but unroutable).'
@@ -1598,7 +1597,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 notification_type='info',
                 related_request=waste_request,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - notification push must not break driver assignment
             logger.warning(
                 f'[ASSIGN_DRIVER] notification push failed for request={waste_request.id} '
                 f'— driver/status was already saved successfully, only the live '
@@ -1779,7 +1778,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                     notification_type='info',
                     related_request=waste_request,
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001 - notification push must not break the status change
             logger.warning(
                 f'[UPDATE_STATUS] notification push failed for request={waste_request.id} '
                 f'— status was already saved successfully.'
@@ -1940,7 +1939,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                     message=f'You have been assigned {updated} new pickup request(s).',
                     notification_type='info',
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001 - notification push must not break bulk assignment
             logger.warning('[BULK_ASSIGN_DRIVER] notification push failed, DB update already committed.')
 
         _log_admin_action(
@@ -2017,7 +2016,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                     notification_type='warning',
                     related_request=waste_request,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - notification push must not break review resolution
                 logger.warning(f'[RESOLVE_REVIEW] notification push failed for request={waste_request.id}.')
 
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
@@ -2102,14 +2101,14 @@ class RouteViewSet(viewsets.ModelViewSet):
         # Parse planned_date once, outside the transaction — pure parsing, no DB touch.
         if planned_date:
             try:
-                planned_date = datetime.strptime(planned_date, '%Y-%m-%d').date()
+                planned_date = timezone.datetime.strptime(planned_date, '%Y-%m-%d').date()
             except (ValueError, TypeError):
                 return Response(
                     {'error': 'planned_date must be in YYYY-MM-DD format.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         else:
-            planned_date = datetime.now().date()
+            planned_date = timezone.now().date()
 
         # ── Transaction + row locking ───────────────────────────────────────
         # Two concurrent admins can't double-assign the same request because:
@@ -2324,7 +2323,7 @@ class ScheduleViewSet(viewsets.ModelViewSet):
                             f'schedule ({schedule.get_frequency_display()}).',
                     notification_type='info',
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - notification push must never fail the request
                 logger.warning(f'[SCHEDULE CREATE] notification push failed for schedule={schedule.id}.')
 
     def perform_update(self, serializer):
@@ -2341,7 +2340,7 @@ class ScheduleViewSet(viewsets.ModelViewSet):
                     message=f'Your collection schedule for "{schedule.zone_name}" has been updated.',
                     notification_type='info',
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - notification push must never fail the request
                 logger.warning(f'[SCHEDULE UPDATE] notification push failed for schedule={schedule.id}.')
 
     def perform_destroy(self, instance):
@@ -2572,7 +2571,7 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
                 validate_image_file(logo_file)
                 clean_logo = sanitize_image(logo_file)
                 clean_logo = compress_image(clean_logo)
-            except Exception:
+            except Exception:  # noqa: BLE001 - validated image still failed processing
                 return Response(
                     {'error': 'Invalid image file. Upload a valid PNG, JPG, GIF or WebP (max 5MB).'},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -2713,7 +2712,7 @@ class ComplaintViewSet(viewsets.ModelViewSet):
                 message=f'Your complaint "{complaint.subject}" status changed to: {complaint.get_status_display()}.',
                 notification_type='success' if new_status == 'completed' else 'info',
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - notification push must never break the status change
             logger.warning(f'[COMPLAINT UPDATE_STATUS] notification push failed for complaint={complaint.id}.')
  
         return Response(ComplaintSerializer(complaint, context={'request': request}).data)
@@ -2752,7 +2751,7 @@ class ComplaintViewSet(viewsets.ModelViewSet):
                     message=f'Your complaint "{complaint.subject}" status changed to: {complaint.get_status_display()}.',
                     notification_type='success' if new_status == 'completed' else 'info',
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - notification push must never break the bulk update
                 logger.warning(f'[COMPLAINT BULK UPDATE] notification push failed for complaint={complaint.id}.')
 
         _log_admin_action(
@@ -2837,7 +2836,7 @@ class ThumbnailView(APIView):
     def get(self, request, size):
         import re
 
-        from django.http import FileResponse, Http404
+        from django.http import Http404
 
         from .thumbnails import get_or_create_thumbnail
 
@@ -2859,7 +2858,7 @@ class ThumbnailView(APIView):
         try:
             with source.storage.open(stored_name, 'rb') as fh:
                 content = fh.read()
-        except Exception:
+        except OSError:
             raise Http404('Thumbnail not available.')
 
         content_type = 'image/png' if stored_name.endswith('.png') else 'image/jpeg'

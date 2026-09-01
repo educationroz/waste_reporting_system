@@ -265,7 +265,7 @@ class WebSocketMessageRateTests(TransactionTestCase):
                 )
                 try:
                     output = await c.receive_output(timeout=0.4)
-                except Exception:
+                except Exception:  # noqa: BLE001,S112 - timeout: keep draining until the close frame arrives
                     continue
                 if output['type'] == 'websocket.close':
                     close_code = output.get('code')
