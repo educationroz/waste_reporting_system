@@ -102,16 +102,69 @@ class Driver(models.Model):
         help_text='Driving license document (PDF only, max 5MB)'
     )
 
+    # ── Break / shift management ──────────────────────────────────────
+    # Driver marks themselves On Break (lunch, fuel, rest). While on break the
+    # driver is NOT available (is_available stays False). The reason + start
+    # timestamp are recorded, and each break session is logged in
+    # DriverBreakLog for an audit trail / analytics.
+    on_break = models.BooleanField(
+        default=False,
+        help_text='True while the driver has marked themselves on a break.'
+    )
+    break_reason = models.CharField(
+        max_length=50, blank=True, null=True,
+        help_text='Optional reason for the current break (lunch, fuel, rest, other).'
+    )
+    break_started_at = models.DateTimeField(
+        blank=True, null=True,
+        help_text='When the current break session started.'
+    )
+
     class Meta:
         db_table = 'drivers'
         indexes = [
             models.Index(fields=['is_available', 'vehicle']),
             models.Index(fields=['is_available', '-created_at']),
+<<<<<<< HEAD
             models.Index(fields=['zone', 'is_available']),
+=======
+            models.Index(fields=['is_available', 'on_break']),
+            models.Index(fields=['on_break', '-break_started_at']),
+>>>>>>> d04dda4f441a820cfafc956ec2bce9dd00ee5956
         ]
 
     def __str__(self):
         return f"Driver: {self.user.username}"
+
+
+class DriverBreakLog(models.Model):
+    """One logged break session. Written on break start, closed on break end."""
+    REASON_CHOICES = [
+        ('lunch', _('Lunch')),
+        ('fuel', _('Fuel')),
+        ('rest', _('Rest')),
+        ('other', _('Other')),
+    ]
+
+    driver = models.ForeignKey(
+        Driver, on_delete=models.CASCADE, related_name='break_logs'
+    )
+    started_at = models.DateTimeField()
+    ended_at = models.DateTimeField(blank=True, null=True)
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES, default='other')
+    note = models.CharField(max_length=50, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'driver_break_logs'
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['driver', '-started_at']),
+            models.Index(fields=['driver', 'ended_at']),
+        ]
+
+    def __str__(self):
+        return f"Break for {self.driver.user.username} ({self.get_reason_display()})"
 
 
 class Bin(models.Model):

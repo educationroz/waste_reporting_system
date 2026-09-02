@@ -1,4 +1,24 @@
-const CACHE_NAME = 'waste-management-v1';
+const CACHE_NAME = 'waste-management-v2';
+
+// ── Offline route caching ──────────────────────────────────────────────────
+// GET endpoints the driver dashboard reads to draw the route map and its
+// performance stats. Responses to these are cached stale-while-revalidate so
+// the map/stats can still render (from the last-good snapshot) on patchy
+// mobile data or full offline. Only 200 responses are saved; backend scopes
+// each response to the authenticated driver, so nothing cross-leaks.
+const ROUTE_API_PREFIXES = [
+    '/api/waste-requests/',
+    '/api/routes/',
+    '/api/checkpoints/',
+    '/api/drivers/',
+];
+
+function isRouteApiRequest(requestUrl) {
+    if (!requestUrl || !requestUrl.pathname) return false;
+    return ROUTE_API_PREFIXES.some((prefix) =>
+        requestUrl.pathname.startsWith(prefix)
+    );
+}
 
 // Install event - cache the app shell
 self.addEventListener('install', (event) => {
@@ -94,8 +114,8 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Never cache API calls or WebSocket upgrades
-    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws/')) {
+    // WebSocket upgrades are never cached.
+    if (url.pathname.startsWith('/ws/')) {
         return;
     }
 
@@ -105,6 +125,42 @@ self.addEventListener('fetch', (event) => {
     // a SW is governed by connect-src, and third-party hosts aren't listed
     // there) and bloats the cache with thousands of third-party files.
     if (url.origin !== location.origin) {
+        return;
+    }
+
+    // Route-data API reads: stale-while-revalidate. Serve the last good
+    // snapshot immediately if present, and refresh the cache in the
+    // background when the network allows. This keeps the route map and
+    // performance stats usable while offline or on slow links.
+    if (isRouteApiRequest(url)) {
+        event.respondWith(
+            caches.match(req).then((cached) => {
+                const network = fetch(req)
+                    .then((res) => {
+                        if (res && res.status === 200) {
+                            const copy = res.clone();
+                            caches.open(CACHE_NAME).then((cache) => {
+                                cache.put(req, copy).catch(() => {});
+                            });
+                        }
+                        return res;
+                    })
+                    .catch(() => cached);
+                // Always return a valid Response: cached, or network, or offline fallback.
+                return cached || network || Promise.resolve(
+                    new Response(JSON.stringify({ error: 'Offline', cached: false }), {
+                        status: 503,
+                        statusText: 'Service Unavailable',
+                        headers: { 'Content-Type': 'application/json' },
+                    })
+                );
+            })
+        );
+        return;
+    }
+
+    // Never cache other API calls
+    if (url.pathname.startsWith('/api/')) {
         return;
     }
 
@@ -158,7 +214,14 @@ self.addEventListener('fetch', (event) => {
                 })
                 .catch(() => cached); // Return cached version if network fails
 
-            return cached || network;
+            // Always return a valid Response
+            return cached || network || Promise.resolve(
+                new Response('Offline', {
+                    status: 503,
+                    statusText: 'Service Unavailable',
+                    headers: { 'Content-Type': 'text/plain' },
+                })
+            );
         })
     );
 });

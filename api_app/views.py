@@ -15,7 +15,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import F, Q
+from django.db.models import Count, F, Q
 from django.http import FileResponse, HttpResponse
 from django.utils import timezone
 from rest_framework import filters, status, viewsets  # type: ignore
@@ -44,6 +44,7 @@ from .models import (
     Checkpoint,
     Complaint,
     Driver,
+    DriverBreakLog,
     Notification,
     PushSubscription,
     Route,
@@ -851,6 +852,138 @@ class DriverViewSet(viewsets.ModelViewSet):
             f'{driver.user.username} availability set to {driver.is_available}'
         )
         return Response(DriverSerializer(driver).data)
+
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
+    def set_break(self, request, pk=None):
+        """PATCH /api/drivers/{id}/set_break/
+        Driver marks themselves On Break / Back from break.
+        Body: {on_break: true, reason: 'lunch'}  OR  {on_break: false}
+        While on break the driver is NOT available. Each session is logged.
+        """
+        driver = self.get_object()
+        if request.user.role != 'admin' and driver.user != request.user:
+            return Response(
+                {'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        on_break = _parse_bool(request.data.get('on_break'))
+        now = timezone.now()
+
+        if on_break:
+            if driver.on_break:
+                return Response(
+                    {'error': 'Driver is already on break.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            new_reason = (request.data.get('reason') or '').strip() or 'other'
+            if new_reason not in dict(DriverBreakLog.REASON_CHOICES):
+                new_reason = 'other'
+            driver_reason = new_reason if new_reason != 'other' else ''
+            driver.on_break = True
+            driver.break_reason = driver_reason
+            driver.break_started_at = now
+            driver.is_available = False
+            driver.save(update_fields=[
+                'on_break', 'break_reason', 'break_started_at', 'is_available',
+            ])
+            DriverBreakLog.objects.create(
+                driver=driver, started_at=now, reason=new_reason,
+            )
+            log_note = f'{driver.user.username} on break ({new_reason})'
+        else:
+            if not driver.on_break and not driver.break_started_at:
+                return Response(
+                    {'error': 'Driver is not on break.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            log = driver.break_logs.filter(ended_at__isnull=True).order_by('-started_at').first()
+            if log:
+                log.ended_at = now
+                log.save(update_fields=['ended_at'])
+            driver.on_break = False
+            driver.break_reason = ''
+            driver.break_started_at = None
+            # Return to whatever the driver's normal availability was; we keep
+            # it available (a break is a pause, not an end of shift).
+            driver.is_available = True
+            driver.save(update_fields=[
+                'on_break', 'break_reason', 'break_started_at', 'is_available',
+            ])
+            log_note = f'{driver.user.username} back from break'
+
+        _log_admin_action(
+            request, 'update', 'Driver', driver, log_note,
+        )
+        return Response(DriverSerializer(driver).data)
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def performance(self, request, pk=None):
+        """GET /api/drivers/{id}/performance/?range=today|week|month|all
+        Driver's own performance stats: trips completed, average route
+        distance, on-time rate for the selected time range.
+        """
+        driver = self.get_object()
+        if request.user.role != 'admin' and driver.user != request.user:
+            return Response(
+                {'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        rng = (request.query_params.get('range') or 'month').strip().lower()
+        now = timezone.localtime(timezone.now())
+        def _day_start(d):
+            return timezone.make_aware(
+                timezone.datetime(d.year, d.month, d.day)
+            )
+        if rng == 'today':
+            start = _day_start(now.date())
+        elif rng == 'week':
+            # Week starts on Monday
+            monday = now.date() - timedelta(days=now.weekday())
+            start = _day_start(monday)
+        elif rng == 'all':
+            start = None
+        else:  # month
+            start = timezone.make_aware(timezone.datetime(now.year, now.month, 1))
+
+        completed_qs = WasteRequest.objects.filter(
+            driver=driver, status='completed', completed_at__isnull=False,
+        )
+        if start is not None:
+            completed_qs = completed_qs.filter(completed_at__gte=start)
+
+        completed_ids = list(completed_qs.values_list('id', flat=True))
+        completed_count = len(completed_ids)
+
+        # On-time rate: completed on/before the scheduled date (+2h grace).
+        on_time = 0
+        for wr in completed_qs.only('completed_at', 'scheduled_date'):
+            if wr.completed_at and wr.scheduled_date:
+                if wr.completed_at <= (wr.scheduled_date + timedelta(hours=2)):
+                    on_time += 1
+        on_time_rate = round((on_time / completed_count) * 100, 1) if completed_count else 0.0
+
+        # Average route distance: mean total_distance_km of routes COMPLETED
+        # by this driver in the range (proxy for per-trip distance, since true
+        # per-request travel distance is not recorded).
+        routes_qs = Route.objects.filter(
+            driver=driver, status='completed', completed_at__isnull=False,
+        )
+        if start is not None:
+            routes_qs = routes_qs.filter(completed_at__gte=start)
+        route_distances = list(routes_qs.values_list('total_distance_km', flat=True))
+        avg_distance = (
+            round(sum(route_distances) / len(route_distances), 2)
+            if route_distances else 0.0
+        )
+
+        return Response({
+            'range': rng,
+            'trips_completed': completed_count,
+            'avg_distance_km': avg_distance,
+            'on_time_rate': on_time_rate,
+            'on_time': on_time,
+            'total_completed': completed_count,
+        })
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def update_location(self, request, pk=None):
@@ -2023,6 +2156,164 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             'updated': updated,
             'updated_ids': found_ids,
             'missing_ids': missing_ids,
+        })
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def bulk_update_status(self, request):
+        """POST /api/waste-requests/bulk_update_status/
+        Batch status transition for MULTIPLE requests at once.
+        Body: {ids: [...], status: 'in_progress'|'completed'|'cancelled', latitude?, longitude?}
+
+        Allowed statuses:
+          - 'in_progress' — driver starts work on their assigned requests
+          - 'completed'   — driver completes them (GPS required, per-request
+                            completion distance verification like update_status)
+          - 'cancelled'   — driver cancels their own pending/assigned requests
+
+        Only drivers (on their own requests) and admins may use this.
+        """
+        if request.user.role not in ('admin', 'driver'):
+            return Response({'error': 'Drivers and admins only.'}, status=status.HTTP_403_FORBIDDEN)
+
+        ids = request.data.get('ids', [])
+        new_status = request.data.get('status')
+        if not ids or not isinstance(ids, list):
+            return Response({'error': 'ids (list) is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        valid_statuses = ('in_progress', 'completed', 'cancelled')
+        if new_status not in valid_statuses:
+            return Response(
+                {'error': f'Invalid status. Choose: {list(valid_statuses)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            clean_ids = [int(i) for i in ids]
+        except (TypeError, ValueError):
+            return Response({'error': 'ids must be a list of integers.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        comp_lat = comp_lng = None
+        if new_status == 'completed':
+            raw_lat = request.data.get('latitude')
+            raw_lng = request.data.get('longitude')
+            missing_gps = raw_lat in (None, '') or raw_lng in (None, '')
+            if missing_gps and request.user.role != 'admin':
+                return Response(
+                    {'error': 'GPS location is required to mark requests as completed. Please enable location access and try again.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not missing_gps:
+                try:
+                    comp_lat = float(raw_lat)
+                    comp_lng = float(raw_lng)
+                except (TypeError, ValueError):
+                    return Response({'error': 'Invalid GPS coordinates.'}, status=status.HTTP_400_BAD_REQUEST)
+                if not (-90.0 <= comp_lat <= 90.0) or not (-180.0 <= comp_lng <= 180.0):
+                    return Response({'error': 'GPS coordinates out of range.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Eligibility by target status:
+        #  - completed/in_progress: must be assigned to this driver (or any, for admin) and not terminal
+        #  - cancelled: only pending/assigned (admins may cancel any; drivers only their own, cancelled stays)
+        now = timezone.now()
+        qs = WasteRequest.objects.select_related('driver', 'user').filter(
+            id__in=clean_ids, is_deleted=False,
+        )
+
+        # Driver scope: only their own requests
+        if request.user.role == 'driver':
+            qs = qs.filter(driver__user=request.user)
+
+        eligible = qs.exclude(status__in=['completed', 'cancelled'])
+        eligible_ids = set(eligible.values_list('id', flat=True))
+        # For completed/start, skip rows already flagged for manual review? No —
+        # drivers should be able to complete even review-flagged requests, but
+        # keep them visible to admin. We allow all non-terminal.
+
+        matched_ids = set(
+            WasteRequest.objects.filter(id__in=clean_ids).values_list('id', flat=True)
+        )
+        missing_ids = [i for i in clean_ids if i not in matched_ids]
+        ineligible_ids = [i for i in clean_ids if i in matched_ids and i not in eligible_ids]
+
+        if new_status == 'completed':
+            flagged = []
+            completed = 0
+            for wr in eligible:
+                pickup_lat = wr.latitude if wr.latitude is not None else wr.photo_latitude
+                pickup_lng = wr.longitude if wr.longitude is not None else wr.photo_longitude
+                dist = None
+                is_flagged = False
+                if comp_lat is not None and comp_lng is not None and pickup_lat is not None and pickup_lng is not None:
+                    dist = round(_haversine_meters(float(pickup_lat), float(pickup_lng), comp_lat, comp_lng), 1)
+                    is_flagged = dist > COMPLETION_DISTANCE_THRESHOLD_METERS
+
+                wr.status = 'completed'
+                wr.completed_at = now
+                wr.completion_latitude = comp_lat
+                wr.completion_longitude = comp_lng
+                wr.completion_distance_meters = dist
+                wr.completion_flagged = is_flagged
+                wr.save(update_fields=[
+                    'status', 'completed_at', 'completion_latitude',
+                    'completion_longitude', 'completion_distance_meters',
+                    'completion_flagged',
+                ])
+                completed += 1
+                if is_flagged:
+                    flagged.append(wr.id)
+                    _log_admin_action(
+                        request, 'other', 'WasteRequest', wr,
+                        f'⚠️ Request #{wr.id} bulk-completed {dist}m from pickup by {request.user.username} — flagged.'
+                    )
+                if wr.user_id:
+                    _create_notification(
+                        user=wr.user,
+                        title='Report Completed',
+                        message=f'Your waste pickup request #{wr.id} has been completed.',
+                        notification_type='success',
+                        related_request=wr,
+                    )
+
+            # Bump total_trips correctly per driver: one driver may complete
+            # many rows in this batch, admins may complete rows for several
+            # drivers. Count completed rows per driver and add that many.
+            per_driver = (
+                WasteRequest.objects
+                .filter(id__in=clean_ids, status='completed', driver_id__isnull=False)
+                .values('driver_id')
+                .annotate(n=Count('id'))
+            )
+            for row in per_driver:
+                Driver.objects.filter(pk=row['driver_id']).update(
+                    total_trips=F('total_trips') + row['n']
+                )
+
+            _log_admin_action(
+                request, 'status_change', 'WasteRequest', None,
+                f'Bulk-completed {completed} request(s): {list(eligible_ids)}'
+            )
+            return Response({
+                'updated': completed,
+                'updated_ids': list(eligible_ids),
+                'missing_ids': missing_ids,
+                'ineligible_ids': ineligible_ids,
+                'flagged_ids': flagged,
+            })
+
+        update_fields = ['status']
+        if new_status == 'cancelled':
+            updated = eligible.update(status='cancelled')
+        else:  # in_progress
+            updated = eligible.update(status='in_progress')
+
+        _log_admin_action(
+            request, 'status_change', 'WasteRequest', None,
+            f'Bulk-{new_status} {updated} request(s): {list(eligible_ids)}'
+        )
+        return Response({
+            'updated': updated,
+            'updated_ids': list(eligible_ids),
+            'missing_ids': missing_ids,
+            'ineligible_ids': ineligible_ids,
         })
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])

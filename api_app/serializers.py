@@ -68,8 +68,9 @@ class DriverSerializer(serializers.ModelSerializer):
             'license_number', 'license_document', 'is_available',
             'current_latitude', 'current_longitude',
             'total_trips', 'created_at',
+            'on_break', 'break_reason', 'break_started_at',
         )
-        read_only_fields = ('total_trips', 'created_at')
+        read_only_fields = ('total_trips', 'created_at', 'on_break', 'break_reason', 'break_started_at')
 
     def validate_license_document(self, file):
         """
