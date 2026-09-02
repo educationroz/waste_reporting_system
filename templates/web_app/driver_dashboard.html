@@ -140,17 +140,23 @@
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <div class="card border-0 {% if driver.is_available %}bg-success{% else %}bg-secondary{% endif %} bg-opacity-10 h-100" id="availability-stat-card">
+                    <div class="card border-0 {% if driver.on_break %}bg-danger{% elif driver.is_available %}bg-success{% else %}bg-secondary{% endif %} bg-opacity-10 h-100" id="availability-stat-card">
                         <div class="card-body text-center">
                             <div class="text-muted small">{% trans "Status" %}</div>
-                            <div class="fw-bold {% if driver.is_available %}text-success{% else %}text-secondary{% endif %}" id="availability-label">
-                                {% if driver.is_available %}{% trans "Available" %}{% else %}{% trans "Busy" %}{% endif %}
+                            <div class="fw-bold {% if driver.on_break %}text-danger{% elif driver.is_available %}text-success{% else %}text-secondary{% endif %}" id="availability-label">
+                                {% if driver.on_break %}{% trans "On Break" %}{% elif driver.is_available %}{% trans "Available" %}{% else %}{% trans "Busy" %}{% endif %}
                             </div>
-                            <button class="btn btn-sm {% if driver.is_available %}btn-outline-secondary{% else %}btn-outline-success{% endif %} mt-1"
-                                id="toggle-availability-btn"
-                                onclick="toggleAvailability()">
-                                {% trans "Toggle" %}
-                            </button>
+                            {% if driver.on_break %}
+                                <div class="small text-muted" id="break-info">
+                                    {% if driver.break_reason %}{{ driver.break_reason }}{% endif %}
+                                    {% if driver.break_started_at %}&middot; {{ driver.break_started_at|date:"H:i" }}{% endif %}
+                                </div>
+                            {% else %}
+                                <button class="btn btn-sm btn-outline-danger mt-1" id="start-break-btn"
+                                    onclick="openBreakModal()" title="{% trans 'Mark yourself on a break' %}">
+                                    <i class="bi bi-cup-hot me-1"></i>{% trans "On Break" %}
+                                </button>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -163,6 +169,36 @@
                     </div>
                 </div>
             </div>
+
+            <!-- My Performance -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span><i class="bi bi-bar-chart-line text-success me-2"></i>{% trans "My Performance" %}</span>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="{% trans 'Performance range' %}">
+                        <button type="button" class="btn btn-outline-success" data-perf-range="today" onclick="loadPerformance('today', this)">{% trans "Today" %}</button>
+                        <button type="button" class="btn btn-outline-success" data-perf-range="week" onclick="loadPerformance('week', this)">{% trans "This Week" %}</button>
+                        <button type="button" class="btn btn-outline-success active" data-perf-range="month" onclick="loadPerformance('month', this)">{% trans "This Month" %}</button>
+                        <button type="button" class="btn btn-outline-success" data-perf-range="all" onclick="loadPerformance('all', this)">{% trans "All Time" %}</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 text-center" id="performance-body">
+                        <div class="col-4">
+                            <div class="text-muted small">{% trans "Trips Completed" %}</div>
+                            <div class="fs-3 fw-bold text-success" id="perf-trips">–</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted small">{% trans "Avg Route Distance" %}</div>
+                            <div class="fs-3 fw-bold text-info" id="perf-distance">–</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted small">{% trans "On-Time Rate" %}</div>
+                            <div class="fs-3 fw-bold text-warning" id="perf-ontime">–</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- /My Performance -->
 
             <!-- Route & Reports Map -->
             <div class="card shadow-sm mb-4">
@@ -190,6 +226,23 @@
                     <span class="legend-item">{% trans "🚩 Checkpoint (drop-off point)" %}</span>
                     <span class="legend-item">{% trans "🚛 Your last known location" %}</span>
                     <span class="legend-item"><span style="border-top:3px solid #198754; width:20px; display:inline-block;"></span>{% trans "Admin-generated route (road path)" %}</span>
+                </div>
+
+                <!-- In-app navigation panel: turn-by-turn to a selected stop -->
+                <div id="nav-panel" class="d-none border-top">
+                    <div class="nav-panel-header d-flex justify-content-between align-items-center px-3 py-2 bg-success bg-opacity-10">
+                        <span class="fw-bold small"><i class="bi bi-sign-turn-right me-1"></i>{% trans "Navigation" %}</span>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="stopNavigation()" title="{% trans 'Close navigation' %}">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <div class="nav-panel-body px-3 py-2">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong id="nav-dest" class="small"></strong>
+                            <span class="text-muted small" id="nav-summary"></span>
+                        </div>
+                        <ol id="nav-steps" class="nav-steps ps-3 mb-0 small"></ol>
+                    </div>
                 </div>
             </div>
 
@@ -233,17 +286,42 @@
 
             <!-- Assigned Requests -->
             <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white fw-bold">
-                    <i class="bi bi-clipboard-check text-success me-2"></i>{% trans "My Assigned Requests" %}
+                <div class="card-header bg-white fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span><i class="bi bi-clipboard-check text-success me-2"></i>{% trans "My Assigned Requests" %}</span>
+                    <!-- Batch action bar (shown when ≥1 row selected) -->
+                    <div class="d-none align-items-center gap-2" id="batch-action-bar">
+                        <span class="badge bg-dark" id="batch-count">0</span>
+                        <button class="btn btn-sm btn-outline-info" onclick="batchStatus('in_progress')">
+                            <i class="bi bi-play-circle me-1"></i>{% trans "Start Selected" %}
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" onclick="batchStatus('completed')">
+                            <i class="bi bi-check2-circle me-1"></i>{% trans "Complete Selected" %}
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="batchStatus('cancelled')">
+                            <i class="bi bi-x-circle me-1"></i>{% trans "Cancel Selected" %}
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="clearBatchSelection()">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body p-0 table-responsive">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
-                            <tr><th>#</th><th>{% trans "User" %}</th><th>{% trans "Address" %}</th><th>{% trans "Type" %}</th><th>{% trans "Status" %}</th><th>{% trans "Date" %}</th><th>{% trans "Action" %}</th></tr>
+                            <tr>
+                                <th style="width:36px;">
+                                    <input type="checkbox" class="form-check-input" id="select-all-batch" onclick="toggleSelectAll(this)">
+                                </th>
+                                <th>#</th><th>{% trans "User" %}</th><th>{% trans "Address" %}</th><th>{% trans "Type" %}</th><th>{% trans "Status" %}</th><th>{% trans "Date" %}</th><th>{% trans "Action" %}</th>
+                            </tr>
                         </thead>
                         <tbody id="assigned-requests-body">
                             {% for req in assigned_requests %}
                             <tr id="assigned-row-{{ req.id }}">
+                                <td>
+                                    <input type="checkbox" class="form-check-input row-batch-check" value="{{ req.id }}"
+                                        data-status="{{ req.status }}" onclick="refreshBatchBar()">
+                                </td>
                                 <td>{{ req.id }}</td>
                                 <td>{{ req.user.username }}</td>
                                 <td class="small">{{ req.pickup_address|truncatechars:30 }}</td>
@@ -266,7 +344,7 @@
                                 </td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="7" class="text-center text-muted py-3">{% trans "No assigned requests." %}</td></tr>
+                            <tr><td colspan="8" class="text-center text-muted py-3">{% trans "No assigned requests." %}</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -317,6 +395,35 @@
                 </div>
             </div>
             {# ===== END COMPLETED WORK HISTORY ===== #}
+
+            {# ===== BREAK MODAL ===== #}
+            <div class="modal fade" id="breakModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-sm">
+                    <div class="modal-content border-0 shadow-lg" style="border-radius: 18px;">
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold"><i class="bi bi-cup-hot text-danger me-2"></i>{% trans "Start a Break" %}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label class="form-label small text-muted">{% trans "Break reason" %}</label>
+                            <div class="d-flex flex-wrap gap-2 mb-3" id="break-reason-options">
+                                <button type="button" class="btn btn-sm btn-outline-danger active" data-reason="lunch">{% trans "Lunch" %}</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-reason="fuel">{% trans "Fuel" %}</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-reason="rest">{% trans "Rest" %}</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-reason="other">{% trans "Other" %}</button>
+                            </div>
+                            <input type="hidden" id="break-reason-input" value="lunch">
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                            <button type="button" class="btn btn-danger" id="confirm-break-btn">
+                                <i class="bi bi-cup-hot me-1"></i>{% trans "Start Break" %}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {# ===== END BREAK MODAL ===== #}
 
             {% endif %}
         </div> <!-- /मुख्य सामाग्री -->
@@ -740,6 +847,142 @@ window.updateStatus = async function(requestId, newStatus, btn) {
     });
 };
 
+// ── Batch status updates ───────────────────────────────────────────────────
+window.refreshBatchBar = function() {
+    const checks = document.querySelectorAll('.row-batch-check:checked');
+    const bar = document.getElementById('batch-action-bar');
+    const count = document.getElementById('batch-count');
+    if (bar && count) {
+        const n = checks.length;
+        count.textContent = n;
+        bar.classList.toggle('d-none', n === 0);
+        bar.classList.toggle('d-inline-flex', n > 0);
+    }
+    // Toggle the select-all header checkbox
+    const all = document.querySelectorAll('.row-batch-check');
+    const selectAll = document.getElementById('select-all-batch');
+    if (selectAll && all.length) {
+        const allChecked = all.length > 0 && Array.from(all).every(c => c.checked);
+        selectAll.checked = allChecked;
+        selectAll.indeterminate = !allChecked && Array.from(all).some(c => c.checked);
+    }
+};
+
+window.toggleSelectAll = function(el) {
+    const checks = document.querySelectorAll('.row-batch-check');
+    checks.forEach(c => { c.checked = el.checked; });
+    refreshBatchBar();
+};
+
+window.clearBatchSelection = function() {
+    document.querySelectorAll('.row-batch-check').forEach(c => { c.checked = false; });
+    refreshBatchBar();
+};
+
+// Resolve a one-shot GPS fix for batch completion (10s timeout, hard-block if none).
+window.getBatchGpsFix = function() {
+    return new Promise(function(resolve, reject) {
+        if (!navigator.geolocation) { reject(new Error(gettext('Geolocation not supported'))); return; }
+        navigator.geolocation.getCurrentPosition(function(pos) {
+            resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        }, function() {
+            reject(new Error(gettext('Unable to get GPS location.')));
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 2000 });
+    });
+};
+
+window.batchStatus = async function(status, btn) {
+    const checks = document.querySelectorAll('.row-batch-check:checked');
+    if (!checks.length) return;
+    // For start/completed, only include rows that are not already cancelled/completed.
+    const ids = Array.from(checks).map(c => parseInt(c.value, 10));
+
+    let body = { ids: ids, status: status };
+    if (status === 'completed') {
+        // Confirm + obtain one GPS fix
+        const ok = await showConfirmDialog({ message: gettext('Mark selected requests as completed? You need a GPS fix.'), title: gettext('Complete Selected'), confirmText: gettext('Complete') });
+        if (!ok) return;
+        try {
+            showToast(gettext('Getting GPS location…'), 'info');
+            const gps = await getBatchGpsFix();
+            body.latitude = gps.lat;
+            body.longitude = gps.lng;
+        } catch (e) {
+            showToast(e.message || gettext('GPS location required to complete requests.'), 'danger');
+            return;
+        }
+    } else if (status === 'cancelled') {
+        const ok = await showConfirmDialog({ message: gettext('Cancel selected assigned requests?'), title: gettext('Cancel Selected'), confirmText: gettext('Cancel Requests') });
+        if (!ok) return;
+    } else {
+        const ok = await showConfirmDialog({ message: gettext('Mark selected requests as in-progress?'), title: gettext('Start Selected'), confirmText: gettext('Start') });
+        if (!ok) return;
+    }
+
+    const driverId = {{ driver.id|default:'null' }};
+    // Completed uses the PATCH-able location on each row; we use the single fix above.
+    const data = await API.post('/api/waste-requests/bulk_update_status/', body);
+    if (data && typeof data.updated === 'number') {
+        const flagged = (data.flagged_ids || []).length;
+        let msg = interpolate(gettext('%(n)s request(s) updated.'), { n: data.updated }, true);
+        if (flagged > 0) msg += ' ' + interpolate(gettext('%(n)s flagged for review.'), { n: flagged }, true);
+        showToast(msg, 'success');
+        // Refresh everything: remove completed/cancelled rows, update in-progress ones.
+        (data.updated_ids || []).forEach(function(id) {
+            const row = document.getElementById('assigned-row-' + id);
+            if (!row) return;
+            if (status === 'completed') {
+                removeAssignedRow(id);
+                if (typeof loadMapData === 'function') loadMapData();
+            } else if (status === 'cancelled') {
+                removeAssignedRow(id);
+            } else {
+                // in_progress
+                applyAssignedRowUpdate(id, 'in_progress');
+            }
+        });
+        const actionCount = data.updated;
+        if (status === 'completed') {
+            bumpStat('stat-completed-today', actionCount);
+            bumpStat('stat-total-trips', actionCount);
+            bumpStat('stat-completed-month', actionCount);
+            // Reload history for batch completions
+            if (typeof loadMapData === 'function') loadMapData();
+        }
+        clearBatchSelection();
+    } else {
+        showToast((data && data.error) || gettext('Batch update failed.'), 'danger');
+    }
+};
+
+// ── Performance dashboard ──────────────────────────────────────────────────
+window.loadPerformance = async function(range, btn) {
+    const driverId = {{ driver.id|default:'null' }};
+    if (!driverId) return;
+    // Highlight the active tab
+    document.querySelectorAll('[data-perf-range]').forEach(function(b) {
+        b.classList.remove('active');
+    });
+    if (btn) btn.classList.add('active');
+
+    const data = await API.get(`/api/drivers/${driverId}/performance/?range=${encodeURIComponent(range || 'month')}`);
+    if (!data || typeof data.trips_completed === 'undefined') {
+        showToast(gettext('Failed to load performance stats.'), 'danger');
+        return;
+    }
+    const dist = document.getElementById('perf-distance');
+    if (dist) dist.textContent = data.avg_distance_km ? (data.avg_distance_km + ' km') : '–';
+    const trips = document.getElementById('perf-trips');
+    if (trips) trips.textContent = data.trips_completed;
+    const ontime = document.getElementById('perf-ontime');
+    if (ontime) ontime.textContent = (data.on_time_rate || 0) + '%';
+};
+
+// Load performance on page load (defaults to 'month')
+document.addEventListener('DOMContentLoaded', function() {
+    loadPerformance('month', document.querySelector('[data-perf-range="month"]'));
+});
+
 window.toggleAvailability = async function() {
     const driverId = {{ driver.id|default:'null' }};
     if (!driverId) return;
@@ -747,23 +990,129 @@ window.toggleAvailability = async function() {
     const data = await API.patch(`/api/drivers/${driverId}/toggle_availability/`, {});
     if (data && data.id) {
         showToast(interpolate(gettext('Changed to %(v0)s'), {v0: data.is_available ? 'Available' : 'Busy'}, true), 'success');
-
-        const label = document.getElementById('availability-label');
-        const btn = document.getElementById('toggle-availability-btn');
-        const statCard = document.getElementById('availability-stat-card');
-
-        if (label) {
-            label.textContent = data.is_available ? gettext('Available') : gettext('Busy');
-            label.className = `fw-bold ${data.is_available ? 'text-success' : 'text-secondary'}`;
-        }
-        if (btn) {
-            btn.className = `btn btn-sm ${data.is_available ? 'btn-outline-secondary' : 'btn-outline-success'} mt-1`;
-        }
-        if (statCard) {
-            statCard.className = `card border-0 ${data.is_available ? 'bg-success' : 'bg-secondary'} bg-opacity-10 h-100`;
-        }
+        applyStatusCard(data);
     } else {
         showToast(gettext('Failed to update availability.'), 'danger');
+    }
+};
+
+// ── Break / shift management ───────────────────────────────────────────────
+// Shared DOM updater: renders the Status card from a Driver object payload.
+window.applyStatusCard = function(d) {
+    const label = document.getElementById('availability-label');
+    const statCard = document.getElementById('availability-stat-card');
+    const breakInfo = document.getElementById('break-info');
+    const startBreakBtn = document.getElementById('start-break-btn');
+
+    let text, cls, cardCls;
+    if (d.on_break) {
+        text = gettext('On Break');
+        cls = 'text-danger';
+        cardCls = 'card border-0 bg-danger bg-opacity-10 h-100';
+    } else if (d.is_available) {
+        text = gettext('Available');
+        cls = 'text-success';
+        cardCls = 'card border-0 bg-success bg-opacity-10 h-100';
+    } else {
+        text = gettext('Busy');
+        cls = 'text-secondary';
+        cardCls = 'card border-0 bg-secondary bg-opacity-10 h-100';
+    }
+
+    if (label) {
+        label.textContent = text;
+        label.className = `fw-bold ${cls}`;
+    }
+    if (statCard) {
+        statCard.className = cardCls;
+    }
+
+    if (d.on_break) {
+        // Show "Back from break" button + break info
+        if (startBreakBtn) {
+            startBreakBtn.outerHTML =
+                '<button class="btn btn-sm btn-outline-success mt-1" id="end-break-btn" ' +
+                'onclick="endBreak()" title="' + gettext('Return from break') + '">' +
+                '<i class="bi bi-play-circle me-1"></i>' + gettext('Back') + '</button>';
+        }
+        if (breakInfo) {
+            let info = '';
+            if (d.break_reason) info += d.break_reason;
+            if (d.break_started_at) {
+                const t = new Date(d.break_started_at);
+                if (!isNaN(t.getTime())) {
+                    const hm = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    info += (info ? ' &middot; ' : '') + hm;
+                }
+            }
+            breakInfo.innerHTML = info || '';
+            breakInfo.classList.remove('d-none');
+        }
+    } else {
+        // Show "On Break" button, hide break info
+        if (startBreakBtn) {
+            startBreakBtn.outerHTML =
+                '<button class="btn btn-sm btn-outline-danger mt-1" id="start-break-btn" ' +
+                'onclick="openBreakModal()" title="' + gettext('Mark yourself on a break') + '">' +
+                '<i class="bi bi-cup-hot me-1"></i>' + gettext('On Break') + '</button>';
+        }
+        if (breakInfo) {
+            breakInfo.innerHTML = '';
+            breakInfo.classList.add('d-none');
+        }
+    }
+};
+
+// Break reason selector in the modal
+document.addEventListener('click', function onBreakReasonClick(e) {
+    const btn = e.target.closest('#break-reason-options button');
+    if (!btn) return;
+    document.querySelectorAll('#break-reason-options button').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    const input = document.getElementById('break-reason-input');
+    if (input) input.value = btn.getAttribute('data-reason') || 'other';
+});
+
+window.openBreakModal = function() {
+    const input = document.getElementById('break-reason-input');
+    if (input) input.value = 'lunch';
+    document.querySelectorAll('#break-reason-options button').forEach((b) => {
+        const active = (b.getAttribute('data-reason') || '') === 'lunch';
+        b.classList.toggle('active', active);
+    });
+    const modalEl = document.getElementById('breakModal');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+        new bootstrap.Modal(modalEl).show();
+    }
+};
+
+// Confirm start break
+document.addEventListener('click', async function onConfirmBreak(e) {
+    if (e.target.closest('#confirm-break-btn')) {
+        const driverId = {{ driver.id|default:'null' }};
+        if (!driverId) { e.preventDefault(); return; }
+        const reason = (document.getElementById('break-reason-input') || {}).value || 'other';
+        const modalEl = document.getElementById('breakModal');
+        if (modalEl && typeof bootstrap !== 'undefined') bootstrap.Modal.getInstance(modalEl)?.hide();
+        const data = await API.patch(`/api/drivers/${driverId}/set_break/`, { on_break: true, reason });
+        if (data && data.id) {
+            showToast(gettext('You are now on break.'), 'success');
+            applyStatusCard(data);
+        } else {
+            showToast((data && data.error) || gettext('Failed to start break.'), 'danger');
+        }
+    }
+});
+
+window.endBreak = async function() {
+    const driverId = {{ driver.id|default:'null' }};
+    if (!driverId) return;
+    const data = await API.patch(`/api/drivers/${driverId}/set_break/`, { on_break: false });
+    if (data && data.id) {
+        showToast(gettext('Welcome back!'), 'success');
+        applyStatusCard(data);
+    } else {
+        showToast((data && data.error) || gettext('Failed to end break.'), 'danger');
     }
 };
 
@@ -1044,6 +1393,122 @@ window.centerMap = function() {
     }
 };
 
+/* ==========================================================
+   IN-APP NAVIGATION
+   Given a destination stop, draws a highlighted road-following
+   route from the driver's current position to that stop and
+   lists turn-by-turn instructions (via OSRM stepped=true).
+   ========================================================== */
+let navPolyline = null;
+
+function getDriverOrigin() {
+    // Prefer the last-reported driver marker; fall back to browser GPS.
+    if (driverMarker) {
+        const p = driverMarker.getLatLng();
+        if (p && Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
+            return { found: true, coords: [p.lat, p.lng], source: 'reported' };
+        }
+    }
+    if (INITIAL_DRIVER_LAT !== null && INITIAL_DRIVER_LNG !== null) {
+        return { found: true, coords: [INITIAL_DRIVER_LAT, INITIAL_DRIVER_LNG], source: 'saved' };
+    }
+    return { found: false, coords: null, source: null };
+}
+
+function clearNavPolyline() {
+    if (navPolyline && driverMap) {
+        try { driverMap.removeLayer(navPolyline); } catch (e) {}
+    }
+    navPolyline = null;
+}
+
+window.stopNavigation = function() {
+    clearNavPolyline();
+    const panel = document.getElementById('nav-panel');
+    if (panel) panel.classList.add('d-none');
+    // Redraw the normal route once navigation is closed.
+    if (typeof loadMapData === 'function') loadMapData();
+};
+
+window.navigateToRequest = async function(destLat, destLng, label) {
+    if (!driverMap || isNaN(destLat) || isNaN(destLng)) return;
+    const origin = getDriverOrigin();
+    if (!origin.found) {
+        showToast(window.gettext ? gettext('Your location is unknown — please enable GPS or wait for the location update.') : 'Your location is unknown', 'warning');
+        return;
+    }
+
+    const panel = document.getElementById('nav-panel');
+    const destEl = document.getElementById('nav-dest');
+    const summaryEl = document.getElementById('nav-summary');
+    const stepsEl = document.getElementById('nav-steps');
+
+    if (destEl) destEl.textContent = label || '';
+    if (summaryEl) summaryEl.textContent = window.gettext ? gettext('Calculating…') : 'Calculating…';
+    if (stepsEl) stepsEl.innerHTML = '<li class="text-muted"><i class="bi bi-stopwatch"></i> ' + (window.gettext ? gettext('Contacting routing service…') : 'Contacting routing service…') + '</li>';
+    if (panel) panel.classList.remove('d-none');
+
+    const [olat, olng] = origin.coords;
+    const url = `https://router.project-osrm.org/route/v1/driving/${olng},${olat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=false`;
+
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+            throw new Error('No route found');
+        }
+        const route = data.routes[0];
+
+        clearNavPolyline();
+        const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+        navPolyline = L.polyline(coords, {
+            color: '#0d6efd',
+            weight: 6,
+            opacity: 0.9,
+        }).addTo(driverMap);
+
+        const meters = route.distance || 0;
+        const secs = route.duration || 0;
+        const km = (meters / 1000).toFixed(1);
+        const mins = Math.round(secs / 60);
+        if (summaryEl) summaryEl.textContent = km + ' km · ~' + mins + (window.gettext ? gettext(" min") : " min");
+
+        if (stepsEl) {
+            stepsEl.innerHTML = '';
+            (route.legs || []).forEach(leg => {
+                (leg.steps || []).forEach(step => {
+                    const inst = (step.maneuver && step.maneuver.instruction) ? step.maneuver.instruction : '';
+                    if (!inst) return;
+                    const stepMeters = step.distance || 0;
+                    const li = document.createElement('li');
+                    li.textContent = inst + (stepMeters ? ' (' + Math.round(stepMeters).toString() + ' m)' : '');
+                    stepsEl.appendChild(li);
+                });
+            });
+        }
+
+        // Fit the navigation route into view.
+        whenRendererReady(() => {
+            try {
+                driverMap.invalidateSize();
+                driverMap.fitBounds(L.latLngBounds(coords), { padding: [40, 40], maxZoom: 16, animate: false });
+            } catch (err) {
+                console.warn('nav fitBounds failed', err);
+            }
+        });
+    } catch (err) {
+        console.warn('Navigation routing failed:', err);
+        if (summaryEl) summaryEl.textContent = '';
+        if (stepsEl) stepsEl.innerHTML = '<li class="text-danger">' + (window.gettext ? gettext('Routing failed — are you online?') : 'Routing failed — are you online?') + '</li>';
+        // Fall back to a straight dashed line to the destination.
+        clearNavPolyline();
+        navPolyline = L.polyline([origin.coords, [destLat, destLng]], {
+            color: '#0d6efd', weight: 4, dashArray: '6,6', opacity: 0.9,
+        }).addTo(driverMap);
+    }
+};
+
 window.loadMapData = async function() {
     // FIX: bail out if the map or its layers no longer exist — covers the
     // case where this call was already in flight (awaiting the API calls
@@ -1115,10 +1580,13 @@ window.loadMapData = async function() {
 
         const marker = L.marker(coords, { icon: dotIcon });
 
+        // JS-safe label for the inline onclick (no quotes/apostrophes/newlines)
+        const navLabel = ('Request #' + req.id + ' ' + (req.pickup_address || '')).replace(/["'\r\n]/g, ' ');
         marker.bindPopup(`
             <strong>#${req.id} — ${escapeHtml(req.status_display || req.status)}</strong><br>
             ${req.pickup_address ? escapeHtml(req.pickup_address) : 'No address given'}<br>
-            <span class="text-muted">${escapeHtml(req.waste_type_display || req.waste_type || '')}</span>
+            <span class="text-muted">${escapeHtml(req.waste_type_display || req.waste_type || '')}</span><br>
+            <button class="btn btn-sm btn-success mt-1" onclick="navigateToRequest(${coords[0]}, ${coords[1]}, '${navLabel}'); return false;">🧭 ${window.gettext ? gettext('Navigate here') : 'Navigate here'}</button>
         `);
 
         try {

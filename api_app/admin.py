@@ -4,6 +4,7 @@ from .models import (
     Bin,
     Checkpoint,
     Driver,
+    DriverBreakLog,
     Notification,
     Route,
     Schedule,
@@ -21,9 +22,17 @@ class VehicleAdmin(admin.ModelAdmin):
 
 @admin.register(Driver)
 class DriverAdmin(admin.ModelAdmin):
-    list_display = ('user', 'vehicle', 'license_number', 'is_available', 'total_trips')
-    list_filter = ('is_available',)
+    list_display = ('user', 'vehicle', 'license_number', 'is_available', 'on_break', 'total_trips')
+    list_filter = ('is_available', 'on_break')
     search_fields = ('user__username', 'license_number')
+
+
+@admin.register(DriverBreakLog)
+class DriverBreakLogAdmin(admin.ModelAdmin):
+    list_display = ('driver', 'reason', 'started_at', 'ended_at')
+    list_filter = ('reason',)
+    search_fields = ('driver__user__username',)
+    date_hierarchy = 'started_at'
 
 
 @admin.register(Bin)
