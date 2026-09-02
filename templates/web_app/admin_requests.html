@@ -178,6 +178,16 @@
                         </div>
 
                         <div class="col-lg-3 col-md-6 col-sm-12">
+                            <label class="form-label small fw-semibold text-secondary mb-1">{% trans "Filter Zone" %}</label>
+                            <select name="zone" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').requestSubmit()">
+                                <option value="">{% trans "All Zones" %}</option>
+                                {% for key, label in zone_choices %}
+                                <option value="{{ key }}" {% if current_zone == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-lg-3 col-md-6 col-sm-12">
                             <label class="form-label small fw-semibold text-secondary mb-1">{% trans "Filter Report Date" %}</label>
                             <input type="date" name="report_date" class="form-control" value="{{ current_report_date|default:'' }}"
                                    style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').requestSubmit()">
@@ -190,7 +200,7 @@
                             </select>
                         </div>
 
-                        {% if current_status or current_search or current_waste_type or current_report_date or current_needs_review %}
+                        {% if current_status or current_search or current_waste_type or current_zone or current_report_date or current_needs_review %}
                         <div class="col-12 mt-2 text-end">
                             <a href="{% url 'admin-requests' %}" class="btn btn-sm btn-outline-secondary px-3">
                                 <i class="bi bi-x-circle me-1"></i>{% trans "Clear All Active Filters" %}
@@ -239,6 +249,7 @@
                                     <th>{% trans "# ID" %}</th>
                                     <th>{% trans "Citizen User" %}</th>
                                     <th>{% trans "Waste Vector Classification" %}</th>
+                                    <th>{% trans "Zone" %}</th>
                                     <th>{% trans "Waste Photo" %}</th>
                                     <th>{% trans "AI Severity" %}</th>
                                     <th>{% trans "Geospatial Address Context" %}</th>
@@ -265,6 +276,11 @@
                                     <td>
                                         <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-10 px-2.5 py-1">
                                             {{ req.get_waste_type_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge text-bg-light border px-2.5 py-1">
+                                            <i class="bi bi-geo-alt me-1 text-success"></i>{{ req.get_zone_display }}
                                         </span>
                                     </td>
 
@@ -410,7 +426,7 @@
                                     </td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>{% trans "No request manifests mapped inside this filtered vector block." %}</td></tr>
+                                <tr><td colspan="13" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>{% trans "No request manifests mapped inside this filtered vector block." %}</td></tr>
 
                                 {% endfor %}
                             </tbody>
@@ -781,7 +797,7 @@ window.deleteRequest = async function(requestId, btn) {
 
         const tbody = document.getElementById('requests-table-body');
         if (tbody && !tbody.querySelector('tr')) {
-            tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-1"></i>No request manifests mapped inside this filtered vector block.</td></tr>';
         }
     } catch (err) {
         console.error(err);

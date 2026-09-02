@@ -58,11 +58,13 @@ class DriverSerializer(serializers.ModelSerializer):
         queryset=User.objects.all(), source='user', write_only=True
     )
     vehicle_detail = VehicleSerializer(source='vehicle', read_only=True)
+    zone_display = serializers.CharField(source='get_zone_display', read_only=True)
 
     class Meta:
         model = Driver
         fields = (
             'id', 'user', 'user_id', 'vehicle', 'vehicle_detail',
+            'zone', 'zone_display',
             'license_number', 'license_document', 'is_available',
             'current_latitude', 'current_longitude',
             'total_trips', 'created_at',
@@ -82,6 +84,10 @@ class DriverSerializer(serializers.ModelSerializer):
 
 
 class BinSerializer(serializers.ModelSerializer):
+    zone_display = serializers.CharField(source='get_zone_display', read_only=True)
+    waste_type_display = serializers.CharField(source='get_waste_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
     class Meta:
         model = Bin
         fields = '__all__'
@@ -122,6 +128,7 @@ class WasteRequestSerializer(serializers.ModelSerializer):
     )
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     waste_type_display = serializers.CharField(source='get_waste_type_display', read_only=True)
+    zone_display = serializers.CharField(source='get_zone_display', read_only=True)
     severity_display = serializers.CharField(source='get_severity_display', read_only=True)
     route_id = serializers.SerializerMethodField()
     route_status = serializers.SerializerMethodField()
@@ -145,6 +152,7 @@ class WasteRequestSerializer(serializers.ModelSerializer):
             'id', 'user', 'driver', 'driver_detail',
             'dropoff_checkpoint', 'dropoff_checkpoint_id',
             'waste_type', 'waste_type_display',
+            'zone', 'zone_display',
             'status', 'status_display',
             'description', 'pickup_address',
             'latitude', 'longitude',
@@ -331,12 +339,14 @@ class WasteRequestMinimalSerializer(serializers.ModelSerializer):
     """
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     waste_type_display = serializers.CharField(source='get_waste_type_display', read_only=True)
+    zone_display = serializers.CharField(source='get_zone_display', read_only=True)
 
     class Meta:
         model = WasteRequest
         fields = (
             'id', 'status', 'status_display',
             'waste_type', 'waste_type_display',
+            'zone', 'zone_display',
             'pickup_address', 'created_at',
         )
         read_only_fields = fields

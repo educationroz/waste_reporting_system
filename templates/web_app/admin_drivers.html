@@ -140,6 +140,38 @@
                 </button>
             </div>
 
+            <!-- Zone / Availability Filter Bar -->
+            <form method="get" class="card dashboard-card mb-4" id="drivers-filter-form">
+                <div class="card-body p-3">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-lg-4 col-md-6 col-sm-12">
+                            <label class="form-label small fw-semibold text-secondary mb-1">{% trans "Filter Zone" %}</label>
+                            <select name="zone" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('drivers-filter-form').requestSubmit()">
+                                <option value="">{% trans "All Zones" %}</option>
+                                {% for key, label in zone_choices %}
+                                <option value="{{ key }}" {% if current_zone == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-lg-3 col-md-6 col-sm-12">
+                            <label class="form-label small fw-semibold text-secondary mb-1">{% trans "Filter Availability" %}</label>
+                            <select name="available" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('drivers-filter-form').requestSubmit()">
+                                <option value="">{% trans "All Drivers" %}</option>
+                                <option value="available" {% if current_available == 'available' %}selected{% endif %}>{% trans "Available Only" %}</option>
+                                <option value="busy" {% if current_available == 'busy' %}selected{% endif %}>{% trans "Busy Only" %}</option>
+                            </select>
+                        </div>
+                        {% if current_zone or current_available %}
+                        <div class="col-lg-5 col-md-12 text-lg-end">
+                            <a href="{% url 'admin-drivers' %}" class="btn btn-sm btn-outline-secondary px-3">
+                                <i class="bi bi-x-circle me-1"></i>{% trans "Clear Filters" %}
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </form>
+
             <!-- Drivers Primary Records Card -->
             <div class="card dashboard-card">
                 <div class="card-header py-3">
@@ -152,6 +184,7 @@
                                 <tr>
                                     <th>#</th>
                                     <th>{% trans "Name / Contact Node" %}</th>
+                                    <th>{% trans "Zone" %}</th>
                                     <th>{% trans "License Permittance" %}</th>
                                     <th>{% trans "Allocated Machinery" %}</th>
                                     <th>{% trans "Status Check" %}</th>
@@ -166,6 +199,11 @@
                                     <td>
                                         <div class="fw-semibold">{{ driver.user.get_full_name|default:driver.user.username }}</div>
                                         <div class="small text-muted" style="font-size: 0.8rem;">{{ driver.user.email }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge text-bg-light border px-2.5 py-1">
+                                            <i class="bi bi-geo-alt me-1 text-success"></i>{{ driver.get_zone_display }}
+                                        </span>
                                     </td>
                                     <td class="font-monospace text-secondary fw-semibold">{{ driver.license_number|default:"—" }}</td>
                                     <td>
@@ -245,6 +283,10 @@
                                                         </div>
 
                                                         <h6 class="fw-bold text-secondary small text-uppercase mb-2 mt-4">{% trans "Assignment" %} &amp; {% trans "Performance" %}</h6>
+                                                        <div class="profile-detail-row">
+                                                            <span class="profile-detail-label">{% trans "Zone" %}</span>
+                                                            <span class="profile-detail-value"><i class="bi bi-geo-alt me-1 text-success"></i>{{ driver.get_zone_display }}</span>
+                                                        </div>
                                                         <div class="profile-detail-row">
                                                             <span class="profile-detail-label">{% trans "License Number" %}</span>
                                                             <span class="profile-detail-value font-monospace">{{ driver.license_number|default:"—" }}</span>
@@ -332,7 +374,7 @@
                                 </div>
 
                                 {% empty %}
-                                <tr><td colspan="7" class="text-center text-muted py-5">{% trans "No drivers registered in this sector cluster yet. Create a user with role 'driver' first." %}</td></tr>
+                                <tr><td colspan="8" class="text-center text-muted py-5">{% trans "No drivers registered in this sector cluster yet. Create a user with role 'driver' first." %}</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -387,6 +429,15 @@
                     <div class="mb-3">
                         <label class="form-label small fw-semibold text-secondary">{% trans "Address" %}</label>
                         <textarea class="form-control" id="driver_address" rows="3" placeholder="Optional address"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">{% trans "Zone" %}</label>
+                        <select class="form-select" id="driver_zone" required>
+                            <option value="">{% trans "Select Zone" %}</option>
+                            {% for key, label in zone_choices %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-semibold text-secondary">{% trans "Password" %}</label>
@@ -638,11 +689,12 @@
         const email = document.getElementById('driver_email').value.trim();
         const phone = document.getElementById('driver_phone').value.trim();
         const address = document.getElementById('driver_address').value.trim();
+        const zone = document.getElementById('driver_zone').value.trim();
         const password = document.getElementById('driver_password').value;
         const password2 = document.getElementById('driver_password2').value;
 
-        if (!username || !email || !password || !password2) {
-            showToast(gettext('Please fill in username, email, and both password fields.'), 'warning');
+        if (!username || !email || !password || !password2 || !zone) {
+            showToast(gettext('Please fill in username, email, zone, and both password fields.'), 'warning');
             return;
         }
 
@@ -670,6 +722,7 @@
                     password,
                     phone,
                     address,
+                    zone,
                 }),
             });
 
@@ -824,7 +877,7 @@
 
                 const tbody = document.getElementById('drivers-table-body');
                 if (tbody && !tbody.querySelector('tr')) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-5">No drivers registered in this sector cluster yet. Create a user with role \'driver\' first.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-5">No drivers registered in this sector cluster yet. Create a user with role \'driver\' first.</td></tr>';
                 }
             } else {
                 let errMsg = 'Failed to remove driver.';

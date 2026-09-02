@@ -20,6 +20,7 @@ from django.views.decorators.http import require_POST
 from django.views.generic import ListView, TemplateView
 
 from api_app.models import (
+    Bin,
     Complaint,
     Driver,
     Notification,
@@ -27,6 +28,7 @@ from api_app.models import (
     Schedule,
     Vehicle,
     WasteRequest,
+    ZONE_CHOICES,
 )
 
 User = get_user_model()
@@ -332,6 +334,76 @@ class ResetPasswordPageView(TemplateView):
 
 # ─── Admin Dashboard ───────────────────────────────────────────────────────────
 
+def _requests_over_time(days=30):
+    """Daily request counts for the trailing `days` (newest-last), zero-filled
+    for days with no reports so the Chart.js line is continuous."""
+    from datetime import timedelta
+    from django.db.models import Count
+    from django.db.models.functions import TruncDate
+
+    cutoff = timezone.now() - timedelta(days=days - 1)
+    start = timezone.localtime(cutoff).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+
+    rows = (
+        WasteRequest.objects
+        .filter(created_at__gte=start)
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(count=Count('id'))
+        .order_by('day')
+    )
+    counts_by_day = {row['day']: row['count'] for row in rows if row['day']}
+
+    labels = []
+    data = []
+    for i in range(days):
+        day = (start + timedelta(days=i)).date()
+        labels.append(day.strftime('%d %b'))
+        data.append(counts_by_day.get(day, 0))
+
+    return {'labels': labels, 'data': data}
+
+
+def _requests_by_dimension(field, choices, label_field, count_field):
+    """Count requests grouped by `field`, returning per-choice {label, count}
+    lists. Labels use get_FOO_display() so they localize to the active
+    language in Chart.js."""
+    from django.db.models import Count
+
+    grouped = (
+        WasteRequest.objects
+        .values(field)
+        .annotate(count=Count('id'))
+    )
+    counts = {row[field]: row['count'] for row in grouped if row[field]}
+
+    labels = []
+    data = []
+    for key, display in choices:
+        labels.append(display)
+        data.append(counts.get(key, 0))
+
+    return {'labels': labels, 'data': data}
+
+
+def _zone_overview():
+    """Aggregate counts of requests, drivers, and bins per zone for the
+    admin dashboard allocation panel."""
+    from django.db.models import Count
+
+    choices = ZONE_CHOICES
+    results = {}
+    for key, label in choices:
+        results[key] = {
+            'label': label,
+            'requests': WasteRequest.objects.filter(zone=key).count(),
+            'drivers': Driver.objects.filter(zone=key).count(),
+            'bins': Bin.objects.filter(zone=key).count(),
+        }
+    return results
+
+
 class AdminDashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'web_app/admin_dashboard.html'
 
@@ -353,6 +425,7 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
         else:
             from django.db.models import Count, Q, Value
             from django.db.models.functions import Lower
+            from datetime import timedelta
 
             # Single aggregate query replaces 10+ individual .count() calls.
             # The old pattern issued a separate SELECT COUNT(*) for each
@@ -385,6 +458,23 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
             )
 
             stats = {**waste_stats, **driver_stats, **vehicle_stats, **user_stats}
+
+            # ── Trend chart data (single pass over requests for the last
+            #    30 days) ────────────────────────────────────────────────
+            stats['requests_over_time'] = _requests_over_time()
+            stats['requests_by_type'] = _requests_by_dimension(
+                field='waste_type',
+                choices=WasteRequest.WASTE_TYPE_CHOICES,
+                label_field='waste_type_label',
+                count_field='waste_type_count',
+            )
+            stats['requests_by_zone'] = _requests_by_dimension(
+                field='zone',
+                choices=WasteRequest.ZONE_CHOICES,
+                label_field='zone_label',
+                count_field='zone_count',
+            )
+            stats['zone_overview'] = _zone_overview()
 
             # Cache for 5 minutes (300 seconds)
             cache.set(cache_key, stats, 300)
@@ -463,6 +553,7 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
 
         status_filter = self.request.GET.get('status')
         waste_type_filter = self.request.GET.get('waste_type')
+        zone_filter = self.request.GET.get('zone', '').strip()
         search_query = self.request.GET.get('search', '').strip()
         report_date = parse_date(self.request.GET.get('report_date', '').strip())
         needs_review_filter = self.request.GET.get('needs_review', '').strip().lower()
@@ -475,6 +566,9 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
 
         if waste_type_filter:
             qs = qs.filter(waste_type=waste_type_filter)
+
+        if zone_filter in dict(WasteRequest.ZONE_CHOICES):
+            qs = qs.filter(zone=zone_filter)
 
         if search_query:
             filters = Q(user__username__iexact=search_query) | \
@@ -499,9 +593,11 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         ctx['drivers'] = Driver.objects.filter(is_available=True).select_related('user')
         ctx['status_choices'] = WasteRequest.STATUS_CHOICES
         ctx['waste_type_choices'] = WasteRequest.WASTE_TYPE_CHOICES
+        ctx['zone_choices'] = WasteRequest.ZONE_CHOICES
         ctx['current_status'] = self.request.GET.get('status', '')
         ctx['current_search'] = self.request.GET.get('search', '')
         ctx['current_waste_type'] = self.request.GET.get('waste_type', '')
+        ctx['current_zone'] = self.request.GET.get('zone', '')
         ctx['current_report_date'] = self.request.GET.get('report_date', '')
         ctx['current_needs_review'] = self.request.GET.get('needs_review', '')
         return ctx
@@ -516,7 +612,20 @@ class AdminDriverListView(LoginRequiredMixin, ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        return Driver.objects.select_related('user', 'vehicle').order_by('-created_at')
+        qs = Driver.objects.select_related('user', 'vehicle').order_by('-created_at')
+
+        zone_filter = self.request.GET.get('zone', '').strip()
+        availability_filter = self.request.GET.get('available', '').strip()
+
+        if zone_filter in dict(ZONE_CHOICES):
+            qs = qs.filter(zone=zone_filter)
+
+        if availability_filter == 'available':
+            qs = qs.filter(is_available=True)
+        elif availability_filter == 'busy':
+            qs = qs.filter(is_available=False)
+
+        return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -524,6 +633,9 @@ class AdminDriverListView(LoginRequiredMixin, ListView):
         ctx['users_no_driver'] = User.objects.filter(
             role='driver', driver_profile__isnull=True
         )
+        ctx['zone_choices'] = ZONE_CHOICES
+        ctx['current_zone'] = self.request.GET.get('zone', '')
+        ctx['current_available'] = self.request.GET.get('available', '')
         return ctx
 
 

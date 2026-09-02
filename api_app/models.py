@@ -10,6 +10,17 @@ from django.utils.translation import gettext_lazy as _
 from .validators import validate_image_file, validate_pdf_file
 
 
+# Shared geographic zone picklist used by WasteRequest, Driver, and Bin so the
+# whole municipality can be grouped/allocated by the same zone labels.
+ZONE_CHOICES = [
+    ('north', _('North Zone')),
+    ('south', _('South Zone')),
+    ('east', _('East Zone')),
+    ('west', _('West Zone')),
+    ('central', _('Central Zone')),
+]
+
+
 class Vehicle(models.Model):
     STATUS_CHOICES = [
         ('available', _('Available')),
@@ -74,6 +85,7 @@ class Driver(models.Model):
         Vehicle, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='assigned_drivers',
     )
+    zone = models.CharField(max_length=20, choices=ZONE_CHOICES, default='central', db_index=True)
     license_number = models.CharField(max_length=50, unique=True)
     is_available = models.BooleanField(default=True, db_index=True)
     current_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True,
@@ -95,6 +107,7 @@ class Driver(models.Model):
         indexes = [
             models.Index(fields=['is_available', 'vehicle']),
             models.Index(fields=['is_available', '-created_at']),
+            models.Index(fields=['zone', 'is_available']),
         ]
 
     def __str__(self):
@@ -116,6 +129,7 @@ class Bin(models.Model):
     ]
 
     bin_code = models.CharField(max_length=30, unique=True)
+    zone = models.CharField(max_length=20, choices=ZONE_CHOICES, default='central', db_index=True)
     waste_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='general')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='empty')
     capacity_liters = models.FloatField(default=240.0)
@@ -132,6 +146,7 @@ class Bin(models.Model):
         indexes = [
             models.Index(fields=['status', 'waste_type']),
             models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['zone', 'status']),
             models.Index(fields=['waste_type']),
         ]
 
@@ -184,6 +199,7 @@ class WasteRequest(models.Model):
         ('medium', _('Medium')),
         ('high', _('High')),
     ]
+    ZONE_CHOICES = ZONE_CHOICES
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -202,6 +218,7 @@ class WasteRequest(models.Model):
         related_name='assigned_requests',
     )
     waste_type = models.CharField(max_length=20, choices=WASTE_TYPE_CHOICES, default='general')
+    zone = models.CharField(max_length=20, choices=ZONE_CHOICES, default='central', db_index=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
     description = models.TextField(blank=True)
     pickup_address = models.TextField()
@@ -296,6 +313,7 @@ class WasteRequest(models.Model):
             models.Index(fields=['user', 'status']),
             models.Index(fields=['driver', 'status']),
             models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['zone', 'status']),
             models.Index(fields=['-created_at']),
         ]
 

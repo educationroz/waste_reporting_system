@@ -52,6 +52,7 @@ from .models import (
     Vehicle,
     WasteRequest,
     WasteRequestPhoto,
+    ZONE_CHOICES,
 )
 from .permissions import (
     IsAdminOrReadOnly,
@@ -703,6 +704,13 @@ class DriverViewSet(viewsets.ModelViewSet):
     # DriverViewSet only accepted JSON bodies and a file upload would 400.
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def get_queryset(self):
+        qs = Driver.objects.select_related('user', 'vehicle').order_by('-id')
+        zone_filter = self.request.query_params.get('zone', '').strip()
+        if zone_filter in dict(ZONE_CHOICES):
+            qs = qs.filter(zone=zone_filter)
+        return qs
+
     def perform_create(self, serializer):
         driver = serializer.save()
         _log_admin_action(self.request, 'create', 'Driver', driver, f'Registered driver {driver.user.username}')
@@ -732,9 +740,12 @@ class DriverViewSet(viewsets.ModelViewSet):
         password = request.data.get('password') or ''
         phone = (request.data.get('phone') or '').strip() or None
         address = (request.data.get('address') or '').strip() or None
+        zone = (request.data.get('zone') or '').strip() or 'central'
 
         if not username or not password:
             return Response({'error': 'username and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if zone not in dict(ZONE_CHOICES):
+            zone = 'central'
 
         if User.objects.filter(username__iexact=username).exists():
             return Response({'error': 'Username already in use.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -761,6 +772,8 @@ class DriverViewSet(viewsets.ModelViewSet):
         user.set_password(password)
         user.save()  # signal creates the Driver row
         driver = Driver.objects.get(user=user)
+        driver.zone = zone
+        driver.save(update_fields=['zone'])
 
         _log_admin_action(request, 'create', 'Driver', driver, f'Created driver account {user.username}')
         return Response(DriverSerializer(driver, context={'request': request}).data, status=status.HTTP_201_CREATED)
@@ -1461,6 +1474,11 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         status_filter = self.request.query_params.get('status')
         if status_filter:
             qs = qs.filter(status=status_filter)
+
+        zone_filter = self.request.query_params.get('zone', '').strip()
+        if zone_filter in dict(WasteRequest.ZONE_CHOICES):
+            qs = qs.filter(zone=zone_filter)
+
         return qs.order_by('-created_at')
 
     def create(self, request, *args, **kwargs):
@@ -1868,6 +1886,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         else:
             status_filter = request.query_params.get('status')
             waste_type_filter = request.query_params.get('waste_type')
+            zone_filter = request.query_params.get('zone', '').strip()
             search_query = request.query_params.get('search', '').strip()
             report_date = request.query_params.get('report_date', '').strip()
             needs_review = request.query_params.get('needs_review', '').strip().lower()
@@ -1876,6 +1895,8 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 qs = qs.filter(status=status_filter)
             if waste_type_filter:
                 qs = qs.filter(waste_type=waste_type_filter)
+            if zone_filter in dict(WasteRequest.ZONE_CHOICES):
+                qs = qs.filter(zone=zone_filter)
             if needs_review == 'true':
                 qs = qs.filter(needs_manual_review=True)
             if search_query:
