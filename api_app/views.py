@@ -1680,9 +1680,8 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                     'dropoff_checkpoint': 'You have already submitted a request at this checkpoint in the last hour. Please wait before submitting another.'
                 })
             
-            # Check daily max (5 requests per day per checkpoint)
+            # Check daily max (5 requests TOTAL per day per checkpoint across ALL users)
             daily_count = WasteRequest.objects.filter(
-                user=user,
                 dropoff_checkpoint=checkpoint,
                 created_at__gte=today_start
             ).count()
@@ -1690,7 +1689,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             if daily_count >= 5:
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError({
-                    'dropoff_checkpoint': 'You have reached the maximum of 5 requests per day at this checkpoint. Please try again tomorrow.'
+                    'dropoff_checkpoint': 'This checkpoint has reached the maximum of 5 requests for today. Please try another checkpoint or try again tomorrow.'
                 })
         
         waste_request = serializer.save(user=user)
