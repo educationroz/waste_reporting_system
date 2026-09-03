@@ -34,6 +34,24 @@ def get_location_coords(obj) -> tuple[float, float]:
     return None
 
 
+def get_ml_info(obj) -> dict:
+    """Extract ML prediction info from a WasteRequest."""
+    if not isinstance(obj, WasteRequest):
+        return {'prediction': None, 'confidence': None, 'reviewed': False}
+    
+    # Map severity (low/medium/high) to user's HIGH/MEDIUM/LOW
+    severity_map = {'high': 'HIGH', 'medium': 'MEDIUM', 'low': 'LOW'}
+    pred = severity_map.get(obj.severity) if obj.severity else None
+    conf = float(obj.ml_confidence) / 100.0 if obj.ml_confidence else None
+    reviewed = not obj.needs_manual_review if obj.needs_manual_review is not None else True
+    
+    return {
+        'prediction': pred,
+        'confidence': conf,
+        'reviewed': reviewed,
+    }
+
+
 class RouteOptimizer:
     """Optimizes waste pickup routes using nearest neighbor algorithm."""
     
@@ -43,16 +61,16 @@ class RouteOptimizer:
         self.route_points = []
         self.total_distance = 0.0
     
-    def optimize_nearest_neighbor(self, locations: list[tuple[int, str, float, float]]) -> list[dict]:
+def optimize_nearest_neighbor(self, locations: list) -> list[dict]:
         """
         Optimize route using nearest neighbor algorithm.
         
         Args:
-            locations: List of (id, type, lat, lon) tuples
-                      where type is 'request' or 'bin'
-        
+            locations: List of (id, type, lat, lon, ml_info) tuples
+                      where type is 'request' or 'bin', ml_info is dict
+         
         Returns:
-            Optimized list of waypoints with coordinates
+            Optimized list of waypoints with coordinates and ML info
         """
         if not locations:
             return []
@@ -67,20 +85,24 @@ class RouteOptimizer:
             nearest_idx = 0
             nearest_distance = float('inf')
             
-            for idx, (location_id, location_type, lat, lon) in enumerate(unvisited):
+            for idx, loc in enumerate(unvisited):
+                lat, lon = loc[2], loc[3]
                 dist = haversine_distance(current_lat, current_lon, lat, lon)
                 if dist < nearest_distance:
                     nearest_distance = dist
                     nearest_idx = idx
             
             # Move to nearest location
-            location_id, location_type, lat, lon = unvisited.pop(nearest_idx)
+            location_id, location_type, lat, lon, ml_info = unvisited.pop(nearest_idx)
             optimized_route.append({
                 'id': location_id,
                 'type': location_type,
                 'latitude': lat,
                 'longitude': lon,
                 'distance_from_previous': nearest_distance,
+                'ml_prediction': ml_info.get('prediction'),
+                'ml_confidence': ml_info.get('confidence'),
+                'ml_reviewed': ml_info.get('reviewed', False),
             })
             
             total_distance += nearest_distance
@@ -121,18 +143,19 @@ def generate_optimal_route(driver, waste_request_ids=None, bin_ids=None):
     
     locations = []
     if waste_request_ids:
-        requests = WasteRequest.objects.filter(id__in=waste_request_ids)
+        requests = WasteRequest.objects.filter(id__in=waste_request_ids).prefetch_related('photos')
         for req in requests:
             coords = get_location_coords(req)
             if coords:
-                locations.append((req.id, 'request', coords[0], coords[1]))
+                ml_info = get_ml_info(req)
+                locations.append((req.id, 'request', coords[0], coords[1], ml_info))
 
     if bin_ids:
         bins = Bin.objects.filter(id__in=bin_ids)
         for bin_obj in bins:
             coords = get_location_coords(bin_obj)
             if coords:
-                locations.append((bin_obj.id, 'bin', coords[0], coords[1]))
+                locations.append((bin_obj.id, 'bin', coords[0], coords[1], {}))
 
     if not locations:
         return {'error': 'No valid locations to optimize'}

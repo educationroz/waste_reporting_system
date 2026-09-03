@@ -1612,6 +1612,35 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         if zone_filter in dict(WasteRequest.ZONE_CHOICES):
             qs = qs.filter(zone=zone_filter)
 
+        # ML prediction filters (for route planning) - uses WasteRequest fields
+        pred_filter = self.request.query_params.get('prediction', '').strip()
+        if pred_filter:
+            preds = [p.strip().lower() for p in pred_filter.split(',')]
+            # Map user's HIGH/MEDIUM/LOW to model's high/medium/low
+            pred_map = {'high': 'high', 'medium': 'medium', 'low': 'low', 'none': ''}
+            mapped_preds = [pred_map.get(p, p) for p in preds if pred_map.get(p, p)]
+            if mapped_preds:
+                qs = qs.filter(severity__in=mapped_preds).distinct()
+
+        conf_gte = self.request.query_params.get('confidence_gte')
+        if conf_gte:
+            try:
+                qs = qs.filter(ml_confidence__gte=float(conf_gte) * 100).distinct()
+            except ValueError:
+                pass
+
+        conf_lt = self.request.query_params.get('confidence_lt')
+        if conf_lt:
+            try:
+                qs = qs.filter(ml_confidence__lt=float(conf_lt) * 100).distinct()
+            except ValueError:
+                pass
+
+        reviewed = self.request.query_params.get('reviewed', '').lower()
+        if reviewed in ('true', 'false'):
+            # reviewed=true means needs_manual_review=false
+            qs = qs.filter(needs_manual_review=(reviewed == 'false')).distinct()
+
         return qs.order_by('-created_at')
 
     def create(self, request, *args, **kwargs):
@@ -1627,7 +1656,52 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
+        
+        # Checkpoint spam prevention: 1-hour cooldown and 5 daily max per user per checkpoint
+        checkpoint = serializer.validated_data.get('dropoff_checkpoint')
+        if checkpoint and user:
+            from django.utils import timezone
+            from datetime import timedelta
+            
+            now = timezone.now()
+            one_hour_ago = now - timedelta(hours=1)
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            # Check 1-hour cooldown
+            recent_request = WasteRequest.objects.filter(
+                user=user,
+                dropoff_checkpoint=checkpoint,
+                created_at__gte=one_hour_ago
+            ).exists()
+            
+            if recent_request:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    'dropoff_checkpoint': 'You have already submitted a request at this checkpoint in the last hour. Please wait before submitting another.'
+                })
+            
+            # Check daily max (5 requests per day per checkpoint)
+            daily_count = WasteRequest.objects.filter(
+                user=user,
+                dropoff_checkpoint=checkpoint,
+                created_at__gte=today_start
+            ).count()
+            
+            if daily_count >= 5:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    'dropoff_checkpoint': 'You have reached the maximum of 5 requests per day at this checkpoint. Please try again tomorrow.'
+                })
+        
         waste_request = serializer.save(user=user)
+
+        # Auto-assign driver for HIGH waste with confidence >= 80%
+        # Only if ML result is already available (sync path)
+        if (waste_request.severity == 'high' and 
+            waste_request.ml_confidence is not None and 
+            waste_request.ml_confidence >= 80 and 
+            not waste_request.needs_manual_review):
+            self._auto_assign_driver_for_request(waste_request)
 
         # Async ML classification: when the fast-path inference deferred
         # (timeout / model unavailable), the request row is already saved with
@@ -2316,6 +2390,438 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             'ineligible_ids': ineligible_ids,
         })
 
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def auto_assign_driver(self, request, pk=None):
+        """POST /api/waste-requests/{id}/auto_assign_driver/
+        
+        Automatically assign the nearest available driver in the same zone.
+        Only considers drivers who:
+        - Are in the same zone as the request
+        - Are available (is_available=True)
+        - Are NOT on break (on_break=False)
+        - Have confidence >= 80% (ml_confidence >= 80)
+        
+        Returns the assigned driver or error if no suitable driver found.
+        """
+        waste_request = self.get_object()
+        
+        if waste_request.status not in ('pending', 'assigned'):
+            return Response(
+                {'error': f'Cannot auto-assign: request status is {waste_request.status}. Only pending/assigned requests can be auto-assigned.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if waste_request.needs_manual_review:
+            return Response(
+                {'error': 'Cannot auto-assign: request needs manual review (ML confidence < 80%).'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get request zone
+        zone = waste_request.zone
+        
+        # Find available drivers in the same zone
+        available_drivers = Driver.objects.select_related('user', 'vehicle').filter(
+            zone=zone,
+            is_available=True,
+            on_break=False,
+            user__is_active=True
+        ).exclude(
+            user__role__in=['admin', 'user']  # Only actual drivers
+        )
+        
+        if not available_drivers.exists():
+            return Response(
+                {'error': f'No available drivers in {dict(WasteRequest.ZONE_CHOICES).get(zone, zone)} zone.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get request coordinates
+        req_lat = waste_request.latitude if waste_request.latitude is not None else waste_request.photo_latitude
+        req_lng = waste_request.longitude if waste_request.longitude is not None else waste_request.photo_longitude
+        
+        if req_lat is None or req_lng is None:
+            return Response(
+                {'error': 'Request has no valid location coordinates.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Calculate distance to each driver and find nearest
+        req_lat = float(req_lat)
+        req_lng = float(req_lng)
+        
+        nearest_driver = None
+        min_distance = float('inf')
+        
+        for driver in available_drivers:
+            if driver.current_latitude is not None and driver.current_longitude is not None:
+                driver_lat = float(driver.current_latitude)
+                driver_lng = float(driver.current_longitude)
+                distance = _haversine_meters(req_lat, req_lng, driver_lat, driver_lng)
+                
+                if distance < min_distance:
+                    min_distance = distance
+                    nearest_driver = driver
+        
+        if nearest_driver is None:
+            return Response(
+                {'error': 'No available drivers with valid GPS location in this zone.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Assign the nearest driver
+        waste_request.driver = nearest_driver
+        waste_request.status = 'assigned'
+        waste_request.save(update_fields=['driver', 'status'])
+        
+        # Also assign same-location siblings
+        siblings = _same_location_siblings(waste_request)
+        for sibling in siblings:
+            sibling.driver = nearest_driver
+            sibling.status = 'assigned'
+            sibling.save(update_fields=['driver', 'status'])
+        
+        grouped_note = f' (+{len(siblings)} same-location request(s))' if siblings else ''
+        _log_admin_action(
+            request, 'assign', 'WasteRequest', waste_request,
+            f'Auto-assigned driver {nearest_driver.user.username} to request #{waste_request.id}{grouped_note} (distance: {round(min_distance)}m)'
+        )
+        
+        try:
+            for sibling in siblings:
+                if sibling.user_id:
+                    _create_notification(
+                        user=sibling.user,
+                        title='Driver Assigned',
+                        message=f'Driver {nearest_driver.user.username} has been assigned to your request.',
+                        notification_type='info',
+                        related_request=sibling,
+                    )
+
+            if waste_request.user_id:
+                _create_notification(
+                    user=waste_request.user,
+                    title='Driver Assigned',
+                    message=f'Driver {nearest_driver.user.username} has been assigned to your request.',
+                    notification_type='info',
+                    related_request=waste_request,
+                )
+
+            _notify_driver(
+                nearest_driver,
+                title='New Pickup Assigned',
+                message=f'You have been assigned pickup request #{waste_request.id}'
+                        f'{" at " + waste_request.pickup_address if waste_request.pickup_address else ""}.',
+                notification_type='info',
+                related_request=waste_request,
+            )
+        except Exception:
+            logger.warning(
+                f'[AUTO_ASSIGN_DRIVER] notification push failed for request={waste_request.id}'
+            )
+        
+        return Response({
+            'message': 'Driver auto-assigned successfully',
+            'driver': {
+                'id': nearest_driver.id,
+                'name': nearest_driver.user.username,
+                'zone': nearest_driver.zone,
+                'vehicle': nearest_driver.vehicle.plate_number if nearest_driver.vehicle else None,
+                'distance_meters': round(min_distance),
+            },
+            'siblings_assigned': len(siblings),
+        })
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def driver_reject(self, request, pk=None):
+        """POST /api/waste-requests/{id}/driver_reject/
+        
+        Driver rejects an assigned request. System will try to auto-assign
+        to the next nearest available driver in the same zone.
+        
+        Body: {reason: 'string'} - optional rejection reason
+        """
+        waste_request = self.get_object()
+        user = request.user
+        
+        if user.role != 'driver':
+            return Response({'error': 'Only drivers can reject assigned requests.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if waste_request.driver is None or waste_request.driver.user != user:
+            return Response({'error': 'This request is not assigned to you.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if waste_request.status not in ('assigned', 'in_progress'):
+            return Response(
+                {'error': f'Cannot reject: request status is {waste_request.status}.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        reason = request.data.get('reason', '').strip() or 'No reason provided'
+        
+        # Log the rejection
+        _log_admin_action(
+            request, 'other', 'WasteRequest', waste_request,
+            f'Driver {user.username} rejected request #{waste_request.id}: {reason}'
+        )
+        
+        # Unassign the driver
+        waste_request.driver = None
+        waste_request.status = 'pending'
+        waste_request.save(update_fields=['driver', 'status'])
+        
+        # Try to auto-assign to next nearest driver
+        zone = waste_request.zone
+        
+        available_drivers = Driver.objects.select_related('user', 'vehicle').filter(
+            zone=zone,
+            is_available=True,
+            on_break=False,
+            user__is_active=True
+        ).exclude(
+            user__role__in=['admin', 'user']
+        ).exclude(id=user.driver_profile.id if hasattr(user, 'driver_profile') else None)
+        
+        req_lat = waste_request.latitude if waste_request.latitude is not None else waste_request.photo_latitude
+        req_lng = waste_request.longitude if waste_request.longitude is not None else waste_request.photo_longitude
+        
+        next_driver = None
+        min_distance = float('inf')
+        
+        if req_lat is not None and req_lng is not None:
+            req_lat = float(req_lat)
+            req_lng = float(req_lng)
+            
+            for driver in available_drivers:
+                if driver.current_latitude is not None and driver.current_longitude is not None:
+                    driver_lat = float(driver.current_latitude)
+                    driver_lng = float(driver.current_longitude)
+                    distance = _haversine_meters(req_lat, req_lng, driver_lat, driver_lng)
+                    
+                    if distance < min_distance:
+                        min_distance = distance
+                        next_driver = driver
+        
+        assigned = False
+        if next_driver:
+            waste_request.driver = next_driver
+            waste_request.status = 'assigned'
+            waste_request.save(update_fields=['driver', 'status'])
+            
+            # Also assign same-location siblings
+            siblings = _same_location_siblings(waste_request)
+            for sibling in siblings:
+                sibling.driver = next_driver
+                sibling.status = 'assigned'
+                sibling.save(update_fields=['driver', 'status'])
+            
+            assigned = True
+            
+            _log_admin_action(
+                request, 'assign', 'WasteRequest', waste_request,
+                f'Auto-reassigned driver {next_driver.user.username} to request #{waste_request.id} after rejection (distance: {round(min_distance)}m)'
+            )
+            
+            try:
+                _notify_driver(
+                    next_driver,
+                    title='New Pickup Assigned (Reassigned)',
+                    message=f'You have been assigned pickup request #{waste_request.id} (previously rejected by another driver).',
+                    notification_type='warning',
+                    related_request=waste_request,
+                )
+            except Exception:
+                pass
+        
+        return Response({
+            'message': 'Request rejected and unassigned' + (' - reassigned to next driver' if assigned else ' - no other available drivers'),
+            'reassigned': assigned,
+            'new_driver': {
+                'id': next_driver.id,
+                'name': next_driver.user.username,
+                'distance_meters': round(min_distance),
+            } if next_driver else None,
+        })
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def available_requests(self, request):
+        """GET /api/waste-requests/available_requests/
+        
+        List unassigned pending requests in the driver's zone that they can pick up.
+        Only shows requests where:
+        - Status is 'pending' (not assigned)
+        - Zone matches driver's zone
+        - ML confidence >= 80% (not needs_manual_review)
+        - Has valid location coordinates
+        - Not flagged for spam (checkpoint cooldown handled at creation)
+        
+        Only available to drivers who are:
+        - is_available=True
+        - on_break=False
+        - user is active
+        """
+        if request.user.role != 'driver':
+            return Response({'error': 'Only drivers can view available requests.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            driver = request.user.driver_profile
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        if not driver.is_available or driver.on_break:
+            return Response({
+                'message': 'You are not available or on break. Available requests are hidden.',
+                'requests': []
+            })
+        
+        # Find pending requests in driver's zone
+        available_requests = WasteRequest.objects.filter(
+            status='pending',
+            zone=driver.zone,
+            needs_manual_review=False,
+            is_deleted=False,
+            driver__isnull=True,
+        ).exclude(
+            latitude__isnull=True,
+            photo_latitude__isnull=True
+        ).select_related('user').order_by('created_at')
+        
+        # Filter to only those with valid coordinates
+        valid_requests = []
+        for req in available_requests:
+            lat = req.latitude if req.latitude is not None else req.photo_latitude
+            lng = req.longitude if req.longitude is not None else req.photo_longitude
+            if lat is not None and lng is not None:
+                valid_requests.append(req)
+        
+        # Calculate distance from driver's current location
+        driver_lat = driver.current_latitude
+        driver_lng = driver.current_longitude
+        
+        requests_with_distance = []
+        for req in valid_requests:
+            req_lat = float(req.latitude if req.latitude is not None else req.photo_latitude)
+            req_lng = float(req.longitude if req.longitude is not None else req.photo_longitude)
+            
+            distance = None
+            if driver_lat is not None and driver_lng is not None:
+                distance = round(_haversine_meters(
+                    float(driver_lat), float(driver_lng), req_lat, req_lng
+                ))
+            
+            requests_with_distance.append({
+                'id': req.id,
+                'waste_type': req.waste_type,
+                'zone': req.zone,
+                'pickup_address': req.pickup_address,
+                'latitude': req_lat,
+                'longitude': req_lng,
+                'severity': req.severity,
+                'ml_confidence': req.ml_confidence,
+                'created_at': req.created_at,
+                'distance_meters': distance,
+                'user': req.user.username if req.user else 'Anonymous',
+            })
+        
+        # Sort by distance (nearest first)
+        requests_with_distance.sort(key=lambda x: x['distance_meters'] if x['distance_meters'] is not None else float('inf'))
+        
+        return Response({
+            'requests': requests_with_distance,
+            'count': len(requests_with_distance),
+        })
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def claim_request(self, request, pk=None):
+        """POST /api/waste-requests/{id}/claim_request/
+        
+        Driver claims an available (pending) request in their zone.
+        Only works if:
+        - Driver is available (is_available=True, on_break=False)
+        - Request is in driver's zone
+        - Request status is 'pending'
+        - Request has no driver assigned
+        - Request ML confidence >= 80%
+        """
+        waste_request = self.get_object()
+        user = request.user
+        
+        if user.role != 'driver':
+            return Response({'error': 'Only drivers can claim requests.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            driver = user.driver_profile
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        if not driver.is_available or driver.on_break:
+            return Response({'error': 'You are not available or on break.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if waste_request.status != 'pending':
+            return Response({'error': f'Request is not available for claiming (status: {waste_request.status}).'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if waste_request.driver is not None:
+            return Response({'error': 'Request is already assigned to another driver.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if waste_request.zone != driver.zone:
+            return Response({'error': 'Request is not in your zone.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if waste_request.needs_manual_review:
+            return Response({'error': 'Request needs manual review (ML confidence < 80%).'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Assign the request to this driver
+        waste_request.driver = driver
+        waste_request.status = 'assigned'
+        waste_request.save(update_fields=['driver', 'status'])
+        
+        # Also assign same-location siblings
+        siblings = _same_location_siblings(waste_request)
+        for sibling in siblings:
+            sibling.driver = driver
+            sibling.status = 'assigned'
+            sibling.save(update_fields=['driver', 'status'])
+        
+        grouped_note = f' (+{len(siblings)} same-location request(s))' if siblings else ''
+        _log_admin_action(
+            request, 'assign', 'WasteRequest', waste_request,
+            f'Driver {user.username} claimed request #{waste_request.id}{grouped_note}'
+        )
+        
+        try:
+            for sibling in siblings:
+                if sibling.user_id:
+                    _create_notification(
+                        user=sibling.user,
+                        title='Driver Assigned',
+                        message=f'Driver {user.username} has been assigned to your request.',
+                        notification_type='info',
+                        related_request=sibling,
+                    )
+
+            if waste_request.user_id:
+                _create_notification(
+                    user=waste_request.user,
+                    title='Driver Assigned',
+                    message=f'Driver {user.username} has been assigned to your request.',
+                    notification_type='info',
+                    related_request=waste_request,
+                )
+
+            _notify_driver(
+                driver,
+                title='Pickup Claimed',
+                message=f'You have claimed pickup request #{waste_request.id}'
+                        f'{" at " + waste_request.pickup_address if waste_request.pickup_address else ""}.',
+                notification_type='success',
+                related_request=waste_request,
+            )
+        except Exception:
+            logger.warning(f'[CLAIM_REQUEST] notification push failed for request={waste_request.id}')
+        
+        return Response({
+            'message': 'Request claimed successfully',
+            'siblings_assigned': len(siblings),
+        })
+
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
     def resolve_review(self, request, pk=None):
         """PATCH /api/waste-requests/{id}/resolve_review/ — {decision: 'approve'|'reject'}"""
@@ -2352,7 +2858,101 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 logger.warning(f'[RESOLVE_REVIEW] notification push failed for request={waste_request.id}.')
 
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
-    
+
+    def _auto_assign_driver_for_request(self, waste_request):
+        """Auto-assign nearest available driver for HIGH waste with confidence >= 80%.
+        Called from perform_create (sync ML) or from async ML task callback.
+        """
+        # Only for HIGH waste with high confidence
+        if waste_request.severity != 'high':
+            return
+        if waste_request.ml_confidence is None or waste_request.ml_confidence < 80:
+            return
+        if waste_request.needs_manual_review:
+            return
+        if waste_request.status not in ('pending', 'assigned'):
+            return
+        if waste_request.driver is not None:
+            return
+
+        zone = waste_request.zone
+        req_lat = waste_request.latitude if waste_request.latitude is not None else waste_request.photo_latitude
+        req_lng = waste_request.longitude if waste_request.longitude is not None else waste_request.photo_longitude
+        if req_lat is None or req_lng is None:
+            return
+
+        available_drivers = Driver.objects.select_related('user', 'vehicle').filter(
+            zone=zone,
+            is_available=True,
+            on_break=False,
+            user__is_active=True
+        ).exclude(user__role__in=['admin', 'user'])
+
+        if not available_drivers.exists():
+            return
+
+        req_lat = float(req_lat)
+        req_lng = float(req_lng)
+        nearest_driver = None
+        min_distance = float('inf')
+
+        for driver in available_drivers:
+            if driver.current_latitude is not None and driver.current_longitude is not None:
+                driver_lat = float(driver.current_latitude)
+                driver_lng = float(driver.current_longitude)
+                distance = _haversine_meters(req_lat, req_lng, driver_lat, driver_lng)
+                if distance < min_distance:
+                    min_distance = distance
+                    nearest_driver = driver
+
+        if nearest_driver is None:
+            return
+
+        # Assign driver
+        waste_request.driver = nearest_driver
+        waste_request.status = 'assigned'
+        waste_request.save(update_fields=['driver', 'status'])
+
+        # Also assign same-location siblings
+        siblings = _same_location_siblings(waste_request)
+        for sibling in siblings:
+            sibling.driver = nearest_driver
+            sibling.status = 'assigned'
+            sibling.save(update_fields=['driver', 'status'])
+
+        _log_admin_action(
+            None, 'assign', 'WasteRequest', waste_request,
+            f'Auto-assigned driver {nearest_driver.user.username} to HIGH waste request #{waste_request.id} (confidence: {waste_request.ml_confidence}%, distance: {round(min_distance)}m)'
+        )
+
+        try:
+            for sibling in siblings:
+                if sibling.user_id:
+                    _create_notification(
+                        user=sibling.user,
+                        title='Driver Assigned',
+                        message=f'Driver {nearest_driver.user.username} has been assigned to your request.',
+                        notification_type='info',
+                        related_request=sibling,
+                    )
+            if waste_request.user_id:
+                _create_notification(
+                    user=waste_request.user,
+                    title='Driver Assigned',
+                    message=f'Driver {nearest_driver.user.username} has been assigned to your HIGH priority waste request.',
+                    notification_type='success',
+                    related_request=waste_request,
+                )
+            _notify_driver(
+                nearest_driver,
+                title='HIGH Priority Pickup Assigned',
+                message=f'You have been assigned HIGH priority pickup #{waste_request.id} at {waste_request.pickup_address or "the location"}.',
+                notification_type='alert',
+                related_request=waste_request,
+            )
+        except Exception:
+            logger.warning(f'[AUTO_ASSIGN_HIGH] notification push failed for request={waste_request.id}')
+
 class RouteViewSet(viewsets.ModelViewSet):
     """Route planning and management. Admin only for write."""
     queryset = Route.objects.select_related('driver__user', 'vehicle').prefetch_related(
@@ -2719,6 +3319,68 @@ class ScheduleViewSet(viewsets.ModelViewSet):
             for sch in qs.iterator(chunk_size=500)
         )
         return _write_csv_response('schedules.csv', header, rows)
+
+    @action(detail=False, methods=['get'])
+    def zone_forecast(self, request):
+        """
+        GET /api/schedules/zone_forecast/
+        Returns ML prediction stats per zone for the last 7 days.
+        Used by admin_schedules.html for forecast cards.
+        """
+        from django.db.models import Count, Avg, Q
+        from django.utils import timezone
+        from datetime import timedelta
+
+        week_ago = timezone.now() - timedelta(days=7)
+        zones = [c[0] for c in WasteRequest.ZONE_CHOICES]
+
+        data = {}
+        for zone_code in zones:
+            # Filter requests with ML predictions in the last 7 days
+            requests = WasteRequest.objects.filter(
+                zone=zone_code,
+                created_at__gte=week_ago,
+                severity__in=['high', 'medium', 'low'],
+                ml_confidence__gte=80
+            ).values('severity').annotate(cnt=Count('id'))
+
+            counts = {'HIGH': 0, 'MEDIUM': 0, 'LOW': 0}
+            total = 0
+            for r in requests:
+                mapped = {'high': 'HIGH', 'medium': 'MEDIUM', 'low': 'LOW'}.get(r['severity'])
+                if mapped:
+                    counts[mapped] = r['cnt']
+                    total += r['cnt']
+
+            # Avg confidence for verified predictions (ml_confidence >= 80)
+            avg_conf = WasteRequest.objects.filter(
+                zone=zone_code,
+                created_at__gte=week_ago,
+                severity__in=['high', 'medium', 'low'],
+                ml_confidence__gte=80
+            ).aggregate(avg=Avg('ml_confidence'))['avg'] or 0
+
+            # Check if zone has active schedule
+            has_schedule = Schedule.objects.filter(
+                zone_name=zone_code, is_active=True
+            ).exists()
+
+            # Gap: has HIGH/MED requests but no active schedule
+            high_med = counts['HIGH'] + counts['MEDIUM']
+            has_gap = high_med > 5 and not has_schedule
+
+            data[zone_code] = {
+                'zone_name': dict(WasteRequest.ZONE_CHOICES).get(zone_code, zone_code),
+                'high': counts['HIGH'],
+                'medium': counts['MEDIUM'],
+                'low': counts['LOW'],
+                'total': total,
+                'avg_confidence': round(avg_conf, 1),
+                'has_schedule': has_schedule,
+                'has_gap': has_gap,
+            }
+
+        return Response(data)
 
 class NotificationViewSet(viewsets.ModelViewSet):
     """

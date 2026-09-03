@@ -248,18 +248,31 @@
             </form>
 
             {% if user.is_authenticated %}
-                <a class="nav-link position-relative px-2 py-1" href="{% url 'notifications' %}">
-                    <i class="bi bi-bell fs-5"></i>
-                    <span id="notif-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"></span>
-                </a>
                 <div class="dropdown">
+                    <a class="nav-link position-relative dropdown-toggle px-2 py-1" href="#" hx-boost="false" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-bell fs-5"></i>
+                        <span id="notif-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"></span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-lg" style="min-width: 340px; max-width: 380px; border-radius: 14px; border: none;">
+                        <li class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0 fw-bold">{% trans "Notifications" %}</h6>
+                            <a href="{% url 'notifications' %}" class="btn btn-sm btn-outline-success px-3 py-1 fw-semibold rounded-2" style="font-size: 0.75rem;">{% trans "View All" %}</a>
+                        </li>
+                        <li>
+                            <div class="list-group list-group-flush p-1" id="notif-dropdown-list" style="max-height: 320px; overflow-y: auto;">
+                                <div class="text-center py-4 text-muted small" id="notif-dropdown-loading">
+                                    <div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div>
+                                    <div>{% trans "Loading..." %}</div>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="px-3 py-2 border-top">
+                            <a href="{% url 'notifications' %}" class="btn btn-success btn-sm w-100 fw-semibold rounded-2">{% trans "View All Notifications" %}</a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="dropdown ms-2">
                     <a class="nav-link dropdown-toggle d-flex align-items-center px-2 py-1" href="#" hx-boost="false" data-bs-toggle="dropdown">
-                        <!--
-                            Wrapped in #navbar-avatar-slot so profile.html can
-                            swap the img/icon in place after a successful
-                            Save Changes — without needing a full page refresh.
-                            See window.updateNavbarAvatar() below.
-                        -->
                         <span id="navbar-avatar-slot" class="d-inline-flex align-items-center me-1">
                             {% if user.profile_picture %}
                                 <img id="navbar-profile-pic" src="{{ user.profile_picture|thumbnail:'32x32' }}" alt="{% trans 'Profile' %}" class="navbar-profile-pic">
@@ -810,6 +823,59 @@ if (!window.__ssAuthScriptLoaded) {
         }).catch((e) => console.error('Failed to refresh notification badge:', e));
     }
 
+    // Load recent notifications into dropdown
+    function loadNotifDropdown() {
+        const listEl = document.getElementById('notif-dropdown-list');
+        const loadingEl = document.getElementById('notif-dropdown-loading');
+        if (!listEl || !getToken()) return;
+        
+        if (loadingEl) loadingEl.style.display = 'block';
+        
+        API.get('/api/notifications/?page_size=10').then(data => {
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (!data) return;
+            
+            const notifications = Array.isArray(data) ? data : (data.results || []);
+            
+            if (notifications.length === 0) {
+                listEl.innerHTML = `
+                    <div class="text-center py-4 text-muted small">
+                        <i class="bi bi-bell-slash fs-1 d-block mb-2 text-secondary"></i>
+                        <span class="fw-medium">${window.escapeHtml(gettext('No notifications'))}</span>
+                    </div>
+                `;
+                return;
+            }
+            
+            listEl.innerHTML = notifications.map(n => `
+                <a href="#" class="list-group-item list-group-item-action py-2 px-3 ${!n.is_read ? 'unread-style' : ''}"
+                   onclick="event.preventDefault(); ${!n.is_read ? `markOneRead(${n.id})` : ''} window.location.href='${n.related_request ? '/user-requests/' : '/notifications/'}';">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <span class="badge rounded-pill px-2 py-1 me-2
+                                ${n.notification_type === 'success' ? 'bg-success-subtle text-success border border-success-subtle' : ''}
+                                ${n.notification_type === 'warning' ? 'bg-warning-subtle text-warning border border-warning-subtle' : ''}
+                                ${n.notification_type === 'alert' ? 'bg-danger-subtle text-danger border border-danger-subtle' : ''}
+                                ${n.notification_type === 'info' ? 'bg-info-subtle text-info border border-info-subtle' : ''}"
+                                style="font-size: 0.65rem;">
+                                ${window.escapeHtml(n.get_notification_type_display ? n.get_notification_type_display() : n.notification_type)}
+                            </span>
+                            <strong class="text-dark small">${window.escapeHtml(n.title)}</strong>
+                            ${!n.is_read ? '<span class="badge bg-primary ms-1 unread-tag" style="font-size: 0.6rem;">New</span>' : ''}
+                        </div>
+                        <small class="text-muted fw-medium ms-2">${window.escapeHtml(n.created_at ? new Date(n.created_at).toLocaleString() : '')}</small>
+                    </div>
+                    <p class="mb-0 mt-1 text-secondary small" style="font-size: 0.8rem;">${window.escapeHtml(n.message)}</p>
+                    ${n.related_request ? `<div class="mt-1"><span class="badge bg-light text-secondary border rounded-1" style="font-size: 0.65rem;">Request #${n.related_request.id}</span></div>` : ''}
+                </a>
+            `).join('');
+        }).catch((e) => {
+            if (loadingEl) loadingEl.style.display = 'none';
+            listEl.innerHTML = `<div class="text-center py-3 text-danger small">Failed to load</div>`;
+            console.error('Failed to load notification dropdown:', e);
+        });
+    }
+
     function refreshRecycleBinBadge() {
         const binBadge = document.getElementById('recycle-bin-badge');
         if (!getToken() || !binBadge) return;
@@ -995,6 +1061,14 @@ if (!window.__ssAuthScriptLoaded) {
         refreshNotifBadge();
         refreshRecycleBinBadge();
         refreshComplaintsBadge();
+
+        // Load notifications dropdown when opened
+        const notifDropdown = document.querySelector('[data-bs-toggle="dropdown"] i.bi-bell')?.closest('.dropdown');
+        if (notifDropdown) {
+            notifDropdown.addEventListener('show.bs.dropdown', () => {
+                loadNotifDropdown();
+            });
+        }
 
         setInterval(() => {
             refreshRecycleBinBadge();

@@ -127,6 +127,20 @@ def run_ml_classification_async(waste_request_id, image_bytes):
         )
         if not updated:
             logger.warning(f'[ML] request={waste_request_id} not found for classification update.')
+            return result
+
+        # Auto-assign driver for HIGH waste with confidence >= 80%
+        if result and result.get('severity') == 'high' and result.get('confidence', 0) >= 80:
+            try:
+                from .views import WasteRequestViewSet
+                waste_request = WasteRequest.objects.select_related('driver').get(pk=waste_request_id)
+                # Only auto-assign if still pending and no driver
+                if waste_request.status == 'pending' and waste_request.driver is None:
+                    viewset = WasteRequestViewSet()
+                    viewset._auto_assign_driver_for_request(waste_request)
+            except Exception:
+                logger.exception(f'[ML] auto-assign failed for request={waste_request_id}')
+
         return result
     finally:
         close_old_connections()

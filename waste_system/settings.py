@@ -144,10 +144,22 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 # stays valid for days. (It does NOT stop an attacker acting as the user inside
 # the page — for that, see the CSP below and keep escaping output.)
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'   # blocks cross-site sends on top-level POSTs
+# On localhost (DEBUG=True), use SameSite=None + Secure=True — browsers treat
+# localhost as a secure context. In production (DEBUG=False), use Lax + Secure.
+if DEBUG:
+    SESSION_COOKIE_SAMESITE = 'None'
+    SESSION_COOKIE_SECURE = True
+else:
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = True
 # CSRF cookie must stay readable by JS: fetch() copies it into X-CSRFToken.
 CSRF_COOKIE_HTTPONLY = False
-CSRF_COOKIE_SAMESITE = 'Lax'
+if DEBUG:
+    CSRF_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_SECURE = True
+else:
+    CSRF_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SECURE = True
 # Rolling expiry so an idle session eventually dies.
 SESSION_COOKIE_AGE = 60 * 60 * 12          # 12 hours
 SESSION_SAVE_EVERY_REQUEST = True          # refresh the window on activity
@@ -175,8 +187,6 @@ if not DEBUG:
     # only the two probe paths escape the redirect. (Wired to match the
     # docstrings in waste_system/health.py and the SslRedirectExemptionTests.)
     SECURE_REDIRECT_EXEMPT = [r'^healthz$', r'^healthz/live$']
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
 # ─── Database ─────────────────────────────────────────────────────────────────
 # Use SQLite for development, PostgreSQL for production
 DB_ENGINE = config('DB_ENGINE', default='sqlite3')  # 'postgresql' or 'sqlite3'

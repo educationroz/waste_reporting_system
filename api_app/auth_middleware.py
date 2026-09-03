@@ -25,9 +25,51 @@ library supports a ``Cookie`` header.
 
 The consumers already reject unauthenticated connections (``close(code=4001)``
 in ``api_app/consumers.py``), so an anonymous scope is refused at connect time.
+
+Development fallback: when DEBUG=True, also accept a ``token`` query parameter
+to work around SameSite=Lax cookie issues on localhost. This is NOT enabled
+in production.
 """
 
+from urllib.parse import parse_qs
+
 from channels.auth import AuthMiddlewareStack
+from channels.db import database_sync_to_async
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+
+
+@database_sync_to_async
+def get_user_from_jwt(token):
+    try:
+        access_token = AccessToken(token)
+        user_id = access_token['user_id']
+        return get_user_model().objects.get(id=user_id)
+    except (InvalidToken, TokenError, get_user_model().DoesNotExist):
+        return AnonymousUser()
+
+
+class TokenAuthMiddleware:
+    """
+    Accepts JWT from query string when DEBUG=True.
+    Only used for WebSocket connections on localhost.
+    """
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        # Try cookie-based auth first (handled by AuthMiddlewareStack outer)
+        # If user is still anonymous and DEBUG=True, try token from query string
+        if settings.DEBUG:
+            query_string = scope.get('query_string', b'').decode()
+            params = parse_qs(query_string)
+            token = params.get('token', [None])[0]
+            if token:
+                scope['user'] = await get_user_from_jwt(token)
+        return await self.inner(scope, receive, send)
 
 
 def SessionOrJWTAuthMiddlewareStack(inner):
@@ -38,7 +80,7 @@ def SessionOrJWTAuthMiddlewareStack(inner):
     ``AuthMiddlewareStack``: the query-string JWT fallback it used to add has
     been removed (see the module docstring).
     """
-    return AuthMiddlewareStack(inner)
+    return TokenAuthMiddleware(AuthMiddlewareStack(inner))
 
 
 # Backwards-compatible alias. Anything still importing ``JWTAuthMiddleware``
