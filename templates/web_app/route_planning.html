@@ -178,6 +178,33 @@
                                 <input type="date" id="plannedDate" class="form-control">
                             </div>
                         </div>
+
+                        <!-- ML Prediction Filter -->
+                        <div class="row mt-2">
+                            <div class="col-md-4 mb-2">
+                                <label>{% trans "ML Prediction" %}</label>
+                                <select id="mlFilter" class="form-select" onchange="loadWasteRequests()">
+                                    <option value="">{% trans "All Predictions" %}</option>
+                                    <option value="HIGH">{% trans "HIGH only" %} (≥80%)</option>
+                                    <option value="HIGH_MED">{% trans "HIGH + MEDIUM" %} (≥80%)</option>
+                                    <option value="LOW">{% trans "LOW only" %} (≥80%)</option>
+                                    <option value="REVIEW">{% trans "Needs Review" %} (<80%)</option>
+                                    <option value="VERIFIED">{% trans "Verified Only" %}</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-2 d-flex align-items-end">
+                                <button class="btn btn-outline-success w-100" onclick="selectAllHighMed()" id="selectHighMedBtn" disabled>
+                                    <i class="fas fa-check-double me-1"></i>{% trans "Select All HIGH+MED" %}
+                                </button>
+                            </div>
+                            <div class="col-md-4 mb-2 d-flex align-items-end">
+                                <label class="form-check form-switch m-0">
+                                    <input class="form-check-input" type="checkbox" id="verifiedOnly" checked onchange="loadWasteRequests()">
+                                    <span class="form-check-label">{% trans "Verified only" %}</span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="row mt-2">
                             <div class="col-md-6">
                                 <button class="btn btn-primary w-100" onclick="loadWasteRequests()">
@@ -504,7 +531,24 @@
     }
 
     window.loadWasteRequests = async function() {
-        const data = await getApiClient().get('/api/waste-requests/');
+        const mlFilter = document.getElementById('mlFilter')?.value || '';
+        const verifiedOnly = document.getElementById('verifiedOnly')?.checked || false;
+        const selectHighMedBtn = document.getElementById('selectHighMedBtn');
+        
+        // Enable select button only when filter shows HIGH/MED
+        if (selectHighMedBtn) {
+            selectHighMedBtn.disabled = !(mlFilter === 'HIGH' || mlFilter === 'HIGH_MED');
+        }
+
+        let url = '/api/waste-requests/?status=pending&status=assigned';
+        if (mlFilter === 'HIGH') url += '&prediction=HIGH&confidence_gte=0.8';
+        else if (mlFilter === 'HIGH_MED') url += '&prediction=HIGH,MEDIUM&confidence_gte=0.8';
+        else if (mlFilter === 'LOW') url += '&prediction=LOW&confidence_gte=0.8';
+        else if (mlFilter === 'REVIEW') url += '&confidence_lt=0.8';
+        else if (mlFilter === 'VERIFIED') url += '&confidence_gte=0.8&reviewed=true';
+        if (verifiedOnly) url += '&reviewed=true';
+
+        const data = await getApiClient().get(url);
         if (!data) {
             showToast(gettext('Failed to load requests. Are you logged in?'), 'danger');
             return;
@@ -517,18 +561,40 @@
         } else {
             let html = '';
             requests.forEach(r => {
+                let mlBadge = '';
+                if (r.severity) {
+                    const conf = Math.round(r.ml_confidence || 0);
+                    const isHighConf = conf >= 80;
+                    const pred = r.severity.charAt(0).toUpperCase() + r.severity.slice(1);
+                    let badgeClass = 'bg-secondary';
+                    if (isHighConf) {
+                        if (pred === 'High') badgeClass = 'bg-danger';
+                        else if (pred === 'Medium') badgeClass = 'bg-warning text-dark';
+                        else if (pred === 'Low') badgeClass = 'bg-info';
+                    } else {
+                        badgeClass = 'bg-secondary';
+                    }
+                    const reviewIcon = !isHighConf && r.needs_manual_review ? ' ⏳' : '';
+                    mlBadge = `<span class="badge ${badgeClass} ms-2">${pred} ${conf}%${reviewIcon}</span>`;
+                }
                 html += `
                     <div class="form-check mb-2">
                         <input class="form-check-input" type="checkbox" value="${r.id}" id="req${r.id}">
                         <label class="form-check-label" for="req${r.id}">
                             <strong>#${r.id}</strong> — ${r.pickup_address || 'No address'}
                             <span class="badge bg-secondary ms-1">${r.status}</span>
+                            ${mlBadge}
                         </label>
                     </div>`;
             });
             document.getElementById('requestsList').innerHTML = html;
         }
         new bootstrap.Modal(document.getElementById('requestsModal')).show();
+    };
+
+    window.selectAllHighMed = function() {
+        const checkboxes = document.querySelectorAll('#requestsList input[type="checkbox"]');
+        checkboxes.forEach(cb => cb.checked = true);
     };
 
     window.confirmSelection = function() {
@@ -607,10 +673,25 @@
         routeMarkers.push(startMarker);
 
         waypoints.forEach((wp, idx) => {
+            let mlHtml = '';
+            if (wp.type === 'request' && wp.ml_prediction) {
+                const conf = wp.ml_confidence ? Math.round(wp.ml_confidence * 100) : 0;
+                const isHighConf = conf >= 80;
+                let badgeClass = 'bg-secondary';
+                if (isHighConf) {
+                    if (wp.ml_prediction === 'HIGH') badgeClass = 'bg-danger';
+                    else if (wp.ml_prediction === 'MEDIUM') badgeClass = 'bg-warning text-dark';
+                    else if (wp.ml_prediction === 'LOW') badgeClass = 'bg-info';
+                } else {
+                    badgeClass = 'bg-secondary';
+                }
+                const reviewIcon = !isHighConf && !wp.ml_reviewed ? ' ⏳' : '';
+                mlHtml = `<br><span class="badge ${badgeClass}">${wp.ml_prediction} ${conf}%${reviewIcon}</span>`;
+            }
             const marker = L.marker([wp.latitude, wp.longitude])
                 .addTo(map)
                 .bindPopup(`
-                    <strong>${wp.type === 'request' ? '🗑 Request' : '🗂 Bin'} #${wp.id}</strong><br>
+                    <strong>${wp.type === 'request' ? '🗑 Request' : '🗂 Bin'} #${wp.id}</strong> ${mlHtml}<br>
                     ${gettext('Stop')} <strong>${idx + 1}</strong> of ${waypoints.length}<br>
                     ${gettext('Distance from previous:')} <strong>${wp.distance_from_previous.toFixed(2)} km</strong>
                 `);
@@ -655,6 +736,22 @@
         displayWaypoints(waypoints);
     }
 
+    function getMLBadge(wp) {
+        if (wp.type !== 'request' || !wp.ml_prediction) return '';
+        const conf = wp.ml_confidence ? Math.round(wp.ml_confidence * 100) : 0;
+        const isHighConf = conf >= 80;
+        let badgeClass = 'bg-secondary';
+        if (isHighConf) {
+            if (wp.ml_prediction === 'HIGH') badgeClass = 'bg-danger';
+            else if (wp.ml_prediction === 'MEDIUM') badgeClass = 'bg-warning text-dark';
+            else if (wp.ml_prediction === 'LOW') badgeClass = 'bg-info';
+        } else {
+            badgeClass = 'bg-secondary';
+        }
+        const reviewIcon = !isHighConf && !wp.ml_reviewed ? ' ⏳' : '';
+        return `<span class="badge ${badgeClass} ms-2">${wp.ml_prediction} ${conf}%${reviewIcon}</span>`;
+    }
+
     function displayWaypoints(waypoints) {
         if (waypoints.length === 0) {
             document.getElementById('waypointList').innerHTML =
@@ -663,10 +760,11 @@
         }
         let html = '';
         waypoints.forEach((wp, idx) => {
+            const mlBadge = getMLBadge(wp);
             html += `
                 <div class="waypoint-item" onclick="highlightWaypoint(${idx})">
                     <div>
-                        <strong>${wp.type === 'request' ? '🗑 Request' : '🗂 Bin'} #${wp.id}</strong><br>
+                        <strong>${wp.type === 'request' ? '🗑 Request' : '🗂 Bin'} #${wp.id}</strong> ${mlBadge}<br>
                         <small class="distance-info">+${wp.distance_from_previous.toFixed(2)} km</small>
                     </div>
                     <div class="waypoint-badge">${idx + 1}</div>

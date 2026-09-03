@@ -125,12 +125,9 @@ class Driver(models.Model):
         indexes = [
             models.Index(fields=['is_available', 'vehicle']),
             models.Index(fields=['is_available', '-created_at']),
-<<<<<<< HEAD
             models.Index(fields=['zone', 'is_available']),
-=======
             models.Index(fields=['is_available', 'on_break']),
             models.Index(fields=['on_break', '-break_started_at']),
->>>>>>> d04dda4f441a820cfafc956ec2bce9dd00ee5956
         ]
 
     def __str__(self):

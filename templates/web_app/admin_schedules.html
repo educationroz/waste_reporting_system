@@ -82,6 +82,14 @@
                 </div>
             </div>
 
+            <!-- Zone ML Forecast Cards -->
+            <div class="row g-3 mb-4" id="zone-forecast-cards">
+                <div class="col-12 text-center text-muted py-3">
+                    <div class="spinner-border text-success" role="status"></div>
+                    <span class="ms-2">{% trans "Loading zone forecasts..." %}</span>
+                </div>
+            </div>
+
             <div class="card dashboard-card">
                 <div class="card-header py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
                     <h6 class="mb-0 fw-bold"><i class="bi bi-calendar2-range me-2 text-success"></i>{% trans "Configured Operational Route Intervals" %}</h6>
@@ -618,6 +626,66 @@ window.toggleActive = toggleActive;
 window.deleteSchedule = deleteSchedule;
 window.onFrequencyChange = onFrequencyChange;
 window.addSchedule = addSchedule;
+
+function getApiClient() {
+    if (window.API) return window.API;
+    // Fallback: wait for API to be ready (defined in base.html)
+    return new Promise((resolve) => {
+        const checkAPI = () => {
+            if (window.API) {
+                resolve(window.API);
+            } else {
+                setTimeout(checkAPI, 50);
+            }
+        };
+        checkAPI();
+    });
+}
+
+async function loadZoneForecast() {
+    try {
+        const api = await getApiClient();
+        const data = await api.get('/api/schedules/zone_forecast/');
+        const container = document.getElementById('zone-forecast-cards');
+        if (!container || !data) return;
+
+        const zoneOrder = ['north', 'south', 'east', 'west', 'central'];
+        let html = '';
+        zoneOrder.forEach(zone => {
+            const z = data[zone];
+            if (!z) return;
+            const gapBadge = z.has_gap ? '<span class="badge bg-danger ms-1">{% trans "No Schedule" %}</span>' : '';
+            const scheduleBadge = z.has_schedule ? '<span class="badge bg-success ms-1">{% trans "Active" %}</span>' : '';
+            html += `
+                <div class="col-md-6 col-lg-4 col-xl-2">
+                    <div class="card dashboard-card h-100 ${z.has_gap ? 'border-danger' : ''}">
+                        <div class="card-body p-3">
+                            <h6 class="fw-bold mb-2">${z.zone_name}</h6>
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                <span class="badge bg-danger">${z.high} HIGH</span>
+                                <span class="badge bg-warning text-dark">${z.medium} MED</span>
+                                <span class="badge bg-info">${z.low} LOW</span>
+                            </div>
+                            <small class="text-muted d-block mb-2">{% trans "Avg confidence" %}: ${z.avg_confidence}%</small>
+                            <div class="d-flex gap-1 flex-wrap">
+                                ${scheduleBadge}
+                                ${gapBadge}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html || '<div class="col-12 text-center text-muted">{% trans "No forecast data available" %}</div>';
+    } catch (err) {
+        console.error('Failed to load zone forecast:', err);
+        const container = document.getElementById('zone-forecast-cards');
+        if (container) container.innerHTML = '<div class="col-12 text-center text-danger">{% trans "Failed to load forecast" %}</div>';
+    }
+}
+
+loadZoneForecast();
+
 })();
 </script>
 {% endblock %}
