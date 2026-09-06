@@ -74,6 +74,14 @@
         z-index: 1;
     }
 
+    /* Ensure chart containers have explicit height */
+    #chart-requests-over-time,
+    #chart-requests-by-type,
+    #chart-requests-by-zone {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
     .driver-truck-marker {
         background: transparent;
         border: none;
@@ -203,6 +211,12 @@
                 <button class="btn btn-success btn-sm px-3 rounded-2" data-bs-toggle="modal" data-bs-target="#quickAddModal">
                     <i class="bi bi-plus-circle me-1"></i>{% trans "Action Terminal" %}
                 </button>
+                <button class="btn btn-warning btn-sm px-3 rounded-2" data-bs-toggle="modal" data-bs-target="#reassignDriverModal">
+                    <i class="bi bi-arrow-left-right text-dark me-1"></i>{% trans "Reassign Driver" %}
+                </button>
+                <button class="btn btn-info btn-sm px-3 rounded-2" data-bs-toggle="modal" data-bs-target="#cloneScheduleModal">
+                    <i class="bi bi-calendar-plus text-white me-1"></i>{% trans "Clone Schedule" %}
+                </button>
                 <a href="{% url 'admin-drivers' %}" class="btn btn-sm border px-3 bg-surface-alt text-secondary">
                     <i class="bi bi-person-plus text-info me-1"></i>{% trans "Drivers Registry" %}
                 </a>
@@ -212,6 +226,9 @@
                 <a href="{% url 'admin-schedules' %}" class="btn btn-sm border px-3 bg-surface-alt text-secondary">
                     <i class="bi bi-calendar-week text-warning me-1"></i>{% trans "Calendar Setup" %}
                 </a>
+                <span class="badge bg-dark ms-auto d-flex align-items-center px-2 small" style="font-size: 0.7rem;">
+                    <kbd class="me-1">A</kbd>{% trans "Assign" %}  <kbd class="ms-2 me-1">R</kbd>{% trans "Route" %}  <kbd class="ms-2 me-1">D</kbd>{% trans "Drivers" %}
+                </span>
             </div>
 
             <!-- Metric Cards (Row 1) -->
@@ -426,7 +443,7 @@
                     </div>
                 </div>
 
-                <div id="live-fleet-map"></div>
+                <div id="live-fleet-map" style="height: 380px;"></div>
             </div>
 
             <div class="row g-4">
@@ -659,6 +676,81 @@
     </div>
 </div>
 
+<!-- Reassign Driver Modal -->
+<div class="modal fade" id="reassignDriverModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title fw-bold"><i class="bi bi-arrow-left-right me-2"></i>{% trans "Reassign All Requests from Driver" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary">{% trans "Source Driver (reassign FROM)" %}</label>
+                    <select id="reassign-from-driver" class="form-select form-select-lg">
+                        {% for driver in drivers %}
+                        <option value="{{ driver.id }}">{{ driver.user.username }} [{% trans "Asset" %}: {{ driver.vehicle.plate_number|default:"No Vehicle" }}] {% if not driver.is_available %}<span class="badge bg-secondary ms-1">{% trans "Busy" %}</span>{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary">{% trans "Target Driver (reassign TO)" %}</label>
+                    <select id="reassign-to-driver" class="form-select form-select-lg">
+                        {% for driver in drivers %}
+                        {% if driver.is_available %}
+                        <option value="{{ driver.id }}">{{ driver.user.username }} [{% trans "Asset" %}: {{ driver.vehicle.plate_number|default:"No Vehicle" }}]</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="alert alert-info small mb-0">
+                    <i class="bi bi-info-circle me-1"></i>
+                    {% trans "This will reassign ALL active (pending/assigned/in-progress) requests from the source driver to the target driver. Completed/cancelled requests are not affected." %}
+                </div>
+            </div>
+            <div class="modal-footer bg-surface-alt">
+                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">{% trans "Abort" %}</button>
+                <button class="btn btn-warning px-4" onclick="reassignAllFromDriver(this)">{% trans "Reassign All" %}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Clone Schedule Modal -->
+<div class="modal fade" id="cloneScheduleModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-calendar-plus me-2"></i>{% trans "Clone Schedule to Next Week" %}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary">{% trans "Select Weekly Schedule to Clone" %}</label>
+                    <select id="clone-schedule-select" class="form-select form-select-lg">
+                        {% for schedule in schedules %}
+                        {% if schedule.frequency == 'weekly' and schedule.day_of_week is not None %}
+                        <option value="{{ schedule.id }}" data-zone="{{ schedule.zone_name }}" data-day="{{ schedule.get_day_of_week_display }}">
+                            {{ schedule.zone_name }} — {{ schedule.get_day_of_week_display }} @ {{ schedule.start_time|time:"H:i" }}
+                            {% if schedule.driver %}({{ schedule.driver.user.username }}){% endif %}
+                        </option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="alert alert-info small mb-0">
+                    <i class="bi bi-info-circle me-1"></i>
+                    {% trans "Creates a copy of the selected weekly schedule starting next week on the same day. Only weekly schedules with a day set are shown." %}
+                </div>
+            </div>
+            <div class="modal-footer bg-surface-alt">
+                <button class="btn border px-4 bg-surface" data-bs-dismiss="modal">{% trans "Abort" %}</button>
+                <button class="btn btn-info px-4" onclick="cloneScheduleToNextWeek(this)">{% trans "Clone to Next Week" %}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Quick Add Modal -->
 <div class="modal fade" id="quickAddModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -702,9 +794,9 @@
 
 {% block extra_js %}
 <!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" onerror="console.error('Chart.js failed to load');"></script>
 <!-- Leaflet JS (OpenStreetMap) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" onerror="console.error('Leaflet failed to load');"></script>
 
 {{ requests_over_time|json_script:"data-requests-over-time" }}
 {{ requests_by_type|json_script:"data-requests-by-type" }}
@@ -735,7 +827,12 @@
 
     function initFleetTrackingMap() {
         const mapEl = document.getElementById('live-fleet-map');
-        if (!mapEl) return;
+        if (!mapEl) {
+            console.warn('Map element not found');
+            return;
+        }
+
+        console.log('Initializing fleet tracking map...', mapEl.offsetWidth, mapEl.offsetHeight);
 
         if (window._adminFleetMap) {
             try { window._adminFleetMap.remove(); } catch(e) {}
@@ -743,9 +840,23 @@
         }
 
         if (typeof L === 'undefined') {
+            console.warn('Leaflet not loaded yet, retrying...');
             setTimeout(initFleetTrackingMap, 150);
             return;
         }
+
+        // Ensure container has dimensions before creating map
+        if (mapEl.offsetWidth === 0 || mapEl.offsetHeight === 0) {
+            // Force a reflow check
+            mapEl.style.minHeight = '380px';
+            console.warn('Map container has zero dimensions, retrying...');
+            setTimeout(initFleetTrackingMap, 100);
+            return;
+        }
+
+        // Ensure explicit height is set
+        mapEl.style.height = '380px';
+        mapEl.style.width = '100%';
 
         fleetMap = L.map('live-fleet-map', {
             scrollWheelZoom: false,
@@ -757,6 +868,11 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
         }).addTo(fleetMap);
+
+        // Force map to recalculate size after a brief moment (fixes white map issue)
+        setTimeout(() => {
+            if (fleetMap) fleetMap.invalidateSize();
+        }, 100);
 
         // Initial fetch of active driver locations
         loadInitialDriverLocations();
@@ -964,6 +1080,9 @@
 
     // ── Dashboard trend charts (Chart.js) ────────────────────────────
     const chartInstances = {};
+    const CHART_PALETTE = [
+        '#198754', '#0d6efd', '#ffc107', '#dc3545', '#6f42c1', '#20c997'
+    ];
 
     function parseJsonScript(id) {
         const el = document.getElementById(id);
@@ -971,14 +1090,18 @@
         try { return JSON.parse(el.textContent); } catch (e) { return null; }
     }
 
-    const CHART_PALETTE = [
-        '#198754', '#0d6efd', '#ffc107', '#dc3545', '#0dcaf0',
-        '#6f42c1', '#fd7e14', '#20c997', '#d63384', '#6610f2'
-    ];
+    function themeGridColor() {
+        const theme = document.documentElement.getAttribute('data-theme') || 'light';
+        return theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    }
 
     function chartTheme() {
-        const theme = document.documentElement.getAttribute('data-theme') || 'light';
-        return theme === 'dark' ? '#e9ecef' : '#495057';
+        try {
+            const theme = document.documentElement.getAttribute('data-theme') || 'light';
+            return theme === 'dark' ? '#e9ecef' : '#495057';
+        } catch (e) {
+            return '#495057';
+        }
     }
 
     function destroyChart(key) {
@@ -990,17 +1113,39 @@
 
     function renderDashboardCharts() {
         if (typeof Chart === 'undefined') {
+            console.warn('Chart.js not loaded yet, retrying...');
             setTimeout(renderDashboardCharts, 150);
             return;
         }
 
+        console.log('Rendering dashboard charts...');
+
+        // Force canvas resize to ensure proper dimensions
+        ['chart-requests-over-time', 'chart-requests-by-type', 'chart-requests-by-zone'].forEach(id => {
+            const canvas = document.getElementById(id);
+            if (canvas && canvas.parentElement) {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) {
+                    canvas.width = rect.width;
+                    canvas.height = rect.height;
+                    console.log(`Canvas ${id} resized to ${rect.width}x${rect.height}`);
+                } else {
+                    console.warn(`Canvas ${id} parent has zero dimensions:`, rect);
+                }
+            } else {
+                console.warn(`Canvas ${id} not found or no parent`);
+            }
+        });
+
         // Requests over time (line)
         const overTimeCanvas = document.getElementById('chart-requests-over-time');
         if (overTimeCanvas) {
-            const data = parseJsonScript('data-requests-over-time');
-            if (data && Array.isArray(data.labels) && Array.isArray(data.data)) {
-                destroyChart('overTime');
-                chartInstances['overTime'] = new Chart(overTimeCanvas, {
+            try {
+                const data = parseJsonScript('data-requests-over-time');
+                console.log('requests-over-time data:', data);
+                if (data && Array.isArray(data.labels) && Array.isArray(data.data)) {
+                    destroyChart('overTime');
+                    chartInstances['overTime'] = new Chart(overTimeCanvas, {
                     type: 'line',
                     data: {
                         labels: data.labels,
@@ -1032,17 +1177,24 @@
                             y: { beginAtZero: true, ticks: { color: chartTheme(), precision: 0 }, grid: { color: themeGridColor() } }
                         }
                     }
-                });
+                    });
+                } else {
+                    console.warn('Chart data missing for requests-over-time:', data);
+                }
+            } catch (e) {
+                console.error('Failed to render requests-over-time chart:', e);
             }
         }
 
         // By waste type (doughnut)
         const typeCanvas = document.getElementById('chart-requests-by-type');
         if (typeCanvas) {
-            const data = parseJsonScript('data-requests-by-type');
-            if (data && Array.isArray(data.labels) && Array.isArray(data.data)) {
-                destroyChart('byType');
-                chartInstances['byType'] = new Chart(typeCanvas, {
+            try {
+                const data = parseJsonScript('data-requests-by-type');
+                console.log('requests-by-type data:', data);
+                if (data && Array.isArray(data.labels) && Array.isArray(data.data)) {
+                    destroyChart('byType');
+                    chartInstances['byType'] = new Chart(typeCanvas, {
                     type: 'doughnut',
                     data: {
                         labels: data.labels,
@@ -1061,17 +1213,24 @@
                             legend: { position: 'right', labels: { color: chartTheme(), boxWidth: 12, font: { size: 11 } } }
                         }
                     }
-                });
+                    });
+                } else {
+                    console.warn('Chart data missing for requests-by-type:', data);
+                }
+            } catch (e) {
+                console.error('Failed to render requests-by-type chart:', e);
             }
         }
 
         // By zone (bar)
         const zoneCanvas = document.getElementById('chart-requests-by-zone');
         if (zoneCanvas) {
-            const data = parseJsonScript('data-requests-by-zone');
-            if (data && Array.isArray(data.labels) && Array.isArray(data.data)) {
-                destroyChart('byZone');
-                chartInstances['byZone'] = new Chart(zoneCanvas, {
+            try {
+                const data = parseJsonScript('data-requests-by-zone');
+                console.log('requests-by-zone data:', data);
+                if (data && Array.isArray(data.labels) && Array.isArray(data.data)) {
+                    destroyChart('byZone');
+                    chartInstances['byZone'] = new Chart(zoneCanvas, {
                     type: 'bar',
                     data: {
                         labels: data.labels,
@@ -1094,14 +1253,14 @@
                             y: { beginAtZero: true, ticks: { color: chartTheme(), precision: 0 }, grid: { color: themeGridColor() } }
                         }
                     }
-                });
+                    });
+                } else {
+                    console.warn('Chart data missing for requests-by-zone:', data);
+                }
+            } catch (e) {
+                console.error('Failed to render requests-by-zone chart:', e);
             }
         }
-    }
-
-    function themeGridColor() {
-        const theme = document.documentElement.getAttribute('data-theme') || 'light';
-        return theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
     }
 
     window.renderDashboardCharts = renderDashboardCharts;
@@ -1231,6 +1390,104 @@
             }
         });
     };
+
+    // ── Reassign All from Driver ──
+    window.reassignAllFromDriver = async function(btn) {
+        const fromDriverId = document.getElementById('reassign-from-driver').value;
+        const toDriverId = document.getElementById('reassign-to-driver').value;
+
+        if (!fromDriverId || !toDriverId) {
+            showToast(gettext('Both source and target drivers are required.'), 'danger');
+            return;
+        }
+
+        if (fromDriverId === toDriverId) {
+            showToast(gettext('Source and target drivers must be different.'), 'danger');
+            return;
+        }
+
+        const ok = await showConfirmDialog({
+            title: gettext('Reassign All Requests?'),
+            message: gettext('This will move ALL active requests from the source driver to the target driver. Continue?'),
+            confirmText: gettext('Yes, Reassign All'),
+            cancelText: gettext('Cancel'),
+            confirmBtnClass: 'btn-warning text-dark',
+            icon: 'bi-arrow-left-right',
+            iconColor: '#f59e0b',
+            iconBg: '#fef3c7'
+        });
+        if (!ok) return;
+
+        await withButtonBusy(eventButton(btn), 'Reassigning...', async () => {
+            const data = await API.post('/api/waste-requests/reassign_all_from_driver/', {
+                from_driver_id: parseInt(fromDriverId, 10),
+                to_driver_id: parseInt(toDriverId, 10)
+            });
+            if (data && data.updated >= 0) {
+                showToast(gettext('Successfully reassigned ') + data.updated + gettext(' request(s).'), 'success');
+                const modalEl = document.getElementById('reassignDriverModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(data?.error || gettext('Failed to reassign requests.'), 'danger');
+            }
+        });
+    };
+
+    // ── Clone Schedule to Next Week ──
+    window.cloneScheduleToNextWeek = async function(btn) {
+        const scheduleId = document.getElementById('clone-schedule-select').value;
+
+        if (!scheduleId) {
+            showToast(gettext('Please select a schedule to clone.'), 'danger');
+            return;
+        }
+
+        await withButtonBusy(eventButton(btn), 'Cloning...', async () => {
+            const data = await API.post(`/api/schedules/${scheduleId}/clone_to_next_week/`);
+            if (data && data.new_schedule) {
+                showToast(gettext('Schedule cloned to next week successfully!'), 'success');
+                const modalEl = document.getElementById('cloneScheduleModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(data?.error || gettext('Failed to clone schedule.'), 'danger');
+            }
+        });
+    };
+
+    // ── Keyboard Shortcuts ──
+    document.addEventListener('keydown', function(e) {
+        // Ignore shortcuts when typing in inputs
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+        switch (e.key.toLowerCase()) {
+            case 'a': // Assign - open assign modal for first pending request
+                const firstPendingRow = document.querySelector('tbody tr td .badge-warning');
+                if (firstPendingRow) {
+                    const row = firstPendingRow.closest('tr');
+                    const requestId = row.querySelector('td:first-child')?.textContent?.replace('#', '');
+                    if (requestId) window.openAssignModal(requestId);
+                }
+                break;
+            case 'r': // Route - navigate to route planning
+                window.location.href = '{% url "route-planning" %}';
+                break;
+            case 'd': // Drivers - navigate to drivers list
+                window.location.href = '{% url "admin-drivers" %}';
+                break;
+            case 'm': // Map - scroll to fleet map
+                const mapCard = document.getElementById('live-fleet-map')?.closest('.card');
+                if (mapCard) mapCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                break;
+            case 'h': // Help - show shortcuts toast
+                showToast('Shortcuts: A=Assign, R=Route, D=Drivers, M=Map, H=Help', 'info');
+                break;
+        }
+    });
 
     window.applyFilters = function() {
         const searchTerm = document.getElementById('search-box').value.trim();

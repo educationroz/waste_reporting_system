@@ -493,6 +493,7 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
             'driver__user', 'vehicle'
         )
         ctx['drivers'] = Driver.objects.select_related('user', 'vehicle').all()
+        ctx['schedules'] = Schedule.objects.select_related('driver__user', 'vehicle').filter(is_active=True)
         ctx['now'] = timezone.now()
         
         # System alerts.

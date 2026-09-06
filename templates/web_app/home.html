@@ -207,6 +207,28 @@
             </div>
             {% endif %}
 
+            <!-- Repeat Last Request / Guest Claim Actions -->
+            <div class="row g-3 mb-3">
+                {% if user.is_authenticated and user.role == 'user' %}
+                <div class="col-12 col-md-6">
+                    <button class="btn btn-outline-primary w-100" id="repeat-last-btn" onclick="repeatLastRequest()">
+                        <i class="bi bi-arrow-clockwise me-2"></i>{% trans "Repeat Last Request" %}
+                    </button>
+                </div>
+                {% else %}
+                <div class="col-12 col-md-6">
+                    <button class="btn btn-outline-success w-100" id="guest-claim-btn" onclick="openGuestClaimModal()">
+                        <i class="bi bi-key me-2"></i>{% trans "Claim My Guest Requests" %}
+                    </button>
+                </div>
+                {% endif %}
+                <div class="col-12 col-md-6">
+                    <a href="{% url 'user-requests' %}" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-clipboard-data me-2"></i>{% trans "View All Requests" %}
+                    </a>
+                </div>
+            </div>
+
             <!-- New Request Card -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white fw-bold">
@@ -541,6 +563,37 @@
                 </button>
                 <button type="button" class="btn btn-outline-light" onclick="closeCamera()" id="camera-done-btn">
                     {% trans "Done" %}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Guest Claim Modal ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="guestClaimModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-key me-2"></i>{% trans "Claim Your Guest Requests" %}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small mb-3">{% trans "Enter your email to receive a magic link. Clicking the link will automatically link any guest requests submitted with that email to your account." %}</p>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="guest-claim-email">{% trans "Email Address" %}</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="bi bi-envelope"></i></span>
+                        <input type="email" id="guest-claim-email" class="form-control" autocomplete="email"
+                            placeholder="name@example.com">
+                    </div>
+                </div>
+                <div id="guest-claim-status" class="small text-muted d-none"></div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button class="btn btn-light border px-4" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button class="btn btn-success px-4" id="guest-claim-send-btn" onclick="sendGuestClaimLink()">
+                    <span id="guest-claim-send-text"><i class="bi bi-send me-1"></i>{% trans "Send Magic Link" %}</span>
+                    <span id="guest-claim-send-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
                 </button>
             </div>
         </div>
@@ -2048,6 +2101,270 @@ try {
     showToast(gettext('Live updates unavailable.'), 'warning');
 }
 {% endif %}
+
+    // ── Repeat Last Request ─────────────────────────────────────────────────────
+    window.repeatLastRequest = async function() {
+        try {
+            // Include guest_token from localStorage if available (for guest users)
+            let url = '/api/waste-requests/my_last_request/';
+            const guestToken = localStorage.getItem('guest_token');
+            if (guestToken) {
+                url += '?guest_token=' + encodeURIComponent(guestToken);
+            }
+
+            const data = await API.get(url);
+            if (!data || !data.id) {
+                showToast(gettext('No previous request found to repeat.'), 'info');
+                return;
+            }
+
+            // Pre-fill the form with last request data
+            document.getElementById('waste-type').value = data.waste_type || 'general';
+            document.getElementById('pickup-address').value = data.pickup_address || '';
+            document.getElementById('description').value = data.description || '';
+
+            // Set map location
+            if (data.latitude && data.longitude) {
+                initMap(parseFloat(data.latitude), parseFloat(data.longitude));
+            }
+
+            // Copy photos if available
+            if (data.photo) {
+                // We can't directly set file inputs, but we can show a message
+                showToast(gettext('Form pre-filled with last request. Photos need to be re-attached.'), 'success');
+            } else {
+                showToast(gettext('Form pre-filled with last request data.'), 'success');
+            }
+
+            // Scroll to form
+            const formCard = document.querySelector('.card.shadow-sm');
+            if (formCard) formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (e) {
+            console.error('Repeat last request failed:', e);
+            showToast(gettext('Failed to load last request.'), 'danger');
+        }
+    };
+
+    // ── Guest Claim Modal ───────────────────────────────────────────────────────
+    function getGuestClaimModal() {
+        if (typeof bootstrap === 'undefined') {
+            showToast(gettext('Bootstrap not loaded.'), 'danger');
+            return null;
+        }
+        return bootstrap.Modal.getOrCreateInstance(document.getElementById('guestClaimModal'));
+    }
+
+    window.openGuestClaimModal = function() {
+        const modal = getGuestClaimModal();
+        if (modal) {
+            document.getElementById('guest-claim-email').value = '';
+            document.getElementById('guest-claim-status').classList.add('d-none');
+            modal.show();
+        }
+    };
+
+    window.sendGuestClaimLink = async function() {
+        const email = document.getElementById('guest-claim-email').value.trim().toLowerCase();
+        const statusEl = document.getElementById('guest-claim-status');
+        const btn = document.getElementById('guest-claim-send-btn');
+        const text = document.getElementById('guest-claim-send-text');
+        const spinner = document.getElementById('guest-claim-send-spinner');
+
+        if (!email || !email.includes('@')) {
+            showToast(gettext('Please enter a valid email address.'), 'warning');
+            return;
+        }
+
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+        statusEl.classList.add('d-none');
+
+        try {
+            const data = await API.post('/api/waste-requests/send_claim_link/', { email });
+            if (data && data.claim_url) {
+                statusEl.className = 'small text-success d-block mt-2';
+                statusEl.textContent = gettext('Magic link sent! Check your email.') + ' ' + data.claim_url;
+                showToast(gettext('Claim link sent to ') + email, 'success');
+            } else {
+                showToast(data?.error || gettext('Failed to send claim link.'), 'danger');
+            }
+        } catch (e) {
+            showToast(gettext('Network error: ') + e.message, 'danger');
+        } finally {
+            btn.disabled = false;
+            spinner.classList.add('d-none');
+        }
+    };
+
+    // ── Photo Auto-Compress Utility ─────────────────────────────────────────────
+    /**
+     * Compresses an image file on the client side before upload.
+     * @param {File} file - The image file to compress
+     * @param {Object} options - Compression options
+     * @param {number} options.maxWidth - Maximum width (default: 1920)
+     * @param {number} options.maxHeight - Maximum height (default: 1920)
+     * @param {number} options.quality - JPEG quality 0-1 (default: 0.8)
+     * @param {string} options.outputType - Output MIME type (default: 'image/jpeg')
+     * @returns {Promise<File>} Compressed file
+     */
+    window.compressImage = function(file, options = {}) {
+        return new Promise((resolve, reject) => {
+            const opts = Object.assign({
+                maxWidth: 1920,
+                maxHeight: 1920,
+                quality: 0.8,
+                outputType: 'image/jpeg',
+            }, options);
+
+            if (!file.type.startsWith('image/')) {
+                resolve(file); // Not an image, return as-is
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    let { width, height } = img;
+
+                    // Calculate new dimensions maintaining aspect ratio
+                    if (width > opts.maxWidth || height > opts.maxHeight) {
+                        const ratio = Math.min(opts.maxWidth / width, opts.maxHeight / height);
+                        width = Math.round(width * ratio);
+                        height = Math.round(height * ratio);
+                    }
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob((blob) => {
+                        if (!blob) {
+                            reject(new Error('Compression failed'));
+                            return;
+                        }
+                        const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+                            type: opts.outputType,
+                            lastModified: Date.now(),
+                        });
+                        resolve(compressedFile);
+                    }, opts.outputType, opts.quality);
+                };
+                img.onerror = () => reject(new Error('Failed to load image'));
+                img.src = e.target.result;
+            };
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsDataURL(file);
+        });
+    };
+
+    // Wrapper for garbage photo upload with compression
+    const originalHandlePhotoUpload = window.handlePhotoUpload;
+    window.handlePhotoUpload = async function(input) {
+        const files = Array.from(input.files || []);
+        if (!files.length) return;
+
+        // Show compressing status
+        const statusEl = document.getElementById('exif-info');
+        if (statusEl) {
+            statusEl.innerHTML = '<span class="text-info"><i class="bi bi-hourglass-split me-1"></i>Compressing ' + files.length + ' photo(s)...</span>';
+        }
+
+        const compressedFiles = [];
+        for (const file of files) {
+            try {
+                const compressed = await window.compressImage(file, {
+                    maxWidth: 1920,
+                    maxHeight: 1920,
+                    quality: 0.85,
+                });
+                compressedFiles.push(compressed);
+                console.log(`Compressed ${file.name}: ${(file.size / 1024).toFixed(1)}KB -> ${(compressed.size / 1024).toFixed(1)}KB (${((1 - compressed.size / file.size) * 100).toFixed(1)}% reduction)`);
+            } catch (e) {
+                console.warn('Compression failed for', file.name, e);
+                compressedFiles.push(file); // Fallback to original
+            }
+        }
+
+        if (statusEl) {
+            const totalOriginal = files.reduce((sum, f) => sum + f.size, 0);
+            const totalCompressed = compressedFiles.reduce((sum, f) => sum + f.size, 0);
+            statusEl.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>Compressed ' + files.length + ' photo(s): ' +
+                (totalOriginal / 1024).toFixed(1) + 'KB -> ' + (totalCompressed / 1024).toFixed(1) + 'KB (' +
+                ((1 - totalCompressed / totalOriginal) * 100).toFixed(1) + '% reduction)</span>';
+        }
+
+        // Create a new DataTransfer with compressed files
+        const dt = new DataTransfer();
+        compressedFiles.forEach(f => dt.items.add(f));
+        input.files = dt.files;
+
+        // Call original handler
+        await originalHandlePhotoUpload(input);
+    };
+
+    // Also compress complaint photos
+    const originalHandleComplaintPhotoUpload = window.handleComplaintPhotoUpload;
+    window.handleComplaintPhotoUpload = async function(input) {
+        const files = Array.from(input.files || []);
+        if (!files.length) return;
+
+        const file = files[0]; // Complaint only takes one photo
+        try {
+            const compressed = await window.compressImage(file, {
+                maxWidth: 1920,
+                maxHeight: 1920,
+                quality: 0.85,
+            });
+            console.log(`Compressed complaint photo: ${(file.size / 1024).toFixed(1)}KB -> ${(compressed.size / 1024).toFixed(1)}KB`);
+
+            const dt = new DataTransfer();
+            dt.items.add(compressed);
+            input.files = dt.files;
+        } catch (e) {
+            console.warn('Complaint photo compression failed:', e);
+        }
+
+        await originalHandleComplaintPhotoUpload(input);
+    };
+
+    // Also compress camera-captured photos before adding
+    const originalAddGarbagePhoto = window.addGarbagePhoto;
+    if (originalAddGarbagePhoto) {
+        window.addGarbagePhoto = async function(file, gps) {
+            try {
+                const compressed = await window.compressImage(file, {
+                    maxWidth: 1920,
+                    maxHeight: 1920,
+                    quality: 0.85,
+                });
+                return originalAddGarbagePhoto(compressed, gps);
+            } catch (e) {
+                console.warn('Camera photo compression failed:', e);
+                return originalAddGarbagePhoto(file, gps);
+            }
+        };
+    }
+
+    const originalUseCapturedComplaintPhoto = window.useCapturedComplaintPhoto;
+    if (originalUseCapturedComplaintPhoto) {
+        window.useCapturedComplaintPhoto = async function(file) {
+            try {
+                const compressed = await window.compressImage(file, {
+                    maxWidth: 1920,
+                    maxHeight: 1920,
+                    quality: 0.85,
+                });
+                return originalUseCapturedComplaintPhoto(compressed);
+            } catch (e) {
+                console.warn('Camera complaint photo compression failed:', e);
+                return originalUseCapturedComplaintPhoto(file);
+            }
+        };
+    }
 
 })();
 </script>

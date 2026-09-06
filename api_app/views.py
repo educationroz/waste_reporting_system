@@ -1085,6 +1085,242 @@ class DriverViewSet(viewsets.ModelViewSet):
             'status': status_type,
         })
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='me/today-summary')
+    def me_today_summary(self, request):
+        """
+        GET /api/drivers/me/today-summary/
+
+        Single-call dashboard summary for the authenticated driver.
+        Returns: assigned requests, completed today, current route, stats.
+        """
+        user = request.user
+        if user.role != 'driver':
+            return Response({'error': 'Driver access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            driver = Driver.objects.select_related('user', 'vehicle').get(user=user)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        today_start = timezone.make_aware(timezone.datetime(timezone.now().year, timezone.now().month, timezone.now().day))
+        today_end = today_start + timedelta(days=1)
+
+        # Assigned requests (pending + assigned + in_progress)
+        assigned_qs = WasteRequest.objects.filter(
+            driver=driver, is_deleted=False,
+        ).exclude(status__in=['completed', 'cancelled']).order_by('scheduled_date')
+
+        # Completed today
+        completed_today_qs = WasteRequest.objects.filter(
+            driver=driver, status='completed', completed_at__gte=today_start, completed_at__lt=today_end
+        )
+
+        # Current active route (if any)
+        current_route = Route.objects.filter(
+            driver=driver, status__in=['planned', 'in_progress']
+        ).order_by('planned_date').first()
+
+        # Serialize assigned requests
+        assigned_data = [
+            {
+                'id': wr.id,
+                'waste_type': wr.waste_type,
+                'waste_type_display': wr.get_waste_type_display(),
+                'status': wr.status,
+                'status_display': wr.get_status_display(),
+                'pickup_address': wr.pickup_address,
+                'latitude': str(wr.latitude) if wr.latitude else None,
+                'longitude': str(wr.longitude) if wr.longitude else None,
+                'scheduled_date': wr.scheduled_date.isoformat() if wr.scheduled_date else None,
+                'zone': wr.zone,
+                'severity': wr.severity,
+                'has_photo': bool(wr.photo),
+            }
+            for wr in assigned_qs[:20]  # Limit to 20
+        ]
+
+        completed_today_count = completed_today_qs.count()
+
+        # Today's stats
+        all_today = WasteRequest.objects.filter(
+            driver=driver, created_at__gte=today_start, created_at__lt=today_end
+        ).count()
+        completed_all = WasteRequest.objects.filter(
+            driver=driver, status='completed', completed_at__gte=today_start, completed_at__lt=today_end
+        ).count()
+
+        route_data = None
+        if current_route:
+            route_data = {
+                'id': current_route.id,
+                'status': current_route.status,
+                'planned_date': current_route.planned_date.isoformat() if current_route.planned_date else None,
+                'total_distance_km': current_route.total_distance_km,
+                'estimated_duration_min': current_route.estimated_duration_min,
+                'waste_request_count': current_route.waste_requests.count(),
+            }
+
+        return Response({
+            'driver': {
+                'id': driver.id,
+                'name': driver.user.username,
+                'phone': driver.user.phone,
+                'zone': driver.zone,
+                'is_available': driver.is_available,
+                'on_break': driver.on_break,
+                'vehicle': {
+                    'id': driver.vehicle.id,
+                    'plate_number': driver.vehicle.plate_number,
+                    'vehicle_type': driver.vehicle.vehicle_type,
+                } if driver.vehicle else None,
+            },
+            'assigned_requests': assigned_data,
+            'assigned_count': assigned_qs.count(),
+            'completed_today': completed_today_count,
+            'total_today': all_today,
+            'completed_all_today': completed_all,
+            'current_route': route_data,
+        })
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated], url_path='me/route-started')
+    def me_route_started(self, request):
+        """
+        POST /api/drivers/me/route-started/
+
+        Driver marks their current route as started.
+        Sends "route started" push notification to admin and citizen.
+        Body: {route_id: n, latitude?, longitude?}
+        """
+        user = request.user
+        if user.role != 'driver':
+            return Response({'error': 'Driver access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            driver = Driver.objects.select_related('user', 'vehicle').get(user=user)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        route_id = request.data.get('route_id')
+        if not route_id:
+            return Response({'error': 'route_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            route = Route.objects.select_related('driver__user', 'vehicle').prefetch_related('waste_requests__user').get(id=route_id, driver=driver)
+        except Route.DoesNotExist:
+            return Response({'error': 'Route not found or not assigned to you.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Update route status to in_progress
+        route.status = 'in_progress'
+        route.started_at = timezone.now()
+        route.save(update_fields=['status', 'started_at'])
+
+        # Optional GPS update
+        lat = request.data.get('latitude')
+        lng = request.data.get('longitude')
+        if lat is not None and lng is not None:
+            try:
+                driver.current_latitude = float(lat)
+                driver.current_longitude = float(lng)
+                driver.save(update_fields=['current_latitude', 'current_longitude'])
+            except (TypeError, ValueError):
+                pass
+
+        # Notify admins
+        plate = driver.vehicle.plate_number if driver.vehicle else 'Vehicle'
+        _notify_admins(
+            title=f"Route #{route.id} Started",
+            message=f"Driver {driver.user.username} ({plate}) started route with {route.waste_requests.count()} pickup(s).",
+            notification_type='info',
+        )
+
+        # Notify citizens on this route
+        for wr in route.waste_requests.select_related('user'):
+            if wr.user_id:
+                _create_notification(
+                    user=wr.user,
+                    title='Driver En Route',
+                    message=f'Driver {driver.user.username} has started the route and is on the way to collect your waste.',
+                    notification_type='info',
+                    related_request=wr,
+                )
+
+        return Response({
+            'message': 'Route marked as started. Notifications sent.',
+            'route': {
+                'id': route.id,
+                'status': route.status,
+                'started_at': route.started_at.isoformat(),
+            },
+        })
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='me/navigation-deeplink')
+    def me_navigation_deeplink(self, request):
+        """
+        GET /api/drivers/me/navigation-deeplink/?destination_lat=X&destination_lng=Y&label=Pickup
+
+        Returns deep-link URLs for voice-guided navigation apps.
+        Query params:
+        - destination_lat (required)
+        - destination_lng (required)
+        - label (optional) - label for the destination
+        - current_lat, current_lng (optional) - driver's current position (uses driver's GPS if not provided)
+        """
+        user = request.user
+        if user.role != 'driver':
+            return Response({'error': 'Driver access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+        dest_lat = request.query_params.get('destination_lat')
+        dest_lng = request.query_params.get('destination_lng')
+        label = request.query_params.get('label', 'Destination')
+
+        if not dest_lat or not dest_lng:
+            return Response({'error': 'destination_lat and destination_lng are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            dest_lat_f = float(dest_lat)
+            dest_lng_f = float(dest_lng)
+        except (TypeError, ValueError):
+            return Response({'error': 'Invalid coordinates.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get driver's current location
+        try:
+            driver = Driver.objects.get(user=user)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        current_lat = request.query_params.get('current_lat')
+        current_lng = request.query_params.get('current_lng')
+
+        if current_lat and current_lng:
+            try:
+                cur_lat = float(current_lat)
+                cur_lng = float(current_lng)
+            except (TypeError, ValueError):
+                cur_lat = driver.current_latitude
+                cur_lng = driver.current_longitude
+        else:
+            cur_lat = driver.current_latitude
+            cur_lng = driver.current_longitude
+
+        # Build deep links for popular navigation apps
+        dest = f"{dest_lat_f},{dest_lng_f}"
+        origin = f"{cur_lat},{cur_lng}" if cur_lat and cur_lng else ""
+
+        deeplinks = {
+            'google_maps': f"https://www.google.com/maps/dir/?api=1&destination={dest}&travelmode=driving" + (f"&origin={origin}" if origin else ""),
+            'waze': f"https://waze.com/ul?ll={dest}&navigate=yes" + (f"&from={origin}" if origin else ""),
+            'apple_maps': f"https://maps.apple.com/?daddr={dest}&dirflg=d" + (f"&saddr={origin}" if origin else ""),
+            'maps_me': f"mapsme://route?points={dest}" + (f",{origin}" if origin else ""),
+            'osm_and': f"https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route={origin}%3B{dest}" if origin else f"https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route={dest}",
+            'generic': f"geo:{dest}?q={dest}({label})",
+        }
+
+        return Response({
+            'deeplinks': deeplinks,
+            'destination': {'latitude': dest_lat_f, 'longitude': dest_lng_f, 'label': label},
+            'origin': {'latitude': cur_lat, 'longitude': cur_lng} if cur_lat and cur_lng else None,
+            'recommended': 'google_maps',
+        })
 
 
 class BinViewSet(viewsets.ModelViewSet):
@@ -1541,6 +1777,52 @@ def claim_guest_requests_by_email(user):
     return claimed_count
 
 
+def guest_claim_view(request):
+    """
+    GET /claim-guest/?token=<signed_token>
+
+    Handles magic link clicks. If user is authenticated, claims requests directly.
+    If not, stores token in session and redirects to login/register with a message.
+    """
+    from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+    from django.shortcuts import redirect
+    from django.contrib import messages
+    from django.urls import reverse
+
+    token = request.GET.get('token')
+    if not token:
+        messages.error(request, 'Invalid claim link.')
+        return redirect('home')
+
+    signer = TimestampSigner(salt='guest-claim-link')
+    try:
+        email = signer.unsign(token, max_age=86400)  # 24 hour expiry
+    except (BadSignature, SignatureExpired):
+        messages.error(request, 'This claim link is invalid or has expired.')
+        return redirect('home')
+
+    email = email.strip().lower()
+
+    if request.user.is_authenticated:
+        user_email = (request.user.email or '').strip().lower()
+        if email == user_email:
+            claimed_count = claim_guest_requests_by_email(request.user)
+            if claimed_count:
+                messages.success(request, f'Successfully claimed {claimed_count} guest request(s)!')
+            else:
+                messages.info(request, 'No guest requests found for this email.')
+            return redirect('user-requests')
+        else:
+            messages.warning(request, 'This claim link is for a different email address. Please log in with the correct account.')
+            return redirect('login')
+    else:
+        # Store token in session and redirect to login with a flag
+        request.session['guest_claim_token'] = token
+        request.session['guest_claim_email'] = email
+        messages.info(request, f'Sign in or register with {email} to claim your guest requests.')
+        return redirect('login')
+
+
 class WasteRequestViewSet(viewsets.ModelViewSet):
     """
     Waste pickup requests.
@@ -1881,6 +2163,104 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             'claimed': claimed_count,
             'claimed_ids': claimed_ids,
         })
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def send_claim_link(self, request):
+        """
+        POST /api/waste-requests/send_claim_link/ — {email: "user@example.com"}
+
+        Sends a magic claim link to the given email. When clicked, the link
+        will claim any guest requests associated with that email (if the user
+        is logged in) or prompt them to register/login first.
+        """
+        email = (request.data.get('email') or '').strip().lower()
+        if not email or '@' not in email:
+            return Response({'error': 'Valid email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.core.signing import TimestampSigner
+        from django.conf import settings
+        from django.urls import reverse
+
+        signer = TimestampSigner(salt='guest-claim-link')
+        token = signer.sign(email)
+
+        claim_url = request.build_absolute_uri(reverse('guest-claim') + f'?token={token}')
+
+        # In production, send via email. For now, return the URL for testing.
+        # TODO: Integrate with email sending system
+        logger.info(f'[SEND_CLAIM_LINK] email={email} claim_url={claim_url}')
+
+        return Response({
+            'message': 'Claim link generated. Check your email (or response below for testing).',
+            'claim_url': claim_url,
+            'email': email,
+        })
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def claim_by_token(self, request):
+        """
+        POST /api/waste-requests/claim_by_token/ — {token: "signed_token"}
+
+        Claims guest requests using a signed token from a magic link.
+        Returns the number of requests claimed.
+        """
+        token = request.data.get('token')
+        if not token:
+            return Response({'error': 'Token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+
+        signer = TimestampSigner(salt='guest-claim-link')
+        try:
+            email = signer.unsign(token, max_age=86400)  # 24 hour expiry
+        except (BadSignature, SignatureExpired):
+            return Response({'error': 'Invalid or expired claim link.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        email = email.strip().lower()
+        user_email = (request.user.email or '').strip().lower()
+
+        if email != user_email:
+            return Response(
+                {'error': 'This claim link is for a different email address.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        claimed_count = claim_guest_requests_by_email(request.user)
+
+        return Response({
+            'claimed': claimed_count,
+            'message': f'Successfully claimed {claimed_count} guest request(s).',
+        })
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def my_last_request(self, request):
+        """
+        GET /api/waste-requests/my_last_request/
+
+        Returns the most recent request for the authenticated user
+        (or the last guest request if they have a guest_token in localStorage).
+        Used for "Repeat Last Request" feature.
+        """
+        user = request.user
+
+        # Try to get the user's last request
+        qs = WasteRequest.objects.filter(user=user).order_by('-created_at')
+        last_request = qs.first()
+
+        if last_request:
+            serializer = self.get_serializer(last_request)
+            return Response(serializer.data)
+
+        # If no user requests, check for guest_token in query params (from localStorage)
+        guest_token = request.query_params.get('guest_token')
+        if guest_token:
+            guest_qs = WasteRequest.objects.filter(guest_token=guest_token, user__isnull=True).order_by('-created_at')
+            guest_request = guest_qs.first()
+            if guest_request:
+                serializer = self.get_serializer(guest_request)
+                return Response(serializer.data)
+
+        return Response({}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def update_status(self, request, pk=None):
@@ -2953,6 +3333,245 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         except Exception:
             logger.warning(f'[AUTO_ASSIGN_HIGH] notification push failed for request={waste_request.id}')
 
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def reassign_all_from_driver(self, request):
+        """POST /api/waste-requests/reassign_all_from_driver/ — {from_driver_id: int, to_driver_id: int}
+
+        Reassign ALL active requests from one driver to another.
+        Useful when a driver goes on leave, vehicle breaks down, or shift change.
+        """
+        from_driver_id = request.data.get('from_driver_id')
+        to_driver_id = request.data.get('to_driver_id')
+
+        if not from_driver_id or not to_driver_id:
+            return Response(
+                {'error': 'from_driver_id and to_driver_id are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if from_driver_id == to_driver_id:
+            return Response(
+                {'error': 'from_driver_id and to_driver_id must be different.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from_driver = Driver.objects.select_related('user').get(id=from_driver_id)
+            to_driver = Driver.objects.select_related('user').get(id=to_driver_id)
+        except (Driver.DoesNotExist, ValueError, TypeError):
+            return Response(
+                {'error': 'One or both drivers not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        active_statuses = ['pending', 'assigned', 'in_progress']
+        qs = WasteRequest.objects.filter(
+            driver=from_driver,
+            status__in=active_statuses,
+            is_deleted=False
+        ).select_related('user')
+
+        request_ids = list(qs.values_list('id', flat=True))
+
+        if not request_ids:
+            return Response({
+                'message': f'No active requests found for driver {from_driver.user.username}.',
+                'updated': 0,
+                'updated_ids': [],
+            })
+
+        updated = qs.update(driver=to_driver)
+
+        for wr in WasteRequest.objects.filter(id__in=request_ids).select_related('user'):
+            if wr.user_id:
+                _create_notification(
+                    user=wr.user,
+                    title='Driver Reassigned',
+                    message=f'Your request has been reassigned to driver {to_driver.user.username}.',
+                    notification_type='info',
+                    related_request=wr,
+                )
+
+        _notify_driver(
+            to_driver,
+            title='New Pickups Assigned',
+            message=f'You have been assigned {updated} request(s) from driver {from_driver.user.username}.',
+            notification_type='info',
+        )
+
+        _log_admin_action(
+            request, 'assign', 'WasteRequest', None,
+            f'Reassigned {updated} request(s) from driver {from_driver.user.username} to {to_driver.user.username}: {request_ids}'
+        )
+
+        return Response({
+            'message': f'Successfully reassigned {updated} request(s) from {from_driver.user.username} to {to_driver.user.username}.',
+            'updated': updated,
+            'updated_ids': request_ids,
+            'from_driver': {'id': from_driver.id, 'name': from_driver.user.username},
+            'to_driver': {'id': to_driver.id, 'name': to_driver.user.username},
+        })
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def bulk_assign(self, request):
+        """
+        POST /api/waste-requests/bulk_assign/ — {ids: [...], driver_id: n}
+
+        Admin-only bulk assign. Assigns multiple requests to a specific driver.
+        Requests must be in pending/assigned status (not completed/cancelled).
+        Updates status to 'assigned' and sends notifications.
+        """
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin only.'}, status=status.HTTP_403_FORBIDDEN)
+
+        ids = request.data.get('ids', [])
+        driver_id = request.data.get('driver_id')
+        if not ids or not isinstance(ids, list):
+            return Response({'error': 'ids (list) is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not driver_id:
+            return Response({'error': 'driver_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            driver = Driver.objects.select_related('user').get(id=driver_id)
+        except (Driver.DoesNotExist, ValueError, TypeError):
+            return Response({'error': 'Driver not found or invalid driver_id.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            clean_ids = [int(i) for i in ids]
+        except (TypeError, ValueError):
+            return Response({'error': 'ids must be a list of integers.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Only assign requests that are not terminal
+        eligible_qs = WasteRequest.objects.filter(
+            id__in=clean_ids, is_deleted=False
+        ).exclude(status__in=['completed', 'cancelled'])
+        found_ids = list(eligible_qs.values_list('id', flat=True))
+
+        matched_ids = set(
+            WasteRequest.objects.filter(id__in=clean_ids).values_list('id', flat=True)
+        )
+        missing_ids = [i for i in clean_ids if i not in matched_ids]
+        ineligible_ids = [i for i in clean_ids if i not in found_ids and i not in missing_ids]
+
+        updated = eligible_qs.update(driver=driver, status='assigned')
+
+        # Notify users
+        try:
+            for wr in WasteRequest.objects.filter(id__in=found_ids).select_related('user'):
+                if wr.user_id:
+                    _create_notification(
+                        user=wr.user,
+                        title='Driver Assigned',
+                        message=f'Driver {driver.user.username} has been assigned to your request.',
+                        notification_type='info',
+                        related_request=wr,
+                    )
+            if updated:
+                _notify_driver(
+                    driver,
+                    title='New Pickups Assigned',
+                    message=f'You have been assigned {updated} new pickup request(s).',
+                    notification_type='info',
+                )
+        except Exception:  # noqa: BLE001
+            logger.warning('[BULK_ASSIGN] notification push failed, DB update already committed.')
+
+        _log_admin_action(
+            request, 'assign', 'WasteRequest', None,
+            f'Bulk-assigned driver {driver.user.username} to {updated} request(s): {found_ids}'
+        )
+
+        return Response({
+            'updated': updated,
+            'updated_ids': found_ids,
+            'missing_ids': missing_ids,
+            'ineligible_ids': ineligible_ids,
+            'driver': {'id': driver.id, 'name': driver.user.username},
+        })
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def bulk_reschedule(self, request):
+        """
+        POST /api/waste-requests/bulk_reschedule/ — {ids: [...], scheduled_date: "2025-01-15T10:00:00"}
+
+        Admin-only bulk reschedule. Updates scheduled_date for multiple requests.
+        Requests must not be completed/cancelled.
+        """
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin only.'}, status=status.HTTP_403_FORBIDDEN)
+
+        ids = request.data.get('ids', [])
+        scheduled_date = request.data.get('scheduled_date')
+        if not ids or not isinstance(ids, list):
+            return Response({'error': 'ids (list) is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not scheduled_date:
+            return Response({'error': 'scheduled_date is required (ISO 8601 format).'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from dateutil import parser
+        try:
+            new_scheduled = parser.isoparse(scheduled_date)
+            if timezone.is_naive(new_scheduled):
+                new_scheduled = timezone.make_aware(new_scheduled)
+        except (ValueError, TypeError):
+            return Response({'error': 'Invalid scheduled_date format. Use ISO 8601 (e.g., 2025-01-15T10:00:00).'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            clean_ids = [int(i) for i in ids]
+        except (TypeError, ValueError):
+            return Response({'error': 'ids must be a list of integers.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Only reschedule requests that are not terminal
+        eligible_qs = WasteRequest.objects.filter(
+            id__in=clean_ids, is_deleted=False
+        ).exclude(status__in=['completed', 'cancelled'])
+        found_ids = list(eligible_qs.values_list('id', flat=True))
+
+        matched_ids = set(
+            WasteRequest.objects.filter(id__in=clean_ids).values_list('id', flat=True)
+        )
+        missing_ids = [i for i in clean_ids if i not in matched_ids]
+        ineligible_ids = [i for i in clean_ids if i not in found_ids and i not in missing_ids]
+
+        updated = eligible_qs.update(scheduled_date=new_scheduled)
+
+        # Notify users
+        try:
+            for wr in WasteRequest.objects.filter(id__in=found_ids).select_related('user'):
+                if wr.user_id:
+                    _create_notification(
+                        user=wr.user,
+                        title='Pickup Rescheduled',
+                        message=f'Your pickup request has been rescheduled to {new_scheduled.strftime("%d %b %Y %H:%M")}.',
+                        notification_type='info',
+                        related_request=wr,
+                    )
+            # Notify assigned drivers
+            drivers_notified = set()
+            for wr in WasteRequest.objects.filter(id__in=found_ids).select_related('driver__user'):
+                if wr.driver_id and wr.driver_id not in drivers_notified:
+                    drivers_notified.add(wr.driver_id)
+                    _notify_driver(
+                        wr.driver,
+                        title='Schedule Updated',
+                        message=f'Request #{wr.id} has been rescheduled to {new_scheduled.strftime("%d %b %Y %H:%M")}.',
+                        notification_type='info',
+                    )
+        except Exception:  # noqa: BLE001
+            logger.warning('[BULK_RESCHEDULE] notification push failed, DB update already committed.')
+
+        _log_admin_action(
+            request, 'update', 'WasteRequest', None,
+            f'Bulk-rescheduled {updated} request(s) to {new_scheduled.isoformat()}: {found_ids}'
+        )
+
+        return Response({
+            'updated': updated,
+            'updated_ids': found_ids,
+            'missing_ids': missing_ids,
+            'ineligible_ids': ineligible_ids,
+            'new_scheduled_date': new_scheduled.isoformat(),
+        })
+
 class RouteViewSet(viewsets.ModelViewSet):
     """Route planning and management. Admin only for write."""
     queryset = Route.objects.select_related('driver__user', 'vehicle').prefetch_related(
@@ -3381,6 +4000,72 @@ class ScheduleViewSet(viewsets.ModelViewSet):
             }
 
         return Response(data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def clone_to_next_week(self, request, pk=None):
+        """POST /api/schedules/{id}/clone_to_next_week/
+
+        Clone a schedule to start next week (same day of week).
+        Useful for recurring weekly schedules — create next week's schedule in one click.
+        """
+        schedule = self.get_object()
+
+        if schedule.frequency != 'weekly':
+            return Response(
+                {'error': 'Clone to next week is only supported for weekly schedules.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if schedule.day_of_week is None:
+            return Response(
+                {'error': 'Schedule must have a day_of_week set to clone to next week.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from datetime import timedelta
+        from django.utils import timezone
+
+        next_week_date = timezone.now().date() + timedelta(days=7)
+        while next_week_date.weekday() != schedule.day_of_week:
+            next_week_date += timedelta(days=1)
+
+        if schedule.planned_date and schedule.planned_date >= next_week_date:
+            next_week_date = schedule.planned_date + timedelta(days=7)
+            while next_week_date.weekday() != schedule.day_of_week:
+                next_week_date += timedelta(days=1)
+
+        new_schedule = Schedule.objects.create(
+            zone_name=schedule.zone_name,
+            driver=schedule.driver,
+            vehicle=schedule.vehicle,
+            frequency=schedule.frequency,
+            day_of_week=schedule.day_of_week,
+            start_time=schedule.start_time,
+            is_active=schedule.is_active,
+        )
+
+        _log_admin_action(
+            request, 'create', 'Schedule', new_schedule,
+            f'Cloned schedule #{schedule.id} for {schedule.zone_name} to next week ({next_week_date})'
+        )
+
+        if new_schedule.driver_id:
+            try:
+                _notify_driver(
+                    new_schedule.driver,
+                    title='New Zone Schedule Assigned',
+                    message=f'You have been assigned to the "{new_schedule.zone_name}" collection '
+                            f'schedule ({new_schedule.get_frequency_display()}) starting {next_week_date}.',
+                    notification_type='info',
+                )
+            except Exception:
+                logger.warning(f'[CLONE_SCHEDULE] notification push failed for schedule={new_schedule.id}.')
+
+        return Response({
+            'message': f'Schedule cloned to next week ({next_week_date}).',
+            'new_schedule': ScheduleSerializer(new_schedule).data,
+            'next_week_date': next_week_date.isoformat(),
+        })
 
 class NotificationViewSet(viewsets.ModelViewSet):
     """

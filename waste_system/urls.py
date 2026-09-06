@@ -22,6 +22,7 @@ from django.views.decorators.cache import cache_page
 from django.views.i18n import JavaScriptCatalog
 
 from waste_system.health import healthz, healthz_live
+from api_app.views import guest_claim_view
 
 urlpatterns = [
     # ── Health checks ────────────────────────────────────────────────────────
@@ -79,6 +80,7 @@ urlpatterns = [
     ),
 
     # web_app HTML pages (catch-all last)
+    path('claim-guest/', guest_claim_view, name='guest-claim'),
     path('', include('web_app.urls')),
 ]
 

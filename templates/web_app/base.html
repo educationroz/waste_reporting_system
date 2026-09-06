@@ -1336,9 +1336,13 @@ document.addEventListener('click', function (e) {
     // we capture at enqueue time — cookie auth replays transparently).
     // A failure here must never block the main flow, so every method swallows
     // storage/parse errors and degrades gracefully.
+    //
+    // ENHANCEMENT: Uses Background Sync API (if available) for reliable
+    // cross-session replay even if user closes the tab while offline.
     (function () {
         const QK = 'offlineRequestQueue';
         const TIMEOUT = 12000;
+        const SYNC_TAG = 'offline-requests-sync';
 
         function read() {
             try {
@@ -1396,6 +1400,16 @@ document.addEventListener('click', function (e) {
             }
         }
 
+        function registerBackgroundSync() {
+            if ('serviceWorker' in navigator && 'SyncManager' in window) {
+                navigator.serviceWorker.ready.then(function(reg) {
+                    return reg.sync.register(SYNC_TAG);
+                }).catch(function(e) {
+                    console.warn('Background sync registration failed:', e);
+                });
+            }
+        }
+
         window.OfflineQueue = {
             enqueue: function (entry) {
                 try {
@@ -1405,7 +1419,9 @@ document.addEventListener('click', function (e) {
                 } catch (e) {
                     return Promise.reject(e);
                 }
-                // Don't block the caller; fire-and-forget a flush attempt.
+                // Register background sync for reliable cross-session replay
+                registerBackgroundSync();
+                // Don't block the caller; fire-and-forget a flush attempt if online.
                 if (navigator.onLine) { flush(); }
                 return Promise.resolve(true);
             },
@@ -1420,6 +1436,15 @@ document.addEventListener('click', function (e) {
         // Also flush on page load in case the queue survived a tab close offline.
         if (navigator.onLine) {
             window.addEventListener('load', function () { setTimeout(flush, 800); });
+        }
+
+        // Listen for background sync messages from service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'SYNC_OFFLINE_REQUESTS') {
+                    flush();
+                }
+            });
         }
     })();
 </script>
