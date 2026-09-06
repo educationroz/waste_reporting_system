@@ -821,6 +821,11 @@
                 try { window._fleetWs.close(); } catch(e) {}
                 window._fleetWs = null;
             }
+            if (window._adminChartHandlersBound) {
+                document.body.removeEventListener('htmx:afterSwap', window._adminChartHandlersBound.renderCharts);
+                document.body.removeEventListener('htmx:afterSwap', window._adminChartHandlersBound.initMap);
+                window._adminChartHandlersBound = null;
+            }
         });
         document.body.dataset._adminFleetCleanupBound = '1';
     }
@@ -1265,11 +1270,15 @@
 
     window.renderDashboardCharts = renderDashboardCharts;
 
+    const renderChartsHandler = () => renderDashboardCharts();
+    const initMapHandler = () => initFleetTrackingMap();
+    window._adminChartHandlersBound = { renderCharts: renderChartsHandler, initMap: initMapHandler };
+
     document.addEventListener('DOMContentLoaded', renderDashboardCharts);
-    document.body.addEventListener('htmx:afterSwap', renderDashboardCharts);
+    document.body.addEventListener('htmx:afterSwap', renderChartsHandler);
 
     document.addEventListener('DOMContentLoaded', initFleetTrackingMap);
-    document.body.addEventListener('htmx:afterSwap', initFleetTrackingMap);
+    document.body.addEventListener('htmx:afterSwap', initMapHandler);
 
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
         setTimeout(initFleetTrackingMap, 100);
