@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'channels',
     'corsheaders',
+    'drf_spectacular',
 
     # Project apps
     'auth_app',
@@ -95,6 +96,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Correlation IDs: generates a unique request ID and attaches it to the
+    # logging context so every log line can be traced to the exact HTTP call.
+    'waste_system.middleware.CorrelationIdMiddleware',
     # CSP + hardening headers. Last so it sees the final response.
     'waste_system.security.SecurityHeadersMiddleware',
 ]
@@ -317,6 +321,10 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    # ─── API versioning ─────────────────────────────────────────────────────
+    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
+    'ALLOWED_VERSIONS': ['v1'],
+    'DEFAULT_VERSION': 'v1',
     # ─── Rate limiting (throttling) ────────────────────────────────────────
     # AnonRateThrottle keys off the client IP (no login needed).
     # UserRateThrottle keys off the authenticated user PK.
@@ -347,6 +355,28 @@ REST_FRAMEWORK = {
         'change_password':          '10/min',
         'verify_email':             '30/min',     # Clicking the email verify link (GET)
     },
+}
+# ─── drf-spectacular (OpenAPI 3.0 / Swagger UI) ────────────────────────────────
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Safha Sahar Waste Reporting API',
+    'DESCRIPTION': 'REST API for waste management, driver tracking, route optimization, and notifications.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/v1/',
+    'TAGS': [
+        {'name': 'Auth', 'description': 'Registration, login, password reset'},
+        {'name': 'Waste Requests', 'description': 'Citizen waste pickup reports'},
+        {'name': 'Drivers', 'description': 'Driver profiles, GPS, availability'},
+        {'name': 'Vehicles', 'description': 'Fleet vehicle management'},
+        {'name': 'Routes', 'description': 'Route planning and optimization'},
+        {'name': 'Bins', 'description': 'Waste bin monitoring'},
+        {'name': 'Checkpoints', 'description': 'Designated drop-off locations'},
+        {'name': 'Schedules', 'description': 'Pickup schedules'},
+        {'name': 'Notifications', 'description': 'User notifications'},
+        {'name': 'Complaints', 'description': 'Citizen complaints'},
+        {'name': 'Admin', 'description': 'Admin logs, settings, backups'},
+    ],
 }
 # ─── JWT ─────────────────────────────────────────────────────────────────────
 SIMPLE_JWT = {

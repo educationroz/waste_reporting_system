@@ -20,6 +20,11 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views.decorators.cache import cache_page
 from django.views.i18n import JavaScriptCatalog
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularSwaggerView,
+    SpectacularRedocView,
+)
 
 from waste_system.health import healthz, healthz_live
 from api_app.views import guest_claim_view
@@ -45,8 +50,13 @@ urlpatterns = [
     # auth_app REST API
     path('auth/', include('auth_app.urls')),
 
-    # api_app REST API
-    path('api/', include('api_app.urls')),
+    # api_app REST API — versioned under /api/v1/
+    path('api/<version>/', include('api_app.urls')),
+
+    # OpenAPI schema + Swagger/ReDoc UI
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
     # Django's built-in set_language view — POST {'language': 'ne'} here to
     # switch languages. It writes the choice into the session (and a

@@ -3629,7 +3629,7 @@ class RouteViewSet(viewsets.ModelViewSet):
         """
         from django.db.utils import IntegrityError
 
-        from .route_optimizer import generate_optimal_route
+        from .route_optimizer import DepotLocationError, generate_optimal_route
 
         driver_id = request.data.get('driver_id')
         input_request_ids = request.data.get('waste_request_ids', [])
@@ -3731,7 +3731,13 @@ class RouteViewSet(viewsets.ModelViewSet):
                     # Step 3 — generate optimal geometry on the actually-
                     # locked subset (not the original input_ids list, which
                     # might have contained already-locked rows skipped above).
-                    route_data = generate_optimal_route(driver, waste_request_ids, bin_ids)
+                    try:
+                        route_data = generate_optimal_route(driver, waste_request_ids, bin_ids)
+                    except DepotLocationError as exc:
+                        return Response(
+                            {'error': str(exc)},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
                     if 'error' in route_data:
                         return Response(route_data, status=status.HTTP_400_BAD_REQUEST)
 

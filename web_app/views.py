@@ -8,6 +8,7 @@ from django.contrib.auth import logout as django_logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.cache import cache
 from django.core.paginator import EmptyPage
+from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import redirect
@@ -702,20 +703,16 @@ class DriverDashboardView(LoginRequiredMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         user = self.request.user
         try:
-            driver, _ = Driver.objects.get_or_create(
-                user=user,
-                defaults={
-                    'license_number': f'DRIVER-{user.id}',
-                    'is_available': True,
-                },
-            )
-        except Driver.MultipleObjectsReturned:
-            # Race condition: two concurrent requests both saw no Driver
-            # row and both called get_or_create, producing duplicates.
-            # Use the first one and delete the rest.
-            driver = Driver.objects.filter(user=user).order_by('id').first()
+            with transaction.atomic():
+                driver = Driver.objects.select_for_update().filter(user=user).first()
+                if driver is None:
+                    driver = Driver.objects.create(
+                        user=user,
+                        license_number=f'DRIVER-{user.id}',
+                        is_available=True,
+                    )
         except Exception:
-            logger.exception(f'[DRIVER DASHBOARD] get_or_create failed for user={user.id}')
+            logger.exception(f'[DRIVER DASHBOARD] driver lookup/create failed for user={user.id}')
             driver = Driver.objects.filter(user=user).first()
             if not driver:
                 return redirect('/')

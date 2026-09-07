@@ -249,7 +249,6 @@ class WasteRequest(models.Model):
         ('medium', _('Medium')),
         ('high', _('High')),
     ]
-    ZONE_CHOICES = ZONE_CHOICES
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

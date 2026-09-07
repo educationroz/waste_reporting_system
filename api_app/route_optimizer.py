@@ -126,15 +126,33 @@ def optimize_nearest_neighbor(self, locations: list) -> list[dict]:
         }
 
 
+class DepotLocationError(Exception):
+    """Raised when depot_location is not configured in SystemSettings."""
+
+
 def get_depot_location():
-    """Read depot location from SystemSettings. Falls back to Pokhara."""
+    """Read depot location from SystemSettings.
+
+    Raises ``DepotLocationError`` when the setting is missing or malformed so
+    the admin is forced to configure it instead of silently using a hardcoded
+    Pokhara fallback.
+    """
+    from .models import SystemSettings
     try:
-        from .models import SystemSettings
         setting = SystemSettings.objects.get(key='depot_location')
         val = setting.value  # JSONField: {"latitude": 28.2096, "longitude": 83.9856}
         return (float(val['latitude']), float(val['longitude']))
-    except (SystemSettings.DoesNotExist, KeyError, TypeError, ValueError):
-        return (28.2096, 83.9856)  # Default: Pokhara
+    except SystemSettings.DoesNotExist:
+        raise DepotLocationError(
+            "depot_location is not configured in SystemSettings. "
+            "Create a SystemSettings row with key='depot_location' and "
+            'value={"latitude": <lat>, "longitude": <lng>}.'
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise DepotLocationError(
+            "depot_location in SystemSettings has invalid value format. "
+            'Expected {"latitude": <float>, "longitude": <float>}.'
+        ) from exc
 
 
 def generate_optimal_route(driver, waste_request_ids=None, bin_ids=None):
