@@ -8,6 +8,9 @@ from torchvision import models, transforms
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), 'gatekeeper_model.pth')
 
+# Default threshold; overridden at runtime by SystemSettings('ml_confidence_threshold').
+DEFAULT_ML_CONFIDENCE_THRESHOLD = 80.0
+
 # Django/web server ma usually GPU hudaina, tara xa bhane use garcha
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -48,11 +51,17 @@ CLASS_LABELS = [
     {'raw': 'medium', 'display': 'Medium Waste', 'is_waste': True, 'severity': 'medium'},
 ]
 
-# LOW_CONFIDENCE_THRESHOLD = 45.0  # tapaiको testing script bata
-LOW_CONFIDENCE_THRESHOLD = 80.0  # 45 → 80: model kaile kaahi fake/wrong
-                                  # confident predict garne bhayeko le,
-                                  # confidence 80% bhanda tala aaye admin
-                                  # manual review ma pathaune
+def _get_ml_confidence_threshold():
+    """Read the ML confidence threshold from SystemSettings, falling back to
+    DEFAULT_ML_CONFIDENCE_THRESHOLD.  Called on every inference so the admin
+    can tune it at runtime without a redeploy.
+    """
+    try:
+        from api_app.models import SystemSettings
+        row = SystemSettings.objects.get(key='ml_confidence_threshold')
+        return float(row.value)
+    except (SystemSettings.DoesNotExist, KeyError, TypeError, ValueError):
+        return DEFAULT_ML_CONFIDENCE_THRESHOLD
 
 
 def predict_waste(image_path_or_file):
@@ -72,11 +81,12 @@ def predict_waste(image_path_or_file):
     idx = predicted_idx.item()
     confidence_pct = round(confidence.item() * 100, 2)
     class_info = CLASS_LABELS[idx]
+    threshold = _get_ml_confidence_threshold()
 
     return {
         'is_waste': class_info['is_waste'],
         'severity': class_info['severity'],
         'display_label': class_info['display'],
         'confidence': confidence_pct,
-        'needs_manual_review': confidence_pct < LOW_CONFIDENCE_THRESHOLD,
+        'needs_manual_review': confidence_pct < threshold,
     }

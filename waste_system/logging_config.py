@@ -16,6 +16,8 @@ Settings wire these up in waste_system/settings.py LOGGING.
 import json
 import logging
 
+from waste_system.middleware import get_current_request_id
+
 
 class JsonFormatter(logging.Formatter):
     """Emit each record as one JSON object on one line."""
@@ -27,6 +29,12 @@ class JsonFormatter(logging.Formatter):
             'logger': record.name,
             'msg': record.getMessage(),
         }
+
+        # Attach correlation ID from the current request thread, if any.
+        request_id = get_current_request_id()
+        if request_id:
+            payload['request_id'] = request_id
+
         if getattr(record, 'request', None) is not None:
             payload['request'] = str(record.request)
         if getattr(record, 'status_code', None) is not None:
