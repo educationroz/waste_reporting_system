@@ -1891,7 +1891,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             qs = qs.filter(status=status_filter)
 
         zone_filter = self.request.query_params.get('zone', '').strip()
-        if zone_filter in dict(WasteRequest.ZONE_CHOICES):
+        if zone_filter in dict(ZONE_CHOICES):
             qs = qs.filter(zone=zone_filter)
 
         # ML prediction filters (for route planning) - uses WasteRequest fields
@@ -3956,8 +3956,10 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         from django.utils import timezone
         from datetime import timedelta
 
+        from .models import ZONE_CHOICES
+
         week_ago = timezone.now() - timedelta(days=7)
-        zones = [c[0] for c in WasteRequest.ZONE_CHOICES]
+        zones = [c[0] for c in ZONE_CHOICES]
 
         data = {}
         for zone_code in zones:
@@ -3995,7 +3997,7 @@ class ScheduleViewSet(viewsets.ModelViewSet):
             has_gap = high_med > 5 and not has_schedule
 
             data[zone_code] = {
-                'zone_name': dict(WasteRequest.ZONE_CHOICES).get(zone_code, zone_code),
+                'zone_name': dict(ZONE_CHOICES).get(zone_code, zone_code),
                 'high': counts['HIGH'],
                 'medium': counts['MEDIUM'],
                 'low': counts['LOW'],

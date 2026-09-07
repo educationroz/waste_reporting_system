@@ -471,7 +471,7 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
             )
             stats['requests_by_zone'] = _requests_by_dimension(
                 field='zone',
-                choices=WasteRequest.ZONE_CHOICES,
+                choices=ZONE_CHOICES,
                 label_field='zone_label',
                 count_field='zone_count',
             )

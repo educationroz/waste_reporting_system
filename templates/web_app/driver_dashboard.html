@@ -1434,7 +1434,7 @@ window.navigateToRequest = async function(destLat, destLng, label) {
     if (!driverMap || isNaN(destLat) || isNaN(destLng)) return;
     const origin = getDriverOrigin();
     if (!origin.found) {
-        showToast(window.gettext ? gettext('Your location is unknown — please enable GPS or wait for the location update.') : 'Your location is unknown', 'warning');
+        showToast(gettext('Your location is unknown — please enable GPS or wait for the location update.'), 'warning');
         return;
     }
 
@@ -1444,8 +1444,8 @@ window.navigateToRequest = async function(destLat, destLng, label) {
     const stepsEl = document.getElementById('nav-steps');
 
     if (destEl) destEl.textContent = label || '';
-    if (summaryEl) summaryEl.textContent = window.gettext ? gettext('Calculating…') : 'Calculating…';
-    if (stepsEl) stepsEl.innerHTML = '<li class="text-muted"><i class="bi bi-stopwatch"></i> ' + (window.gettext ? gettext('Contacting routing service…') : 'Contacting routing service…') + '</li>';
+    if (summaryEl) summaryEl.textContent = gettext('Calculating…');
+    if (stepsEl) stepsEl.innerHTML = '<li class="text-muted"><i class="bi bi-stopwatch"></i> ' + gettext('Contacting routing service…') + '</li>';
     if (panel) panel.classList.remove('d-none');
 
     const [olat, olng] = origin.coords;
@@ -1472,7 +1472,7 @@ window.navigateToRequest = async function(destLat, destLng, label) {
         const secs = route.duration || 0;
         const km = (meters / 1000).toFixed(1);
         const mins = Math.round(secs / 60);
-        if (summaryEl) summaryEl.textContent = km + ' km · ~' + mins + (window.gettext ? gettext(" min") : " min");
+        if (summaryEl) summaryEl.textContent = km + ' km · ~' + mins + gettext(' min');
 
         if (stepsEl) {
             stepsEl.innerHTML = '';
@@ -1500,7 +1500,7 @@ window.navigateToRequest = async function(destLat, destLng, label) {
     } catch (err) {
         console.warn('Navigation routing failed:', err);
         if (summaryEl) summaryEl.textContent = '';
-        if (stepsEl) stepsEl.innerHTML = '<li class="text-danger">' + (window.gettext ? gettext('Routing failed — are you online?') : 'Routing failed — are you online?') + '</li>';
+        if (stepsEl) stepsEl.innerHTML = '<li class="text-danger">' + gettext('Routing failed — are you online?') + '</li>';
         // Fall back to a straight dashed line to the destination.
         clearNavPolyline();
         navPolyline = L.polyline([origin.coords, [destLat, destLng]], {
@@ -1586,7 +1586,7 @@ window.loadMapData = async function() {
             <strong>#${req.id} — ${escapeHtml(req.status_display || req.status)}</strong><br>
             ${req.pickup_address ? escapeHtml(req.pickup_address) : 'No address given'}<br>
             <span class="text-muted">${escapeHtml(req.waste_type_display || req.waste_type || '')}</span><br>
-            <button class="btn btn-sm btn-success mt-1" onclick="navigateToRequest(${coords[0]}, ${coords[1]}, '${navLabel}'); return false;">🧭 ${window.gettext ? gettext('Navigate here') : 'Navigate here'}</button>
+            <button class="btn btn-sm btn-success mt-1" onclick="navigateToRequest(${coords[0]}, ${coords[1]}, '${navLabel}'); return false;">🧭 ${gettext('Navigate here')}</button>
         `);
 
         try {

@@ -262,7 +262,8 @@
                                             {% elif req.status == 'pending' %}bg-warning text-dark
                                             {% elif req.status == 'in_progress' %}bg-info
                                             {% elif req.status == 'cancelled' %}bg-danger
-                                            {% else %}bg-primary{% endif %}">
+                                            {% else %}bg-primary{% endif %}"
+                                            data-status="{{ req.status }}">
                                             {{ req.get_status_display }}
                                         </span>
                                     </td>

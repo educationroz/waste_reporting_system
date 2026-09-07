@@ -19,6 +19,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from django.views.decorators.cache import cache_page
+from django.views.generic import RedirectView
 from django.views.i18n import JavaScriptCatalog
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -45,13 +46,16 @@ urlpatterns = [
     path('healthz/live', healthz_live, name='healthz-live'),
     path('healthz', healthz, name='healthz'),
 
+    # Favicon redirect (browser requests /favicon.ico by default)
+    path('favicon.ico', RedirectView.as_view(url='/static/web_app/image/SafhaSahar.png', permanent=True)),
+
     path('admin/', admin.site.urls),
 
     # auth_app REST API
     path('auth/', include('auth_app.urls')),
 
-    # api_app REST API — versioned under /api/v1/
-    path('api/<version>/', include('api_app.urls')),
+    # api_app REST API
+    path('api/', include('api_app.urls')),
 
     # OpenAPI schema + Swagger/ReDoc UI
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

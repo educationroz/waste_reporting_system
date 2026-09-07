@@ -188,7 +188,7 @@
 
     {% block extra_css %}{% endblock %}
 </head>
-<body hx-ext="head-support" hx-boost="true" hx-target="#content-app" hx-select="#content-app" hx-swap="outerHTML show:window:top">
+<body hx-ext="head-support" hx-boost="true" hx-target="#content-app" hx-select="#content-app" hx-swap="outerHTML show:window:top" data-user-role="{% if user.is_authenticated %}{{ user.role }}{% else %}anonymous{% endif %}">
 
 <!-- NAVBAR SECTION -->
 <nav class="navbar navbar-light shadow-sm sticky-top" style="z-index: 1030;">
@@ -256,7 +256,7 @@
                     <ul class="dropdown-menu dropdown-menu-end shadow-lg" style="min-width: 340px; max-width: 380px; border-radius: 14px; border: none;">
                         <li class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
                             <h6 class="mb-0 fw-bold">{% trans "Notifications" %}</h6>
-                            <a href="{% url 'notifications' %}" class="btn btn-sm btn-outline-success px-3 py-1 fw-semibold rounded-2" style="font-size: 0.75rem;">{% trans "View All" %}</a>
+                            <a href="{% url 'notifications' %}" hx-boost="false" class="btn btn-sm btn-outline-success px-3 py-1 fw-semibold rounded-2" style="font-size: 0.75rem;">{% trans "View All" %}</a>
                         </li>
                         <li>
                             <div class="list-group list-group-flush p-1" id="notif-dropdown-list" style="max-height: 320px; overflow-y: auto;">
@@ -267,7 +267,7 @@
                             </div>
                         </li>
                         <li class="px-3 py-2 border-top">
-                            <a href="{% url 'notifications' %}" class="btn btn-success btn-sm w-100 fw-semibold rounded-2">{% trans "View All Notifications" %}</a>
+                            <a href="{% url 'notifications' %}" hx-boost="false" class="btn btn-success btn-sm w-100 fw-semibold rounded-2">{% trans "View All Notifications" %}</a>
                         </li>
                     </ul>
                 </div>
@@ -391,6 +391,44 @@ function toggleTheme() {
 document.addEventListener("DOMContentLoaded", function() {
     applyThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
 });
+</script>
+
+<!-- ROLE CHANGE DETECTION -->
+<!-- When user logs out and logs in as a different role, HTMX boosted navigation
+     might not refresh the sidebar (which is outside #content-app). This script
+     detects role changes and forces a full page reload. -->
+<script nonce="{{ csp_nonce }}">
+(function () {
+    var body = document.body;
+    var currentRole = body.getAttribute('data-user-role');
+    if (!currentRole) return;
+
+    // If logout flag is set, force reload and clear flag
+    var forceReload = sessionStorage.getItem('ss_force_reload_on_login');
+    if (forceReload) {
+        sessionStorage.removeItem('ss_force_reload_on_login');
+        window.location.reload();
+        return;
+    }
+
+    var lastKnownRole = sessionStorage.getItem('ss_last_role');
+    if (lastKnownRole && lastKnownRole !== currentRole) {
+        // Role changed — force full reload to refresh sidebar/navbar
+        sessionStorage.setItem('ss_last_role', currentRole);
+        window.location.reload();
+        return;
+    }
+    sessionStorage.setItem('ss_last_role', currentRole);
+
+    // Also listen for htmx:afterSwap to catch role changes during boosted navigation
+    document.body.addEventListener('htmx:afterSwap', function (evt) {
+        var newRole = body.getAttribute('data-user-role');
+        if (newRole && newRole !== currentRole) {
+            sessionStorage.setItem('ss_last_role', newRole);
+            window.location.reload();
+        }
+    });
+})();
 </script>
 
 <!-- TOAST & UTILITY HELPER FUNCTIONS -->
@@ -780,10 +818,17 @@ if (!window.__ssAuthScriptLoaded) {
             console.error('Logout API call failed:', e);
         }
         if (window._notifSocket) {
+            window._intentionalSocketClose = true;
             try { window._notifSocket.close(); } catch (e) {
                 console.error('Failed to close notification socket:', e);
             }
         }
+        // Clear HTMX history cache on logout, but SET a flag so next page load
+        // forces a full reload (to refresh sidebar/navbar for new role)
+        try {
+            sessionStorage.removeItem('htmx-history-cache');
+            sessionStorage.setItem('ss_force_reload_on_login', '1');
+        } catch (e) {}
         // web_logout is now POST-only (GET could be weaponized as a forced
         // logout via <img>), so the "clean redirect" step posts a CSRF-bearing
         // form instead of window.location navigation.
