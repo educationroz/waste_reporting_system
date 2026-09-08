@@ -569,7 +569,7 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         if waste_type_filter:
             qs = qs.filter(waste_type=waste_type_filter)
 
-        if zone_filter in dict(WasteRequest.ZONE_CHOICES):
+        if zone_filter in dict(ZONE_CHOICES):
             qs = qs.filter(zone=zone_filter)
 
         if search_query:
@@ -595,7 +595,7 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         ctx['drivers'] = Driver.objects.filter(is_available=True).select_related('user')
         ctx['status_choices'] = WasteRequest.STATUS_CHOICES
         ctx['waste_type_choices'] = WasteRequest.WASTE_TYPE_CHOICES
-        ctx['zone_choices'] = WasteRequest.ZONE_CHOICES
+        ctx['zone_choices'] = ZONE_CHOICES
         ctx['current_status'] = self.request.GET.get('status', '')
         ctx['current_search'] = self.request.GET.get('search', '')
         ctx['current_waste_type'] = self.request.GET.get('waste_type', '')
