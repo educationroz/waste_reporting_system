@@ -2996,14 +2996,26 @@
         );
         return;
       }
-      const ids = pendingCheckpoints
-        .filter((p) => isInsidePokhara(p.lat, p.lng))
-        .map((p) => p.id);
-      if (!ids.length) return;
 
-      if (ids.length > 150) {
+      const validCheckpoints = pendingCheckpoints
+        .filter((p) => isInsidePokhara(p.lat, p.lng))
+        .map((p) => ({
+          name: document.querySelector(`.pending-name-input[data-id="${p.id}"]`)?.value?.trim() || p.name,
+          description: "Auto-generated checkpoint",
+          latitude: round6(p.lat),
+          longitude: round6(p.lng),
+          is_active: true,
+        }))
+        .filter(p => p.name);
+
+      if (!validCheckpoints.length) {
+        showToast("No valid checkpoints to save (all missing names).", "warning");
+        return;
+      }
+
+      if (validCheckpoints.length > 150) {
         showToast(
-          `${ids.length} checkpoints pending — that's a lot for one save run and may take a while if the server rate-limits. Consider a wider spacing next time to generate fewer points.`,
+          `${validCheckpoints.length} checkpoints pending — that's a lot for one save run and may take a while if the server rate-limits. Consider a wider spacing next time to generate fewer points.`,
           "info",
         );
       }
@@ -3011,75 +3023,49 @@
       if (btn) {
         btn.disabled = true;
         btn.dataset._originalHtml = btn.innerHTML;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Saving ${validCheckpoints.length} checkpoints...`;
       }
 
-      let saved = 0;
-      let deduped = 0;
-      let rateLimitHits = 0;
-      let cleanStreak = 0;
-      let delay = SAVE_ALL_BASE_DELAY_MS;
-      const failed = [];
+      try {
+        const res = await fetch("/api/checkpoints/bulk_create/", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ checkpoints: validCheckpoints }),
+        });
 
-      for (let i = 0; i < ids.length; i++) {
-        if (btn)
-          btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Saving ${i + 1}/${ids.length}${rateLimitHits ? " (slowed — server busy)" : ""}...`;
-
-        const result = await savePendingCheckpoint(ids[i], { silent: true });
-        if (result.ok) {
-          if (result.deduped) {
-            deduped++;
-          } else {
-            saved++;
-          }
-          cleanStreak++;
-          if (
-            cleanStreak >= SAVE_ALL_RECOVERY_STREAK &&
-            delay > SAVE_ALL_BASE_DELAY_MS
-          ) {
-            delay = Math.max(
-              SAVE_ALL_BASE_DELAY_MS,
-              delay / SAVE_ALL_BACKOFF_MULTIPLIER,
-            );
-            cleanStreak = 0;
-          }
-        } else {
-          if (result.rateLimited) {
-            rateLimitHits++;
-            cleanStreak = 0;
-            delay = Math.min(
-              SAVE_ALL_MAX_DELAY_MS,
-              delay * SAVE_ALL_BACKOFF_MULTIPLIER,
-            );
-          } else if (result.name) {
-            failed.push(result.name);
-          }
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Bulk save failed");
         }
 
-        if (i < ids.length - 1) await sleep(delay);
-      }
+        const data = await res.json();
 
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML =
-          btn.dataset._originalHtml ||
-          '<i class="bi bi-check2-all me-1"></i>Save All Pending Checkpoints';
-      }
-
-      if (saved) loadCheckpoints();
-
-      const stillPending = pendingCheckpoints.length;
-      if (rateLimitHits && stillPending) {
         showToast(
-          `Saved ${saved} checkpoint(s), but the server kept rate-limiting requests (${rateLimitHits} time(s)) — ${stillPending} still pending. Click "Save All" again in a minute to continue, or save smaller batches at a time.`,
-          "warning",
+          `${data.created_count} checkpoint(s) saved${data.deduped_count ? ` (${data.deduped_count} duplicates skipped)` : ''}.`,
+          "success"
         );
-      } else if (failed.length) {
-        showToast(
-          `Saved ${saved} checkpoint(s). ${failed.length} failed: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? "..." : ""}. You can retry those individually.`,
-          failed.length === ids.length ? "danger" : "warning",
-        );
-      } else {
-        showToast(`All ${saved} checkpoint(s) saved successfully.`, "success");
+
+        // Clear saved checkpoints from pending list
+        if (data.created_ids) {
+          pendingCheckpoints = pendingCheckpoints.filter(p => !data.created_ids.includes(p.id));
+        }
+        if (data.deduped_ids) {
+          pendingCheckpoints = pendingCheckpoints.filter(p => !data.deduped_ids.includes(p.id));
+        }
+        renderPendingList();
+
+      } catch (e) {
+        showToast(e.message || "Failed to save checkpoints.", "danger");
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = btn.dataset._originalHtml || '<i class="bi bi-check-circle me-1"></i>Save All';
+        }
+        await loadCheckpoints();
       }
     }
 
