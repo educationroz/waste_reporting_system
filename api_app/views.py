@@ -1891,7 +1891,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             qs = qs.filter(status=status_filter)
 
         zone_filter = self.request.query_params.get('zone', '').strip()
-        if zone_filter in dict(WasteRequest.ZONE_CHOICES):
+        if zone_filter in dict(ZONE_CHOICES):
             qs = qs.filter(zone=zone_filter)
 
         # ML prediction filters (for route planning) - uses WasteRequest fields
@@ -3956,8 +3956,10 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         from django.utils import timezone
         from datetime import timedelta
 
+        from .models import ZONE_CHOICES
+
         week_ago = timezone.now() - timedelta(days=7)
-        zones = [c[0] for c in WasteRequest.ZONE_CHOICES]
+        zones = [c[0] for c in ZONE_CHOICES]
 
         data = {}
         for zone_code in zones:
@@ -3995,7 +3997,7 @@ class ScheduleViewSet(viewsets.ModelViewSet):
             has_gap = high_med > 5 and not has_schedule
 
             data[zone_code] = {
-                'zone_name': dict(WasteRequest.ZONE_CHOICES).get(zone_code, zone_code),
+                'zone_name': dict(ZONE_CHOICES).get(zone_code, zone_code),
                 'high': counts['HIGH'],
                 'medium': counts['MEDIUM'],
                 'low': counts['LOW'],
@@ -4647,3 +4649,47 @@ def send_web_push(user, title, body, url=None, icon=None):
         except Exception:
             failed += 1
     return {'sent': sent, 'failed': failed, 'skipped': False}
+
+
+class ContactFormView(APIView):
+    """Handle contact form submissions from the website."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        name = request.data.get('name', '').strip()
+        email = request.data.get('email', '').strip()
+        phone = request.data.get('phone', '').strip()
+        subject = request.data.get('subject', '').strip()
+        message = request.data.get('message', '').strip()
+
+        if not name or not email or not subject or not message:
+            return Response(
+                {'error': 'Name, email, subject, and message are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f'Contact form submission: {name} <{email}> - {subject}: {message[:100]}')
+
+        # Send email to safhasaharinfo@gmail.com
+        try:
+            from django.core.mail import send_mail
+            from django.conf import settings
+
+            email_subject = f'Contact Form: {subject}'
+            email_message = f'From: {name} <{email}>\nPhone: {phone}\n\n{message}'
+
+            send_mail(
+                email_subject,
+                email_message,
+                settings.DEFAULT_FROM_EMAIL,
+                ['safhasaharinfo@gmail.com'],
+                fail_silently=False,
+            )
+        except Exception as e:
+            logger.error(f'Failed to send contact form email: {e}')
+            # Don't fail the request - still return success to user
+            pass
+
+        return Response({'success': True, 'message': 'Message sent successfully. We will get back to you within 24 hours.'})

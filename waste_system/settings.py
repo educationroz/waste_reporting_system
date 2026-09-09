@@ -83,6 +83,8 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # serves STATIC_ROOT in production
     'django.contrib.sessions.middleware.SessionMiddleware',
+    # No cache for authenticated users — prevents stale cross-role HTML
+    'waste_system.middleware.NoCacheForAuthenticatedMiddleware',
     # Must come after SessionMiddleware (reads the user's saved language from
     # the session) and before CommonMiddleware (which needs the active
     # language already resolved to redirect correctly). This is what makes
@@ -321,10 +323,6 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
-    # ─── API versioning ─────────────────────────────────────────────────────
-    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
-    'ALLOWED_VERSIONS': ['v1'],
-    'DEFAULT_VERSION': 'v1',
     # ─── Rate limiting (throttling) ────────────────────────────────────────
     # AnonRateThrottle keys off the client IP (no login needed).
     # UserRateThrottle keys off the authenticated user PK.
@@ -363,7 +361,6 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
-    'SCHEMA_PATH_PREFIX': r'/api/v1/',
     'TAGS': [
         {'name': 'Auth', 'description': 'Registration, login, password reset'},
         {'name': 'Waste Requests', 'description': 'Citizen waste pickup reports'},

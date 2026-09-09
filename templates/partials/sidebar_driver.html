@@ -11,7 +11,7 @@
 
     <div class="sidebar-section">
         <span class="sidebar-section-label">{% trans "Account" %}</span>
-        <a href="{% url 'notifications' %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}">
+        <a href="{% url 'notifications' %}" hx-boost="false" class="sidebar-nav-item {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}">
             <span class="sidebar-icon"><i class="bi bi-bell"></i></span>
             <span class="sidebar-link-text">{% trans "Notifications" %}</span>
         </a>

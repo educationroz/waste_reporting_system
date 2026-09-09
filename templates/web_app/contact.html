@@ -1,0 +1,345 @@
+{% extends 'web_app/base.html' %}
+{% load i18n %}
+{% load waste_filters %}
+{% block title %}{% trans "Contact Us" %}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+    .contact-form .form-control:focus,
+    .contact-form .form-select:focus {
+        border-color: #198754;
+        box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.15);
+    }
+    #contact-map {
+        height: 350px;
+        border-radius: 12px;
+        border: 1px solid #dee2e6;
+        width: 100%;
+        min-height: 350px;
+    }
+    @media (max-width: 767.98px) {
+        #contact-map {
+            height: 280px;
+            min-height: 280px;
+        }
+    }
+    .leaflet-container {
+        border-radius: 12px;
+        font-family: inherit;
+    }
+    .leaflet-popup-content-wrapper {
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .leaflet-popup-tip {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-success">
+                    <i class="bi bi-envelope me-2"></i>{% trans "Contact Us" %}
+                </h1>
+                <p class="lead text-muted mt-3">{% trans "Have questions? We'd love to hear from you." %}</p>
+            </div>
+
+            <div class="row g-4">
+                <!-- Contact Form -->
+                <div class="col-lg-7">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body p-4 p-md-5">
+                            <h3 class="fw-bold mb-4">{% trans "Send Us a Message" %}</h3>
+                            <form id="contact-form" class="contact-form" novalidate>
+                                {% csrf_token %}
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="contact-name" class="form-label fw-semibold">{% trans "Name" %} <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="contact-name" name="name" required autocomplete="name">
+                                        <div class="invalid-feedback">{% trans "Please enter your name" %}</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="contact-email" class="form-label fw-semibold">{% trans "Email" %} <span class="text-danger">*</span></label>
+                                        <input type="email" class="form-control" id="contact-email" name="email" required autocomplete="email">
+                                        <div class="invalid-feedback">{% trans "Please enter a valid email" %}</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="contact-phone" class="form-label fw-semibold">{% trans "Phone" %}</label>
+                                        <input type="tel" class="form-control" id="contact-phone" name="phone" autocomplete="tel">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="contact-subject" class="form-label fw-semibold">{% trans "Subject" %} <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="contact-subject" name="subject" required>
+                                            <option value="" selected disabled>{% trans "Select a topic" %}</option>
+                                            <option value="general">{% trans "General Inquiry" %}</option>
+                                            <option value="support">{% trans "Technical Support" %}</option>
+                                            <option value="partnership">{% trans "Partnership / Business" %}</option>
+                                            <option value="feedback">{% trans "Feedback / Suggestion" %}</option>
+                                            <option value="press">{% trans "Press / Media" %}</option>
+                                            <option value="other">{% trans "Other" %}</option>
+                                        </select>
+                                        <div class="invalid-feedback">{% trans "Please select a subject" %}</div>
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="contact-message" class="form-label fw-semibold">{% trans "Message" %} <span class="text-danger">*</span></label>
+                                        <textarea class="form-control" id="contact-message" name="message" rows="5" required placeholder="{% trans 'Tell us how we can help...' %}"></textarea>
+                                        <div class="invalid-feedback">{% trans "Please enter your message" %}</div>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-success btn-lg px-5" id="contact-submit-btn">
+                                            <span id="contact-submit-text"><i class="bi bi-send me-2"></i>{% trans "Send Message" %}</span>
+                                            <span id="contact-submit-spinner" class="spinner-border spinner-border-sm d-none ms-2"></span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                            <div id="contact-success" class="alert alert-success d-none mt-3" role="alert">
+                                <i class="bi bi-check-circle-fill me-2"></i>
+                                <strong>{% trans "Message sent!" %}</strong> {% trans "We'll get back to you within 24 hours." %}
+                            </div>
+                            <div id="contact-error" class="alert alert-danger d-none mt-3" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                <strong>{% trans "Failed to send" %}</strong> <span id="contact-error-text">{% trans "Please try again later." %}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contact Info & Map -->
+                <div class="col-lg-5">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body p-4 p-md-5">
+                            <h3 class="fw-bold mb-4">{% trans "Get in Touch" %}</h3>
+
+                            <div class="mb-4">
+                                <h6 class="fw-bold mb-3">{% trans "Safha Sahar" %}</h6>
+                                <address class="text-muted small mb-0">
+                                    <i class="bi bi-geo-alt-fill me-2"></i>{% trans "Pokhara, Kaski, Nepal" %}<br>
+                                    <i class="bi bi-envelope-fill me-2"></i><a href="mailto:safhasaharinfo@gmail.com" class="text-decoration-none text-muted">safhasaharinfo@gmail.com</a><br>
+                                    <i class="bi bi-telephone-fill me-2"></i><a href="tel:+97761400000" class="text-decoration-none text-muted">+977-61-400000</a>
+                                </address>
+                            </div>
+
+                            <div class="mb-4">
+                                <h6 class="fw-bold mb-3">{% trans "Office Hours" %}</h6>
+                                <ul class="list-unstyled text-muted small mb-0">
+                                    <li class="mb-1"><strong>{% trans "Sunday - Friday" %}:</strong> {% trans "9:00 AM - 5:00 PM" %}</li>
+                                    <li class="mb-1"><strong>{% trans "Saturday" %}:</strong> {% trans "Closed" %}</li>
+                                </ul>
+                            </div>
+
+                            <div class="mb-4">
+                                <h6 class="fw-bold mb-3">{% trans "Follow Us" %}</h6>
+                                <div class="d-flex gap-3">
+                                    <a href="https://facebook.com/safhasahar" target="_blank" rel="noopener" class="text-muted fs-5" aria-label="Facebook"><i class="bi bi-facebook"></i></a>
+                                    <a href="https://twitter.com/safhasahar" target="_blank" rel="noopener" class="text-muted fs-5" aria-label="Twitter"><i class="bi bi-twitter-x"></i></a>
+                                    <a href="https://linkedin.com/company/safhasahar" target="_blank" rel="noopener" class="text-muted fs-5" aria-label="LinkedIn"><i class="bi bi-linkedin"></i></a>
+                                    <a href="https://github.com/safhasahar" target="_blank" rel="noopener" class="text-muted fs-5" aria-label="GitHub"><i class="bi bi-github"></i></a>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h6 class="fw-bold mb-3">{% trans "Our Location" %}</h6>
+                                <div id="contact-map" class="rounded-3 overflow-hidden shadow-sm"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FAQ Section -->
+            <div class="mt-5">
+                <h2 class="fw-bold text-center mb-4">{% trans "Frequently Asked Questions" %}</h2>
+                <div class="accordion" id="faqAccordion">
+                    <div class="accordion-item border-0 shadow-sm mb-2">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                {% trans "How do I report waste using Safha Sahar?" %}
+                            </button>
+                        </h3>
+                        <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-muted">
+                                {% trans "Open the app, allow location access, take a photo of the waste, and tap Submit. Your report goes directly to the municipal dashboard for action." %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm mb-2">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                {% trans "Can I report anonymously?" %}
+                            </button>
+                        </h3>
+                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-muted">
+                                {% trans "Yes. You can submit as a guest with just an email. If you later register with the same email, your guest reports will automatically link to your account." %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm mb-2">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                {% trans "What happens after I submit a report?" %}
+                            </button>
+                        </h3>
+                        <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-muted">
+                                {% trans "The admin team reviews it, assigns the nearest available driver, and you get real-time notifications as the status changes: Pending -> Assigned -> In Progress -> Completed." %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm mb-2">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                                {% trans "How do I file a complaint about missed pickup or driver behavior?" %}
+                            </button>
+                        </h3>
+                        <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-muted">
+                                {% trans "From your dashboard, click 'File a Complaint', select the type (Missed Pickup, Driver Behavior, etc.), add details and optional photo, and submit. Admins are notified immediately." %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
+                                {% trans "Is the app available offline?" %}
+                            </button>
+                        </h3>
+                        <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-muted">
+                                {% trans "Yes! Safha Sahar is a Progressive Web App (PWA). Once loaded, it works offline - you can view your requests and even submit reports (they'll sync when you're back online)." %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+(function() {
+    // Initialize contact map
+    function initContactMap() {
+        if (typeof L === 'undefined') {
+            return; // Will be called again when Leaflet loads
+        }
+
+        const mapEl = document.getElementById('contact-map');
+        if (!mapEl || mapEl._leaflet_id) return;
+
+        // SATRI, Pokhara, Nepal coordinates (fixed location)
+        const lat = 28.211455;
+        const lng = 83.981981;
+
+        const map = L.map('contact-map').setView([lat, lng], 17);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19,
+        }).addTo(map);
+
+        L.marker([lat, lng])
+            .addTo(map)
+            .bindPopup('<b>SATRI</b><br>Pokhara, Kaski, Nepal')
+            .openPopup();
+    }
+
+    // Load Leaflet and initialize map when ready
+    function loadLeafletAndInit() {
+        if (typeof L !== 'undefined') {
+            initContactMap();
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.async = true;
+        script.onload = initContactMap;
+        document.head.appendChild(script);
+    }
+
+    // Handle contact form submission
+    function initPage() {
+        loadLeafletAndInit();
+
+        const form = document.getElementById('contact-form');
+        const submitBtn = document.getElementById('contact-submit-btn');
+        const submitText = document.getElementById('contact-submit-text');
+        const submitSpinner = document.getElementById('contact-submit-spinner');
+        const successAlert = document.getElementById('contact-success');
+        const errorAlert = document.getElementById('contact-error');
+        const errorText = document.getElementById('contact-error-text');
+
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            // Reset alerts
+            successAlert.classList.add('d-none');
+            errorAlert.classList.add('d-none');
+
+            // Validate
+            if (!form.checkValidity()) {
+                form.classList.add('was-validated');
+                return;
+            }
+
+            // Show loading
+            submitBtn.disabled = true;
+            submitText.classList.add('d-none');
+            submitSpinner.classList.remove('d-none');
+
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const res = await fetch('/api/contact/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    },
+                    body: JSON.stringify(data),
+                });
+
+                if (res.ok) {
+                    successAlert.classList.remove('d-none');
+                    form.reset();
+                    form.classList.remove('was-validated');
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || 'Server error');
+                }
+            } catch (err) {
+                errorText.textContent = err.message || 'Please try again later.';
+                errorAlert.classList.remove('d-none');
+            } finally {
+                submitBtn.disabled = false;
+                submitText.classList.remove('d-none');
+                submitSpinner.classList.add('d-none');
+            }
+        });
+    }
+
+    // Initialize on DOM ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPage);
+    } else {
+        initPage();
+    }
+
+    // Re-initialize on HTMX swap (for SPA navigation)
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.target.id === 'content-app') {
+            initPage();
+        }
+    });
+})();
+</script>
+{% endblock %}

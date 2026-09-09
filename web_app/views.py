@@ -130,6 +130,21 @@ class HomeView(TemplateView):
 
         return ctx
 
+
+class AboutView(TemplateView):
+    template_name = 'web_app/about.html'
+
+
+class ContactView(TemplateView):
+    template_name = 'web_app/contact.html'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        from django.conf import settings
+        ctx['GOOGLE_MAPS_API_KEY'] = getattr(settings, 'GOOGLE_MAPS_API_KEY', '')
+        return ctx
+
+
 class UserRequestListView(LoginRequiredMixin, ListView):
     template_name = 'web_app/user_requests.html'
     context_object_name = 'requests'
@@ -471,7 +486,7 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
             )
             stats['requests_by_zone'] = _requests_by_dimension(
                 field='zone',
-                choices=WasteRequest.ZONE_CHOICES,
+                choices=ZONE_CHOICES,
                 label_field='zone_label',
                 count_field='zone_count',
             )
@@ -569,7 +584,7 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         if waste_type_filter:
             qs = qs.filter(waste_type=waste_type_filter)
 
-        if zone_filter in dict(WasteRequest.ZONE_CHOICES):
+        if zone_filter in dict(ZONE_CHOICES):
             qs = qs.filter(zone=zone_filter)
 
         if search_query:
@@ -595,7 +610,7 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         ctx['drivers'] = Driver.objects.filter(is_available=True).select_related('user')
         ctx['status_choices'] = WasteRequest.STATUS_CHOICES
         ctx['waste_type_choices'] = WasteRequest.WASTE_TYPE_CHOICES
-        ctx['zone_choices'] = WasteRequest.ZONE_CHOICES
+        ctx['zone_choices'] = ZONE_CHOICES
         ctx['current_status'] = self.request.GET.get('status', '')
         ctx['current_search'] = self.request.GET.get('search', '')
         ctx['current_waste_type'] = self.request.GET.get('waste_type', '')

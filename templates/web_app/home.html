@@ -1697,7 +1697,7 @@ window.submitRequest = async function() {
         // We don't have a server-assigned id yet, so we can't insert a real
         // row into Recent Requests — it'll appear there once this syncs.
         // The pending count is still safe to bump optimistically.
-        if (accessToken) bumpStat('stat-pending-count', 1);
+        if (IS_AUTHENTICATED) bumpStat('stat-pending-count', 1);
 
         return true;
     }
