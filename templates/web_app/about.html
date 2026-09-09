@@ -1,0 +1,155 @@
+{% extends 'web_app/base.html' %}
+{% load i18n %}
+{% load waste_filters %}
+{% block title %}{% trans "About Us" %}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-success">
+                    <i class="bi bi-info-circle me-2"></i>{% trans "About Safha Sahar" %}
+                </h1>
+                <p class="lead text-muted mt-3">{% trans "Live Waste Reporting System for Cleaner Cities" %}</p>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-4 p-md-5">
+                    <h2 class="fw-bold mb-3">{% trans "Our Mission" %}</h2>
+                    <p class="text-muted mb-3">
+                        {% trans "Safha Sahar (सफा शहर) is a smart waste management platform designed to bridge the gap between citizens and municipal waste collection services. Our mission is to make waste reporting transparent, efficient, and accountable, so every street stays clean." %}
+                    </p>
+                    <p class="text-muted">
+                        {% trans "By empowering residents to report waste issues in real-time and giving administrators the tools to optimize routes and track resolution, we create a feedback loop that keeps cities cleaner and services more responsive." %}
+                    </p>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="bg-success bg-opacity-10 text-success rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 64px; height: 64px;">
+                                <i class="bi bi-geo-alt-fill fs-3"></i>
+                            </div>
+                            <h5 class="fw-bold">{% trans "Real-Time Reporting" %}</h5>
+                            <p class="text-muted small mb-0">{% trans "Citizens report waste with photos and GPS location instantly from their phones." %}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="bg-success bg-opacity-10 text-success rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 64px; height: 64px;">
+                                <i class="bi bi-truck fs-3"></i>
+                            </div>
+                            <h5 class="fw-bold">{% trans "Optimized Collection" %}</h5>
+                            <p class="text-muted small mb-0">{% trans "Admins assign drivers, plan routes, and track pickups on a live dashboard." %}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="bg-success bg-opacity-10 text-success rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 64px; height: 64px;">
+                                <i class="bi bi-graph-up fs-3"></i>
+                            </div>
+                            <h5 class="fw-bold">{% trans "Transparent Tracking" %}</h5>
+                            <p class="text-muted small mb-0">{% trans "Every request is tracked from submission to completion with full audit trail." %}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-4 p-md-5">
+                    <h2 class="fw-bold mb-3">{% trans "How It Works" %}</h2>
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="d-flex gap-3">
+                                <div class="flex-shrink-0 bg-success text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                    <span class="fw-bold">1</span>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold">{% trans "Report" %}</h6>
+                                    <p class="text-muted small mb-0">{% trans "Take a photo of the waste, GPS is auto-captured, submit in seconds." %}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex gap-3">
+                                <div class="flex-shrink-0 bg-success text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                    <span class="fw-bold">2</span>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold">{% trans "Assign" %}</h6>
+                                    <p class="text-muted small mb-0">{% trans "Admins see requests on a map, assign nearest available driver." %}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex gap-3">
+                                <div class="flex-shrink-0 bg-success text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                    <span class="fw-bold">3</span>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold">{% trans "Collect" %}</h6>
+                                    <p class="text-muted small mb-0">{% trans "Driver navigates to location, collects waste, marks complete with photo proof." %}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex gap-3">
+                                <div class="flex-shrink-0 bg-success text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                    <span class="fw-bold">4</span>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold">{% trans "Track" %}</h6>
+                                    <p class="text-muted small mb-0">{% trans "Citizens get notifications, view history, file complaints if needed." %}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-4 p-md-5">
+                    <h2 class="fw-bold mb-3">{% trans "Key Features" %}</h2>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled mb-0">
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>{% trans "Photo-based reporting with GPS verification" %}</li>
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>{% trans "Multi-language support (English, Nepali)" %}</li>
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>{% trans "Offline-capable PWA with service worker" %}</li>
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>{% trans "Push notifications for status updates" %}</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled mb-0">
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>{% trans "Route optimization for drivers" %}</li>
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>{% trans "Admin dashboard with analytics & charts" %}</li>
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>{% trans "Complaint management system" %}</li>
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>{% trans "Recycle bin for deleted requests" %}</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4 p-md-5">
+                    <h2 class="fw-bold mb-3">{% trans "Built By" %}</h2>
+                    <p class="text-muted mb-2">
+                        {% trans "Samarth Technical Research and Innovations, Pokhara, Kaski, Nepal" %}
+                    </p>
+                    <p class="text-muted small mb-0">
+                        {% trans "A technology company focused on civic solutions and smart city platforms." %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -9,6 +9,7 @@ from .views import (
     BinViewSet,
     CheckpointViewSet,
     ComplaintViewSet,
+    ContactFormView,
     DatabaseBackupViewSet,
     DriverViewSet,
     NotificationViewSet,
@@ -41,6 +42,7 @@ urlpatterns = [
     path('auth/admin/<int:admin_id>/update/', AdminUserUpdateView.as_view(), name='update-admin'),
     path('auth/admin/<int:admin_id>/delete/', AdminUserDeleteView.as_view(), name='delete-admin'),
     path('thumbnail/<str:size>/', ThumbnailView.as_view(), name='thumbnail'),
+    path('contact/', ContactFormView.as_view(), name='contact-form'),
 
     path('', include(router.urls)),
 ]

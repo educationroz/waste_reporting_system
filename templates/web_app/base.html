@@ -362,9 +362,95 @@
 </main>
 
 <!-- FOOTER -->
-<footer class="site-footer">
-    <div class="text-center py-3 bg-light">
-        <small>&copy; {% trans "Safha Sahar" %} {% now "Y" %}. {% trans "All rights reserved." %} | {% trans "RA Innovations" %}</small>
+<footer class="site-footer bg-dark text-light">
+    <div class="container py-5">
+        <div class="row g-4">
+            <!-- About/Brand -->
+            <div class="col-lg-4 col-md-6">
+                <a href="/" class="d-inline-flex align-items-center text-decoration-none mb-3">
+                    <img src="{% if SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{% static 'web_app/image/SafhaSahar.png' %}{% endif %}" alt="{% trans 'Logo' %}" width="40" height="40" class="me-2">
+                    <span class="fw-bold fs-4" style="color: #198754;">{{ SITE_NAME|default:"Safha Sahar" }}</span>
+                </a>
+                <p class="text-muted small mb-3">
+                    {% trans "Smart waste reporting system connecting citizens with municipal services for cleaner, healthier cities." %}
+                </p>
+                <div class="d-flex gap-3">
+                    <a href="https://facebook.com/rainovations" target="_blank" rel="noopener" class="text-muted fs-5" aria-label="Facebook"><i class="bi bi-facebook"></i></a>
+                    <a href="https://twitter.com/rainovations" target="_blank" rel="noopener" class="text-muted fs-5" aria-label="Twitter"><i class="bi bi-twitter-x"></i></a>
+                    <a href="https://linkedin.com/company/rainovations" target="_blank" rel="noopener" class="text-muted fs-5" aria-label="LinkedIn"><i class="bi bi-linkedin"></i></a>
+                    <a href="https://github.com/rainovations" target="_blank" rel="noopener" class="text-muted fs-5" aria-label="GitHub"><i class="bi bi-github"></i></a>
+                </div>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="col-lg-2 col-md-6">
+                <h6 class="fw-bold mb-3">{% trans "Quick Links" %}</h6>
+                <ul class="list-unstyled small">
+                    <li class="mb-2"><a href="{% url 'home' %}" class="text-decoration-none text-muted">{% trans "Home" %}</a></li>
+                    <li class="mb-2"><a href="{% url 'about' %}" class="text-decoration-none text-muted">{% trans "About Us" %}</a></li>
+                    <li class="mb-2"><a href="{% url 'contact' %}" class="text-decoration-none text-muted">{% trans "Contact" %}</a></li>
+                    {% if user.is_authenticated %}
+                    <li class="mb-2"><a href="{% url 'user-requests' %}" class="text-decoration-none text-muted">{% trans "My Requests" %}</a></li>
+                    <li class="mb-2"><a href="{% url 'notifications' %}" class="text-decoration-none text-muted">{% trans "Notifications" %}</a></li>
+                    {% else %}
+                    <li class="mb-2"><a href="{% url 'login' %}" class="text-decoration-none text-muted">{% trans "Sign In" %}</a></li>
+                    <li class="mb-2"><a href="{% url 'register' %}" class="text-decoration-none text-muted">{% trans "Register" %}</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            <!-- Features/Services -->
+            <div class="col-lg-2 col-md-6">
+                <h6 class="fw-bold mb-3">{% trans "Features" %}</h6>
+                <ul class="list-unstyled small">
+                    <li class="mb-2"><a href="#" class="text-decoration-none text-muted">{% trans "Real-time Reporting" %}</a></li>
+                    <li class="mb-2"><a href="#" class="text-decoration-none text-muted">{% trans "Route Optimization" %}</a></li>
+                    <li class="mb-2"><a href="#" class="text-decoration-none text-muted">{% trans "Live Tracking" %}</a></li>
+                    <li class="mb-2"><a href="#" class="text-decoration-none text-muted">{% trans "Complaint System" %}</a></li>
+                    <li class="mb-2"><a href="#" class="text-decoration-none text-muted">{% trans "Push Notifications" %}</a></li>
+                    <li class="mb-2"><a href="#" class="text-decoration-none text-muted">{% trans "Offline Support (PWA)" %}</a></li>
+                </ul>
+            </div>
+
+            <!-- Contact Info -->
+            <div class="col-lg-4 col-md-6">
+                <h6 class="fw-bold mb-3">{% trans "Contact Us" %}</h6>
+                <ul class="list-unstyled small text-muted mb-4">
+                    <li class="mb-2 d-flex align-items-start gap-2">
+                        <i class="bi bi-geo-alt-fill text-success mt-1"></i>
+                        <span>{% trans "Samarth Technical Research and Innovations, Pokhara, Kaski, Nepal" %}</span>
+                    </li>
+                    <li class="mb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-envelope-fill text-success"></i>
+                        <a href="mailto:safhasaharinfo@gmail.com" class="text-decoration-none text-muted">safhasaharinfo@gmail.com</a>
+                    </li>
+                    <li class="mb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-telephone-fill text-success"></i>
+                        <a href="tel:+97761400000" class="text-decoration-none text-muted">+977-61-400000</a>
+                    </li>
+                </ul>
+                <h6 class="fw-bold mb-2">{% trans "Office Hours" %}</h6>
+                <ul class="list-unstyled small text-muted">
+                    <li class="mb-1">{% trans "Sunday - Friday: 9:00 AM - 5:00 PM" %}</li>
+                    <li>{% trans "Saturday: Closed" %}</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Divider -->
+        <hr class="my-4 border-secondary">
+
+        <!-- Bottom bar -->
+        <div class="row align-items-center">
+            <div class="col-md-6 text-center text-md-start mb-3 mb-md-0">
+                <small class="text-muted">&copy; {% trans "Safha Sahar" %} {% now "Y" %}. {% trans "All rights reserved." %} | {% trans "Samarth Technical Research and Innovations " %}</small>
+            </div>
+            <div class="col-md-6 text-center text-md-end">
+                <small class="text-muted me-3"><a href="{% url 'about' %}" class="text-decoration-none text-muted">{% trans "Privacy Policy" %}</a></small>
+                <small class="text-muted me-3"><a href="{% url 'contact' %}" class="text-decoration-none text-muted">{% trans "Terms of Service" %}</a></small>
+                <small class="text-muted"><a href="{% url 'contact' %}" class="text-decoration-none text-muted">{% trans "Cookie Policy" %}</a></small>
+            </div>
+        </div>
     </div>
 </footer>
 

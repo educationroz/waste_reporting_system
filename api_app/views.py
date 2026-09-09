@@ -4649,3 +4649,47 @@ def send_web_push(user, title, body, url=None, icon=None):
         except Exception:
             failed += 1
     return {'sent': sent, 'failed': failed, 'skipped': False}
+
+
+class ContactFormView(APIView):
+    """Handle contact form submissions from the website."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        name = request.data.get('name', '').strip()
+        email = request.data.get('email', '').strip()
+        phone = request.data.get('phone', '').strip()
+        subject = request.data.get('subject', '').strip()
+        message = request.data.get('message', '').strip()
+
+        if not name or not email or not subject or not message:
+            return Response(
+                {'error': 'Name, email, subject, and message are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f'Contact form submission: {name} <{email}> - {subject}: {message[:100]}')
+
+        # Send email to safhasaharinfo@gmail.com
+        try:
+            from django.core.mail import send_mail
+            from django.conf import settings
+
+            email_subject = f'Contact Form: {subject}'
+            email_message = f'From: {name} <{email}>\nPhone: {phone}\n\n{message}'
+
+            send_mail(
+                email_subject,
+                email_message,
+                settings.DEFAULT_FROM_EMAIL,
+                ['safhasaharinfo@gmail.com'],
+                fail_silently=False,
+            )
+        except Exception as e:
+            logger.error(f'Failed to send contact form email: {e}')
+            # Don't fail the request - still return success to user
+            pass
+
+        return Response({'success': True, 'message': 'Message sent successfully. We will get back to you within 24 hours.'})

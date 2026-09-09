@@ -10,6 +10,8 @@ from .views import (
     AdminSettingsView,
     AdminUsersManagementView,
     AdminVehicleListView,
+    AboutView,
+    ContactView,
     DriverDashboardView,
     ForgotPasswordPageView,
     HomeView,
@@ -32,6 +34,8 @@ urlpatterns = [
     path('sw.js', ServiceWorkerView.as_view(), name='service-worker'),
     # Public
     path('',          HomeView.as_view(),         name='home'),
+    path('about/',    AboutView.as_view(),        name='about'),
+    path('contact/',  ContactView.as_view(),      name='contact'),
     path('complaints/', UserComplaintListView.as_view(), name='user-complaints'),
     path('recycle-bin/', UserRecycleBinView.as_view(), name='user-recycle-bin'),
     path('login/',    LoginPageView.as_view(),    name='login'),

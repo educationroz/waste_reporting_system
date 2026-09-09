@@ -130,6 +130,21 @@ class HomeView(TemplateView):
 
         return ctx
 
+
+class AboutView(TemplateView):
+    template_name = 'web_app/about.html'
+
+
+class ContactView(TemplateView):
+    template_name = 'web_app/contact.html'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        from django.conf import settings
+        ctx['GOOGLE_MAPS_API_KEY'] = getattr(settings, 'GOOGLE_MAPS_API_KEY', '')
+        return ctx
+
+
 class UserRequestListView(LoginRequiredMixin, ListView):
     template_name = 'web_app/user_requests.html'
     context_object_name = 'requests'
