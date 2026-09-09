@@ -193,7 +193,7 @@
 <!-- NAVBAR SECTION -->
 <nav class="navbar navbar-light shadow-sm sticky-top" style="z-index: 1030;">
     <div class="container-fluid d-flex align-items-center flex-nowrap position-relative px-3 px-md-4">
-        <a class="navbar-brand notranslate d-flex align-items-center flex-shrink-1 me-2" href="/" translate="no" style="min-width:0;">
+        <a class="navbar-brand notranslate d-flex align-items-center flex-shrink-1 me-2" href="/" translate="no" style="min-width:0;" hx-boost="false">
             <img src="{% if SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{% static 'web_app/image/SafhaSahar.png' %}{% endif %}" alt="{% trans 'Logo' %}" width="38" height="38" class="d-inline-block align-text-top me-2 flex-shrink-0 site-brand-logo" style="object-fit: contain;">
             <span class="fw-semibold text-truncate site-brand-name" style="color: #25be27;">
                 <span class="d-none d-sm-inline">{{ SITE_NAME|default:"SafhaSahar" }}</span>

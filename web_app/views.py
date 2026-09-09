@@ -134,9 +134,19 @@ class HomeView(TemplateView):
 class AboutView(TemplateView):
     template_name = 'web_app/about.html'
 
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role in ('admin', 'driver'):
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
+
 
 class ContactView(TemplateView):
     template_name = 'web_app/contact.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.role in ('admin', 'driver'):
+            return redirect_by_role(request.user)
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)

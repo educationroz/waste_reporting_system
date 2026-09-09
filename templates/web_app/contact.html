@@ -145,7 +145,7 @@
 
                             <div>
                                 <h6 class="fw-bold mb-3">{% trans "Our Location" %}</h6>
-                                <div id="contact-map" class="rounded-3 overflow-hidden shadow-sm"></div>
+                                <div id="contact-map" class="rounded-3 overflow-hidden shadow-sm" style="height: 350px; min-height: 350px; width: 100%;"></div>
                             </div>
                         </div>
                     </div>
@@ -226,6 +226,9 @@
 {% block extra_js %}
 <script nonce="{{ csp_nonce }}">
 (function() {
+    // Store map instance globally so we can invalidateSize() later
+    let contactMap = null;
+
     // Initialize contact map
     function initContactMap() {
         if (typeof L === 'undefined') {
@@ -239,17 +242,21 @@
         const lat = 28.211455;
         const lng = 83.981981;
 
-        const map = L.map('contact-map').setView([lat, lng], 17);
+        contactMap = L.map('contact-map').setView([lat, lng], 17);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors',
             maxZoom: 19,
-        }).addTo(map);
+        }).addTo(contactMap);
 
         L.marker([lat, lng])
-            .addTo(map)
+            .addTo(contactMap)
             .bindPopup('<b>SATRI</b><br>Pokhara, Kaski, Nepal')
             .openPopup();
+
+        // Ensure map renders at correct size immediately
+        setTimeout(() => contactMap.invalidateSize(), 0);
+        setTimeout(() => contactMap.invalidateSize(), 100);
     }
 
     // Load Leaflet and initialize map when ready
@@ -263,6 +270,16 @@
         script.async = true;
         script.onload = initContactMap;
         document.head.appendChild(script);
+    }
+
+    // Fix map size after any layout change
+    function fixMapSize() {
+        if (contactMap) {
+            // Multiple delays to catch CSS transitions
+            [0, 50, 150, 300].forEach(delay => 
+                setTimeout(() => contactMap.invalidateSize(), delay)
+            );
+        }
     }
 
     // Handle contact form submission
@@ -312,6 +329,10 @@
                     successAlert.classList.remove('d-none');
                     form.reset();
                     form.classList.remove('was-validated');
+                    // Fix map size after success alert appears
+                    fixMapSize();
+                    // Fix map size after form reset (layout may shift)
+                    fixMapSize();
                 } else {
                     const err = await res.json().catch(() => ({}));
                     throw new Error(err.error || 'Server error');
@@ -337,9 +358,13 @@
     // Re-initialize on HTMX swap (for SPA navigation)
     document.body.addEventListener('htmx:afterSwap', function(evt) {
         if (evt.target.id === 'content-app') {
+            contactMap = null; // Reset so it re-initializes
             initPage();
         }
     });
+
+    // Also fix map size on window resize
+    window.addEventListener('resize', fixMapSize);
 })();
 </script>
 {% endblock %}
