@@ -54,14 +54,10 @@ urlpatterns = [
     # auth_app REST API
     path('auth/', include('auth_app.urls')),
 
-<<<<<<< HEAD
-    # OpenAPI schema + Swagger/ReDoc UI (must come BEFORE api/<version>/)
-=======
     # api_app REST API
     path('api/', include('api_app.urls')),
 
     # OpenAPI schema + Swagger/ReDoc UI
->>>>>>> 25e5cce4af05d2de84d0ca09bf34a13f53417f21
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),

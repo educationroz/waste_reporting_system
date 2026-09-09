@@ -4561,7 +4561,7 @@ def _vapid_claims():
     if not private_key or not settings.WEB_PUSH_ENABLED:
         return None
     try:
-        from py_vapid import b64urlencode
+        from py_vapid import b64urlencode # type: ignore
     except Exception:
         return None
     return {
@@ -4614,8 +4614,8 @@ def send_web_push(user, title, body, url=None, icon=None):
     if not settings.WEB_PUSH_ENABLED or not PushSubscription.objects.filter(user=user).exists():
         return {'sent': 0, 'failed': 0, 'skipped': True}
 
-    from py_vapid import b64urlencode
-    from pywebpush import WebPushException, webpush
+    from py_vapid import b64urlencode  # type: ignore
+    from pywebpush import WebPushException, webpush # type: ignore
 
     payload_json = json.dumps({
         'title': title,
