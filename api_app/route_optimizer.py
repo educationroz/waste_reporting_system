@@ -113,7 +113,7 @@ def optimize_nearest_neighbor(self, locations: list) -> list[dict]:
         
         return optimized_route
     
-    def get_route_data(self) -> dict:
+def get_route_data(self) -> dict:
         """Get complete route data with waypoints and metadata."""
         return {
             'waypoints': self.route_points,
