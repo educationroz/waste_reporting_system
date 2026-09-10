@@ -1,0 +1,10 @@
+{
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "python manage.py migrate && python manage.py collectstatic --noinput && daphne -b 0.0.0.0 -p $PORT waste_system.asgi:application",
+    "healthcheckPath": "/healthz",
+    "healthcheckTimeout": 300
+  }
+}
