@@ -432,6 +432,46 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Pickup Schedule Calendar -->
+            <div class="card shadow-sm mb-4" id="pickup-schedule-card">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">
+                        <i class="bi bi-calendar-check text-success me-2"></i>{% trans "Upcoming Pickup Schedule" %}
+                    </span>
+                    <select class="form-select form-select-sm" id="schedule-weeks" style="width: auto;" onchange="loadPickupSchedule()">
+                        <option value="2">{% trans "Next 2 Weeks" %}</option>
+                        <option value="4" selected>{% trans "Next 4 Weeks" %}</option>
+                        <option value="8">{% trans "Next 8 Weeks" %}</option>
+                    </select>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>{% trans "Date" %}</th>
+                                    <th>{% trans "Day" %}</th>
+                                    <th>{% trans "Type" %}</th>
+                                    <th>{% trans "Zone" %}</th>
+                                    <th>{% trans "Time" %}</th>
+                                    <th>{% trans "Driver" %}</th>
+                                    <th>{% trans "Vehicle" %}</th>
+                                    <th>{% trans "Details" %}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pickup-schedule-body">
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-3">
+                                        <div class="spinner-border spinner-border-sm text-success" role="status"></div>
+                                        <span class="ms-2">{% trans "Loading schedule..." %}</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
             {% endif %}
 
         </div>
@@ -2144,6 +2184,175 @@ try {
             showToast(gettext('Failed to load last request.'), 'danger');
         }
     };
+
+    // ── Pickup Schedule ───────────────────────────────────────────────────────────
+    async function loadPickupSchedule() {
+        const tbody = document.getElementById('pickup-schedule-body');
+        const weeks = document.getElementById('schedule-weeks').value;
+
+        if (!tbody) return;
+
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center text-muted py-3">
+                    <div class="spinner-border spinner-border-sm text-success" role="status"></div>
+                    <span class="ms-2">{% trans "Loading schedule..." %}</span>
+                </td>
+            </tr>
+        `;
+
+        try {
+            const data = await API.get(`/api/waste-requests/pickup_schedule/?weeks=${weeks}`);
+            const today = new Date().toISOString().split('T')[0];
+
+            // Combine schedules and routes, sort by date
+            const allItems = [];
+
+            if (data.schedules) {
+                data.schedules.forEach(s => {
+                    allItems.push({
+                        date: s.date,
+                        type: 'schedule',
+                        zone: s.zone_name,
+                        frequency: s.frequency_display,
+                        day_of_week: s.day_of_week_display,
+                        start_time: s.start_time ? s.start_time.slice(0, 5) : '07:00',
+                        driver: s.driver,
+                        vehicle: s.vehicle,
+                        is_recurring: true,
+                    });
+                });
+            }
+
+            if (data.routes) {
+                data.routes.forEach(r => {
+                    allItems.push({
+                        date: r.date,
+                        type: 'route',
+                        zone: r.pickups[0]?.waste_type_display || 'Mixed',
+                        frequency: r.status_display,
+                        day_of_week: '',
+                        start_time: 'Assigned',
+                        driver: r.driver,
+                        vehicle: r.vehicle,
+                        is_recurring: false,
+                        route_id: r.id,
+                        pickups: r.pickups,
+                    });
+                });
+            }
+
+            allItems.sort((a, b) => a.date.localeCompare(b.date));
+
+            if (allItems.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            <i class="bi bi-calendar-x fs-3 d-block mb-2"></i>
+                            <div>{% trans "No pickup schedule found for your zone." %}</div>
+                            <small class="text-muted">{% trans "Ask your admin to create a schedule for your area." %}</small>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = allItems.map(item => {
+                const dateObj = new Date(item.date);
+                const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+                const formattedDate = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                const isToday = item.date === today;
+                const isPast = item.date < today;
+                const rowClass = isToday ? 'table-success' : (isPast ? 'table-secondary' : '');
+
+                let detailsHtml = '';
+                if (item.type === 'route' && item.pickups) {
+                    detailsHtml = `
+                        <button class="btn btn-sm btn-outline-primary" onclick="showRoutePickups(${JSON.stringify(item.pickups).replace(/"/g, '"')})">
+                            <i class="bi bi-list-ul me-1"></i>{% trans "View Pickups" %}
+                        </button>
+                    `;
+                } else if (item.type === 'schedule') {
+                    detailsHtml = `<span class="badge bg-info text-dark">{% trans "Recurring" %}</span>`;
+                }
+
+                return `
+                    <tr class="${rowClass}">
+                        <td class="${isToday ? 'fw-bold text-success' : ''}">${formattedDate}</td>
+                        <td class="${isToday ? 'fw-bold text-success' : ''}">${dayName}</td>
+                        <td>
+                            <span class="badge ${item.type === 'route' ? 'bg-primary' : 'bg-info text-dark'}">
+                                ${item.type === 'route' ? '{% trans "Route" %}' : '{% trans "Schedule" %}'}
+                            </span>
+                        </td>
+                        <td>${item.zone}</td>
+                        <td>${item.start_time}</td>
+                        <td>${item.driver || '<span class="text-muted">—</span>'}</td>
+                        <td>${item.vehicle || '<span class="text-muted">—</span>'}</td>
+                        <td>${detailsHtml}</td>
+                    </tr>
+                `;
+            }).join('');
+
+        } catch (e) {
+            console.error('Failed to load pickup schedule:', e);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center text-danger py-3">
+                        <i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>
+                        {% trans "Failed to load schedule" %}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    window.showRoutePickups = function(pickups) {
+        const modalHtml = `
+            <div class="modal fade" id="routePickupsModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content border-0 shadow">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title fw-bold"><i class="bi bi-list-ul me-2"></i>{% trans "Pickups on This Route" %}</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>#</th>
+                                            <th>{% trans "Waste Type" %}</th>
+                                            <th>{% trans "Address" %}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${pickups.map(p => `
+                                            <tr>
+                                                <td>${p.id}</td>
+                                                <td><span class="badge bg-info">${p.waste_type_display}</span></td>
+                                                <td class="small">${p.address}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        const existing = document.getElementById('routePickupsModal');
+        if (existing) existing.remove();
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modal = new bootstrap.Modal(document.getElementById('routePickupsModal'));
+        modal.show();
+    };
+
+    // Load pickup schedule on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadPickupSchedule();
+    });
 
     // ── Guest Claim Modal ───────────────────────────────────────────────────────
     function getGuestClaimModal() {

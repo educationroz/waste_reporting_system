@@ -2,7 +2,7 @@ import json
 import math
 import os
 import tempfile
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -1320,6 +1320,152 @@ class DriverViewSet(viewsets.ModelViewSet):
             'destination': {'latitude': dest_lat_f, 'longitude': dest_lng_f, 'label': label},
             'origin': {'latitude': cur_lat, 'longitude': cur_lng} if cur_lat and cur_lng else None,
             'recommended': 'google_maps',
+        })
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='me/schedule')
+    def me_schedule(self, request):
+        """
+        GET /api/drivers/me/schedule/?week=2024-W20
+
+        Returns driver's weekly schedule combining:
+        - Assigned Routes (planned/active/completed)
+        - Recurring Schedules (from Schedule model)
+        Query params:
+        - week: ISO week format (e.g., "2024-W20") or "current"
+        """
+        user = request.user
+        if user.role != 'driver':
+            return Response({'error': 'Driver access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            driver = Driver.objects.select_related('user', 'vehicle').get(user=user)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Parse week parameter
+        week_param = request.query_params.get('week', 'current')
+        if week_param == 'current':
+            week_start = timezone.now().date() - timedelta(days=timezone.now().weekday())
+        else:
+            try:
+                year, week_num = week_param.split('-W')
+                week_start = date.fromisocalendar(int(year), int(week_num), 1)
+            except (ValueError, AttributeError):
+                week_start = timezone.now().date() - timedelta(days=timezone.now().weekday())
+
+        week_end = week_start + timedelta(days=6)
+
+        # Get Routes for this week
+        routes = Route.objects.filter(
+            driver=driver,
+            planned_date__gte=week_start,
+            planned_date__lte=week_end,
+        ).prefetch_related('waste_requests__user').order_by('planned_date', 'started_at')
+
+        route_data = []
+        for route in routes:
+            route_data.append({
+                'id': route.id,
+                'type': 'route',
+                'date': route.planned_date.isoformat(),
+                'status': route.status,
+                'status_display': route.get_status_display(),
+                'start_time': route.started_at.time().isoformat() if route.started_at else None,
+                'end_time': route.completed_at.time().isoformat() if route.completed_at else None,
+                'total_distance_km': route.total_distance_km,
+                'stops': route.waste_requests.count(),
+                'waste_requests': [
+                    {
+                        'id': wr.id,
+                        'address': wr.pickup_address,
+                        'waste_type': wr.waste_type,
+                        'status': wr.status,
+                        'latitude': float(wr.latitude) if wr.latitude else None,
+                        'longitude': float(wr.longitude) if wr.longitude else None,
+                    }
+                    for wr in route.waste_requests.all()
+                ],
+            })
+
+        # Get Schedules for this driver
+        schedules = Schedule.objects.filter(
+            driver=driver,
+            is_active=True,
+        ).select_related('vehicle')
+
+        schedule_data = []
+        for sch in schedules:
+            # Calculate which days this schedule runs in the week
+            run_days = []
+            if sch.frequency == 'daily':
+                run_days = list(range(7))
+            elif sch.frequency in ('weekly', 'biweekly', 'monthly') and sch.day_of_week is not None:
+                run_days = [sch.day_of_week]
+
+            for day_offset in run_days:
+                run_date = week_start + timedelta(days=day_offset)
+                if run_date > week_end:
+                    continue
+
+                # For biweekly, check if this is the right week
+                if sch.frequency == 'biweekly':
+                    weeks_diff = (run_date - week_start).days // 7
+                    if weeks_diff % 2 != 0:
+                        continue
+
+                schedule_data.append({
+                    'id': f'schedule-{sch.id}-{day_offset}',
+                    'type': 'schedule',
+                    'date': run_date.isoformat(),
+                    'schedule_id': sch.id,
+                    'zone_name': sch.zone_name,
+                    'frequency': sch.frequency,
+                    'frequency_display': sch.get_frequency_display(),
+                    'start_time': sch.start_time.isoformat() if sch.start_time else '07:00:00',
+                    'day_of_week': sch.day_of_week,
+                    'vehicle_plate': sch.vehicle.plate_number if sch.vehicle else None,
+                })
+
+        # Get breaks for the week
+        from api_app.models import DriverBreakLog
+        breaks = DriverBreakLog.objects.filter(
+            driver=driver,
+            started_at__date__gte=week_start,
+            started_at__date__lte=week_end,
+        ).order_by('started_at')
+
+        break_data = [
+            {
+                'id': b.id,
+                'date': b.started_at.date().isoformat(),
+                'start_time': b.started_at.time().isoformat(),
+                'end_time': b.ended_at.time().isoformat() if b.ended_at else None,
+                'reason': b.get_reason_display(),
+            }
+            for b in breaks
+        ]
+
+        return Response({
+            'driver': {
+                'id': driver.id,
+                'name': driver.user.username,
+                'zone': driver.zone,
+                'vehicle': {
+                    'id': driver.vehicle.id,
+                    'plate_number': driver.vehicle.plate_number,
+                    'vehicle_type': driver.vehicle.vehicle_type,
+                } if driver.vehicle else None,
+            },
+            'week_start': week_start.isoformat(),
+            'week_end': week_end.isoformat(),
+            'routes': route_data,
+            'schedules': schedule_data,
+            'breaks': break_data,
+            'summary': {
+                'total_routes': len(route_data),
+                'total_scheduled_days': len(set(s['date'] for s in schedule_data)),
+                'total_distance_km': round(sum(r['total_distance_km'] for r in route_data), 1),
+            }
         })
 
 
@@ -3572,6 +3718,128 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             'new_scheduled_date': new_scheduled.isoformat(),
         })
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def pickup_schedule(self, request):
+        """
+        GET /api/waste-requests/pickup_schedule/?weeks=4
+
+        Returns citizen's upcoming pickup schedule based on:
+        - Their zone's recurring schedules (Schedule model)
+        - Their assigned routes
+        Query params:
+        - weeks: Number of weeks ahead to show (default: 4)
+        """
+        user = request.user
+        if user.role != 'user':
+            return Response({'error': 'User access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+        weeks = int(request.query_params.get('weeks', 4))
+        today = timezone.now().date()
+        end_date = today + timedelta(weeks=weeks)
+
+        # Get user's zone from their requests or profile
+        user_zone = None
+        if hasattr(user, 'address') and user.address:
+            # Could extract zone from address, for now use latest request's zone
+            pass
+
+        latest_request = WasteRequest.objects.filter(user=user, is_deleted=False).order_by('-created_at').first()
+        if latest_request:
+            user_zone = latest_request.zone
+
+        # Get schedules for user's zone
+        schedules_qs = Schedule.objects.filter(is_active=True)
+        if user_zone:
+            schedules_qs = schedules_qs.filter(zone_name__iexact=user_zone)
+
+        schedules = schedules_qs.select_related('driver__user', 'vehicle').order_by('day_of_week')
+
+        # Get user's assigned routes
+        routes = Route.objects.filter(
+            waste_requests__user=user,
+            status__in=['planned', 'active', 'in_progress'],
+            planned_date__gte=today,
+            planned_date__lte=end_date,
+        ).select_related('driver__user', 'vehicle').prefetch_related('waste_requests').distinct().order_by('planned_date')
+
+        # Build schedule data
+        schedule_data = []
+        for sch in schedules:
+            # Generate occurrences for the next N weeks
+            if sch.frequency == 'daily':
+                current = today
+                while current <= end_date:
+                    schedule_data.append(self._build_schedule_occurrence(sch, current))
+                    current += timedelta(days=1)
+            elif sch.frequency in ('weekly', 'biweekly', 'monthly') and sch.day_of_week is not None:
+                # Find first occurrence on or after today
+                days_ahead = (sch.day_of_week - today.weekday()) % 7
+                current = today + timedelta(days=days_ahead)
+                week_count = 0
+                while current <= end_date and week_count < weeks * 2:  # Extra buffer for biweekly
+                    if sch.frequency == 'monthly' and current.day > 7:
+                        current += timedelta(weeks=1)
+                        continue
+                    if sch.frequency == 'biweekly' and week_count % 2 == 1:
+                        current += timedelta(weeks=1)
+                        week_count += 1
+                        continue
+                    schedule_data.append(self._build_schedule_occurrence(sch, current))
+                    current += timedelta(weeks=1)
+                    week_count += 1
+
+        # Build route data
+        route_data = []
+        for route in routes:
+            user_requests = [wr for wr in route.waste_requests.all() if wr.user_id == user.id]
+            if user_requests:
+                route_data.append({
+                    'id': route.id,
+                    'date': route.planned_date.isoformat(),
+                    'status': route.status,
+                    'status_display': route.get_status_display(),
+                    'driver': route.driver.user.username if route.driver and route.driver.user else None,
+                    'vehicle': route.vehicle.plate_number if route.vehicle else None,
+                    'total_distance_km': route.total_distance_km,
+                    'stops': len(user_requests),
+                    'pickups': [
+                        {
+                            'id': wr.id,
+                            'address': wr.pickup_address,
+                            'waste_type': wr.waste_type,
+                            'waste_type_display': wr.get_waste_type_display(),
+                        }
+                        for wr in user_requests
+                    ],
+                })
+
+        return Response({
+            'user_zone': user_zone,
+            'schedules': schedule_data,
+            'routes': route_data,
+            'date_range': {
+                'start': today.isoformat(),
+                'end': end_date.isoformat(),
+            }
+        })
+
+    def _build_schedule_occurrence(self, schedule, date_obj):
+        """Helper to build a schedule occurrence dict."""
+        return {
+            'schedule_id': schedule.id,
+            'date': date_obj.isoformat(),
+            'zone_name': schedule.zone_name,
+            'frequency': schedule.frequency,
+            'frequency_display': schedule.get_frequency_display(),
+            'day_of_week': schedule.day_of_week,
+            'day_of_week_display': schedule.get_day_of_week_display() if schedule.day_of_week is not None else None,
+            'start_time': schedule.start_time.isoformat() if schedule.start_time else '07:00:00',
+            'driver': schedule.driver.user.username if schedule.driver and schedule.driver.user else None,
+            'vehicle': schedule.vehicle.plate_number if schedule.vehicle else None,
+            'is_recurring': True,
+        }
+
+
 class RouteViewSet(viewsets.ModelViewSet):
     """Route planning and management. Admin only for write."""
     queryset = Route.objects.select_related('driver__user', 'vehicle').prefetch_related(
@@ -4073,6 +4341,346 @@ class ScheduleViewSet(viewsets.ModelViewSet):
             'message': f'Schedule cloned to next week ({next_week_date}).',
             'new_schedule': ScheduleSerializer(new_schedule).data,
             'next_week_date': next_week_date.isoformat(),
+        })
+
+    @action(detail=False, methods=['get'])
+    def calendar_events(self, request):
+        """
+        GET /api/schedules/calendar_events/
+        Returns all active schedules formatted for FullCalendar.
+        Query params: zone, driver_id
+        """
+        zone_filter = request.query_params.get('zone', '').strip()
+        driver_filter = request.query_params.get('driver_id', '').strip()
+
+        qs = Schedule.objects.filter(is_active=True).select_related('driver__user', 'vehicle')
+
+        if zone_filter in dict(ZONE_CHOICES):
+            qs = qs.filter(zone_name=zone_filter)
+        if driver_filter.isdigit():
+            qs = qs.filter(driver_id=int(driver_filter))
+
+        events = []
+        for sch in qs:
+            # Determine days this schedule occurs on
+            days = []
+            if sch.frequency == 'daily':
+                days = [0, 1, 2, 3, 4, 5, 6]
+            elif sch.frequency == 'weekly' and sch.day_of_week is not None:
+                days = [sch.day_of_week]
+            elif sch.frequency == 'biweekly' and sch.day_of_week is not None:
+                days = [sch.day_of_week]
+            elif sch.frequency == 'monthly' and sch.day_of_week is not None:
+                # For monthly, show on the day of week in calendar (approximation)
+                days = [sch.day_of_week]
+
+            for day in days:
+                events.append({
+                    'id': f'schedule-{sch.id}-{day}',
+                    'title': f'{sch.zone_name}',
+                    'daysOfWeek': [day],
+                    'startTime': sch.start_time.strftime('%H:%M:%S') if sch.start_time else '07:00:00',
+                    'endTime': (datetime.combine(date.today(), sch.start_time) + timedelta(hours=8)).strftime('%H:%M:%S') if sch.start_time else '15:00:00',
+                    'display': 'background' if not sch.driver_id else 'auto',
+                    'backgroundColor': '#e8f5e9' if sch.driver_id else '#fff3e0',
+                    'borderColor': '#198754' if sch.driver_id else '#fd7e14',
+                    'textColor': '#198754' if sch.driver_id else '#e65100',
+                    'classNames': [getFrequencyClass(sch.frequency), getStatusClass(sch.is_active)],
+                    'extendedProps': {
+                        'schedule_id': sch.id,
+                        'zone_name': sch.zone_name,
+                        'frequency': sch.frequency,
+                        'frequency_display': sch.get_frequency_display(),
+                        'is_active': sch.is_active,
+                        'driver_id': sch.driver_id,
+                        'driver_name': sch.driver.user.username if sch.driver and sch.driver.user else None,
+                        'vehicle_plate': sch.vehicle.plate_number if sch.vehicle else None,
+                        'start_time': sch.start_time.strftime('%H:%M') if sch.start_time else '07:00',
+                        'day_of_week': sch.day_of_week,
+                        'day_of_week_display': sch.get_day_of_week_display() if sch.day_of_week is not None else None,
+                        'zone': sch.zone_name.lower().replace(' ', '_'),
+                    }
+                })
+
+        return Response({'events': events})
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def generate_routes_for_week(self, request):
+        """
+        POST /api/schedules/generate_routes_for_week/
+        Generates routes for all active schedules for the next 7 days.
+        """
+        from datetime import timedelta
+        from django.db.utils import IntegrityError
+        from .route_optimizer import DepotLocationError, generate_optimal_route
+
+        today = timezone.now().date()
+        end_date = today + timedelta(days=7)
+
+        active_schedules = Schedule.objects.filter(
+            is_active=True,
+            driver__isnull=False,
+        ).select_related('driver__user', 'vehicle')
+
+        created_count = 0
+        errors = []
+
+        for schedule in active_schedules:
+            # Determine which dates this schedule runs on in the next 7 days
+            run_dates = []
+            current = today
+            while current <= end_date:
+                if schedule.frequency == 'daily':
+                    run_dates.append(current)
+                elif schedule.frequency == 'weekly' and schedule.day_of_week is not None:
+                    if current.weekday() == schedule.day_of_week:
+                        run_dates.append(current)
+                elif schedule.frequency == 'biweekly' and schedule.day_of_week is not None:
+                    # Biweekly: every other week on the same day
+                    weeks_diff = (current - today).days // 7
+                    if weeks_diff % 2 == 0 and current.weekday() == schedule.day_of_week:
+                        run_dates.append(current)
+                elif schedule.frequency == 'monthly' and schedule.day_of_week is not None:
+                    # Monthly: same day of week, first occurrence in month
+                    if current.weekday() == schedule.day_of_week and current.day <= 7:
+                        run_dates.append(current)
+                current += timedelta(days=1)
+
+            for planned_date in run_dates:
+                # Check if route already exists
+                if Route.objects.filter(driver=schedule.driver, planned_date=planned_date, status='planned').exists():
+                    continue
+
+                # Get pending requests in this zone
+                pending_requests = list(WasteRequest.objects.filter(
+                    zone=schedule.zone_name.lower().replace(' ', '_') if schedule.zone_name.lower().replace(' ', '_') in dict(ZONE_CHOICES) else schedule.zone_name,
+                    status='pending',
+                    driver__isnull=True,
+                    is_deleted=False,
+                ).filter(
+                    Q(latitude__isnull=False, longitude__isnull=False) |
+                    Q(photo_latitude__isnull=False, photo_longitude__isnull=False)
+                ).order_by('created_at')[:20])  # Limit to 20 per route
+
+                if not pending_requests:
+                    continue
+
+                request_ids = [wr.id for wr in pending_requests]
+
+                try:
+                    route_data = generate_optimal_route(schedule.driver, request_ids, [])
+                except DepotLocationError as exc:
+                    errors.append(f'{schedule.zone_name} {planned_date}: {exc}')
+                    continue
+                if 'error' in route_data:
+                    errors.append(f'{schedule.zone_name} {planned_date}: {route_data["error"]}')
+                    continue
+
+                # Create route
+                try:
+                    with transaction.atomic():
+                        route = Route.objects.create(
+                            driver=schedule.driver,
+                            vehicle=schedule.vehicle or schedule.driver.vehicle,
+                            planned_date=planned_date,
+                            status='planned',
+                            total_distance_km=route_data['total_distance_km'],
+                        )
+                        route.waste_requests.set(request_ids)
+                        WasteRequest.objects.filter(id__in=request_ids).update(
+                            driver=schedule.driver, status='assigned'
+                        )
+                        created_count += 1
+
+                        # Notify driver
+                        _notify_driver(
+                            schedule.driver,
+                            title='New Route Generated',
+                            message=f'Route for {schedule.zone_name} on {planned_date} with {route_data["total_stops"]} stops.',
+                            notification_type='info',
+                        )
+                except IntegrityError:
+                    continue
+                except Exception as exc:
+                    errors.append(f'{schedule.zone_name} {planned_date}: {exc}')
+                    continue
+
+        return Response({
+            'created_count': created_count,
+            'errors': errors,
+        })
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def check_conflicts(self, request):
+        """
+        POST /api/schedules/check_conflicts/
+        Check for scheduling conflicts before creating/updating a schedule.
+        Body: {
+            "driver_id": int (optional, for checking specific driver),
+            "vehicle_id": int (optional),
+            "zone_name": str (optional),
+            "frequency": str,
+            "day_of_week": int (optional),
+            "start_time": "HH:MM:SS",
+            "exclude_id": int (optional, schedule ID to exclude from check)
+        }
+        Returns conflicts: driver_double_booked, vehicle_double_booked, zone_overlap, etc.
+        """
+        driver_id = request.data.get('driver_id')
+        vehicle_id = request.data.get('vehicle_id')
+        zone_name = request.data.get('zone_name', '').strip()
+        frequency = request.data.get('frequency', 'weekly')
+        day_of_week = request.data.get('day_of_week')
+        start_time = request.data.get('start_time', '07:00:00')
+        exclude_id = request.data.get('exclude_id')
+
+        conflicts = []
+        warnings = []
+
+        # Parse start_time
+        try:
+            if isinstance(start_time, str):
+                start_hour = int(start_time.split(':')[0])
+            else:
+                start_hour = start_time.hour
+        except (ValueError, AttributeError):
+            start_hour = 7
+
+        # Calculate end time (assume 8-hour shift)
+        end_hour = start_hour + 8
+
+        # Build base queryset of active schedules
+        qs = Schedule.objects.filter(is_active=True).select_related('driver__user', 'vehicle')
+
+        if exclude_id:
+            qs = qs.exclude(id=exclude_id)
+
+        if driver_id:
+            driver_conflicts = qs.filter(driver_id=driver_id)
+            if day_of_week is not None:
+                if frequency == 'daily':
+                    pass  # Daily runs every day
+                elif frequency in ('weekly', 'biweekly', 'monthly'):
+                    driver_conflicts = driver_conflicts.filter(day_of_week=day_of_week)
+            else:
+                driver_conflicts = driver_conflicts.filter(day_of_week=day_of_week)
+
+            for conflict in driver_conflicts:
+                conflicts.append({
+                    'type': 'driver_double_booked',
+                    'severity': 'error',
+                    'message': f'Driver {conflict.driver.user.username} already has a {conflict.get_frequency_display()} schedule on {conflict.get_day_of_week_display() or "daily"} at {conflict.start_time}',
+                    'conflicting_schedule_id': conflict.id,
+                    'conflicting_schedule_zone': conflict.zone_name,
+                })
+
+        if vehicle_id:
+            vehicle_conflicts = qs.filter(vehicle_id=vehicle_id)
+            if day_of_week is not None:
+                if frequency == 'daily':
+                    pass
+                elif frequency in ('weekly', 'biweekly', 'monthly'):
+                    vehicle_conflicts = vehicle_conflicts.filter(day_of_week=day_of_week)
+            else:
+                vehicle_conflicts = vehicle_conflicts.filter(day_of_week=day_of_week)
+
+            for conflict in vehicle_conflicts:
+                conflicts.append({
+                    'type': 'vehicle_double_booked',
+                    'severity': 'error',
+                    'message': f'Vehicle {conflict.vehicle.plate_number} already assigned to {conflict.zone_name} on {conflict.get_day_of_week_display() or "daily"} at {conflict.start_time}',
+                    'conflicting_schedule_id': conflict.id,
+                    'conflicting_schedule_zone': conflict.zone_name,
+                })
+
+        # Check zone overlap (same zone, same day, overlapping times)
+        if zone_name and day_of_week is not None:
+            zone_conflicts = qs.filter(zone_name=zone_name)
+            if frequency == 'daily':
+                pass
+            elif frequency in ('weekly', 'biweekly', 'monthly'):
+                zone_conflicts = zone_conflicts.filter(day_of_week=day_of_week)
+
+            for conflict in zone_conflicts:
+                # Check time overlap
+                conflict_start = conflict.start_time.hour if conflict.start_time else 7
+                conflict_end = conflict_start + 8
+                if not (end_hour <= conflict_start or start_hour >= conflict_end):
+                    conflicts.append({
+                        'type': 'zone_overlap',
+                        'severity': 'warning',
+                        'message': f'Zone {conflict.zone_name} already has a schedule on {conflict.get_day_of_week_display()} at {conflict.start_time} (overlapping time)',
+                        'conflicting_schedule_id': conflict.id,
+                    })
+
+        # Check driver availability
+        if driver_id:
+            try:
+                driver = Driver.objects.get(id=driver_id)
+                if not driver.is_available:
+                    warnings.append({
+                        'type': 'driver_unavailable',
+                        'severity': 'warning',
+                        'message': f'Driver {driver.user.username} is currently marked as unavailable',
+                    })
+                if driver.on_break:
+                    warnings.append({
+                        'type': 'driver_on_break',
+                        'severity': 'info',
+                        'message': f'Driver {driver.user.username} is currently on break',
+                    })
+            except Driver.DoesNotExist:
+                conflicts.append({
+                    'type': 'driver_not_found',
+                    'severity': 'error',
+                    'message': 'Specified driver does not exist',
+                })
+
+        # Check vehicle availability
+        if vehicle_id:
+            try:
+                vehicle = Vehicle.objects.get(id=vehicle_id)
+                if vehicle.status != 'available':
+                    warnings.append({
+                        'type': 'vehicle_unavailable',
+                        'severity': 'warning',
+                        'message': f'Vehicle {vehicle.plate_number} is {vehicle.get_status_display()}',
+                    })
+            except Vehicle.DoesNotExist:
+                conflicts.append({
+                    'type': 'vehicle_not_found',
+                    'severity': 'error',
+                    'message': 'Specified vehicle does not exist',
+                })
+
+        # Check capacity (rough estimate: pending requests in zone vs vehicle capacity)
+        if vehicle_id and zone_name:
+            try:
+                vehicle = Vehicle.objects.get(id=vehicle_id)
+                pending_count = WasteRequest.objects.filter(
+                    zone=zone_name.lower().replace(' ', '_') if zone_name.lower().replace(' ', '_') in dict(ZONE_CHOICES) else zone_name,
+                    status='pending',
+                    driver__isnull=True,
+                    is_deleted=False,
+                ).count()
+                if vehicle.capacity_kg and pending_count > 0:
+                    # Rough estimate: avg 5kg per request
+                    estimated_kg = pending_count * 5
+                    if estimated_kg > vehicle.capacity_kg:
+                        warnings.append({
+                            'type': 'capacity_exceeded',
+                            'severity': 'warning',
+                            'message': f'Zone has ~{pending_count} pending requests (~{estimated_kg}kg) but vehicle capacity is {vehicle.capacity_kg}kg',
+                        })
+            except Vehicle.DoesNotExist:
+                pass
+
+        return Response({
+            'has_conflicts': len(conflicts) > 0,
+            'has_warnings': len(warnings) > 0,
+            'conflicts': conflicts,
+            'warnings': warnings,
+            'can_proceed': len([c for c in conflicts if c['severity'] == 'error']) == 0,
         })
 
 class NotificationViewSet(viewsets.ModelViewSet):

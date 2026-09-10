@@ -882,8 +882,8 @@ function applyRequestRowUpdate(requestId, { statusKey, driverHtml, actionHtml, s
     const row = document.getElementById(`request-row-${requestId}`);
     if (!row) return; // row bhetिएन भने silently skip
 
-    // Status Sign cell (8th <td>, index 7) — location-mismatch badge (yedi cha) नछोई status badge matra replace
-    const statusCell = row.children[7];
+    // Status Sign cell (9th <td>, index 8) — location-mismatch badge (yedi cha) नछोई status badge matra replace
+    const statusCell = row.children[8];
     if (statusCell) {
         const badge = statusCell.querySelector('.badge');
         if (badge) {

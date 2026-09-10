@@ -3,6 +3,7 @@
 {% block title %}{% trans "Admin - Schedules Management" %}{% endblock %}
 
 {% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
 <style>
     /* ==========================================
        PAGE-SPECIFIC STYLING ONLY
@@ -57,6 +58,53 @@
     .bulk-toolbar.d-flex {
         display: flex !important;
     }
+
+    /* ==========================================
+       FULLCALENDAR CUSTOMIZATION
+       ========================================== */
+    .fc {
+        font-family: inherit !important;
+        font-size: 0.85rem;
+    }
+    .fc .fc-toolbar-title { font-size: 1.1rem; font-weight: 600; }
+    .fc .fc-button { font-size: 0.75rem; padding: 0.35rem 0.7rem; }
+    .fc .fc-button-primary:not(:disabled).fc-button-active,
+    .fc .fc-button-primary:not(:disabled):active { background-color: #198754; border-color: #198754; }
+    .fc .fc-button-primary { background-color: #198754; border-color: #198754; }
+    .fc .fc-button-primary:hover { background-color: #157347; border-color: #146c43; }
+    .fc-theme-standard td, .fc-theme-standard th { border-color: var(--border-color); }
+    .fc-theme-standard .fc-scrollgrid { border-color: var(--border-color); }
+    .fc-daygrid-day { background: var(--bg-card); }
+    .fc-daygrid-day.fc-day-today { background: #e8f5e9 !important; }
+    .fc-event {
+        border-radius: 6px;
+        border: none;
+        padding: 2px 6px;
+        font-size: 0.7rem;
+        cursor: pointer;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .fc-event:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10; }
+    .fc-event-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fc-event-time { font-size: 0.65rem; opacity: 0.8; }
+    .fc-daygrid-event.fc-event-start, .fc-daygrid-event.fc-event-end { border-radius: 6px; }
+    .fc-popover { border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); border: 1px solid var(--border-color); }
+    .fc-popover-header { background: var(--bg-surface); border-bottom: 1px solid var(--border-color); border-radius: 10px 10px 0 0; }
+    .fc-popover-body { background: var(--bg-card); }
+    .fc-col-header-cell { background: var(--bg-surface); }
+    .fc-scrollgrid-liquid { height: 100% !important; }
+
+    /* Calendar event colors by status */
+    .fc-event.schedule-active { background: #198754; }
+    .fc-event.schedule-inactive { background: #6c757d; opacity: 0.6; }
+    .fc-event.schedule-daily { border-left: 3px solid #0d6efd; }
+    .fc-event.schedule-weekly { border-left: 3px solid #198754; }
+    .fc-event.schedule-biweekly { border-left: 3px solid #fd7e14; }
+    .fc-event.schedule-monthly { border-left: 3px solid #6f42c1; }
+
+    /* View toggle */
+    .view-toggle .btn { font-size: 0.75rem; padding: 0.4rem 0.85rem; }
+    .calendar-container { min-height: 600px; }
 </style>
 {% endblock %}
 
@@ -75,7 +123,15 @@
                     <h2 class="mb-1 fw-bold"><i class="bi bi-calendar-week text-success me-2"></i>{% trans "Schedules Management" %}</h2>
                     <p class="text-muted mb-0">{% trans "Configure municipal boundary collection maps, recurrence intervals, and operational fleet constraints." %}</p>
                 </div>
-                <div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <div class="btn-group view-toggle" role="group">
+                        <button type="button" class="btn btn-outline-secondary active" id="view-table-btn" onclick="switchView('table')">
+                            <i class="bi bi-table me-1"></i>{% trans "Table" %}
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="view-calendar-btn" onclick="switchView('calendar')">
+                            <i class="bi bi-calendar3 me-1"></i>{% trans "Calendar" %}
+                        </button>
+                    </div>
                     <button class="btn btn-success px-4 py-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
                         <i class="bi bi-plus-lg me-2"></i>{% trans "Create Zone Mapping" %}
                     </button>
@@ -90,12 +146,18 @@
                 </div>
             </div>
 
-            <div class="card dashboard-card">
+            <!-- TABLE VIEW -->
+            <div id="table-view" class="card dashboard-card">
                 <div class="card-header py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
                     <h6 class="mb-0 fw-bold"><i class="bi bi-calendar2-range me-2 text-success"></i>{% trans "Configured Operational Route Intervals" %}</h6>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportFilteredSchedules()">
-                        <i class="bi bi-download me-1"></i>{% trans "Export (CSV)" %}
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="generateRoutesForWeek()">
+                            <i class="bi bi-arrow-repeat me-1"></i>{% trans "Generate Routes for Week" %}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportFilteredSchedules()">
+                            <i class="bi bi-download me-1"></i>{% trans "Export (CSV)" %}
+                        </button>
+                    </div>
                 </div>
 
                 {# ===== BULK ACTION TOOLBAR ===== #}
@@ -207,6 +269,34 @@
                     </div>
                 </div>
             </div>
+
+            <!-- CALENDAR VIEW -->
+            <div id="calendar-view" class="card dashboard-card d-none">
+                <div class="card-header py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-calendar3 me-2 text-success"></i>{% trans "Weekly Schedule Calendar" %}</h6>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="generateRoutesForWeek()">
+                            <i class="bi bi-arrow-repeat me-1"></i>{% trans "Generate Routes for Week" %}
+                        </button>
+                        <select class="form-select form-select-sm" id="calendar-zone-filter" style="width: auto;" onchange="filterCalendarByZone()">
+                            <option value="">{% trans "All Zones" %}</option>
+                            {% for key, label in ZONE_CHOICES %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <select class="form-select form-select-sm" id="calendar-driver-filter" style="width: auto;" onchange="filterCalendarByDriver()">
+                            <option value="">{% trans "All Drivers" %}</option>
+                            {% for driver in drivers %}
+                            <option value="{{ driver.id }}">{{ driver.user.username }} ({{ driver.zone }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="schedule-calendar" class="calendar-container p-3"></div>
+                </div>
+            </div>
+
         </div> <!-- /content-col -->
     </div> <!-- /layout-wrapper -->
 </div>
@@ -275,6 +365,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script nonce="{{ csp_nonce }}">
 (function() {
 // ---------- XSS escaping helper ----------
@@ -626,6 +717,12 @@ window.toggleActive = toggleActive;
 window.deleteSchedule = deleteSchedule;
 window.onFrequencyChange = onFrequencyChange;
 window.addSchedule = addSchedule;
+window.switchView = switchView;
+window.filterCalendarByZone = filterCalendarByZone;
+window.filterCalendarByDriver = filterCalendarByDriver;
+window.generateRoutesForWeek = generateRoutesForWeek;
+window.editScheduleFromCalendar = editScheduleFromCalendar;
+window.deleteScheduleFromCalendar = deleteScheduleFromCalendar;
 
 function getApiClient() {
     if (window.API) return window.API;
@@ -685,6 +782,235 @@ async function loadZoneForecast() {
 }
 
 loadZoneForecast();
+
+    // ============================================================
+    // FULLCALENDAR INITIALIZATION
+    // ============================================================
+    let scheduleCalendar = null;
+    let calendarEvents = [];
+
+    function initScheduleCalendar() {
+        const calendarEl = document.getElementById('schedule-calendar');
+        if (!calendarEl || window.FullCalendar === undefined) return;
+
+        scheduleCalendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'timeGridWeek',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'timeGridWeek,dayGridMonth,listWeek'
+            },
+            slotMinTime: '06:00:00',
+            slotMaxTime: '22:00:00',
+            slotDuration: '00:30:00',
+            allDaySlot: false,
+            height: 'auto',
+            expandRows: true,
+            weekNumbers: true,
+            businessHours: {
+                daysOfWeek: [1, 2, 3, 4, 5],
+                startTime: '07:00',
+                endTime: '17:00',
+            },
+            events: calendarEvents,
+            eventTimeFormat: {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            },
+            eventDisplay: 'block',
+            eventDidMount: function(info) {
+                // Add tooltip
+                info.el.title = info.event.extendedProps.description || '';
+            },
+            eventClick: function(info) {
+                showScheduleEventModal(info.event);
+            },
+            datesSet: function(info) {
+                // Update calendar title with date range
+            }
+        });
+
+        scheduleCalendar.render();
+    }
+
+    function switchView(view) {
+        const tableView = document.getElementById('table-view');
+        const calendarView = document.getElementById('calendar-view');
+        const tableBtn = document.getElementById('view-table-btn');
+        const calBtn = document.getElementById('view-calendar-btn');
+
+        if (view === 'calendar') {
+            tableView.classList.add('d-none');
+            calendarView.classList.remove('d-none');
+            tableBtn.classList.remove('active');
+            calBtn.classList.add('active');
+            if (!scheduleCalendar) initScheduleCalendar();
+            else scheduleCalendar.render();
+            loadCalendarEvents();
+        } else {
+            tableView.classList.remove('d-none');
+            calendarView.classList.add('d-none');
+            tableBtn.classList.add('active');
+            calBtn.classList.remove('active');
+        }
+    }
+
+    async function loadCalendarEvents() {
+        try {
+            const api = await getApiClient();
+            const data = await api.get('/api/schedules/calendar_events/');
+            calendarEvents = data.events || [];
+            if (scheduleCalendar) {
+                scheduleCalendar.removeAllEvents();
+                scheduleCalendar.addEventSource(calendarEvents);
+            }
+        } catch (err) {
+            console.error('Failed to load calendar events:', err);
+        }
+    }
+
+    function filterCalendarByZone() {
+        const zone = document.getElementById('calendar-zone-filter').value;
+        const driver = document.getElementById('calendar-driver-filter').value;
+        if (scheduleCalendar) {
+            scheduleCalendar.removeAllEvents();
+            const filtered = calendarEvents.filter(e => {
+                const zoneMatch = !zone || e.extendedProps.zone === zone;
+                const driverMatch = !driver || e.extendedProps.driver_id === parseInt(driver);
+                return zoneMatch && driverMatch;
+            });
+            scheduleCalendar.addEventSource(filtered);
+        }
+    }
+
+    function filterCalendarByDriver() {
+        filterCalendarByZone(); // same logic
+    }
+
+    function getFrequencyClass(freq) {
+        return `schedule-${freq}`;
+    }
+
+    function getStatusClass(isActive) {
+        return isActive ? 'schedule-active' : 'schedule-inactive';
+    }
+
+    function showScheduleEventModal(event) {
+        const props = event.extendedProps;
+        const modalHtml = `
+            <div class="modal fade" id="scheduleEventModal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title fw-bold"><i class="bi bi-calendar-event me-2"></i>${escapeHtml(props.zone_name)}</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <div class="row g-3 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small fw-semibold text-secondary">{% trans "Frequency" %}</label>
+                                    <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 fs-6">${escapeHtml(props.frequency_display)}</span>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-semibold text-secondary">{% trans "Status" %}</label>
+                                    <span class="badge ${props.is_active ? 'bg-success' : 'bg-secondary'} bg-opacity-10 px-3 py-2 fs-6">
+                                        ${props.is_active ? '{% trans "Active" %}' : '{% trans "Inactive" %}'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small fw-semibold text-secondary">{% trans "Driver" %}</label>
+                                    <div>${props.driver_name ? escapeHtml(props.driver_name) : '<span class="text-muted">{% trans "Unassigned" %}</span>'}</div>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-semibold text-secondary">{% trans "Vehicle" %}</label>
+                                    <div>${props.vehicle_plate ? escapeHtml(props.vehicle_plate) : '<span class="text-muted">{% trans "Unassigned" %}</span>'}</div>
+                                </div>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small fw-semibold text-secondary">{% trans "Start Time" %}</label>
+                                    <div>${props.start_time}</div>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-semibold text-secondary">{% trans "Day" %}</label>
+                                    <div>${props.day_of_week_display || '{% trans "Daily" %}'}</div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary flex-fill" onclick="editScheduleFromCalendar(${props.id})" data-bs-dismiss="modal">
+                                    <i class="bi bi-pencil me-1"></i>{% trans "Edit" %}
+                                </button>
+                                <button class="btn btn-outline-danger flex-fill" onclick="deleteScheduleFromCalendar(${props.id})" data-bs-dismiss="modal">
+                                    <i class="bi bi-trash me-1"></i>{% trans "Delete" %}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        // Remove existing modal if any
+        const existing = document.getElementById('scheduleEventModal');
+        if (existing) existing.remove();
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modal = new bootstrap.Modal(document.getElementById('scheduleEventModal'));
+        modal.show();
+    }
+
+    function editScheduleFromCalendar(scheduleId) {
+        // Reuse existing edit logic - for now redirect to table view and scroll
+        switchView('table');
+        const row = document.getElementById(`schedule-row-${scheduleId}`);
+        if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.classList.add('table-primary');
+            setTimeout(() => row.classList.remove('table-primary'), 2000);
+        }
+    }
+
+    function deleteScheduleFromCalendar(scheduleId) {
+        deleteSchedule(scheduleId, null);
+    }
+
+    async function generateRoutesForWeek() {
+        const btn = event?.target?.closest('button') || document.querySelector('button[onclick="generateRoutesForWeek()"]');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>{% trans "Generating..." %}';
+        btn.disabled = true;
+
+        try {
+            const api = await getApiClient();
+            const data = await api.post('/api/schedules/generate_routes_for_week/', {});
+            if (data && data.created_count !== undefined) {
+                showToast(
+                    interpolate(gettext('Successfully generated %(count)s route(s) for the week.'), {count: data.created_count}, true),
+                    'success'
+                );
+                // Refresh both views
+                loadCalendarEvents();
+                // Optionally reload table data
+                location.reload();
+            } else {
+                showToast(gettext('Route generation completed.'), 'success');
+            }
+        } catch (err) {
+            console.error('Route generation failed:', err);
+            showToast(gettext('Failed to generate routes. Check server logs.'), 'danger');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    // Initialize calendar view if URL has calendar hash
+    if (window.location.hash === '#calendar') {
+        setTimeout(() => switchView('calendar'), 100);
+    }
 
 })();
 </script>
