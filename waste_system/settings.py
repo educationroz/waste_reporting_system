@@ -257,7 +257,12 @@ REDIS_DB = config('REDIS_DB', default=1, cast=int)
 def _redis_url():
     host = REDIS_HOST or '127.0.0.1'
     port = REDIS_PORT or 6379
-    db = REDIS_DB or 1
+    # NOTE: must check "is not None" rather than truthiness — REDIS_DB=0 is a
+    # perfectly valid (and common, e.g. Redis Cloud free-tier) database index,
+    # but `0 or 1` evaluates to 1 in Python because 0 is falsy. That bug used
+    # to silently force DB 1 even when REDIS_DB=0 was explicitly configured,
+    # causing "DB index is out of range" on providers that only expose DB 0.
+    db = REDIS_DB if REDIS_DB is not None else 1
     if REDIS_PASSWORD:
         return f'redis://:{REDIS_PASSWORD}@{host}:{port}/{db}'
     return f'redis://{host}:{port}/{db}'
