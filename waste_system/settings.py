@@ -188,6 +188,13 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_SSL_REDIRECT = True
+    # Railway (and most PaaS/reverse-proxy setups) terminate TLS at the edge
+    # and forward plain HTTP to this container, adding an
+    # X-Forwarded-Proto header to say the original request was HTTPS.
+    # Without this, Django can't tell the difference and re-redirects every
+    # already-secure request — SECURE_SSL_REDIRECT then loops forever
+    # (ERR_TOO_MANY_REDIRECTS in the browser).
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     # A plain-HTTP load-balancer probe must get 200, not a 301 to https — most
     # LBs score a redirect as "unhealthy". Exemption is deliberately narrow:
     # only the two probe paths escape the redirect. (Wired to match the
