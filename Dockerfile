@@ -22,11 +22,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Copy project
 COPY . .
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
-
 # Expose port
 EXPOSE 8000
 
-# Run migrations then start Daphne (ASGI for WebSockets)
-CMD ["sh", "-c", "python manage.py migrate && daphne -b 0.0.0.0 -p ${PORT:-8000} waste_system.asgi:application"]
+# Collect static, run migrations, then start Daphne (ASGI for WebSockets)
+CMD ["sh", "-c", "python manage.py collectstatic --noinput && python manage.py migrate && daphne -b 0.0.0.0 -p ${PORT:-8000} waste_system.asgi:application"]
