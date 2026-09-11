@@ -45,6 +45,12 @@ ALLOWED_HOSTS = [
     if h.strip()
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    f'https://*{h}' if h.startswith('.') else f'https://{h}'
+    for h in ALLOWED_HOSTS
+    if h not in ('localhost', '127.0.0.1', '0.0.0.0', 'testserver')
+]
+
 # Whether registration should do a live DNS/MX lookup on the email domain.
 # Defaults to "on in production, off in development". It is exposed as its own
 # setting (rather than being derived from DEBUG inline) because Django's test
