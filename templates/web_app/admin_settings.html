@@ -1579,7 +1579,17 @@
         }
 
         checkpoints = checkpoints.concat(raw.results || []);
-        url = raw.next || null;
+        // DRF gives a full absolute URL; extract path to avoid CSP issues with external domains
+        if (raw.next) {
+          try {
+            const nextUrl = new URL(raw.next);
+            url = nextUrl.pathname + nextUrl.search;
+          } catch {
+            url = null;
+          }
+        } else {
+          url = null;
+        }
       }
 
       return checkpoints;

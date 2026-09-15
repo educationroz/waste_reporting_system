@@ -1027,7 +1027,17 @@ async function fetchAllCheckpoints() {
         }
 
         checkpoints = checkpoints.concat(extractCheckpointList(data));
-        url = data.next || null; // DRF gives a full absolute URL — fetch() handles that fine.
+        // DRF gives a full absolute URL; extract path to avoid CSP issues with external domains
+        if (data.next) {
+            try {
+                const nextUrl = new URL(data.next);
+                url = nextUrl.pathname + nextUrl.search;
+            } catch {
+                url = null;
+            }
+        } else {
+            url = null;
+        }
     }
 
     return checkpoints;
@@ -2188,7 +2198,8 @@ try {
     // ── Pickup Schedule ───────────────────────────────────────────────────────────
     async function loadPickupSchedule() {
         const tbody = document.getElementById('pickup-schedule-body');
-        const weeks = document.getElementById('schedule-weeks').value;
+        const weeksSelect = document.getElementById('schedule-weeks');
+        const weeks = weeksSelect ? weeksSelect.value : '4';
 
         if (!tbody) return;
 
