@@ -415,15 +415,11 @@ if USE_REDIS:
         USE_REDIS = False
 
 if USE_REDIS:
-    redis_host_config = (REDIS_HOST, REDIS_PORT)
-    if REDIS_PASSWORD:
-        redis_host_config = (REDIS_HOST, REDIS_PORT, {'password': REDIS_PASSWORD})
-
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
-                'hosts': [redis_host_config],
+                'hosts': [_redis_url()],
                 'capacity': 1000,
             },
         },
