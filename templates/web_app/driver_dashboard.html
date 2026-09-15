@@ -1690,6 +1690,62 @@ if (driverMapEl && !driverMapEl.dataset._bound) {
 }
 {% endif %}
 
+    // ── Request WebSocket for real-time status updates ──────────────────────
+    let requestWS = null;
+    let requestReconnectAttempt = 0;
+    let requestReconnectTimer = null;
+    let requestReconnectWarned = false;
+
+    function connectRequestWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const wsUrl = `${protocol}${location.host}/ws/requests/`;
+
+        try {
+            if (window._requestWs) {
+                try { window._requestWs.close(); } catch(e) {}
+            }
+            const ws = new WebSocket(wsUrl);
+            window._requestWs = ws;
+            requestWS = ws;
+
+            ws.onopen = () => {
+                requestReconnectAttempt = 0;
+                requestReconnectWarned = false;
+                if (requestReconnectTimer) {
+                    clearTimeout(requestReconnectTimer);
+                    requestReconnectTimer = null;
+                }
+            };
+
+            ws.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'request_update') {
+                        applyAssignedRowUpdate(data.request_id, data.status);
+                    }
+                } catch (err) {
+                    console.error('Error parsing request update:', err);
+                }
+            };
+
+            ws.onclose = () => {
+                setTimeout(() => {
+                    if (document.body.contains(document.getElementById('assigned-requests-body'))) {
+                        connectRequestWebSocket();
+                    }
+                }, 4000);
+            };
+
+            ws.onerror = () => {
+                ws.close();
+            };
+        } catch (e) {
+            console.warn('Request WebSocket setup error:', e);
+        }
+    }
+
+    // Start the WebSocket connection
+    connectRequestWebSocket();
 })();
 </script>
 {% endblock %}

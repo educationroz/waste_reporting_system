@@ -884,6 +884,87 @@
 
         // Start real-time WebSocket connection
         connectFleetLocationWebSocket();
+        
+        // Start real-time request updates WebSocket (for live status changes)
+        connectRequestWebSocket();
+    }
+
+    // ── Request WebSocket for real-time status updates ──────────────────────
+    let requestWS = null;
+    let requestReconnectAttempt = 0;
+    let requestReconnectTimer = null;
+    let requestReconnectWarned = false;
+
+    function connectRequestWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const wsUrl = `${protocol}${location.host}/ws/requests/`;
+
+        try {
+            if (window._requestWs) {
+                try { window._requestWs.close(); } catch(e) {}
+            }
+            const ws = new WebSocket(wsUrl);
+            window._requestWs = ws;
+            requestWS = ws;
+
+            ws.onopen = () => {
+                requestReconnectAttempt = 0;
+                requestReconnectWarned = false;
+                if (requestReconnectTimer) {
+                    clearTimeout(requestReconnectTimer);
+                    requestReconnectTimer = null;
+                }
+            };
+
+            ws.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'request_update') {
+                        // Update the request table row if it exists
+                        applyAdminRequestRowUpdate(data.request_id, data.status);
+                    }
+                } catch (err) {
+                    console.error('Error parsing request update:', err);
+                }
+            };
+
+            ws.onclose = () => {
+                const badge = document.getElementById('request-live-status-badge');
+                if (badge) {
+                    badge.className = 'badge bg-secondary bg-opacity-10 text-secondary border px-2.5 py-1.5 fw-semibold small';
+                    badge.innerHTML = '<i class="bi bi-wifi-off me-1"></i> ' + gettext('Reconnecting...');
+                }
+                setTimeout(() => {
+                    if (document.body.contains(document.getElementById('request-live-status-badge') || document.getElementById('requests-table'))) {
+                        connectRequestWebSocket();
+                    }
+                }, 4000);
+            };
+
+            ws.onerror = () => {
+                ws.close();
+            };
+        } catch (e) {
+            console.warn('Request WebSocket setup error:', e);
+        }
+    }
+
+    function applyAdminRequestRowUpdate(requestId, newStatus) {
+        const row = document.getElementById(`admin-request-row-${requestId}`);
+        if (!row) return;
+
+        const statusCell = row.querySelector('.status-badge, .badge');
+        if (statusCell) {
+            const badgeClass = {
+                'pending': 'bg-warning text-dark',
+                'assigned': 'bg-info text-dark',
+                'in_progress': 'bg-primary',
+                'completed': 'bg-success',
+                'cancelled': 'bg-secondary',
+            }[newStatus] || 'bg-secondary';
+            statusCell.className = 'badge status-badge ' + badgeClass;
+            statusCell.textContent = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).replace('_', ' ');
+        }
     }
 
     async function loadInitialDriverLocations() {

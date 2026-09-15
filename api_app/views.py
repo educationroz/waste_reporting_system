@@ -215,6 +215,27 @@ def _log_admin_action(request, action_type, content_type, obj, description=''):
     )
 
 
+def _push_ws_request_update(request_id, status, updated_by=None):
+    """
+    Broadcast a waste request status/driver change to all connected WebSocket
+    clients in the 'request_updates' group (WasteRequestConsumer).
+    """
+    if CHANNEL_LAYER is None:
+        return
+    try:
+        async_to_sync(CHANNEL_LAYER.group_send)(
+            'request_updates',
+            {
+                'type': 'broadcast_request_update',
+                'request_id': request_id,
+                'status': status,
+                'updated_by': updated_by or 'system',
+            }
+        )
+    except Exception:
+        logger.warning(f'[WS REQUEST UPDATE] failed for request={request_id}')
+
+
 def _push_ws_notification(notification):
     """
     Push a just-created Notification over its owner's personal WebSocket
@@ -2236,6 +2257,11 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             sibling.status = 'assigned'
             sibling.save(update_fields=['driver', 'status'])
 
+        # Broadcast real-time update to all connected clients
+        _push_ws_request_update(waste_request.id, 'assigned', request.user.username)
+        for sibling in siblings:
+            _push_ws_request_update(sibling.id, 'assigned', request.user.username)
+
         grouped_note = f' (+{len(siblings)} same-location request(s))' if siblings else ''
         _log_admin_action(
             request, 'assign', 'WasteRequest', waste_request,
@@ -2487,6 +2513,9 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
         waste_request.save(update_fields=update_fields)
 
+        # Broadcast real-time update to all connected clients
+        _push_ws_request_update(waste_request.id, new_status, user.username)
+
         if new_status == 'completed' and old_status != 'completed' and waste_request.driver_id:
             Driver.objects.filter(pk=waste_request.driver_id).update(
                 total_trips=F('total_trips') + 1
@@ -2506,6 +2535,8 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                     'completion_longitude', 'completion_distance_meters',
                     'completion_flagged',
                 ])
+                # Broadcast for each sibling too
+                _push_ws_request_update(sibling.id, 'completed', user.username)
                 completed_siblings.append(sibling)
 
             if completed_siblings:
@@ -2696,6 +2727,10 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
         updated = eligible_qs.update(driver=driver, status='assigned')
 
+        # Broadcast real-time updates to all connected clients
+        for req_id in found_ids:
+            _push_ws_request_update(req_id, 'assigned', request.user.username)
+
         try:
             for wr in WasteRequest.objects.filter(id__in=found_ids).select_related('user'):
                 if wr.user_id:
@@ -2857,6 +2892,8 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                     'completion_longitude', 'completion_distance_meters',
                     'completion_flagged',
                 ])
+                # Broadcast real-time update
+                _push_ws_request_update(wr.id, 'completed', request.user.username)
                 completed += 1
                 if is_flagged:
                     flagged.append(wr.id)
@@ -2904,6 +2941,10 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             updated = eligible.update(status='cancelled')
         else:  # in_progress
             updated = eligible.update(status='in_progress')
+
+        # Broadcast real-time updates for bulk operations
+        for req_id in eligible_ids:
+            _push_ws_request_update(req_id, new_status, request.user.username)
 
         _log_admin_action(
             request, 'status_change', 'WasteRequest', None,
@@ -3007,6 +3048,11 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             sibling.status = 'assigned'
             sibling.save(update_fields=['driver', 'status'])
         
+        # Broadcast real-time updates
+        _push_ws_request_update(waste_request.id, 'assigned', 'auto-assign')
+        for sibling in siblings:
+            _push_ws_request_update(sibling.id, 'assigned', 'auto-assign')
+        
         grouped_note = f' (+{len(siblings)} same-location request(s))' if siblings else ''
         _log_admin_action(
             request, 'assign', 'WasteRequest', waste_request,
@@ -3095,6 +3141,9 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         waste_request.status = 'pending'
         waste_request.save(update_fields=['driver', 'status'])
         
+        # Broadcast real-time update for rejection
+        _push_ws_request_update(waste_request.id, 'pending', user.username)
+        
         # Try to auto-assign to next nearest driver
         zone = waste_request.zone
         
@@ -3141,6 +3190,11 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 sibling.save(update_fields=['driver', 'status'])
             
             assigned = True
+            
+            # Broadcast real-time updates for reassignment
+            _push_ws_request_update(waste_request.id, 'assigned', 'driver-reassign')
+            for sibling in siblings:
+                _push_ws_request_update(sibling.id, 'assigned', 'driver-reassign')
             
             _log_admin_action(
                 request, 'assign', 'WasteRequest', waste_request,
@@ -3446,6 +3500,11 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             sibling.status = 'assigned'
             sibling.save(update_fields=['driver', 'status'])
 
+        # Broadcast real-time updates
+        _push_ws_request_update(waste_request.id, 'assigned', 'auto-assign-high')
+        for sibling in siblings:
+            _push_ws_request_update(sibling.id, 'assigned', 'auto-assign-high')
+
         _log_admin_action(
             None, 'assign', 'WasteRequest', waste_request,
             f'Auto-assigned driver {nearest_driver.user.username} to HIGH waste request #{waste_request.id} (confidence: {waste_request.ml_confidence}%, distance: {round(min_distance)}m)'
@@ -3527,6 +3586,10 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             })
 
         updated = qs.update(driver=to_driver)
+
+        # Broadcast real-time updates for reassigned requests
+        for req_id in request_ids:
+            _push_ws_request_update(req_id, 'assigned', request.user.username)
 
         for wr in WasteRequest.objects.filter(id__in=request_ids).select_related('user'):
             if wr.user_id:

@@ -782,6 +782,95 @@
     document.getElementById('myRequestsMapModal').addEventListener('hidden.bs.modal', function() {
         if (myMap) { myMap.remove(); myMap = null; myMapInit = false; }
     });
+
+    // ── Request WebSocket for real-time status updates ──────────────────────
+    let requestWS = null;
+    let requestReconnectAttempt = 0;
+    let requestReconnectTimer = null;
+    let requestReconnectWarned = false;
+
+    function connectRequestWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const wsUrl = `${protocol}${location.host}/ws/requests/`;
+
+        try {
+            if (window._requestWs) {
+                try { window._requestWs.close(); } catch(e) {}
+            }
+            const ws = new WebSocket(wsUrl);
+            window._requestWs = ws;
+            requestWS = ws;
+
+            ws.onopen = () => {
+                requestReconnectAttempt = 0;
+                requestReconnectWarned = false;
+                if (requestReconnectTimer) {
+                    clearTimeout(requestReconnectTimer);
+                    requestReconnectTimer = null;
+                }
+            };
+
+            ws.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'request_update') {
+                        applyUserRequestRowUpdate(data.request_id, data.status);
+                    }
+                } catch (err) {
+                    console.error('Error parsing request update:', err);
+                }
+            };
+
+            ws.onclose = () => {
+                setTimeout(() => {
+                    if (document.body.contains(document.getElementById('requests-tbody'))) {
+                        connectRequestWebSocket();
+                    }
+                }, 4000);
+            };
+
+            ws.onerror = () => {
+                ws.close();
+            };
+        } catch (e) {
+            console.warn('Request WebSocket setup error:', e);
+        }
+    }
+
+    function applyUserRequestRowUpdate(requestId, newStatus) {
+        const row = document.getElementById(`request-row-${requestId}`);
+        if (!row) return;
+
+        // Update status badge
+        const statusCell = row.querySelector('.badge');
+        if (statusCell) {
+            const badgeClass = {
+                'pending': 'bg-warning bg-opacity-10 text-warning-emphasis',
+                'assigned': 'bg-primary bg-opacity-10 text-primary',
+                'in_progress': 'bg-info bg-opacity-10 text-info',
+                'completed': 'bg-success bg-opacity-10 text-success',
+                'cancelled': 'bg-danger bg-opacity-10 text-danger',
+            }[newStatus] || 'bg-secondary bg-opacity-10 text-secondary';
+            statusCell.className = 'badge px-3 rounded-pill ' + badgeClass;
+            statusCell.textContent = STATUS_LABELS[newStatus] || newStatus;
+            statusCell.dataset.status = newStatus;
+        }
+
+        // Update timeline in detail modal if open
+        const detailBody = document.getElementById('detailModalBody');
+        if (detailBody) {
+            const modalTitle = document.getElementById('detailModalTitle');
+            if (modalTitle && modalTitle.textContent.includes(requestId)) {
+                const timelineDiv = detailBody.querySelector('.status-timeline');
+                if (timelineDiv) {
+                    timelineDiv.outerHTML = renderTimeline(newStatus);
+                }
+            }
+        }
+    }
+
+    // Start the WebSocket connection
+    connectRequestWebSocket();
 })();
 </script>
 {% endblock %}
