@@ -40,7 +40,7 @@ ALLOWED_HOSTS = [
     h.strip()
     for h in config(
         'ALLOWED_HOSTS',
-        default='localhost,127.0.0.1,testserver,0.0.0.0,.e2b.app'
+        default='localhost,127.0.0.1,testserver,0.0.0.0,.e2b.app,.up.railway.app'
     ).split(',')
     if h.strip()
 ]
