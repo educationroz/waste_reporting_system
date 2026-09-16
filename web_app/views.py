@@ -212,7 +212,13 @@ class UserRequestListView(LoginRequiredMixin, ListView):
                 'latitude': float(lat),
                 'longitude': float(lng),
                 'status': req.status,
+                'status_display': req.get_status_display(),
                 'label': req.get_waste_type_display(),
+                'address': req.pickup_address or '',
+                'scheduled': (
+                    req.scheduled_date.strftime('%d %b %Y, %H:%M')
+                    if req.scheduled_date else ''
+                ),
             })
         ctx['located_requests_json'] = mark_safe(json.dumps(located_data))
         ctx['has_located_requests'] = bool(located_data)

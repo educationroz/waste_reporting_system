@@ -4,6 +4,7 @@
 {% block title %}{% trans "My Requests" %}{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
     .nav-pills .nav-link:not(.active):hover {
         background-color: #f8f9fa;
@@ -152,10 +153,92 @@
 
     /* ── Map modal ────────────────────────────────────────────────── */
     #my-map {
-        height: 420px;
+        height: clamp(340px, 58vh, 520px);
         width: 100%;
-        border-radius: 10px;
+        border-radius: 14px;
+        border: 1px solid var(--border-color, #e9ecef);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
     }
+    .leaflet-container {
+        font-family: inherit;
+        border-radius: 14px;
+        background: #eef1f4;
+    }
+    .leaflet-popup-content-wrapper {
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+        padding: 0;
+    }
+    .leaflet-popup-content {
+        margin: 12px 14px;
+        line-height: 1.35;
+        min-width: 170px;
+    }
+    .map-popup-title {
+        font-weight: 700;
+        font-size: 0.92rem;
+        color: #212529;
+        margin-bottom: 2px;
+    }
+    .map-popup-addr {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-bottom: 6px;
+    }
+    .map-popup-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 2px 9px;
+        border-radius: 999px;
+        color: #fff;
+        background: var(--sc, #6c757d);
+        text-transform: capitalize;
+    }
+    .map-popup-sched {
+        margin-top: 6px;
+        font-size: 0.72rem;
+        color: #adb5bd;
+    }
+    .map-status-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: var(--bg-card, #f8f9fa);
+    }
+    .map-status-legend .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78rem;
+        color: var(--text-secondary, #495057);
+    }
+    .legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .map-loading {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.88);
+        color: #6c757d;
+        font-size: 0.85rem;
+        z-index: 1000;
+    }
+    .map-loading.d-none { display: none; }
 </style>
 {% endblock %}
 
@@ -367,13 +450,19 @@
             </div>
             <div class="modal-body p-3">
                 {% if located_requests_json %}
-                <div id="my-map"></div>
-                <div class="d-flex flex-wrap gap-2 mt-2 small">
-                    <span class="badge bg-success">{% trans "Completed" %}</span>
-                    <span class="badge bg-warning text-dark">{% trans "Pending" %}</span>
-                    <span class="badge bg-info">{% trans "In Progress" %}</span>
-                    <span class="badge bg-primary">{% trans "Assigned" %}</span>
-                    <span class="badge bg-danger">{% trans "Cancelled" %}</span>
+                <div class="map-wrap position-relative">
+                    <div id="my-map"></div>
+                    <div class="map-loading" id="mapLoading">
+                        <div class="spinner-border spinner-border-sm text-success" role="status"></div>
+                        <div>{% trans "Loading map..." %}</div>
+                    </div>
+                </div>
+                <div class="map-status-legend mt-3">
+                    <span class="legend-item"><span class="legend-dot" style="background:#198754"></span>{% trans "Completed" %}</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#ffc107"></span>{% trans "Pending" %}</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#0dcaf0"></span>{% trans "In Progress" %}</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#0d6efd"></span>{% trans "Assigned" %}</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#dc3545"></span>{% trans "Cancelled" %}</span>
                 </div>
                 {% else %}
                 <p class="text-muted text-center py-4">{% trans "No located requests to show on the map." %}</p>
@@ -720,21 +809,54 @@
     };
 
     // ── Map view modal ────────────────────────────────────────────────
+    const mapModalEl = document.getElementById('myRequestsMapModal');
+
     document.getElementById('openMapBtn').addEventListener('click', function() {
-        const modalEl = document.getElementById('myRequestsMapModal');
-        const bsModal = new bootstrap.Modal(modalEl, {});
+        const bsModal = bootstrap.Modal.getOrCreateInstance(mapModalEl);
         bsModal.show();
-        initMyMap();
     });
 
-    let myMap = null, myMapInit = false;
+    // Leaflet maps initialised inside an animating Bootstrap modal get a
+    // 0×0 canvas with grey tiles. Initialise only AFTER the modal is fully
+    // visible, then invalidateSize() so tiles render at the correct pixel
+    // dimensions.
+    mapModalEl.addEventListener('shown.bs.modal', function () {
+        setTimeout(function () {
+            if (!myMap) initMyMap();
+            else { myMap.invalidateSize(); }
+        }, 60);
+    });
+
+    let myMap = null;
+
+    function statusColor(status) {
+        return {
+            completed: '#198754',
+            pending: '#ffc107',
+            in_progress: '#0dcaf0',
+            assigned: '#0d6efd',
+            cancelled: '#dc3545',
+        }[status] || '#6c757d';
+    }
+
+    function statusPinHtml(color, id) {
+        return '<svg width="32" height="40" viewBox="0 0 32 40" xmlns="http://www.w3.org/2000/svg">'
+            + '<path d="M16 0C7.2 0 0 6.9 0 15.4 0 26.9 16 40 16 40s16-13.1 16-24.6C32 6.9 24.8 0 16 0z" fill="' + color + '" stroke="#fff" stroke-width="2"/>'
+            + '<circle cx="16" cy="15" r="10" fill="#fff"/>'
+            + '<text x="16" y="19" font-size="11" font-weight="700" text-anchor="middle" fill="#212529">' + id + '</text>'
+            + '</svg>';
+    }
+
     function ensureLeafletLoaded(onReady) {
-        if (typeof L !== 'undefined') { onReady(); return; }
+        if (typeof L !== 'undefined' && L.map) { onReady(); return; }
         if (window._leafletLoadPromise) { window._leafletLoadPromise.then(onReady).catch(function(){}); return; }
         window._leafletLoadPromise = new Promise(function(resolve, reject) {
-            var script = document.createElement('script');
+            const existing = document.querySelector('script[data-leaflet-loader="user-requests"]');
+            if (existing) { existing.addEventListener('load', resolve); existing.addEventListener('error', reject); return; }
+            const script = document.createElement('script');
             script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
             script.async = true;
+            script.dataset.leafletLoader = 'user-requests';
             script.onload = resolve;
             script.onerror = reject;
             document.head.appendChild(script);
@@ -743,44 +865,57 @@
     }
 
     function initMyMap() {
-        if (myMapInit || typeof L === 'undefined') return;
-        myMapInit = true;
+        if (myMap) return;
         ensureLeafletLoaded(function() {
             const mapEl = document.getElementById('my-map');
             if (!mapEl || myMap) return;
-            myMap = L.map('my-map').setView([28.3949, 84.1240], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(myMap);
 
-            {% if located_requests_json %}
-            const located = {{ located_requests_json|safe }};
-            const bounds = [];
-            located.forEach(function(r) {
-                const lat = parseFloat(r.latitude), lng = parseFloat(r.longitude);
-                if (isNaN(lat) || isNaN(lng)) return;
-                const color = r.status === 'completed' ? 'green' :
-                              (r.status === 'in_progress' ? '#0dcaf0' :
-                              (r.status === 'assigned' ? '#0d6efd' :
-                              (r.status === 'cancelled' ? '#dc3545' : '#ffc107')));
-                const icon = L.divIcon({
-                    className: '',
-                    html: '<div style="background:' + color + ';width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.4);"></div>',
-                    iconSize: [16,16], iconAnchor: [8,8]
+            // Let the just-shown modal settle so the container has real pixels.
+            requestAnimationFrame(function () {
+                myMap = L.map('my-map', { scrollWheelZoom: false }).setView([28.3949, 84.1240], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(myMap);
+
+                {% if located_requests_json %}
+                const located = {{ located_requests_json|safe }};
+                const bounds = [];
+                located.forEach(function(r) {
+                    const lat = parseFloat(r.latitude), lng = parseFloat(r.longitude);
+                    if (isNaN(lat) || isNaN(lng)) return;
+                    const color = statusColor(r.status);
+                    const icon = L.divIcon({
+                        className: '',
+                        html: statusPinHtml(color, r.id),
+                        iconSize: [32, 40],
+                        iconAnchor: [16, 38],
+                        popupAnchor: [0, -34],
+                    });
+                    const addr = r.address ? window.escapeHtml(r.address) : '';
+                    const popup = '<div class="map-popup">'
+                        + '<div class="map-popup-title">#' + r.id + ' &middot; ' + window.escapeHtml(r.label || '') + '</div>'
+                        + (addr ? '<div class="map-popup-addr"><i class="bi bi-geo-alt-fill me-1"></i>' + addr + '</div>' : '')
+                        + '<span class="map-popup-status" style="--sc:' + color + '">' + window.escapeHtml(r.status_display || r.status) + '</span>'
+                        + (r.scheduled ? '<div class="map-popup-sched"><i class="bi bi-calendar3 me-1"></i>' + window.escapeHtml(r.scheduled) + '</div>' : '')
+                        + '</div>';
+                    L.marker([lat, lng], { icon: icon }).bindPopup(popup).addTo(myMap);
+                    bounds.push([lat, lng]);
                 });
-                L.marker([lat, lng], { icon: icon })
-                    .bindPopup('<strong>#' + r.id + '</strong><br>' + (r.label || ''))
-                    .addTo(myMap);
-                bounds.push([lat, lng]);
+                if (bounds.length) myMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+                {% endif %}
+
+                setTimeout(function() { if (myMap) myMap.invalidateSize(); }, 140);
+                const loading = document.getElementById('mapLoading');
+                if (loading) loading.classList.add('d-none');
             });
-            if (bounds.length) myMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
-            {% endif %}
         });
     }
 
-    // Clean up Leaflet when the modal closes to avoid map duplication on htmx nav
-    document.getElementById('myRequestsMapModal').addEventListener('hidden.bs.modal', function() {
-        if (myMap) { myMap.remove(); myMap = null; myMapInit = false; }
+    mapModalEl.addEventListener('hidden.bs.modal', function() {
+        if (myMap) { myMap.remove(); myMap = null; }
+        const loading = document.getElementById('mapLoading');
+        if (loading) loading.classList.remove('d-none');
     });
 
     // ── Request WebSocket for real-time status updates ──────────────────────

@@ -289,13 +289,18 @@
         if (!window.__gsiGlobalInitialized) {
             google.accounts.id.initialize({
                 client_id: clientId,
-                callback: function(resp) {
-                    if (typeof window.handleGoogleCredential === 'function') {
-                        window.handleGoogleCredential(resp);
-                    }
-                },
-                auto_select: false,
-                use_fedcm_for_button: true,
+callback: function(resp) {
+                if (typeof window.handleGoogleCredential === 'function') {
+                    window.handleGoogleCredential(resp);
+                }
+            },
+            error_callback: function(data) {
+                if (typeof window.handleGoogleSignInError === 'function') {
+                    window.handleGoogleSignInError(data);
+                }
+            },
+            auto_select: false,
+            use_fedcm_for_button: true,
             });
             window.__gsiGlobalInitialized = true;
         }
@@ -367,6 +372,28 @@
                 errDiv.classList.remove('d-none');
             }
         }
+    };
+
+    // Surface Google Identity errors as a friendly message instead of leaving
+    // the user staring at a silent/generic failure. The common "origin
+    // mismatch" case (site origin not registered for the OAuth client) gets a
+    // targeted hint so it can be traced to the Google Cloud Console settings.
+    window.handleGoogleSignInError = function(data) {
+        const errDiv = document.getElementById('error-alert');
+        if (!errDiv) return;
+        // User cancelled the popup — not an error, don't show anything.
+        if (data && data.type === 'popup_closed_by_user') return;
+
+        let message = gettext('Google sign-in failed. Please try again.');
+        const errCode = (data && (data.error || data.type)) || '';
+        const code = String(errCode).toLowerCase();
+        if (code.indexOf('origin') !== -1 || code === 'origin_mismatch') {
+            message = gettext('Google sign-in is not configured for this site address (origin mismatch). Contact the administrator to add this site in the Google Cloud Console.');
+        } else if (code.indexOf('concurrent') !== -1) {
+            message = gettext('Too many Google sign-in attempts. Please wait a minute and try again.');
+        }
+        errDiv.textContent = message;
+        errDiv.classList.remove('d-none');
     };
 
     function initGoogleSignIn() {
