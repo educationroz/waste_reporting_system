@@ -1,5 +1,13 @@
 const CACHE_NAME = 'waste-management-v3';
 
+// Dev passthrough: when the page registers this worker as /sw.js?debug=1
+// (base.html does that while DEBUG=True via runserver), the worker never
+// caches anything — it lets every request hit the network so template,
+// static (CSS/JS) and Python edits show up live without a hard refresh.
+// It still activates and claims, purging every stale cache left behind by
+// an earlier prod-mode registration so old assets can never resurface.
+const DEBUG_SW = new URL(self.location.href).searchParams.has('debug');
+
 // Background Sync tags
 const SYNC_TAGS = {
     OFFLINE_REQUESTS: 'offline-requests-sync',
@@ -28,17 +36,21 @@ function isRouteApiRequest(requestUrl) {
 
 // Install event - cache the app shell
 self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll([
-                '/',
-                '/static/web_app/css/style.css',
-                '/static/web_app/js/main.js',
-            ]).catch(() => {
-                // Ignore cache.addAll failures (e.g., if a file is temporarily missing)
-            });
-        })
-    );
+    // In dev (DEBUG_SW) there is nothing to pre-cache: the app shell and
+    // every static asset must stay network-served so changes appear live.
+    if (!DEBUG_SW) {
+        event.waitUntil(
+            caches.open(CACHE_NAME).then((cache) => {
+                return cache.addAll([
+                    '/',
+                    '/static/web_app/css/style.css',
+                    '/static/web_app/js/main.js',
+                ]).catch(() => {
+                    // Ignore cache.addAll failures (e.g., if a file is temporarily missing)
+                });
+            })
+        );
+    }
     self.skipWaiting();
 });
 
@@ -48,7 +60,9 @@ self.addEventListener('activate', (event) => {
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames
-                    .filter((name) => name !== CACHE_NAME)
+                    // Dev mode: delete ALL caches so nothing stale from a
+                    // previous prod-mode worker can be served while working.
+                    .filter((name) => DEBUG_SW || name !== CACHE_NAME)
                     .map((name) => caches.delete(name))
             );
         })
@@ -162,6 +176,10 @@ self.addEventListener('fetch', (event) => {
 
     // Only handle GET requests
     if (req.method !== 'GET') return;
+
+    // Dev mode: never intercept — plain network request, nothing cached, so
+    // every edit is visible on the next poll/refresh.
+    if (DEBUG_SW) return;
 
     const url = new URL(req.url);
 

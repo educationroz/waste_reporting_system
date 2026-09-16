@@ -104,5 +104,12 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
+    from waste_system.reload import livereload_ping
+
+    # Dev-only live reload: base.html's poller hits this every ~1.5s and
+    # reloads the page when the signature changes. Never exists outside DEBUG.
+    urlpatterns += [
+        path('__dev__/livereload/', livereload_ping, name='dev-livereload'),
+    ]
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

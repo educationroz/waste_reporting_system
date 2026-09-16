@@ -1584,6 +1584,11 @@ document.addEventListener('click', function (e) {
     // Register the app-shell service worker served at /sw.js (ServiceWorkerView)
     // so previously visited pages still open on patchy mobile data. A failed
     // registration must never break the page — only warn.
+    //
+    // In development (DEBUG=True) the worker is registered as /sw.js?debug=1:
+    // sw.js then refuses to cache or intercept anything, and purges every
+    // cache on activate, so edited CSS/JS/templates always reach the browser
+    // fresh instead of being shadowed by stale service-worker copies.
     (function () {
         if (!('serviceWorker' in navigator)) return;
         // Service workers only run in secure contexts (https, or localhost).
@@ -1591,13 +1596,70 @@ document.addEventListener('click', function (e) {
             location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
             return;
         }
+        var swUrl = {% if debug %}'/sw.js?debug=1'{% else %}'/sw.js'{% endif %};
         window.addEventListener('load', function () {
-            navigator.serviceWorker.register('/sw.js').catch(function (err) {
+            navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' }).catch(function (err) {
                 console.warn('Service worker registration failed:', err);
             });
         });
     })();
 </script>
+
+{% if debug %}
+<script nonce="{{ csp_nonce }}">
+    // ── DEV LIVE-RELOAD ─────────────────────────────────────────────────
+    // Polls the dev-only /__dev__/livereload/ signature (newest mtime across
+    // templates/, locale/, static/ and *.py) and reloads the page the moment
+    // it changes — so a template, CSS/JS or Python edit appears live with no
+    // manual refresh. Gated by the template-level debug flag AND hostname so
+    // it can never run against a production host even if DEBUG were wrongly
+    // enabled there.
+    //
+    // The previous signature is parked in sessionStorage so the reload lands
+    // on the new signature and doesn't reload again in a loop.
+    (function () {
+        var host = location.hostname;
+        if (host !== 'localhost' && host !== '127.0.0.1' &&
+            host !== '::1' && host !== '[::1]' && host !== '0.0.0.0') return;
+
+        var KEY = 'ss_livereload_sig';
+        var lastSig = null;
+        try { lastSig = sessionStorage.getItem(KEY); } catch (e) { lastSig = null; }
+
+        var reloading = false;
+        function reloadNow() {
+            if (reloading) return;
+            reloading = true;
+            window.location.reload();
+        }
+
+        async function tick() {
+            try {
+                var res = await fetch('/__dev__/livereload/', {
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!res.ok) return;
+                var data = await res.json();
+                var sig = data && data.sig;
+                if (!sig) return;
+                if (lastSig && sig !== lastSig) {
+                    try { sessionStorage.setItem(KEY, sig); } catch (e) {}
+                    reloadNow();
+                    return;
+                }
+                lastSig = sig;
+            } catch (e) {
+                // Server briefly restarting (runserver auto-reload on a .py
+                // save) — the next tick picks things back up.
+            }
+        }
+
+        setInterval(function () { tick(); }, 1500);
+    })();
+</script>
+{% endif %}
 
 </body>
 </html>
