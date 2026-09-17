@@ -5343,24 +5343,20 @@ class ContactFormView(APIView):
         logger = logging.getLogger(__name__)
         logger.info(f'Contact form submission: {name} <{email}> - {subject}: {message[:100]}')
 
-        # Send email to safhasaharinfo@gmail.com
-        try:
-            from django.core.mail import send_mail
-            from django.conf import settings
+        # Send email asynchronously so the request returns immediately
+        from django.core.mail import send_mail
+        from django.conf import settings
+        from api_app.tasks import send_mail_async
 
-            email_subject = f'Contact Form: {subject}'
-            email_message = f'From: {name} <{email}>\nPhone: {phone}\n\n{message}'
+        email_subject = f'Contact Form: {subject}'
+        email_message = f'From: {name} <{email}>\nPhone: {phone}\n\n{message}'
 
-            send_mail(
-                email_subject,
-                email_message,
-                settings.DEFAULT_FROM_EMAIL,
-                ['safhasaharinfo@gmail.com'],
-                fail_silently=False,
-            )
-        except Exception as e:
-            logger.error(f'Failed to send contact form email: {e}')
-            # Don't fail the request - still return success to user
-            pass
+        send_mail_async(
+            email_subject,
+            email_message,
+            settings.DEFAULT_FROM_EMAIL,
+            ['safhasaharinfo@gmail.com'],
+            fail_silently=False,
+        )
 
         return Response({'success': True, 'message': 'Message sent successfully. We will get back to you within 24 hours.'})
