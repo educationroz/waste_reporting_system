@@ -384,6 +384,9 @@ class WasteRequestPhoto(models.Model):
     )
     photo = models.ImageField(
         upload_to='waste_photos/extra/',
+        blank=True,
+        null=True,
+        default='defaults/no_photo.png',
         validators=[
             FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp']),
             validate_image_file,
@@ -622,6 +625,7 @@ class Complaint(models.Model):
         upload_to='complaint_photos/',
         blank=True,
         null=True,
+        default='defaults/no_photo.png',
         validators=[
             FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'webp']),
             validate_image_file,

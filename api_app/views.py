@@ -4937,7 +4937,11 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
             if ext not in allowed_logo_exts:
                 ext = '.png'  # sanitize_image() re-encodes anyway; use a safe name
             file_path = default_storage.save(f'branding/custom_logo{ext}', clean_logo)
-            logo_url = settings.MEDIA_URL + file_path
+            # default_storage.url() resolves the real public URL whatever the
+            # active MEDIA_BACKEND is (local FileSystemStorage, S3 or
+            # Cloudinary CDN) — a relative MEDIA_URL + name would 404 once
+            # media is served off-host.
+            logo_url = default_storage.url(file_path)
             current_val['site_logo'] = logo_url
 
         setting.value = current_val

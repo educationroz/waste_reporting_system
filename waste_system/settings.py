@@ -607,15 +607,46 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Media storage backend: 'local' (FileSystemStorage under MEDIA_ROOT) or 's3'
-# (django-storages S3). Local is the default and fine for single-server;
-# 's3' enables horizontal scaling + a CDN edge. When MEDIA_BACKEND=s3 the
-# AWS_* variables are required and startup fails loudly if django-storages is
-# missing or the bucket name is empty.
+# Media storage backend: 'local' (FileSystemStorage under MEDIA_ROOT), 's3'
+# (django-storages S3) or 'cloudinary' (Cloudinary CDN).
+# Local is the default and fine for single-server; 's3' enables horizontal
+# scaling + a CDN edge. 'cloudinary' serves every uploaded photo/PDF from the
+# Cloudinary CDN over https, so images load on every device/role and survive
+# ephemeral container restarts (the reason photos 404 on some devices today).
+# When MEDIA_BACKEND=cloudinary the CLOUDINARY_* variables are required and
+# startup fails loudly (in production) if django-cloudinary-storage is missing
+# or the cloud name is empty.
 MEDIA_BACKEND = config('MEDIA_BACKEND', default='local')
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+CLOUDINARY_CLOUD_NAME = config('CLOUDINARY_CLOUD_NAME', default='')
+CLOUDINARY_API_KEY = config('CLOUDINARY_API_KEY', default='')
+CLOUDINARY_API_SECRET = config('CLOUDINARY_API_SECRET', default='')
+
+if MEDIA_BACKEND == 'cloudinary':
+    if not DEBUG and not CLOUDINARY_CLOUD_NAME:
+        raise ImproperlyConfigured(
+            'MEDIA_BACKEND=cloudinary is set but CLOUDINARY_CLOUD_NAME is empty. '
+            'Set CLOUDINARY_CLOUD_NAME/CLOUDINARY_API_KEY/CLOUDINARY_API_SECRET '
+            'in the environment (from the Cloudinary console -> Dashboard / '
+            'Account -> API Keys).'
+        )
+    if not DEBUG:
+        import importlib.util
+        if importlib.util.find_spec('cloudinary_storage') is None:
+            raise ImproperlyConfigured(
+                'MEDIA_BACKEND=cloudinary requires cloudinary and '
+                'django-cloudinary-storage. Install with `pip install -r '
+                'requirements.txt` (they are already listed there).'
+            )
+    CLOUDINARY_STORAGE = {
+        'CLOUD_NAME': CLOUDINARY_CLOUD_NAME,
+        'API_KEY': CLOUDINARY_API_KEY,
+        'API_SECRET': CLOUDINARY_API_SECRET,
+        'SECURE': True,  # always serve https image URLs (works on every device)
+    }
 
 if MEDIA_BACKEND == 's3':
     try:
@@ -641,6 +672,32 @@ if MEDIA_BACKEND == 's3':
             '(and AWS_S3_REGION_NAME) in the environment.'
         )
 
+
+def _resolve_default_storage_backend(backend):
+    """Pick the STORAGES['default'] backend class for a MEDIA_BACKEND value.
+
+    cloudinary requires a configured CLOUDINARY_CLOUD_NAME; when it is missing
+    (e.g. a fresh local checkout that hasn't pasted credentials yet), fall back
+    to local disk in DEBUG so everyday development keeps working and only log a
+    warning. Production fails loudly instead (see the MEDIA_BACKEND block).
+    """
+    if backend == 'cloudinary':
+        if CLOUDINARY_CLOUD_NAME:
+            return 'api_app.storage.SmartMediaCloudinaryStorage'
+        if not DEBUG:
+            raise ImproperlyConfigured(
+                'MEDIA_BACKEND=cloudinary is set but CLOUDINARY_CLOUD_NAME is empty.'
+            )
+        logging.getLogger(__name__).warning(
+            'MEDIA_BACKEND=cloudinary but CLOUDINARY_CLOUD_NAME is not set; '
+            'falling back to local file storage in DEBUG.'
+        )
+        return 'django.core.files.storage.FileSystemStorage'
+    if backend == 's3':
+        return 'storages.backends.s3.S3Storage'
+    return 'django.core.files.storage.FileSystemStorage'
+
+
 # WhiteNoise serves /static/ in production, where Django's dev static handler
 # is switched off (urls.py only mounts it when DEBUG is True). Compressed but
 # NOT hashed (CompressedStaticFilesStorage, not ManifestStaticFilesStorage):
@@ -649,11 +706,7 @@ if MEDIA_BACKEND == 's3':
 # deploy time (run.sh does this).
 STORAGES = {
     'default': {
-        'BACKEND': (
-            'storages.backends.s3.S3Storage'
-            if MEDIA_BACKEND == 's3'
-            else 'django.core.files.storage.FileSystemStorage'
-        ),
+        'BACKEND': _resolve_default_storage_backend(MEDIA_BACKEND),
     },
     'staticfiles': {
         'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
@@ -662,7 +715,9 @@ STORAGES = {
 # /media/ (uploaded photos, licence PDFs) is served by Django only in DEBUG.
 # In production with MEDIA_BACKEND=local, nginx (or a CDN) must alias it —
 # see the deploy notes in HEALTHCHECK.md. With MEDIA_BACKEND=s3 the files
-# live in the bucket and are served from there.
+# live in the bucket and are served from there. With MEDIA_BACKEND=cloudinary
+# every upload lives on the Cloudinary CDN and is served over https, so it
+# shows on every device and role without any extra nginx/CDN setup.
 
 # ─── File Upload Security ─────────────────────────────────────────────────────
 # Per-photo cap — validators.py's MAX_IMAGE_SIZE reads this value directly
@@ -719,16 +774,22 @@ LOGIN_REDIRECT_URL = '/dashboard/'
 
 # ─── Email (used for account verification links) ──────────────────────────────
 # Dev default: prints emails to the runserver console instead of sending them.
-# In production, set EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-# and the EMAIL_HOST_* / EMAIL_PORT / EMAIL_USE_TLS vars in your .env.
+# In production, configure SendGrid (free tier: 100 emails/day):
+#   EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+#   EMAIL_HOST=smtp.sendgrid.net
+#   EMAIL_PORT=587
+#   EMAIL_USE_TLS=True
+#   EMAIL_HOST_USER=apikey
+#   EMAIL_HOST_PASSWORD=<SendGrid API key>
+#   DEFAULT_FROM_EMAIL=<verified sender email>
 EMAIL_BACKEND = config(
     'EMAIL_BACKEND',
-    default='django.core.mail.backends.console.EmailBackend',
+    default='django.core.mail.backends.smtp.EmailBackend',
 )
-EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.sendgrid.net')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='apikey')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@wastesystem.local')
 
