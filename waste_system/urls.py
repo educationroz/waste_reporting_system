@@ -104,6 +104,12 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
+    # django-browser-reload: live reload for template/static changes
+    urlpatterns += [
+        path('__reload__/', include('django_browser_reload.urls')),
+    ]
+
+if settings.DEBUG:
     from waste_system.reload import livereload_ping
 
     # Dev-only live reload: base.html's poller hits this every ~1.5s and

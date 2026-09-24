@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'channels',
     'corsheaders',
     'drf_spectacular',
+    'django_browser_reload',  # Live reload for templates/static files
 
     # Project apps
     'auth_app',
@@ -87,6 +88,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # must be first
     'django.middleware.security.SecurityMiddleware',
+    'django_browser_reload.middleware.BrowserReloadMiddleware',  # Live reload
     'whitenoise.middleware.WhiteNoiseMiddleware',  # serves STATIC_ROOT in production
     'django.contrib.sessions.middleware.SessionMiddleware',
     # No cache for authenticated users — prevents stale cross-role HTML
