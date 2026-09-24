@@ -491,12 +491,104 @@
         }
     }
 
+    // ────────────────────────────────────────────────────────────────────────
+    // Live complaint updates via WebSocket
+    // ────────────────────────────────────────────────────────────────────────
+    let complaintWS = null;
+
+    function connectComplaintWebSocket() {
+        if (complaintWS && (complaintWS.readyState === WebSocket.OPEN || complaintWS.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+        const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const wsUrl = `${protocol}${location.host}/ws/complaints/`;
+
+        try {
+            const ws = new WebSocket(wsUrl);
+            complaintWS = ws;
+
+            ws.onopen = () => {
+                console.log('[Complaint WS] Connected');
+            };
+
+            ws.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'complaint_update') {
+                        applyComplaintRowUpdate(data);
+                    }
+                } catch (err) {
+                    console.error('Error parsing complaint update:', err);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('[Complaint WS] Disconnected, reconnecting...');
+                setTimeout(connectComplaintWebSocket, 4000);
+            };
+
+            ws.onerror = () => {
+                ws.close();
+            };
+        } catch (e) {
+            console.warn('Complaint WebSocket setup error:', e);
+        }
+    }
+
+    function applyComplaintRowUpdate(data) {
+        const id = data.complaint_id;
+        const filterEl = document.getElementById('status-filter');
+        const filter = filterEl ? filterEl.value : '';
+        const body = document.getElementById('complaint-table-body');
+        if (!body) return;
+
+        if (data.deleted) {
+            // Remove the row from the table
+            const row = document.getElementById(`complaint-row-${id}`);
+            if (row) {
+                const wasPending = row.querySelector('.badge.bg-warning') !== null;
+                row.remove();
+                if (wasPending) adjustComplaintsBadge(-1);
+            }
+            // Remove from allComplaints
+            const idx = allComplaints.findIndex(c => c.id == id);
+            if (idx !== -1) {
+                const wasPending = allComplaints[idx].status === 'pending';
+                allComplaints.splice(idx, 1);
+                if (wasPending) adjustComplaintsBadge(-1);
+            }
+            // If table is empty, renderComplaints will show "No complaints"
+            if (!body.querySelector('tr')) {
+                renderComplaints();
+            }
+            return;
+        }
+
+        // Update or add the complaint in allComplaints
+        const existingIdx = allComplaints.findIndex(c => c.id == id);
+        if (existingIdx !== -1) {
+            // Update existing
+            allComplaints[existingIdx].status = data.status;
+            if (data.status_display) {
+                allComplaints[existingIdx].status_display = data.status_display;
+            }
+        } else {
+            // New complaint not in our loaded list — need full reload to get all fields
+            loadComplaints();
+            return;
+        }
+
+        // Re-render with current filter
+        renderComplaints();
+    }
+
     function bootstrapComplaintsPage() {
         const body = document.getElementById('complaint-table-body');
         if (!body) return;
         if (body.dataset._loaded) return;
         body.dataset._loaded = '1';
         loadComplaints();
+        connectComplaintWebSocket();
     }
 
     window.renderComplaints = renderComplaints;

@@ -121,6 +121,11 @@ class WasteRequestConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
             'type': 'request_update',
             'request_id': event['request_id'],
             'status': event['status'],
+            'status_display': event.get('status_display'),
+            'waste_type': event.get('waste_type'),
+            'waste_type_display': event.get('waste_type_display'),
+            'zone': event.get('zone', ''),
+            'driver_name': event.get('driver_name', ''),
             'updated_by': event['updated_by'],
         }))
 
@@ -290,7 +295,59 @@ class NotificationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
         """Called by group_send to push notification to user's socket."""
         await self.send(json.dumps({
             'type': 'notification',
+            'id': event.get('id'),
             'title': event['title'],
             'message': event['message'],
             'notification_type': event['notification_type'],
+            'created_at': event.get('created_at', ''),
+        }))
+
+
+class ComplaintConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
+    """
+    Real-time complaint updates for admin monitoring pages.
+    Connect: ws://localhost:8000/ws/complaints/
+    Broadcasts complaint create/status/delete changes to the
+    'complaint_updates' group so open admin tables refresh live.
+    """
+
+    GROUP_NAME = 'complaint_updates'
+
+    async def connect(self):
+        if not await self.enforce_handshake_rate():
+            return
+
+        user = self.scope.get('user')
+        if user is None or not user.is_authenticated:
+            await self.close(code=4001)
+            return
+
+        # Complaint changes are an admin surface; non-admins have their own
+        # per-user notification socket for complaint status changes already.
+        if user.role != 'admin':
+            await self.close(code=4001)
+            return
+
+        if not await self.enforce_connection_limit(user):
+            return
+
+        self.user = user
+        await self.channel_layer.group_add(self.GROUP_NAME, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.release_connection_slot()
+        await self.channel_layer.group_discard(self.GROUP_NAME, self.channel_name)
+
+    async def receive(self, text_data):
+        pass  # Admins only receive complaint updates, never send them
+
+    async def complaint_update(self, event):
+        """Called by group_send to push a complaint change to the client."""
+        await self.send(json.dumps({
+            'type': 'complaint_update',
+            'complaint_id': event['complaint_id'],
+            'status': event.get('status'),
+            'status_display': event.get('status_display'),
+            'deleted': bool(event.get('deleted', False)),
         }))

@@ -351,6 +351,62 @@
             }
         });
     };
+
+    // Live notification prepend
+    window.onLiveNotification = function(data) {
+        const list = document.getElementById('notif-list');
+        if (!list) return;
+
+        // Remove empty state if present
+        const emptyState = document.getElementById('notif-empty-state');
+        if (emptyState) emptyState.remove();
+
+        // Skip if already exists (e.g. duplicate WS message)
+        const id = data.id;
+        if (id && document.getElementById(`notif-${id}`)) return;
+
+        const ntype = data.notification_type || 'info';
+        const badgeClass = {
+            success: 'bg-success',
+            warning: 'bg-warning text-dark',
+            alert: 'bg-danger',
+            info: 'bg-info'
+        }[ntype] || 'bg-secondary';
+
+        const createdAt = data.created_at
+            ? new Date(data.created_at).toLocaleString()
+            : new Date().toLocaleString();
+
+        const rowHtml = `
+            <div class="notif-item ${!data.read ? 'unread-style' : ''}" id="notif-${id || ''}"
+                 onclick="${id ? `markOneRead(${id})` : ''}" title="${gettext('Click to mark as read')}">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="flex-shrink-0">
+                        <span class="badge ${badgeClass} rounded-pill px-2 py-1">
+                            <i class="bi bi-${{ success: 'check-circle-fill', warning: 'exclamation-triangle-fill', alert: 'exclamation-octagon-fill', info: 'info-circle-fill' }[ntype] || 'bell-fill'} me-1"></i>
+                            ${escapeHtml(ntype.charAt(0).toUpperCase() + ntype.slice(1))}
+                        </span>
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-semibold text-truncate">${escapeHtml(data.title || '')}</div>
+                        <div class="small text-muted text-truncate">${escapeHtml(data.message || '')}</div>
+                        <div class="d-flex align-items-center justify-content-between mt-2">
+                            <span class="text-muted small">${createdAt}</span>
+                            <button class="btn btn-sm btn-outline-danger ms-2" onclick="event.stopPropagation(); deleteNotification(${id || 'null'}, this)" title="${gettext('Delete')}">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+        list.insertAdjacentHTML('afterbegin', rowHtml);
+
+        // Also show a toast (same as base.html fallback) so other pages still notify
+        if (typeof showToast === 'function') {
+            showToast(`${data.title}: ${data.message}`, ntype === 'alert' ? 'danger' : ntype);
+        }
+    };
 })();
 </script>
 {% endblock %}

@@ -188,3 +188,25 @@ def send_mail_async(subject, message, from_email, recipient_list, **kwargs):
         _send()
         return
     executor.submit(_send)
+
+
+def send_email_message_async(email_message):
+    """
+    Send a django.core.mail.EmailMessage on a background thread.
+
+    This supports features like reply_to, attachments, etc. that send_mail doesn't.
+    """
+    def _send():
+        try:
+            email_message.send(fail_silently=False)
+        except Exception:
+            logger.exception(
+                '[MAIL] failed to send EmailMessage to %s (subject=%s)',
+                email_message.to, email_message.subject,
+            )
+
+    executor = _get_email_executor()
+    if executor is None:
+        _send()
+        return
+    executor.submit(_send)

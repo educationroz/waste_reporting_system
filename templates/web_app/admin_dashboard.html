@@ -497,7 +497,7 @@
                                     </thead>
                                     <tbody>
                                         {% for req in recent_requests %}
-                                        <tr>
+                                        <tr id="admin-request-row-{{ req.id }}" data-status="{{ req.status }}">
                                             <td class="fw-bold text-secondary">#{{ req.id }}</td>
                                             {% if req.user %}
                                             <td>{{ req.user.username }}</td>
@@ -921,7 +921,7 @@
                     const data = JSON.parse(e.data);
                     if (data.type === 'request_update') {
                         // Update the request table row if it exists
-                        applyAdminRequestRowUpdate(data.request_id, data.status);
+                        applyAdminRequestRowUpdate(data);
                     }
                 } catch (err) {
                     console.error('Error parsing request update:', err);
@@ -949,22 +949,52 @@
         }
     }
 
-    function applyAdminRequestRowUpdate(requestId, newStatus) {
+    function applyAdminRequestRowUpdate(data) {
+        const requestId = data.request_id;
         const row = document.getElementById(`admin-request-row-${requestId}`);
         if (!row) return;
 
-        const statusCell = row.querySelector('.status-badge, .badge');
-        if (statusCell) {
+        // Update status badge (cell 4)
+        const statusCell = row.children[4];
+        const badge = statusCell?.querySelector('.badge');
+        if (badge) {
+            const status = data.status;
             const badgeClass = {
                 'pending': 'bg-warning text-dark',
                 'assigned': 'bg-info text-dark',
                 'in_progress': 'bg-primary',
                 'completed': 'bg-success',
                 'cancelled': 'bg-secondary',
-            }[newStatus] || 'bg-secondary';
-            statusCell.className = 'badge status-badge ' + badgeClass;
-            statusCell.textContent = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).replace('_', ' ');
+            }[status] || 'bg-secondary';
+            badge.className = 'badge status-badge px-2 py-1 ' + badgeClass;
+            badge.textContent = data.status_display || status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
         }
+
+        // Update driver cell (cell 5)
+        const driverCell = row.children[5];
+        if (driverCell && data.driver_name !== undefined) {
+            if (data.driver_name) {
+                driverCell.innerHTML = `<span><i class="bi bi-person me-1"></i>${window.escapeHtml ? window.escapeHtml(data.driver_name) : data.driver_name}</span>`;
+            } else {
+                driverCell.innerHTML = '<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>Unassigned</span>';
+            }
+        }
+
+        // Update action cell (cell 7) based on new status
+        const actionCell = row.children[7];
+        if (actionCell) {
+            const status = data.status;
+            if (status === 'pending') {
+                actionCell.innerHTML = `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${requestId}, this)">{% trans "Cancel" %}</button>`;
+            } else if (['completed', 'cancelled', 'assigned', 'in_progress'].includes(status)) {
+                actionCell.innerHTML = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${requestId}, this)"><i class="bi bi-trash3"></i> {% trans "Delete" %}</button>`;
+            } else {
+                actionCell.innerHTML = '—';
+            }
+        }
+
+        // Keep data-status in sync for any CSS selectors
+        row.dataset.status = data.status;
     }
 
     async function loadInitialDriverLocations() {

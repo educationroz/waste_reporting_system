@@ -985,11 +985,33 @@ window.openPhotoGallery = function(requestId) {
                 try {
                     const data = JSON.parse(e.data);
                     if (data.type === 'request_update') {
+                        const statusKey = data.status;
+                        // Build driver cell HTML from enriched payload
+                        let driverHtml = null;
+                        if (data.driver_name !== undefined) {
+                            if (data.driver_name) {
+                                driverHtml = `<span><i class="bi bi-person me-1"></i>${window.escapeHtml ? window.escapeHtml(data.driver_name) : data.driver_name}</span>`;
+                            } else {
+                                driverHtml = '<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>Unassigned</span>';
+                            }
+                        }
+                        // Build action cell HTML based on new status
+                        let actionHtml = '';
+                        let showDelete = false;
+                        if (statusKey === 'pending') {
+                            actionHtml = `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${data.request_id}, this)">${gettext('Cancel')}</button>`;
+                        } else if (['completed', 'cancelled', 'assigned', 'in_progress'].includes(statusKey)) {
+                            actionHtml = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${data.request_id}, this)"><i class="bi bi-trash3"></i> ${gettext('Delete')}</button>`;
+                            showDelete = true;
+                        } else {
+                            actionHtml = '<span class="text-muted small italic px-2">Lifecycle Locked</span>';
+                            showDelete = true;
+                        }
                         applyRequestRowUpdate(data.request_id, {
-                            statusKey: data.status,
-                            driverHtml: null,
-                            actionHtml: '',
-                            showDelete: false
+                            statusKey,
+                            driverHtml,
+                            actionHtml,
+                            showDelete
                         });
                     }
                 } catch (err) {

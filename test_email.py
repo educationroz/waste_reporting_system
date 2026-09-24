@@ -37,8 +37,8 @@ GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
 if not GMAIL_USER or not GMAIL_APP_PASSWORD:
     try:
         from decouple import config  # type: ignore
-        GMAIL_USER = GMAIL_USER or config("GMAIL_USER", default="")
-        GMAIL_APP_PASSWORD = GMAIL_APP_PASSWORD or config("EMAIL_HOST_PASSWORD", default="")
+        GMAIL_USER = GMAIL_USER or config("GMAIL_USER", default="") or config("EMAIL_HOST_USER", default="")
+        GMAIL_APP_PASSWORD = GMAIL_APP_PASSWORD or config("GMAIL_APP_PASSWORD", default="") or config("EMAIL_HOST_PASSWORD", default="")
     except ImportError:
         pass
 

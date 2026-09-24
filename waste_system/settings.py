@@ -372,6 +372,10 @@ REST_FRAMEWORK = {
         'verify_email':             '30/min',     # Clicking the email verify link (GET)
     },
 }
+# ─── DRF Schema ────────────────────────────────────────────────────────────────
+# Required for drf-spectacular to generate schema correctly
+REST_FRAMEWORK['DEFAULT_SCHEMA_CLASS'] = 'drf_spectacular.openapi.AutoSchema'
+
 # ─── drf-spectacular (OpenAPI 3.0 / Swagger UI) ────────────────────────────────
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Safha Sahar Waste Reporting API',
@@ -772,20 +776,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 
-# ─── Email (used for account verification links) ──────────────────────────────
-# Dev default: prints emails to the runserver console instead of sending them.
-# In production, configure SendGrid (free tier: 100 emails/day):
-#   EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-#   EMAIL_HOST=smtp.sendgrid.net
-#   EMAIL_PORT=587
-#   EMAIL_USE_TLS=True
-#   EMAIL_HOST_USER=apikey
-#   EMAIL_HOST_PASSWORD=<SendGrid API key>
-#   DEFAULT_FROM_EMAIL=<verified sender email>
-EMAIL_BACKEND = config(
-    'EMAIL_BACKEND',
-    default='django.core.mail.backends.smtp.EmailBackend',
-)
+RESEND_API_KEY = config('RESEND_API_KEY', default='')
+
+if RESEND_API_KEY:
+    EMAIL_BACKEND = 'api_app.email_backends.ResendEmailBackend'
+else:
+    EMAIL_BACKEND = config(
+        'EMAIL_BACKEND',
+        default='django.core.mail.backends.smtp.EmailBackend',
+    )
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.sendgrid.net')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)

@@ -219,18 +219,37 @@ def _push_ws_request_update(request_id, status, updated_by=None):
     """
     Broadcast a waste request status/driver change to all connected WebSocket
     clients in the 'request_updates' group (WasteRequestConsumer).
+
+    The payload carries display-format extras (status_display, waste_type,
+    zone, driver_name) so every page's live row-updater can render the changed
+    cells without re-fetching the row from the API. Extras are best-effort: if
+    the row is gone (e.g. someone deleted it) they're simply omitted.
     """
     if CHANNEL_LAYER is None:
         return
+    payload = {
+        'type': 'broadcast_request_update',
+        'request_id': request_id,
+        'status': status,
+        'updated_by': updated_by or 'system',
+    }
+    try:
+        req = WasteRequest.objects.select_related('driver', 'driver__user').filter(pk=request_id).first()
+        if req is not None:
+            payload['status_display'] = req.get_status_display()
+            payload['waste_type'] = req.waste_type
+            payload['waste_type_display'] = req.get_waste_type_display()
+            payload['zone'] = req.get_zone_display() if req.zone else ''
+            payload['driver_name'] = (
+                req.driver.user.username
+                if req.driver is not None and req.driver.user_id else ''
+            )
+    except Exception:  # noqa: BLE001 - extras are best-effort; base payload still fires
+        pass
     try:
         async_to_sync(CHANNEL_LAYER.group_send)(
             'request_updates',
-            {
-                'type': 'broadcast_request_update',
-                'request_id': request_id,
-                'status': status,
-                'updated_by': updated_by or 'system',
-            }
+            payload
         )
     except Exception:
         logger.warning(f'[WS REQUEST UPDATE] failed for request={request_id}')
@@ -260,12 +279,53 @@ def _push_ws_notification(notification):
         group_name,
         {
             'type': 'send_notification',
+            'id': notification.id,
             'title': notification.title,
             'message': notification.message,
             'notification_type': notification.notification_type,
+            'created_at': notification.created_at.astimezone().isoformat() if notification.created_at else '',
         }
     )
     logger.info(f'[NOTIF PUSH] group_send completed for group={group_name}')
+
+
+def _push_ws_complaint_update(complaint_id, status=None, deleted=False):
+    """
+    Broadcast a complaint create/status/delete change to the
+    'complaint_updates' group (ComplaintConsumer). Admin pages listening on
+    /ws/complaints/ refresh the affected row live instead of reloading.
+    Status extras are best-effort — deletion only needs the id and a flag.
+    """
+    if CHANNEL_LAYER is None:
+        return
+    payload = {
+        'type': 'complaint_update',
+        'complaint_id': complaint_id,
+        'deleted': bool(deleted),
+    }
+    try:
+        if deleted:
+            pass
+        elif status is None:
+            c = Complaint.objects.filter(pk=complaint_id).first()
+            if c is not None:
+                payload['status'] = c.status
+                payload['status_display'] = c.get_status_display()
+        else:
+            payload['status'] = status
+            payload['status_display'] = (
+                dict(Complaint.STATUS_CHOICES).get(status, status)
+                if hasattr(Complaint, 'STATUS_CHOICES') else status
+            )
+    except Exception:  # noqa: BLE001 - extras are best-effort; id + deleted flag still fire
+        pass
+    try:
+        async_to_sync(CHANNEL_LAYER.group_send)(
+            'complaint_updates',
+            payload
+        )
+    except Exception:
+        logger.warning(f'[WS COMPLAINT UPDATE] failed for complaint={complaint_id}')
 
 
 def _create_notification(user, title, message, notification_type='info', related_request=None):
@@ -2106,9 +2166,9 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         
-        # Checkpoint spam prevention: 1-hour cooldown and 5 daily max per user per checkpoint
+        # Checkpoint spam prevention: 2 per hour, 10 per day per identity per checkpoint
         checkpoint = serializer.validated_data.get('dropoff_checkpoint')
-        if checkpoint and user:
+        if checkpoint:
             from django.utils import timezone
             from datetime import timedelta
             
@@ -2116,30 +2176,43 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             one_hour_ago = now - timedelta(hours=1)
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             
-            # Check 1-hour cooldown
-            recent_request = WasteRequest.objects.filter(
-                user=user,
-                dropoff_checkpoint=checkpoint,
-                created_at__gte=one_hour_ago
-            ).exists()
+            # Identify the requester: authenticated user, or guest by token, or IP
+            guest_token = serializer.validated_data.get('guest_token')
+            ip_address = self.request.META.get('REMOTE_ADDR')
             
-            if recent_request:
+            # Build query filters for this identity
+            identity_filters = {'dropoff_checkpoint': checkpoint}
+            if user:
+                identity_filters['user'] = user
+            elif guest_token:
+                identity_filters['guest_token'] = guest_token
+            elif ip_address:
+                identity_filters['ip_address'] = ip_address
+            else:
+                identity_filters['user__isnull'] = True  # fallback: anonymous without token/IP
+            
+            # Check 1-hour cooldown (max 2 per hour)
+            recent_count = WasteRequest.objects.filter(
+                **identity_filters,
+                created_at__gte=one_hour_ago
+            ).count()
+            
+            if recent_count >= 2:
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError({
-                    'dropoff_checkpoint': 'You have already submitted a request at this checkpoint in the last hour. Please wait before submitting another.'
+                    'dropoff_checkpoint': 'You have already submitted 2 requests at this checkpoint in the last hour. Please wait before submitting another.'
                 })
             
-            # Check daily max (5 requests per day per checkpoint)
+            # Check daily max (10 requests per day)
             daily_count = WasteRequest.objects.filter(
-                user=user,
-                dropoff_checkpoint=checkpoint,
+                **identity_filters,
                 created_at__gte=today_start
             ).count()
             
-            if daily_count >= 5:
+            if daily_count >= 10:
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError({
-                    'dropoff_checkpoint': 'You have reached the maximum of 5 requests per day at this checkpoint. Please try again tomorrow.'
+                    'dropoff_checkpoint': 'You have reached the maximum of 10 requests per day at this checkpoint. Please try again tomorrow.'
                 })
         
         waste_request = serializer.save(user=user)
@@ -5042,6 +5115,16 @@ class ComplaintViewSet(viewsets.ModelViewSet):
             message=f'{self.request.user.username} filed a complaint: "{complaint.subject}".',
             notification_type='warning',
         )
+        # Live-refresh any open admin complaint table so the new row appears
+        # without a page reload.
+        _push_ws_complaint_update(complaint.id)
+
+    def destroy(self, request, *args, **kwargs):
+        complaint = self.get_object()
+        complaint_id = complaint.id
+        response = super().destroy(request, *args, **kwargs)
+        _push_ws_complaint_update(complaint_id, deleted=True)
+        return response
  
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
     def update_status(self, request, pk=None):
@@ -5058,7 +5141,9 @@ class ComplaintViewSet(viewsets.ModelViewSet):
             complaint.admin_response = request.data['admin_response']
             update_fields.append('admin_response')
         complaint.save(update_fields=update_fields)
- 
+
+        _push_ws_complaint_update(complaint.id, status=new_status)
+
         _log_admin_action(
             request, 'status_change', 'Complaint', complaint,
             f'Complaint #{complaint.id} status changed to {new_status}'
@@ -5106,6 +5191,7 @@ class ComplaintViewSet(viewsets.ModelViewSet):
         )
 
         for complaint in complaints:
+            _push_ws_complaint_update(complaint.id, status=new_status)
             try:
                 _create_notification(
                     user=complaint.user,
@@ -5343,24 +5429,72 @@ class ContactFormView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Valid subject choices from the frontend form
+        valid_subjects = {'general', 'support', 'partnership', 'feedback', 'press', 'other'}
+        if subject not in valid_subjects:
+            return Response(
+                {'error': 'Invalid subject selection.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         import logging
         logger = logging.getLogger(__name__)
         logger.info(f'Contact form submission: {name} <{email}> - {subject}: {message[:100]}')
 
-        # Send email asynchronously so the request returns immediately
-        from django.core.mail import send_mail
+        # Send email asynchronously using Django's email system (uses Resend backend when configured)
+        from django.core.mail import send_mail, EmailMessage
         from django.conf import settings
         from api_app.tasks import send_mail_async
 
-        email_subject = f'Contact Form: {subject}'
-        email_message = f'From: {name} <{email}>\nPhone: {phone}\n\n{message}'
-
-        send_mail_async(
-            email_subject,
-            email_message,
-            settings.DEFAULT_FROM_EMAIL,
-            ['safhasaharinfo@gmail.com'],
-            fail_silently=False,
+        subject_display = dict(valid_subjects).get(subject, subject)
+        email_subject = f'Contact Form: {subject_display}'
+        email_body = (
+            f'From: {name} <{email}>\n'
+            f'Phone: {phone or "Not provided"}\n'
+            f'Subject: {subject_display}\n\n'
+            f'{message}\n\n'
+            f'---\n'
+            f'Safha Sahar Contact Form'
         )
 
-        return Response({'success': True, 'message': 'Message sent successfully. We will get back to you within 24 hours.'})
+        # Send to admin with reply_to set to user's email
+        admin_email = EmailMessage(
+            subject=email_subject,
+            body=email_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=['safhasaharinfo@gmail.com'],
+            reply_to=[email],  # Allow admin to reply directly to user
+        )
+        
+        # Send admin email async
+        from api_app.tasks import send_email_message_async
+        send_email_message_async(admin_email)
+
+        # Send confirmation email to user
+        try:
+            user_subject = 'Thank you for contacting Safha Sahar'
+            user_message = (
+                f'Dear {name},\n\n'
+                f'Thank you for reaching out to us. We have received your message '
+                f'and will get back to you within 24 hours.\n\n'
+                f'Your message details:\n'
+                f'Subject: {subject_display}\n\n'
+                f'---\n'
+                f'Safha Sahar Team\n'
+                f'Pokhara, Kaski, Nepal\n'
+                f'safhasaharinfo@gmail.com'
+            )
+            send_mail_async(
+                user_subject,
+                user_message,
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=True,  # Don't fail if user confirmation fails
+            )
+        except Exception:
+            logger.exception(f'Failed to send confirmation email to {email}')
+
+        return Response({
+            'success': True,
+            'message': 'Message sent successfully. We will get back to you within 24 hours.',
+        })
