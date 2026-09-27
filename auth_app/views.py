@@ -123,7 +123,7 @@ class BiometricRegisterTokenView(APIView):
         signer = TimestampSigner(salt='biometric-auth')
         signed_token = signer.sign(f"{request.user.id}:{request.user.username}")
         user = request.user
-        profile_pic_url = user.profile_picture.url if getattr(user, 'profile_picture', None) else ''
+        profile_pic_url = user.profile_picture.url if user.profile_picture else ''
         role_display = user.get_role_display() if hasattr(user, 'get_role_display') else getattr(user, 'role', '')
         return Response({
             'message': 'Biometric token generated.',
@@ -172,7 +172,7 @@ class BiometricLoginView(APIView):
         except Exception:  # noqa: BLE001 - biometric login must succeed even if the claim backup hiccups
             logger.warning(f'[BIOMETRIC LOGIN] claim_guest_requests_by_email failed for user={user.id}.')
 
-        profile_pic_url = user.profile_picture.url if getattr(user, 'profile_picture', None) else ''
+        profile_pic_url = user.profile_picture.url if user.profile_picture else ''
         role_display = user.get_role_display() if hasattr(user, 'get_role_display') else getattr(user, 'role', '')
         return Response({
             'message': 'Biometric login successful.',

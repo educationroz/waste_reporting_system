@@ -625,7 +625,13 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_BACKEND = config('MEDIA_BACKEND', default='local')
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+
+# MEDIA_ROOT is only used for local storage backend.
+# With Cloudinary or S3, files are stored on the CDN/bucket, not local disk.
+if MEDIA_BACKEND == 'local':
+    MEDIA_ROOT = BASE_DIR / 'media'
+else:
+    MEDIA_ROOT = None  # Not used with cloudinary/s3
 
 CLOUDINARY_CLOUD_NAME = config('CLOUDINARY_CLOUD_NAME', default='')
 CLOUDINARY_API_KEY = config('CLOUDINARY_API_KEY', default='')
@@ -793,6 +799,7 @@ EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='apikey')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@wastesystem.local')
+CONTACT_FORM_RECIPIENT = config('CONTACT_FORM_RECIPIENT', default='safhasaharinfo@gmail.com')
 
 
 # ── Web Push (VAPID) ─────────────────────────────────────────────────────────

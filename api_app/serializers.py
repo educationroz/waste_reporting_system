@@ -198,26 +198,13 @@ class WasteRequestSerializer(serializers.ModelSerializer):
           2. sanitize_image — fully decodes and re-encodes the image from
              scratch, stripping any bytes appended after the real image
              data (the classic "valid JPEG + payload glued on" polyglot
-             trick). The ML model reads this clean copy, never the
-             original upload.
-          3. Run the ML gatekeeper on the sanitized copy — NOW ASYNC (see
-             below) so uploads don't freeze the web worker on CPU inference.
-          4. compress_image — resize/re-encode for storage after the ML
-             check ran, so the classifier always sees full quality.
+             trick).
+          3. compress_image — resize/re-encode for storage.
 
-        Async ML behaviour:
-        - The fast, always-synchronous steps (validate/sanitize/compress)
-          still run here in the request.
-        - Inference is scheduled on the background pool (api_app/tasks.py).
-          We wait up to ``ML_FAST_PATH_TIMEOUT`` seconds for it: if it
-          resolves in time, a *confidently* non-waste photo is hard-rejected
-          here, and a confident positive attaches its severity/confidence to
-          the row immediately.
-        - If inference is slower than the timeout (heavy load / cold model),
-          the request is NOT blocked: we default the row to
-          ``needs_manual_review=True`` and stash the sanitized image bytes on
-          the serializer so the view can schedule a background classification
-          that fills in the real severity/confidence right after the save.
+        ML inference runs ASYNCHRONOUSLY in the background (api_app/tasks.py)
+        after the request returns, so uploads never block on CPU inference.
+        The request is saved with needs_manual_review=True initially, and the
+        background task updates severity/confidence when inference completes.
         """
         if not file:
             return file
@@ -225,52 +212,20 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         validate_image_file(file)  # raises on spoofed/corrupt/oversized files
         clean_file = sanitize_image(file)
 
-        # Fast-path inference with a bounded wait.
-        result = None
-        try:
-            from io import BytesIO
+        # Store sanitized image bytes for background ML classification
+        from io import BytesIO
+        bytes_io = BytesIO()
+        clean_file.seek(0)
+        for chunk in iter(lambda: clean_file.read(65536), b''):
+            bytes_io.write(chunk)
+        self._ml_bytes = bytes_io.getvalue()
+        clean_file.seek(0)
 
-            from ml_models.waste_classifier.inference import predict_waste
-
-            from .tasks import submit
-
-            bytes_io = BytesIO()
-            clean_file.seek(0)
-            for chunk in iter(lambda: clean_file.read(65536), b''):
-                bytes_io.write(chunk)
-            image_bytes = bytes_io.getvalue()
-            clean_file.seek(0)
-
-            timeout = getattr(settings, 'ML_FAST_PATH_TIMEOUT', 1.5)
-            future = submit(predict_waste, BytesIO(image_bytes))
-            if timeout > 0:
-                try:
-                    result = future.result(timeout=timeout)
-                except Exception:  # noqa: BLE001 - timeouts/errors defer to background update
-                    # Inference did not finish within the fast-path window —
-                    # don't block the request; defer to background update.
-                    result = None
-            else:
-                result = future.result()
-        except Exception:
-            # Model missing / import error / any ML failure must not break
-            # citizen reporting. Flag for manual review and move on.
-            logger.exception('[ML] fast-path inference unavailable; flagging for review.')
-            result = None
-
-        if result is not None and not result.get('is_waste'):
-            raise serializers.ValidationError(
-                "This doesn't look like waste. Please upload a valid waste photo."
-            )
-
-        # Default pending state until the background task fills in the truth.
-        # result is None exactly when inference deferred (timeout/error) —
-        # that is the only case needing a background classification.
-        self._ml_result = result
-        self._ml_bytes = image_bytes if result is None else None
+        # Default pending state — background task will fill in the truth
+        self._ml_result = None
 
         clean_file.seek(0)
-        compressed_file = compress_image(clean_file)  # shrink for storage, ML already ran
+        compressed_file = compress_image(clean_file)
         return compressed_file
 
     def validate(self, data):

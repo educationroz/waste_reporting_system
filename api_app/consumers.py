@@ -209,15 +209,11 @@ class DriverLocationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
                     'longitude': str(lng_f),
                     'vehicle_plate': driver_info.get('vehicle_plate'),
                     'is_available': driver_info.get('is_available', True),
-                    'phone': driver_info.get('phone', ''),
                 }
             )
 
     async def driver_location_update(self, event):
-        # Only admins see the driver's phone number; regular users get the
-        # live position without personal contact info. The phone may appear
-        # anyway for admins only because admin_dashboard reads `data.phone`.
-        include_phone = self.user.is_authenticated and self.user.role == 'admin'
+        # Only send necessary location data - no personal contact info
         await self.send(json.dumps({
             'type': 'driver_location',
             'driver_id': event.get('driver_id'),
@@ -226,7 +222,6 @@ class DriverLocationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
             'longitude': str(event.get('longitude', '')),
             'vehicle_plate': event.get('vehicle_plate') or '',
             'is_available': event.get('is_available', True),
-            'phone': event.get('phone', '') if include_phone else '',
         }))
 
     async def route_update(self, event):
@@ -253,7 +248,6 @@ class DriverLocationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
                 'driver_name': self.user.username,
                 'vehicle_plate': driver.vehicle.plate_number if driver.vehicle else None,
                 'is_available': driver.is_available,
-                'phone': getattr(self.user, 'phone', '') or '',
             }
         except Driver.DoesNotExist:
             return None  # Silent fail - driver profile not created yet

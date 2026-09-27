@@ -1114,7 +1114,6 @@ class DriverViewSet(viewsets.ModelViewSet):
                     'longitude': str(lng_f),
                     'vehicle_plate': driver.vehicle.plate_number if driver.vehicle else '',
                     'is_available': driver.is_available,
-                    'phone': getattr(driver.user, 'phone', '') or '',
                 }
             )
         return Response({'message': 'Location updated.', 'latitude': lat_f, 'longitude': lng_f})
@@ -1245,7 +1244,6 @@ class DriverViewSet(viewsets.ModelViewSet):
             'driver': {
                 'id': driver.id,
                 'name': driver.user.username,
-                'phone': driver.user.phone,
                 'zone': driver.zone,
                 'is_available': driver.is_available,
                 'on_break': driver.on_break,
@@ -2093,6 +2091,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             'driver',
             'driver__user',
             'driver__vehicle',
+            'dropoff_checkpoint',
         ).prefetch_related('extra_photos')
 
         if not user.is_authenticated:
@@ -5441,58 +5440,63 @@ class ContactFormView(APIView):
         logger = logging.getLogger(__name__)
         logger.info(f'Contact form submission: {name} <{email}> - {subject}: {message[:100]}')
 
-        # Send email asynchronously using Django's email system (uses Resend backend when configured)
-        from django.core.mail import send_mail, EmailMessage
-        from django.conf import settings
-        from api_app.tasks import send_mail_async
-
-        subject_display = dict(valid_subjects).get(subject, subject)
-        email_subject = f'Contact Form: {subject_display}'
-        email_body = (
-            f'From: {name} <{email}>\n'
-            f'Phone: {phone or "Not provided"}\n'
-            f'Subject: {subject_display}\n\n'
-            f'{message}\n\n'
-            f'---\n'
-            f'Safha Sahar Contact Form'
-        )
-
-        # Send to admin with reply_to set to user's email
-        admin_email = EmailMessage(
-            subject=email_subject,
-            body=email_body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=['safhasaharinfo@gmail.com'],
-            reply_to=[email],  # Allow admin to reply directly to user
-        )
-        
-        # Send admin email async
-        from api_app.tasks import send_email_message_async
-        send_email_message_async(admin_email)
-
-        # Send confirmation email to user
         try:
-            user_subject = 'Thank you for contacting Safha Sahar'
-            user_message = (
-                f'Dear {name},\n\n'
-                f'Thank you for reaching out to us. We have received your message '
-                f'and will get back to you within 24 hours.\n\n'
-                f'Your message details:\n'
+            from django.core.mail import send_mail, EmailMessage
+            from django.conf import settings
+            from api_app.tasks import send_mail_async, send_email_message_async
+
+            subject_display = dict(valid_subjects).get(subject, subject)
+            email_subject = f'Contact Form: {subject_display}'
+            email_body = (
+                f'From: {name} <{email}>\n'
+                f'Phone: {phone or "Not provided"}\n'
                 f'Subject: {subject_display}\n\n'
+                f'{message}\n\n'
                 f'---\n'
-                f'Safha Sahar Team\n'
-                f'Pokhara, Kaski, Nepal\n'
-                f'safhasaharinfo@gmail.com'
+                f'Safha Sahar Contact Form'
             )
-            send_mail_async(
-                user_subject,
-                user_message,
-                settings.DEFAULT_FROM_EMAIL,
-                [email],
-                fail_silently=True,  # Don't fail if user confirmation fails
+
+            admin_recipient = getattr(settings, 'CONTACT_FORM_RECIPIENT', 'safhasaharinfo@gmail.com')
+
+            admin_email = EmailMessage(
+                subject=email_subject,
+                body=email_body,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[admin_recipient],
+                reply_to=[email],
             )
-        except Exception:
-            logger.exception(f'Failed to send confirmation email to {email}')
+
+            send_email_message_async(admin_email)
+
+            try:
+                user_subject = 'Thank you for contacting Safha Sahar'
+                user_message = (
+                    f'Dear {name},\n\n'
+                    f'Thank you for reaching out to us. We have received your message '
+                    f'and will get back to you within 24 hours.\n\n'
+                    f'Your message details:\n'
+                    f'Subject: {subject_display}\n\n'
+                    f'---\n'
+                    f'Safha Sahar Team\n'
+                    f'Pokhara, Kaski, Nepal\n'
+                    f'safhasaharinfo@gmail.com'
+                )
+                send_mail_async(
+                    user_subject,
+                    user_message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                    fail_silently=True,
+                )
+            except Exception:
+                logger.exception(f'Failed to send confirmation email to {email}')
+
+        except Exception as e:
+            logger.exception('Contact form processing failed')
+            return Response(
+                {'error': 'Server error. Please try again later.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         return Response({
             'success': True,
