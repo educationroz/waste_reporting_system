@@ -431,13 +431,13 @@
 
     /* ──────────────────────────────────────────────────
        DEFAULT MOBILE STATE
-       Keep sidebar visible with icons.
+       Keep sidebar visible with icons (52px - just icons).
        ────────────────────────────────────────────────── */
 
     .layout-wrapper:not(.mobile-open) .sidebar-col {
-        flex: 0 0 68px;
-        max-width: 68px;
-        width: 68px;
+        flex: 0 0 52px;
+        max-width: 52px;
+        width: 52px;
         position: sticky;
         top: var(--navbar-height, 60px);
         height: calc(100vh - var(--navbar-height, 60px));
@@ -450,7 +450,7 @@
     }
 
     .layout-wrapper:not(.mobile-open) .sidebar-card .card-body {
-        padding: 0.75rem 0.25rem !important;
+        padding: 0.5rem 0.15rem !important;
         align-items: center;
     }
 
@@ -460,10 +460,10 @@
         flex-direction: column;
         justify-content: center !important;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         border-bottom: 1px solid var(--border-color, #e5e7eb);
-        margin-bottom: 0.65rem;
-        padding: 0 0 0.75rem 0 !important;
+        margin-bottom: 0.5rem;
+        padding: 0 0 0.5rem 0 !important;
     }
 
     /* Match desktop's collapsed rail: keep the small logo icon visible
@@ -480,13 +480,18 @@
         display: none !important;
     }
 
+    .layout-wrapper:not(.mobile-open) .sidebar-logo-img {
+        width: 22px;
+        height: 22px;
+    }
+
     /* Hamburger stays visible */
     .layout-wrapper:not(.mobile-open) .sidebar-toggle-btn {
         display: inline-flex !important;
-        width: 40px;
-        height: 40px;
+        width: 36px;
+        height: 36px;
         margin: 0 auto !important;
-        padding: 4px;
+        padding: 2px;
     }
 
     /* ── Navigation stays visible ────────────────────── */
@@ -505,17 +510,17 @@
         display: none !important;
     }
 
-    /* Icon-only navigation */
+    /* Icon-only navigation - touch-friendly 44x44 minimum */
     .layout-wrapper:not(.mobile-open) .sidebar-nav-item {
         display: flex;
         justify-content: center !important;
         align-items: center;
-        width: 46px;
-        height: 46px;
-        padding: 0.35rem !important;
-        margin: 0 auto 7px auto;
+        width: 44px;
+        height: 44px;
+        padding: 0.25rem !important;
+        margin: 0 auto 5px auto;
         gap: 0;
-        border-radius: 11px;
+        border-radius: 10px;
     }
 
     .layout-wrapper:not(.mobile-open) .sidebar-nav-item:hover {
@@ -527,11 +532,11 @@
     }
 
     .layout-wrapper:not(.mobile-open) .sidebar-nav-item .sidebar-icon {
-        width: 36px;
-        height: 36px;
-        min-width: 36px;
-        border-radius: 10px;
-        font-size: 1.12rem !important;
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        border-radius: 8px;
+        font-size: 1rem !important;
         margin: 0 !important;
     }
 
@@ -541,19 +546,19 @@
         display: block !important;
         width: 100%;
         margin-top: auto;
-        padding-top: 0.7rem;
+        padding-top: 0.5rem;
     }
 
     .layout-wrapper:not(.mobile-open) .sidebar-profile-link {
         justify-content: center !important;
-        padding: 0.35rem !important;
+        padding: 0.25rem !important;
         width: 100%;
     }
 
     .layout-wrapper:not(.mobile-open) .sidebar-avatar {
-        width: 38px;
-        height: 38px;
-        min-width: 38px;
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
     }
 
     /* Hide profile text/settings but keep avatar */

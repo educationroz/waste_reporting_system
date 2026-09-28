@@ -516,13 +516,71 @@ nav.navbar {
 
     /* Action buttons in tables touch spacing */
     .btn-sm {
-        padding: 0.35rem 0.6rem !important;
-        font-size: 0.8rem !important;
+        padding: 0.5rem 0.8rem !important;
+        font-size: 0.85rem !important;
+        min-height: 40px;
+    }
+
+    /* General buttons - touch friendly */
+    .btn {
+        min-height: 44px;
+        padding: 0.6rem 1rem;
+    }
+    .btn-lg {
+        min-height: 48px;
+        padding: 0.75rem 1.5rem;
+    }
+
+    /* Photo thumbnails - touch friendly */
+    .photo-thumb,
+    .photo-thumb-add {
+        width: 84px !important;
+        height: 84px !important;
+        min-width: 84px;
+    }
+    .photo-thumb .thumb-remove-btn {
+        width: 28px !important;
+        height: 28px !important;
+        top: 2px !important;
+        right: 2px !important;
+        font-size: 1rem !important;
+    }
+
+    /* Form controls */
+    .form-control,
+    .form-select {
+        min-height: 44px;
+        padding: 0.6rem 0.85rem;
     }
 
     /* Maps on mobile */
     #map, #live-fleet-map, #driver-map, #route-map, #checkpoint-map, #depot-map {
-        min-height: 260px;
+        min-height: 280px;
+    }
+
+    /* Card headers */
+    .card-header {
+        padding: 1rem 1rem !important;
+    }
+
+    /* Dropdown items */
+    .dropdown-item {
+        padding: 0.6rem 1rem;
+        min-height: 44px;
+    }
+
+    /* Navbar */
+    .navbar-brand {
+        font-size: 1.15rem;
+    }
+    .navbar-nav .nav-link {
+        padding: 0.5rem 0.8rem !important;
+    }
+
+    /* Toast */
+    #toast-container .toast {
+        min-width: 280px;
+        margin-bottom: 0.5rem;
     }
 }
 
@@ -535,6 +593,29 @@ nav.navbar {
     }
     .btn {
         font-size: 0.85rem;
+    }
+    
+    /* Extra small photo thumbnails */
+    .photo-thumb,
+    .photo-thumb-add {
+        width: 76px !important;
+        height: 76px !important;
+        min-width: 76px;
+    }
+    .photo-thumb .thumb-remove-btn {
+        width: 24px !important;
+        height: 24px !important;
+    }
+    
+    /* Modal full width on very small screens */
+    .modal-dialog {
+        margin: 0.5rem auto;
+        max-width: calc(100% - 1rem) !important;
+    }
+    
+    /* Reduce map height on very small screens */
+    #map, #live-fleet-map, #driver-map, #route-map, #checkpoint-map, #depot-map {
+        min-height: 240px;
     }
 }
 

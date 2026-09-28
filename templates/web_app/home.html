@@ -1811,7 +1811,13 @@ window.submitRequest = async function() {
             body: formData,
         });
 
-        const data = await res.json();
+        let data;
+        try {
+            data = await res.json();
+        } catch (jsonErr) {
+            // Response wasn't valid JSON (e.g., HTML error page, network error)
+            throw new Error('Server returned an invalid response. Please try again.');
+        }
 
         if (res.ok) {
             showToast(gettext('Request submitted successfully!'), 'success');
@@ -1835,7 +1841,8 @@ window.submitRequest = async function() {
         // patchy mobile data) — fall back to the offline queue.
         const queued = await tryQueueOffline();
         if (!queued) {
-            showToast(gettext('Network error: ') + e.message, 'danger');
+            const msg = e.message || gettext('Network error occurred');
+            showToast(gettext('Network error: ') + msg, 'danger');
         }
     } finally {
         btn.disabled = false;
@@ -1999,7 +2006,12 @@ window.submitComplaint = async function() {
             body: formData,
         });
 
-        const data = await res.json();
+        let data;
+        try {
+            data = await res.json();
+        } catch (jsonErr) {
+            throw new Error('Server returned an invalid response. Please try again.');
+        }
 
         if (res.ok) {
             showToast(gettext('Complaint submitted successfully!'), 'success');
@@ -2012,7 +2024,8 @@ window.submitComplaint = async function() {
             showToast(gettext('Error: ') + errMsg, 'danger');
         }
     } catch (e) {
-        showToast(gettext('Network error: ') + e.message, 'danger');
+        const msg = e.message || gettext('Network error occurred');
+        showToast(gettext('Network error: ') + msg, 'danger');
     } finally {
         btn.disabled = false;
         text.innerHTML = '<i class="bi bi-send me-1"></i>Submit Complaint';
