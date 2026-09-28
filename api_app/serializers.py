@@ -236,6 +236,11 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         if 'longitude' in data and data['longitude'] is not None and not (-180 <= data['longitude'] <= 180):
             raise serializers.ValidationError({'longitude': 'Longitude must be between -180 and 180'})
 
+        # Require at least one photo (primary photo field)
+        photo = self.initial_data.get('photo') if hasattr(self, 'initial_data') else None
+        if not photo and not data.get('photo'):
+            raise serializers.ValidationError({'photo': 'At least one photo is required to submit a waste request.'})
+
         if 'guest_email' in data and data['guest_email'] in (None, ''):
             # Client sent an empty string — normalize to NULL so the db_index
             # stays usable and unclaimed rows aren't stuffed with blanks.

@@ -1672,6 +1672,15 @@ window.submitRequest = async function() {
 
     const hasPhotos = photoFiles.length > 0;
 
+    // Require at least one photo
+    if (!hasPhotos) {
+        btn.disabled = false;
+        text.innerHTML = '<i class="bi bi-send me-2"></i>Submit Request';
+        spinner.classList.add('d-none');
+        showToast(gettext('Please add at least one photo of the garbage to submit a request.'), 'warning');
+        return;
+    }
+
     let currentGuestToken = null;
     if (!IS_AUTHENTICATED) {
         currentGuestToken = getOrCreateGuestToken();
