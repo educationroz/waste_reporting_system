@@ -1813,19 +1813,28 @@ window.submitRequest = async function() {
     }
 
     try {
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
         const res = await fetch('/api/waste-requests/', {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'X-CSRFToken': getCookie('csrftoken') },
             body: formData,
+            signal: controller.signal,
         });
 
+        clearTimeout(timeoutId);
+
         let data;
-        try {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
             data = await res.json();
-        } catch (jsonErr) {
-            // Response wasn't valid JSON (e.g., HTML error page, network error)
-            throw new Error('Server returned an invalid response. Please try again.');
+        } else {
+            const text = await res.text();
+            console.error('Non-JSON response:', res.status, text.substring(0, 500));
+            throw new Error(`Server error ${res.status}: ${text.substring(0, 200)}`);
         }
 
         if (res.ok) {
@@ -1848,6 +1857,7 @@ window.submitRequest = async function() {
         // navigator.onLine said we were online but the request still
         // failed outright (connection dropped mid-flight, common on
         // patchy mobile data) — fall back to the offline queue.
+        console.error('Submit error:', e);
         const queued = await tryQueueOffline();
         if (!queued) {
             const msg = e.message || gettext('Network error occurred');
