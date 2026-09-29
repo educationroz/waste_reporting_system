@@ -5445,7 +5445,7 @@ class ContactFormView(APIView):
             from django.conf import settings
             from api_app.tasks import send_mail_async, send_email_message_async
 
-            subject_display = dict(valid_subjects).get(subject, subject)
+            subject_display = subject  # subject is already validated, use directly
             email_subject = f'Contact Form: {subject_display}'
             email_body = (
                 f'From: {name} <{email}>\n'

@@ -786,13 +786,11 @@ LOGIN_REDIRECT_URL = '/dashboard/'
 
 RESEND_API_KEY = config('RESEND_API_KEY', default='')
 
-if RESEND_API_KEY:
-    EMAIL_BACKEND = 'api_app.email_backends.ResendEmailBackend'
-else:
-    EMAIL_BACKEND = config(
-        'EMAIL_BACKEND',
-        default='django.core.mail.backends.smtp.EmailBackend',
-    )
+# Use explicit EMAIL_BACKEND from .env if set, otherwise auto-detect
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default=('api_app.email_backends.ResendEmailBackend' if RESEND_API_KEY else 'django.core.mail.backends.smtp.EmailBackend'),
+)
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.sendgrid.net')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)

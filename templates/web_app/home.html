@@ -1858,10 +1858,15 @@ window.submitRequest = async function() {
         // failed outright (connection dropped mid-flight, common on
         // patchy mobile data) — fall back to the offline queue.
         console.error('Submit error:', e);
+        
+        // Show the ACTUAL error to user instead of generic message
+        let errorMsg = e.message || gettext('Network error occurred');
+        if (e.name === 'AbortError') errorMsg = 'Request timed out (30s). Check connection.';
+        else if (e.name === 'TypeError') errorMsg = 'Network error - check internet connection.';
+        
         const queued = await tryQueueOffline();
         if (!queued) {
-            const msg = e.message || gettext('Network error occurred');
-            showToast(gettext('Network error: ') + msg, 'danger');
+            showToast(gettext('Error: ') + errorMsg, 'danger');
         }
     } finally {
         btn.disabled = false;
