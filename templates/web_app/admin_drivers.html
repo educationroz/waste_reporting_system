@@ -1017,6 +1017,87 @@
             document.activeElement.blur();
         }
     }, true);
+
+    // Real-time driver location updates
+    (function () {
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        let driverWS = null;
+        let driverReconnectAttempt = 0;
+        let driverReconnectTimer = null;
+        let driverReconnectWarned = false;
+
+        async function connectDriverLocationWebSocket() {
+            const ws = new WebSocket(`${protocol}${location.host}/ws/driver-locations/`);
+            driverWS = ws;
+
+            function scheduleDriverReconnect() {
+                if (driverReconnectTimer) return;
+                const delay = Math.min(30000, 1000 * Math.pow(2, driverReconnectAttempt));
+                driverReconnectAttempt += 1;
+                driverReconnectTimer = setTimeout(() => {
+                    driverReconnectTimer = null;
+                    connectDriverLocationWebSocket();
+                }, delay);
+            }
+
+            function notifyDriverSocketIssue(label, event) {
+                console.warn(label, event);
+                if (!driverReconnectWarned) {
+                    showToast(gettext('Connection lost — live driver updates paused'), 'warning');
+                    driverReconnectWarned = true;
+                }
+                scheduleDriverReconnect();
+            }
+
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if (data.type !== 'driver_location') return;
+
+                const driverId = data.driver_id;
+                const lat = parseFloat(data.latitude);
+                const lng = parseFloat(data.longitude);
+                if (!driverId || isNaN(lat) || isNaN(lng)) return;
+
+                updateDriverLocationInTable(driverId, lat, lng, data);
+            };
+
+            ws.onopen = () => {
+                driverReconnectAttempt = 0;
+                driverReconnectWarned = false;
+                if (driverReconnectTimer) {
+                    clearTimeout(driverReconnectTimer);
+                    driverReconnectTimer = null;
+                }
+            };
+            ws.onerror = (e) => notifyDriverSocketIssue('Driver location WebSocket error:', e);
+            ws.onclose = (e) => notifyDriverSocketIssue('Driver location WebSocket closed:', e);
+        }
+
+        function updateDriverLocationInTable(driverId, lat, lng, data) {
+            const row = document.getElementById(`driver-row-${driverId}`);
+            if (!row) return;
+
+            const latCell = row.querySelector('[data-field="latitude"]');
+            const lngCell = row.querySelector('[data-field="longitude"]');
+            const statusCell = row.querySelector('[data-field="status"]');
+
+            if (latCell) latCell.textContent = lat.toFixed(6);
+            if (lngCell) lngCell.textContent = lng.toFixed(6);
+            if (statusCell && data.is_available !== undefined) {
+                statusCell.innerHTML = data.is_available
+                    ? '<span class="badge bg-success">' + gettext('Available') + '</span>'
+                    : '<span class="badge bg-secondary">' + gettext('Unavailable') + '</span>';
+            }
+        }
+
+        connectDriverLocationWebSocket();
+    })();
+
+    document.addEventListener('hide.bs.modal', function (e) {
+        if (document.activeElement) {
+            document.activeElement.blur();
+        }
+    }, true);
 })();
 </script>
 {% endblock %}

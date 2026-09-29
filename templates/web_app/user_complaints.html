@@ -91,3 +91,94 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    let complaintWS = null;
+    let complaintReconnectAttempt = 0;
+    let complaintReconnectTimer = null;
+    let complaintReconnectWarned = false;
+
+    async function connectComplaintWebSocket() {
+        const ws = new WebSocket(`${protocol}${location.host}/ws/complaints/`);
+        complaintWS = ws;
+
+        function scheduleComplaintReconnect() {
+            if (complaintReconnectTimer) return;
+            const delay = Math.min(30000, 1000 * Math.pow(2, complaintReconnectAttempt));
+            complaintReconnectAttempt += 1;
+            complaintReconnectTimer = setTimeout(() => {
+                complaintReconnectTimer = null;
+                connectComplaintWebSocket();
+            }, delay);
+        }
+
+        function notifyComplaintSocketIssue(label, event) {
+            console.warn(label, event);
+            if (!complaintReconnectWarned) {
+                showToast(gettext('Connection lost — live complaint updates paused'), 'warning');
+                complaintReconnectWarned = true;
+            }
+            scheduleComplaintReconnect();
+        }
+
+        ws.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'complaint_update') {
+                showToast(interpolate(gettext('Complaint #%(v0)s updated to: %(v1)s'), {v0: data.complaint_id, v1: data.status}, true), 'info');
+                applyUserComplaintRowUpdate(data.complaint_id, data.status);
+            }
+        };
+
+        ws.onopen = () => {
+            complaintReconnectAttempt = 0;
+            complaintReconnectWarned = false;
+            if (complaintReconnectTimer) {
+                clearTimeout(complaintReconnectTimer);
+                complaintReconnectTimer = null;
+            }
+        };
+        ws.onerror = (e) => notifyComplaintSocketIssue('Complaint WebSocket error:', e);
+        ws.onclose = (e) => notifyComplaintSocketIssue('Complaint WebSocket closed:', e);
+    }
+
+    function applyUserComplaintRowUpdate(complaintId, newStatus) {
+        const row = document.getElementById(`complaint-row-${complaintId}`);
+        if (!row) return;
+
+        const statusCell = row.querySelector('[data-field="status"]');
+        if (statusCell) {
+            const statusLabels = {
+                'pending': gettext('Pending'),
+                'under_review': gettext('Under Review'),
+                'completed': gettext('Completed'),
+            };
+            const statusClasses = {
+                'pending': 'bg-warning text-dark',
+                'under_review': 'bg-info',
+                'completed': 'bg-success',
+            };
+            const badge = statusCell.querySelector('.badge');
+            if (badge) {
+                badge.className = `badge ${STATUS_CLASSES[newStatus] || 'bg-secondary'}`;
+                badge.textContent = STATUS_LABELS[newStatus] || newStatus;
+            }
+        }
+    }
+
+    const STATUS_CLASSES = {
+        'pending': 'bg-warning text-dark',
+        'under_review': 'bg-info',
+        'completed': 'bg-success',
+    };
+    const STATUS_LABELS = {
+        'pending': gettext('Pending'),
+        'under_review': gettext('Under Review'),
+        'completed': gettext('Completed'),
+    };
+
+    connectComplaintWebSocket();
+</script>
+{% endblock %}

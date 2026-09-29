@@ -739,6 +739,20 @@ document.addEventListener("DOMContentLoaded", function() {
 })();
 </script>
 
+<!-- GLOBAL API OBJECT (available to all users, including guests) -->
+<script nonce="{{ csp_nonce }}">
+// Global API object for all users (including guests for claim links, etc.)
+if (!window.API) {
+    const API = {
+        get: (url) => apiFetch('GET', url),
+        post: (url, data) => apiFetch('POST', url, data),
+        patch: (url, data) => apiFetch('PATCH', url, data),
+        delete: (url) => apiFetch('DELETE', url),
+    };
+    window.API = API;
+}
+</script>
+
 <!-- AUTHENTICATED USER SCRIPT -->
 {% if user.is_authenticated %}
 <script nonce="{{ csp_nonce }}">
@@ -752,14 +766,6 @@ document.addEventListener("DOMContentLoaded", function() {
 // makes the whole init block idempotent: it does nothing after the first run.
 if (!window.__ssAuthScriptLoaded) {
     window.__ssAuthScriptLoaded = true;
-
-    const API = {
-        get: (url) => apiFetch('GET', url),
-        post: (url, data) => apiFetch('POST', url, data),
-        patch: (url, data) => apiFetch('PATCH', url, data),
-        delete: (url) => apiFetch('DELETE', url),
-    };
-    window.API = API;
 
     // ─── Web Push (VAPID) subscription ─────────────────────────────────
     // Registers this browser for push notifications (status updates while
