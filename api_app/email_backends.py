@@ -1,16 +1,10 @@
-"""
-Resend HTTP API email backend for Django.
-Bypasses SMTP entirely — works on Railway/Render/Fly where SMTP ports are blocked.
-
-Requires:
-- Resend account with verified domain
-- RESEND_API_KEY in .env
-- DEFAULT_FROM_EMAIL must use your verified domain (e.g., noreply@safhasahar.com)
-"""
 import json
 import logging
-from django.core.mail.backends.base import BaseEmailBackend
+import urllib.error
+import urllib.request
+
 from django.conf import settings
+from django.core.mail.backends.base import BaseEmailBackend
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +23,7 @@ class ResendEmailBackend(BaseEmailBackend):
         if not self.api_key:
             if not self.fail_silently:
                 raise ValueError('RESEND_API_KEY not configured in settings')
+            logger.error('[RESEND] RESEND_API_KEY not configured')
             return 0
 
         sent = 0
@@ -37,60 +32,72 @@ class ResendEmailBackend(BaseEmailBackend):
                 if self._send_message(message):
                     sent += 1
             except Exception:
+                logger.exception('[RESEND] Failed to send email')
                 if not self.fail_silently:
                     raise
-                logger.exception('[RESEND] Failed to send email')
         return sent
 
-    def _send_message(self, message):
-        import urllib.request
-        import urllib.error
-
-        # Build payload
-        from_email = message.from_email or settings.DEFAULT_FROM_EMAIL
+    def _build_payload(self, message):
         to = message.to
         if isinstance(to, str):
             to = [to]
 
         payload = {
-            'from': from_email,
-            'to': to,
+            'from': message.from_email or settings.DEFAULT_FROM_EMAIL,
+            'to': list(to),
             'subject': message.subject,
         }
 
-        # Prefer HTML if available
-        if hasattr(message, 'alternatives') and message.alternatives:
-            for content, mimetype in message.alternatives:
-                if mimetype == 'text/html':
-                    payload['html'] = content
-                    break
+        # Body: html if the message is html or has an html alternative
+        if getattr(message, 'content_subtype', 'plain') == 'html':
+            payload['html'] = message.body
         else:
             payload['text'] = message.body
 
-        # Optional: reply-to
-        if hasattr(message, 'reply_to') and message.reply_to:
-            payload['reply_to'] = message.reply_to
+        for content, mimetype in getattr(message, 'alternatives', []) or []:
+            if mimetype == 'text/html':
+                payload['html'] = content
+                break
 
+        if getattr(message, 'cc', None):
+            payload['cc'] = list(message.cc)
+        if getattr(message, 'bcc', None):
+            payload['bcc'] = list(message.bcc)
+        if getattr(message, 'reply_to', None):
+            payload['reply_to'] = list(message.reply_to)
+
+        return payload
+
+    def _send_message(self, message):
+        payload = self._build_payload(message)
         data = json.dumps(payload).encode('utf-8')
+
         req = urllib.request.Request(
             self.api_url,
             data=data,
             headers={
                 'Authorization': f'Bearer {self.api_key}',
                 'Content-Type': 'application/json',
+                # Without this, Cloudflare in front of Resend can return 403 (code 1010)
+                'User-Agent': 'SafhaSahar/1.0 (Django; +https://safhasahar.xyz)',
+                'Accept': 'application/json',
             },
             method='POST',
         )
 
         try:
             with urllib.request.urlopen(req, timeout=10) as response:
-                if response.status >= 400:
-                    body = response.read().decode('utf-8')
-                    raise RuntimeError(f'Resend API error {response.status}: {body}')
-                logger.info('[RESEND] Email sent to %s (subject: %s)', to, message.subject)
+                body = response.read().decode('utf-8')
+                logger.info(
+                    '[RESEND] Email sent to %s (subject: %s) response: %s',
+                    payload['to'], message.subject, body,
+                )
                 return True
         except urllib.error.HTTPError as e:
-            body = e.read().decode('utf-8') if e.fp else ''
-            raise RuntimeError(f'Resend HTTP error {e.code}: {body}')
+            try:
+                err_body = e.read().decode('utf-8')
+            except Exception:
+                err_body = ''
+            raise RuntimeError(f'Resend HTTP error {e.code}: {err_body}')
         except urllib.error.URLError as e:
             raise RuntimeError(f'Resend network error: {e.reason}')

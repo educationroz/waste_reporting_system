@@ -736,7 +736,58 @@ document.addEventListener("DOMContentLoaded", function() {
             return false;
         }
     };
-})();
+})
+();
+</script>
+
+<script nonce="{{ csp_nonce }}">
+// Global utility functions (available to ALL users, including guests)
+function getCookie(name) {
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m.pop()) : '';
+}
+
+function csrfHeaders(method, extra) {
+    const headers = Object.assign({}, extra || {});
+    if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(method || 'GET')) {
+        headers['X-CSRFToken'] = getCookie('csrftoken');
+    }
+    return headers;
+}
+
+async function apiFetch(method, url, data = null) {
+    const opts = {
+        method,
+        credentials: 'same-origin',
+        headers: csrfHeaders(method, { 'Content-Type': 'application/json' }),
+    };
+    if (data) opts.body = JSON.stringify(data);
+
+    const res = await fetch(url, opts);
+
+    if (res.status === 401 || res.status === 403) {
+        if (res.status === 401) { return null; }
+    }
+
+    const text = await res.text();
+    if (!text) return {};
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        return text;
+    }
+}
+
+window.authFetch = async function authFetch(url, options = {}) {
+    const method = (options && options.method) || 'GET';
+    const merged = Object.assign({}, options, {
+        credentials: 'same-origin',
+        headers: csrfHeaders(method, options.headers),
+    });
+    const res = await fetch(url, merged);
+    if (res.status === 401) { return null; }
+    return res;
+};
 </script>
 
 <!-- GLOBAL API OBJECT (available to all users, including guests) -->
@@ -848,55 +899,6 @@ if (!window.__ssAuthScriptLoaded) {
     window.addEventListener('load', function () {
         setTimeout(function () { window.initWebPush(); }, 1500);
     });
-
-    // ─── SECURITY: cookie-session auth, no tokens in localStorage ────────
-    // The JWT access/refresh pair used to live in localStorage, which meant
-    // any XSS anywhere on the site could read and exfiltrate it (localStorage
-    // has no HttpOnly equivalent). Every browser request below now rides on
-    // the Django session cookie, which IS HttpOnly and therefore invisible to
-    // injected JS. Unsafe verbs carry the CSRF token, which is what makes
-    // cookie auth safe against cross-site abuse.
-    const getCookie = window.getCookie;
-    const csrfHeaders = window.csrfHeaders;
-
-    // Kept so legacy callers that still probe for "am I logged in?" work.
-    // Server-rendered: this block only renders for authenticated users.
-    function getToken() { return true; }
-
-    async function apiFetch(method, url, data = null) {
-        const opts = {
-            method,
-            credentials: 'same-origin',
-            headers: csrfHeaders(method, { 'Content-Type': 'application/json' }),
-        };
-        if (data) opts.body = JSON.stringify(data);
-
-        const res = await fetch(url, opts);
-
-        if (res.status === 401 || res.status === 403) {
-            // Session expired or was invalidated server-side.
-            if (res.status === 401) { logout(); return null; }
-        }
-
-        const text = await res.text();
-        if (!text) return {};
-        try {
-            return JSON.parse(text);
-        } catch (e) {
-            return text;
-        }
-    }
-
-    window.authFetch = async function authFetch(url, options = {}) {
-        const method = (options && options.method) || 'GET';
-        const merged = Object.assign({}, options, {
-            credentials: 'same-origin',
-            headers: csrfHeaders(method, options.headers),
-        });
-        const res = await fetch(url, merged);
-        if (res.status === 401) { logout(); return null; }
-        return res;
-    };
 
     window.logout = async function logout() {
         try {
