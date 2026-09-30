@@ -58,6 +58,9 @@ def _get_ml_confidence_threshold():
     """
     try:
         from api_app.models import SystemSettings
+    except Exception:
+        return DEFAULT_ML_CONFIDENCE_THRESHOLD
+    try:
         row = SystemSettings.objects.get(key='ml_confidence_threshold')
         return float(row.value)
     except (SystemSettings.DoesNotExist, KeyError, TypeError, ValueError):

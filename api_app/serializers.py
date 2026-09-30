@@ -200,11 +200,8 @@ class WasteRequestSerializer(serializers.ModelSerializer):
              data (the classic "valid JPEG + payload glued on" polyglot
              trick).
           3. compress_image — resize/re-encode for storage.
-
-        ML inference runs ASYNCHRONOUSLY in the background (api_app/tasks.py)
-        after the request returns, so uploads never block on CPU inference.
-        The request is saved with needs_manual_review=True initially, and the
-        background task updates severity/confidence when inference completes.
+          4. ML gatekeeper inference — runs SYNCHRONOUSLY to reject non-waste
+             immediately and capture severity/confidence for waste images.
         """
         if not file:
             return file
@@ -212,7 +209,7 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         validate_image_file(file)  # raises on spoofed/corrupt/oversized files
         clean_file = sanitize_image(file)
 
-        # Store sanitized image bytes for background ML classification
+        # Store sanitized image bytes for background ML classification (fallback)
         from io import BytesIO
         bytes_io = BytesIO()
         clean_file.seek(0)
@@ -221,8 +218,25 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         self._ml_bytes = bytes_io.getvalue()
         clean_file.seek(0)
 
-        # Default pending state — background task will fill in the truth
-        self._ml_result = None
+        # Run ML gatekeeper SYNCHRONOUSLY to reject non-waste immediately
+        try:
+            from ml_models.waste_classifier.inference import predict_waste
+            ml_result = predict_waste(BytesIO(self._ml_bytes))
+            
+            # Reject non-waste (invalid/clean place) immediately
+            if not ml_result.get('is_waste', True):
+                raise serializers.ValidationError(
+                    'The uploaded image does not appear to show reportable waste. Please upload a photo of actual waste.'
+                )
+            
+            # Waste detected — store result for validate() to persist
+            self._ml_result = ml_result
+        except serializers.ValidationError:
+            raise
+        except Exception as e:
+            # Model unavailable / corrupt / bad image — defer to async + manual review
+            logger.warning(f'[ML] Sync inference failed, deferring to async: {e}')
+            self._ml_result = None
 
         clean_file.seek(0)
         compressed_file = compress_image(clean_file)

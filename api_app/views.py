@@ -2175,43 +2175,29 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             one_hour_ago = now - timedelta(hours=1)
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             
-            # Identify the requester: authenticated user, or guest by token, or IP
-            guest_token = serializer.validated_data.get('guest_token')
-            ip_address = self.request.META.get('REMOTE_ADDR')
-            
-            # Build query filters for this identity
-            identity_filters = {'dropoff_checkpoint': checkpoint}
-            if user:
-                identity_filters['user'] = user
-            elif guest_token:
-                identity_filters['guest_token'] = guest_token
-            elif ip_address:
-                identity_filters['ip_address'] = ip_address
-            else:
-                identity_filters['user__isnull'] = True  # fallback: anonymous without token/IP
-            
-            # Check 1-hour cooldown (max 2 per hour)
+            # Global checkpoint limits (applies to ALL users/guests combined)
+            # Check 1-hour cooldown (max 2 per hour total at this checkpoint)
             recent_count = WasteRequest.objects.filter(
-                **identity_filters,
+                dropoff_checkpoint=checkpoint,
                 created_at__gte=one_hour_ago
             ).count()
             
             if recent_count >= 2:
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError({
-                    'dropoff_checkpoint': 'You have already submitted 2 requests at this checkpoint in the last hour. Please wait before submitting another.'
+                    'dropoff_checkpoint': 'This checkpoint has reached the limit of 2 requests in the last hour. Please try again after an hour.'
                 })
             
-            # Check daily max (10 requests per day)
+            # Check daily max (10 requests per day total at this checkpoint)
             daily_count = WasteRequest.objects.filter(
-                **identity_filters,
+                dropoff_checkpoint=checkpoint,
                 created_at__gte=today_start
             ).count()
             
             if daily_count >= 10:
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError({
-                    'dropoff_checkpoint': 'You have reached the maximum of 10 requests per day at this checkpoint. Please try again tomorrow.'
+                    'dropoff_checkpoint': 'This checkpoint has reached the daily limit of 10 requests. Please try again tomorrow.'
                 })
         
         waste_request = serializer.save(user=user)
@@ -4520,7 +4506,7 @@ class ScheduleViewSet(viewsets.ModelViewSet):
                     'backgroundColor': '#e8f5e9' if sch.driver_id else '#fff3e0',
                     'borderColor': '#198754' if sch.driver_id else '#fd7e14',
                     'textColor': '#198754' if sch.driver_id else '#e65100',
-                    'classNames': [getFrequencyClass(sch.frequency), getStatusClass(sch.is_active)],
+                    'classNames': [getFrequencyClass(sch.frequency), getStatusClass(sch.is_active)], #type: ignore
                     'extendedProps': {
                         'schedule_id': sch.id,
                         'zone_name': sch.zone_name,
