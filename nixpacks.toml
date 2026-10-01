@@ -1,0 +1,9 @@
+# Railway (Nixpacks builder) system packages.
+#
+# python-magic sniffs real MIME types via libmagic. The app already falls
+# back to magic-byte sniffing when libmagic is absent (see
+# api_app/validators.py), so uploads keep working either way — but with
+# libmagic1 installed, production MIME detection matches local dev exactly.
+
+[phases.setup]
+aptPkgs = ["libmagic1"]
