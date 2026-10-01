@@ -184,6 +184,35 @@
             width: 100%;
             overflow: hidden !important;
         }
+
+        /* Notification dropdown: 340px is wider than small phones, and
+           dropdown-menu-end anchors it to the bell (not the viewport edge),
+           so on <=576px screens it ran off the left edge. On mobile it
+           becomes a full-width sheet pinned under the navbar instead.
+           The !important flags win over Popper's inline
+           position/transform, which Bootstrap cleans up on close. */
+        .notif-dropdown-menu {
+            min-width: 340px;
+            max-width: 380px;
+        }
+        .notif-dropdown-menu .flex-grow-1 {
+            min-width: 0; /* long titles wrap instead of stretching the menu */
+        }
+        .notif-dropdown-menu .list-group-item p {
+            overflow-wrap: anywhere; /* long unbroken strings can't overflow */
+        }
+        @media (max-width: 575.98px) {
+            .notif-dropdown-menu {
+                position: fixed !important;
+                top: 4rem !important;
+                left: 0.75rem !important;
+                right: 0.75rem !important;
+                width: auto !important;
+                min-width: 0 !important;
+                max-width: none !important;
+                transform: none !important;
+            }
+        }
     </style>
 
     {% block extra_css %}{% endblock %}
@@ -287,7 +316,7 @@
                         <i class="bi bi-bell fs-5"></i>
                         <span id="notif-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"></span>
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-lg" style="min-width: 340px; max-width: 380px; border-radius: 14px; border: none;">
+                    <ul class="dropdown-menu dropdown-menu-end shadow-lg notif-dropdown-menu" style="border-radius: 14px; border: none;">
                         <li class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
                             <h6 class="mb-0 fw-bold">{% trans "Notifications" %}</h6>
                             <a href="{% url 'notifications' %}" hx-boost="false" class="btn btn-sm btn-outline-success px-3 py-1 fw-semibold rounded-2" style="font-size: 0.75rem;">{% trans "View All" %}</a>

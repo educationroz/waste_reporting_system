@@ -2029,9 +2029,15 @@ def claim_guest_requests_by_email(user):
     nothing to claim, and a request already claimed by token won't be
     claimed twice (the user__isnull=True filter excludes it).
 
+    Citizen-only: guest reports belong to citizen accounts. Drivers and
+    admins logging in with a matching email must NOT absorb guest
+    requests into their staff accounts.
+
     Returns the number of requests newly claimed.
     """
     if user is None or not user.is_authenticated:
+        return 0
+    if getattr(user, 'role', '') != 'user':
         return 0
     email = (user.email or '').strip()
     if not email:
@@ -2084,6 +2090,11 @@ def guest_claim_view(request):
     email = email.strip().lower()
 
     if request.user.is_authenticated:
+        # Guest reports belong to citizen accounts only — a driver/admin
+        # opening a magic link must not absorb it into a staff account.
+        if request.user.role != 'user':
+            messages.error(request, 'Only citizen accounts can claim guest requests.')
+            return redirect('home')
         user_email = (request.user.email or '').strip().lower()
         if email == user_email:
             claimed_count = claim_guest_requests_by_email(request.user)
@@ -2433,11 +2444,34 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def claim_guest_requests(self, request):
+        # Citizen-only: guest reports belong to citizen accounts, never to
+        # driver/admin accounts (the login/register pages only attempt this
+        # claim for role=='user' too).
+        if request.user.role != 'user':
+            return Response(
+                {'error': 'Only citizen accounts can claim guest requests.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         tokens = request.data.get('guest_tokens', [])
         if not tokens or not isinstance(tokens, list):
             return Response({'error': 'guest_tokens (list) is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        qs = WasteRequest.objects.filter(guest_token__in=tokens, user__isnull=True)
+        user_email = (request.user.email or '').strip()
+        base_qs = WasteRequest.objects.filter(guest_token__in=tokens, user__isnull=True)
+        # A guest row carrying a guest_email is RESERVED for that email's
+        # owner (they will claim it via magic link / email auto-claim).
+        # Another citizen signing in on the same browser must not steal it
+        # with the localStorage token — leave it unclaimed so the email
+        # owner still gets it. Rows with no email keep the old behaviour:
+        # first signed-in citizen claims them.
+        claimable_qs = base_qs.filter(
+            Q(guest_email__isnull=True)
+            | Q(guest_email='')
+            | Q(guest_email__iexact=user_email)
+        )
+        reserved_count = base_qs.exclude(pk__in=claimable_qs).count()
+
+        qs = claimable_qs
         claimed_requests = list(qs)
         claimed_ids = [wr.id for wr in claimed_requests]
         claimed_count = qs.update(user=request.user)
@@ -2460,6 +2494,9 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         return Response({
             'claimed': claimed_count,
             'claimed_ids': claimed_ids,
+            # Tokens left untouched because their rows carry another
+            # email — the email owner claims them via magic link.
+            'reserved': reserved_count,
         })
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
@@ -2505,6 +2542,13 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         token = request.data.get('token')
         if not token:
             return Response({'error': 'Token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Citizen-only (same rule as claim_guest_requests).
+        if request.user.role != 'user':
+            return Response(
+                {'error': 'Only citizen accounts can claim guest requests.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 
