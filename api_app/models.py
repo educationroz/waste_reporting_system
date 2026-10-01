@@ -431,6 +431,10 @@ class Route(models.Model):
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     total_distance_km = models.FloatField(default=0.0)
+    estimated_duration_min = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Estimated route duration in minutes; computed when the route is generated.',
+    )
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

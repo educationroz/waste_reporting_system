@@ -32,12 +32,15 @@ class CorrelationIdMiddleware:
         # Set context variable for logging
         token = _request_id_var.set(correlation_id)
 
-        # Add to response headers for client-side tracing
-        response = self.get_response(request)
-        response['X-Correlation-ID'] = correlation_id
+        # Reset context variable. try/finally, not a bare call after: if
+        # get_response raises, the ASGI task context is reused by the next
+        # request this worker handles and it would inherit a stale id.
+        try:
+            response = self.get_response(request)
+        finally:
+            _request_id_var.reset(token)
 
-        # Reset context variable
-        _request_id_var.reset(token)
+        response['X-Correlation-ID'] = correlation_id
         return response
 
 

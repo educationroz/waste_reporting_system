@@ -6,7 +6,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework.test import APIClient, APITestCase
 
-from .models import Notification, WasteRequest
+from .models import Notification, Schedule, WasteRequest
 from .views import _create_notification
 
 User = get_user_model()
@@ -191,6 +191,20 @@ class WasteRequestLocationGroupingTest(TestCase):
         # even though the users above are now created once per class.
         self.client = APIClient()
 
+    def _photo(self):
+        """A minimal real PNG.
+
+        WasteRequestSerializer.validate_photo() runs validate_image_file() ->
+        sanitize_image() -> compress_image(), so the payload has to be a
+        genuinely decodable image, not arbitrary bytes.
+        """
+        import base64
+        png = base64.b64decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8'
+            'z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+        )
+        return SimpleUploadedFile('waste.png', png, content_type='image/png')
+
     def _payload(self):
         return {
             'waste_type': 'general',
@@ -199,16 +213,32 @@ class WasteRequestLocationGroupingTest(TestCase):
             'description': 'Test pickup',
             'latitude': '28.209600',
             'longitude': '83.985600',
+            # Creating a WasteRequest requires a photo (serializer rejects a
+            # photo-less create with 400), so this test must upload one even
+            # though it is only asserting same-location grouping.
+            'photo': self._photo(),
         }
 
     def test_same_location_requests_are_registered_and_completed_together(self):
-        self.client.force_authenticate(user=self.user_one)
-        first_response = self.client.post('/api/waste-requests/', self._payload(), format='json')
-        self.assertEqual(first_response.status_code, 201, first_response.content)
+        # The ML gatekeeper runs synchronously on create and would reject a
+        # 1x1 test PNG as "not waste". The classifier is not what this test
+        # covers (same-location grouping is), so stub it out.
+        ml_ok = {
+            'is_waste': True,
+            'category': 'general',
+            'confidence': 0.99,
+            'severity': 'low',
+            'needs_manual_review': False,
+        }
+        with patch('ml_models.waste_classifier.inference.predict_waste', return_value=ml_ok):
+            self.client.force_authenticate(user=self.user_one)
+            # multipart, not json: the payload now carries an uploaded file.
+            first_response = self.client.post('/api/waste-requests/', self._payload(), format='multipart')
+            self.assertEqual(first_response.status_code, 201, first_response.content)
 
-        self.client.force_authenticate(user=self.user_two)
-        second_response = self.client.post('/api/waste-requests/', self._payload(), format='json')
-        self.assertEqual(second_response.status_code, 201, second_response.content)
+            self.client.force_authenticate(user=self.user_two)
+            second_response = self.client.post('/api/waste-requests/', self._payload(), format='multipart')
+            self.assertEqual(second_response.status_code, 201, second_response.content)
         self.assertEqual(WasteRequest.objects.count(), 2)
 
         request_obj = WasteRequest.objects.order_by('id').first()
@@ -234,6 +264,7 @@ class WasteRequestLocationGroupingTest(TestCase):
         notifications = Notification.objects.filter(title='Report Completed')
         self.assertEqual(notifications.count(), 2)
         self.assertSetEqual(set(notifications.values_list('user_id', flat=True)), {self.user_one.id, self.user_two.id})
+
 
     def test_assign_driver_applies_to_same_location_siblings(self):
         driver_user = User.objects.create_user(
@@ -413,3 +444,82 @@ class SystemSettingsBrandingAPITest(TestCase):
         get_resp = self.client.get('/api/system-settings/get_branding/')
         self.assertEqual(get_resp.status_code, 200)
         self.assertEqual(get_resp.json()['site_name'], 'Pokhara Safha Sahar')
+
+
+class DriverScheduleRecurrenceTests(APITestCase):
+    """GET /api/drivers/me/schedule/ recurring-schedule expansion.
+
+    The endpoint renders ONE week at a time, so daily/weekly/biweekly/monthly
+    have to be decided against a stable anchor. A previous monthly rule
+    compared the requested day's month AND year with the schedule's creation
+    month, so a "monthly" collection only ever appeared in the month it was
+    created and then never again.
+    """
+
+    URL = '/api/drivers/me/schedule/'
+
+    def setUp(self):
+        self.driver_user = User.objects.create_user(
+            username='sched-driver', password='StrongPass123!', role='driver',
+        )
+        self.driver = self.driver_user.driver_profile
+        self.client.force_authenticate(user=self.driver_user)
+
+    def _make_schedule(self, frequency, day_of_week, created_at, start_time='07:00:00'):
+        schedule = Schedule.objects.create(
+            zone_name='Zone A',
+            driver=self.driver,
+            frequency=frequency,
+            day_of_week=day_of_week,
+            start_time=start_time,
+            is_active=True,
+        )
+        # created_at is auto_now_add, so it ignores the constructor value and
+        # the recurrence anchor would always be "now". Force it afterwards.
+        Schedule.objects.filter(pk=schedule.pk).update(created_at=created_at)
+        schedule.refresh_from_db()
+        return schedule
+
+    def _occurrences(self, week_param):
+        response = self.client.get(self.URL, {'week': week_param})
+        self.assertEqual(response.status_code, 200, response.content)
+        body = response.data
+        items = body['schedules'] if isinstance(body, dict) and 'schedules' in body else body
+        return sorted(
+            d['date'] for d in items
+            if d.get('type') == 'schedule'
+        )
+
+    def test_monthly_recurs_in_later_months(self):
+        # Anchor: 2026-01-13 is a Tuesday (day_of_week == 1).
+        self._make_schedule('monthly', 1, datetime.datetime(2026, 1, 13, 9, 0))
+
+        # Week of 2026-01-12 (Mon) contains the anchor itself.
+        self.assertIn('2026-01-13', self._occurrences('2026-W03'))
+        # The whole point: it must ALSO appear in later months.
+        self.assertIn('2026-02-10', self._occurrences('2026-W07'))
+        self.assertIn('2026-03-10', self._occurrences('2026-W11'))
+        self.assertIn('2026-04-14', self._occurrences('2026-W16'))
+
+    def test_monthly_appears_exactly_once_per_month(self):
+        self._make_schedule('monthly', 1, datetime.datetime(2026, 1, 13, 9, 0))
+        for week in ('2026-W03', '2026-W07', '2026-W11', '2026-W16', '2026-W20'):
+            self.assertEqual(
+                len(self._occurrences(week)), 1,
+                f'week {week} should contain exactly one monthly occurrence',
+            )
+
+    def test_weekly_and_biweekly_use_whole_week_parity(self):
+        self._make_schedule('biweekly', 2, datetime.datetime(2026, 1, 14, 9, 0))  # Wed
+        # W03 (Jan 12-18) contains the anchor: runs.
+        self.assertIn('2026-01-14', self._occurrences('2026-W03'))
+        # W04 is exactly one week later: parity says skip.
+        self.assertEqual(self._occurrences('2026-W04'), [])
+        # W05 is two weeks later: runs again.
+        self.assertIn('2026-01-28', self._occurrences('2026-W05'))
+        # W06 is three weeks later: skip.
+        self.assertEqual(self._occurrences('2026-W06'), [])
+
+    def test_daily_covers_every_day_of_the_week(self):
+        self._make_schedule('daily', None, datetime.datetime(2026, 1, 13, 9, 0))
+        self.assertEqual(len(self._occurrences('2026-W03')), 7)

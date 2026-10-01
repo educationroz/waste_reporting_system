@@ -760,7 +760,7 @@
                 }
             }
 
-            setTimeout(() => location.reload(), 900);
+                setTimeout(() => window.ssRefreshContent(), 300);
         } catch (e) {
             showToast(gettext('Failed to create driver: ') + e.message, 'danger');
         }
@@ -1025,6 +1025,31 @@
         let driverReconnectAttempt = 0;
         let driverReconnectTimer = null;
         let driverReconnectWarned = false;
+        // This IIFE re-runs on every htmx visit to the page. Without teardown each
+        // visit leaked an open socket AND an exponential-backoff reconnect timer
+        // that re-armed forever, long after the user navigated away. The active
+        // teardown is parked on window so a new visit can retire the previous one.
+        function teardownDriverSocket() {
+            if (driverReconnectTimer) {
+                clearTimeout(driverReconnectTimer);
+                driverReconnectTimer = null;
+            }
+            if (driverWS) {
+                driverWS.onclose = null;
+                driverWS.onerror = null;
+                try { driverWS.close(1000, 'htmx navigation'); } catch (e) { /* already closing */ }
+                driverWS = null;
+            }
+            if (window.__ssDriverLocationTeardown === teardownDriverSocket) {
+                document.body.removeEventListener('htmx:beforeSwap', teardownDriverSocket, true);
+                window.__ssDriverLocationTeardown = null;
+            }
+        }
+        if (typeof window.__ssDriverLocationTeardown === 'function') {
+            window.__ssDriverLocationTeardown();
+        }
+        window.__ssDriverLocationTeardown = teardownDriverSocket;
+        document.body.addEventListener('htmx:beforeSwap', teardownDriverSocket, true);
 
         async function connectDriverLocationWebSocket() {
             const ws = new WebSocket(`${protocol}${location.host}/ws/driver-locations/`);
@@ -1092,12 +1117,6 @@
 
         connectDriverLocationWebSocket();
     })();
-
-    document.addEventListener('hide.bs.modal', function (e) {
-        if (document.activeElement) {
-            document.activeElement.blur();
-        }
-    }, true);
 })();
 </script>
 {% endblock %}

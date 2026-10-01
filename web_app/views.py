@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 
@@ -215,7 +214,13 @@ class UserRequestListView(LoginRequiredMixin, ListView):
                     if req.scheduled_date else ''
                 ),
             })
-        ctx['located_requests_json'] = mark_safe(json.dumps(located_data))
+        # Pass the RAW list, not a pre-serialized string. The template applies
+        # the json_script filter, which JSON-encodes whatever it is given, so
+        # handing it a string produced `<script ...>"[]"</script>`; JSON.parse
+        # then returned a string and every .forEach() on it threw. json_script
+        # also escapes <, > and &, so no mark_safe() is needed and a pickup
+        # address cannot break out of the script block.
+        ctx['located_requests_json'] = located_data
         ctx['has_located_requests'] = bool(located_data)
         return ctx
 
@@ -529,23 +534,28 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
         # evaluated before gettext ever sees it, which would leave the
         # sentence untranslatable. Messages use gettext() directly.
         ctx['system_alerts'] = []
-        if ctx['overdue_requests'] > 0:
+        # .get(), not []: the stats dict is cached for 5 minutes, so a deploy that
+        # adds a stat key can be served a pre-deploy dict that lacks it.
+        overdue_requests = ctx.get('overdue_requests', 0)
+        pending_requests = ctx.get('pending_requests', 0)
+        active_drivers = ctx.get('active_drivers', 0)
+        if overdue_requests > 0:
             ctx['system_alerts'].append({
                 'type': 'danger',
                 'icon': 'exclamation-triangle',
                 'title': _('%(count)s Overdue Requests') % {
-                    'count': ctx['overdue_requests']},
+                    'count': overdue_requests},
                 'message': _('Requests past scheduled date need immediate attention'),
             })
-        if ctx['pending_requests'] > 5:
+        if pending_requests > 5:
             ctx['system_alerts'].append({
                 'type': 'warning',
                 'icon': 'clock-history',
                 'title': _('%(count)s Pending Requests') % {
-                    'count': ctx['pending_requests']},
+                    'count': pending_requests},
                 'message': _('Multiple requests awaiting driver assignment'),
             })
-        if ctx['active_drivers'] == 0:
+        if active_drivers == 0:
             ctx['system_alerts'].append({
                 'type': 'danger',
                 'icon': 'exclamation-circle',
@@ -721,13 +731,24 @@ class DriverDashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'web_app/driver_dashboard.html'
 
     def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated and request.user.role != 'driver':
+        # Auth check MUST come first: LoginRequiredMixin only redirects to
+        # /login/ from super().dispatch(), but _resolve_driver() below ran
+        # before it — an anonymous hit on /driver-dashboard/ passed AnonymousUser
+        # into Driver.objects.filter(user=...) and crashed with a 500 instead
+        # of redirecting.
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if request.user.role != 'driver':
             return redirect_by_role(request.user)
+        # The driver profile is resolved here, not in get_context_data(): returning
+        # a redirect from get_context_data makes TemplateView hand an
+        # HttpResponseRedirect to the template layer and 500.
+        self._driver = self._resolve_driver(request.user)
+        if self._driver is None:
+            return redirect('/')
         return super().dispatch(request, *args, **kwargs)
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        user = self.request.user
+    def _resolve_driver(self, user):
         try:
             with transaction.atomic():
                 driver = Driver.objects.select_for_update().filter(user=user).first()
@@ -737,11 +758,15 @@ class DriverDashboardView(LoginRequiredMixin, TemplateView):
                         license_number=f'DRIVER-{user.id}',
                         is_available=True,
                     )
+                return driver
         except Exception:
             logger.exception(f'[DRIVER DASHBOARD] driver lookup/create failed for user={user.id}')
-            driver = Driver.objects.filter(user=user).first()
-            if not driver:
-                return redirect('/')
+            return Driver.objects.filter(user=user).first()
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        user = self.request.user
+        driver = self._driver
         ctx['driver'] = driver
         ctx['assigned_requests'] = (
             WasteRequest.objects.filter(driver=driver, status__in=['assigned', 'in_progress'])
@@ -804,8 +829,13 @@ class RoutePlanningView(LoginRequiredMixin, TemplateView):
         user = self.request.user
         
         if user.role == 'driver':
-            # Driver sees only their routes
-            driver = Driver.objects.get(user=user)
+            # Driver sees only their routes. get_or_create, not get(): a driver
+            # account created before the profile signal existed has no row and
+            # would otherwise raise DoesNotExist -> 500.
+            driver, _ = Driver.objects.get_or_create(
+                user=user,
+                defaults={'license_number': f'DRIVER-{user.id}', 'is_available': True},
+            )
             ctx['user_routes'] = Route.objects.filter(driver=driver).order_by('-planned_date')
         else:
             # Admin sees all routes

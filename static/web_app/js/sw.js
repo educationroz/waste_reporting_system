@@ -1,4 +1,8 @@
-const CACHE_NAME = 'waste-management-v3';
+// Bump this whenever precache/handling changes. Old caches are only purged by
+// the activate handler when their name differs, so shipping the authenticated
+// API-cache removal under the previous name would have left every previously
+// cached /api/ response sitting on the user's disk indefinitely.
+const CACHE_NAME = 'waste-management-v4';
 
 // Dev passthrough: when the page registers this worker as /sw.js?debug=1
 // (base.html does that while DEBUG=True via runserver), the worker never
@@ -15,17 +19,14 @@ const SYNC_TAGS = {
 };
 
 // ── Offline route caching ──────────────────────────────────────────────────
-// GET endpoints the driver dashboard reads to draw the route map and its
-// performance stats. Responses to these are cached stale-while-revalidate so
-// the map/stats can still render (from the last-good snapshot) on patchy
-// mobile data or full offline. Only 200 responses are saved; backend scopes
-// each response to the authenticated driver, so nothing cross-leaks.
-const ROUTE_API_PREFIXES = [
-    '/api/waste-requests/',
-    '/api/routes/',
-    '/api/checkpoints/',
-    '/api/drivers/',
-];
+// DISABLED. These are authenticated, per-user endpoints (addresses, photos,
+// driver usernames/phones, live GPS). The Cache Storage API is keyed by URL
+// only and never by user, so on a shared device `caches.match(req)` would serve
+// the previous user's response to whoever signs in next. The backend scoping
+// the response does not help: the leak happens in the browser cache, before
+// any request is made. Kept as an empty list rather than deleted so the intent
+// stays visible.
+const ROUTE_API_PREFIXES = [];
 
 function isRouteApiRequest(requestUrl) {
     if (!requestUrl || !requestUrl.pathname) return false;
@@ -41,9 +42,13 @@ self.addEventListener('install', (event) => {
     if (!DEBUG_SW) {
         event.waitUntil(
             caches.open(CACHE_NAME).then((cache) => {
+                // cache.addAll() is atomic: a single 404 rejects the whole batch,
+                // so every entry must be a URL that actually exists. These are
+                // the files base.html loads.
                 return cache.addAll([
                     '/',
-                    '/static/web_app/css/style.css',
+                    '/static/web_app/css/layout.css',
+                    '/static/web_app/css/main.css',
                     '/static/web_app/js/main.js',
                 ]).catch(() => {
                     // Ignore cache.addAll failures (e.g., if a file is temporarily missing)
@@ -225,14 +230,20 @@ self.addEventListener('fetch', (event) => {
                         return res;
                     })
                     .catch(() => cached);
-                // Always return a valid Response: cached, or network, or offline fallback.
-                return cached || network || Promise.resolve(
-                    new Response(JSON.stringify({ error: 'Offline', cached: false }), {
+                // Always return a valid Response: cached, else network, else a 503.
+                // `network` is a Promise and therefore always truthy, so the
+                // fallback must be resolved INSIDE the then() — testing it in the
+                // || chain made the 503 unreachable and turned a rejected fetch
+                // into respondWith(undefined), which throws a TypeError.
+                const offlineFallback = new Response(
+                    JSON.stringify({ error: 'Offline', cached: false }),
+                    {
                         status: 503,
                         statusText: 'Service Unavailable',
                         headers: { 'Content-Type': 'application/json' },
-                    })
+                    }
                 );
+                return cached || network.then((res) => res || offlineFallback);
             })
         );
         return;
@@ -260,16 +271,20 @@ self.addEventListener('fetch', (event) => {
                     return res;
                 })
                 .catch(() =>
-                    caches.match(req).then(
-                        (cached) =>
-                            cached ||
-                            caches.match('/') ||
-                            new Response('Offline', {
-                                status: 503,
-                                statusText: 'Service Unavailable',
-                                headers: { 'Content-Type': 'text/plain' },
-                            })
-                    )
+                    caches.match(req)
+                        .then((cached) => cached || caches.match('/'))
+                        // caches.match resolves to undefined on a miss, and
+                        // respondWith(undefined) throws a TypeError — so a real
+                        // offline Response has to be the final fallback.
+                        .then((cached) => cached || new Response(
+                            '<!doctype html><html><head><meta charset="utf-8">'
+                            + '<title>Offline</title></head><body>'
+                            + '<h1>You are offline</h1>'
+                            + '<p>Please reconnect and try again.</p>'
+                            + '</body></html>',
+                            { status: 503, statusText: 'Service Unavailable',
+                              headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+                        ))
                 )
         );
         return;
@@ -293,14 +308,14 @@ self.addEventListener('fetch', (event) => {
                 })
                 .catch(() => cached); // Return cached version if network fails
 
-            // Always return a valid Response
-            return cached || network || Promise.resolve(
-                new Response('Offline', {
-                    status: 503,
-                    statusText: 'Service Unavailable',
-                    headers: { 'Content-Type': 'text/plain' },
-                })
-            );
+            // Always return a valid Response. As above, `network` is a Promise
+            // and always truthy, so the 503 must be resolved inside then().
+            const offlineFallback = new Response('Offline', {
+                status: 503,
+                statusText: 'Service Unavailable',
+                headers: { 'Content-Type': 'text/plain' },
+            });
+            return cached || network.then((res) => res || offlineFallback);
         })
     );
 });

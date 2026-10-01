@@ -5,6 +5,7 @@ pip install python-decouple
 """
 
 import logging
+import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -242,8 +243,14 @@ else:  # SQLite (default for development)
     # safety, no real backup story. Refuse to start instead of pretending.
     # 'test'/'pytest' in sys.argv exempts `manage.py test` (which forces
     # DEBUG=False) so CI can run the suite without a Postgres instance.
-    if not DEBUG and not any(tool in sys.argv[0:1] or tool in sys.argv[1:2]
-                             for tool in ('test', 'pytest')):
+    # Both the executable name and the first subcommand are checked: a console
+    # script invocation is `pytest tests/ -x`, where sys.argv[0] is the .exe.
+    _argv0 = os.path.basename(sys.argv[0]) if sys.argv else ''
+    _is_test_run = (
+        _argv0 in ('test', 'pytest', 'py.test')
+        or any(tool in sys.argv[1:2] for tool in ('test', 'pytest'))
+    )
+    if not DEBUG and not _is_test_run:
         raise ImproperlyConfigured(
             'DB_ENGINE defaults to sqlite3, which is not safe in production. '
             'Set DB_ENGINE=postgresql (plus DB_NAME/DB_USER/DB_PASSWORD/'
@@ -575,15 +582,21 @@ if SENTRY_DSN:
 # /healthz readiness + /healthz/live liveness probes (waste_system/health.py).
 # HEALTHCHECK_DETAIL is OFF by default: the probes are unauthenticated, so
 # exception *messages* stay internal. Flip it to True for a deployment while
-# debugging, then turn it back off.
-HEALTHCHECK_TIMEOUT = 2.0          # seconds per dependency probe (below LB timeout)
-HEALTHCHECK_DETAIL = False         # redact exception text in /healthz responses
+# debugging, then turn it back off. Both are read from the environment so an
+# operator can tune them without a code change.
+HEALTHCHECK_TIMEOUT = config('HEALTHCHECK_TIMEOUT', default=2.0, cast=float)
+HEALTHCHECK_DETAIL = config('HEALTHCHECK_DETAIL', default=False, cast=bool)
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
+# Env-driven: if the PWA/frontend is ever served from a different origin than
+# the API, every preflight fails with a hardcoded localhost-only list.
 CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:8000',
-    'http://127.0.0.1:8000',
+    origin.strip()
+    for origin in config(
+        'CORS_ALLOWED_ORIGINS',
+        default='http://localhost:3000,http://localhost:8000,http://127.0.0.1:8000',
+    ).split(',')
+    if origin.strip()
 ]
 CORS_ALLOW_CREDENTIALS = True
 

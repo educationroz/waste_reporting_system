@@ -878,7 +878,10 @@ window.resolveReview = async function(requestId, decision, btn) {
 };
 
 // ── Reload नगरी: status badge, driver cell, action cell, delete button live update ──
-function applyRequestRowUpdate(requestId, { statusKey, driverHtml, actionHtml, showDelete }) {
+    function applyRequestRowUpdate(requestId, { statusKey, driverHtml, actionHtml, showDelete }) {
+        // requestId is interpolated into an inline onclick attribute below —
+        // force a number so JSON content can never break out of the attribute.
+        requestId = Number(requestId);
     const row = document.getElementById(`request-row-${requestId}`);
     if (!row) return; // row bhetिएन भने silently skip
 
@@ -946,7 +949,7 @@ window.openPhotoGallery = function(requestId) {
             img.src = url;
             img.className = 'rounded shadow-sm';
             img.style.cssText = 'width: 200px; height: 200px; object-fit: cover;';
-            img.onclick = () => window.open(url, '_blank');
+            img.onclick = () => window.open(url, '_blank', 'noopener,noreferrer');
             container.appendChild(img);
         });
     }
@@ -990,7 +993,7 @@ window.openPhotoGallery = function(requestId) {
                         let driverHtml = null;
                         if (data.driver_name !== undefined) {
                             if (data.driver_name) {
-                                driverHtml = `<span><i class="bi bi-person me-1"></i>${window.escapeHtml ? window.escapeHtml(data.driver_name) : data.driver_name}</span>`;
+                                driverHtml = `<span><i class="bi bi-person me-1"></i>${escapeHtml(data.driver_name)}</span>`;
                             } else {
                                 driverHtml = '<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>Unassigned</span>';
                             }

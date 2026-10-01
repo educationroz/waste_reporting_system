@@ -234,7 +234,7 @@
             <!-- Metric Cards (Row 1) -->
             <div class="row g-3 mb-3">
                 <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}'">
+                    <div class="card metric-card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-requests' %}'">
                         <div class="card-body p-4">
                             <div class="text-success fw-semibold small mb-1">{% trans "Total Requests" %}</div>
                             <div class="display-6 fw-bold text-success">{{ total_requests }}</div>
@@ -242,7 +242,7 @@
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-warning bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=pending'">
+                    <div class="card metric-card border-0 bg-warning bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-requests' %}?status=pending'">
                         <div class="card-body p-4">
                             <div class="text-warning fw-semibold small mb-1">{% trans "Pending Sync" %}</div>
                             <div class="display-6 fw-bold text-warning">{{ pending_requests }}</div>
@@ -258,7 +258,7 @@
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=assigned'">
+                    <div class="card metric-card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-requests' %}?status=assigned'">
                         <div class="card-body p-4">
                             <div class="text-info fw-semibold small mb-1">{% trans "Assigned Tasks" %}</div>
                             <div class="display-6 fw-bold text-info">{{ assigned_requests_count }}</div>
@@ -270,7 +270,7 @@
             <!-- Metric Cards (Row 2) -->
             <div class="row g-3 mb-4">
                 <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=in_progress'">
+                    <div class="card metric-card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-requests' %}?status=in_progress'">
                         <div class="card-body p-4">
                             <div class="text-primary fw-semibold small mb-1">{% trans "In Progress" %}</div>
                             <div class="display-6 fw-bold text-primary">{{ in_progress_requests_count }}</div>
@@ -278,7 +278,7 @@
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-requests' %}?status=completed'">
+                    <div class="card metric-card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-requests' %}?status=completed'">
                         <div class="card-body p-4">
                             <div class="text-success fw-semibold small mb-1">{% trans "Completed Jobs" %}</div>
                             <div class="display-6 fw-bold text-success">{{ completed_requests_count }}</div>
@@ -286,7 +286,7 @@
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-drivers' %}'">
+                    <div class="card metric-card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-drivers' %}'">
                         <div class="card-body p-4">
                             <div class="text-info fw-semibold small mb-1">{% trans "Active Drivers" %}</div>
                             <div class="display-6 fw-bold text-info">{{ active_drivers }}<span class="fs-5 text-secondary fw-normal">/{{ total_drivers }}</span></div>
@@ -294,7 +294,7 @@
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.location.href='{% url 'admin-vehicles' %}'">
+                    <div class="card metric-card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-vehicles' %}'">
                         <div class="card-body p-4">
                             <div class="text-primary fw-semibold small mb-1">{% trans "Fleet Available" %}</div>
                             <div class="display-6 fw-bold text-primary">{{ available_vehicles }}<span class="fs-5 text-secondary fw-normal">/{{ total_vehicles }}</span></div>
@@ -950,7 +950,9 @@
     }
 
     function applyAdminRequestRowUpdate(data) {
-        const requestId = data.request_id;
+        // Coerce: this value is interpolated into an inline onclick attribute
+        // below, so it must be a number and never free-form JSON content.
+        const requestId = Number(data.request_id);
         const row = document.getElementById(`admin-request-row-${requestId}`);
         if (!row) return;
 
@@ -974,7 +976,7 @@
         const driverCell = row.children[5];
         if (driverCell && data.driver_name !== undefined) {
             if (data.driver_name) {
-                driverCell.innerHTML = `<span><i class="bi bi-person me-1"></i>${window.escapeHtml ? window.escapeHtml(data.driver_name) : data.driver_name}</span>`;
+                driverCell.innerHTML = `<span><i class="bi bi-person me-1"></i>${escapeHtml(data.driver_name)}</span>`;
             } else {
                 driverCell.innerHTML = '<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>Unassigned</span>';
             }
@@ -1435,7 +1437,7 @@
                 showToast(gettext('Driver dispatch successfully configured!'), 'success');
                 const modal = getAssignModal();
                 if (modal) modal.hide();
-                setTimeout(() => location.reload(), 1000);
+                setTimeout(() => window.ssRefreshContent(), 400);
             } else {
                 showToast(gettext('Failed to deploy driver node.'), 'danger');
             }
@@ -1459,7 +1461,7 @@
             const data = await API.patch(`/api/waste-requests/${requestId}/update_status/`, { status: 'cancelled' });
             if (data && data.id) {
                 showToast(gettext('Request cancelled.'), 'success');
-                setTimeout(() => location.reload(), 1000);
+                setTimeout(() => window.ssRefreshContent(), 400);
             } else {
                 showToast(gettext('Failed to cancel request.'), 'danger');
             }
@@ -1491,7 +1493,7 @@
 
                 if (res.ok) {
                     showToast(gettext('Request deleted.'), 'success');
-                    setTimeout(() => location.reload(), 800);
+                    setTimeout(() => window.ssRefreshContent(), 300);
                 } else {
                     let errMsg = 'Failed to delete request.';
                     try {
@@ -1548,7 +1550,7 @@
                 const modalEl = document.getElementById('reassignDriverModal');
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
-                setTimeout(() => location.reload(), 1000);
+                setTimeout(() => window.ssRefreshContent(), 400);
             } else {
                 showToast(data?.error || gettext('Failed to reassign requests.'), 'danger');
             }
@@ -1571,7 +1573,7 @@
                 const modalEl = document.getElementById('cloneScheduleModal');
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
-                setTimeout(() => location.reload(), 1000);
+                setTimeout(() => window.ssRefreshContent(), 400);
             } else {
                 showToast(data?.error || gettext('Failed to clone schedule.'), 'danger');
             }
@@ -1579,35 +1581,48 @@
     };
 
     // ── Keyboard Shortcuts ──
-    document.addEventListener('keydown', function(e) {
-        // Ignore shortcuts when typing in inputs
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-        if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // Registered on document, which persists across htmx swaps, while this IIFE
+    // re-runs on every visit — without the one-time flag the handler stacked up
+    // and pressing "A" opened N modals, "R" fired N navigations.
+    if (!window.__ssAdminDashShortcutsBound) {
+        window.__ssAdminDashShortcutsBound = true;
+        document.addEventListener('keydown', function(e) {
+            // Ignore shortcuts when typing in inputs
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
 
-        switch (e.key.toLowerCase()) {
-            case 'a': // Assign - open assign modal for first pending request
-                const firstPendingRow = document.querySelector('tbody tr td .badge-warning');
-                if (firstPendingRow) {
-                    const row = firstPendingRow.closest('tr');
-                    const requestId = row.querySelector('td:first-child')?.textContent?.replace('#', '');
-                    if (requestId) window.openAssignModal(requestId);
+            switch (e.key.toLowerCase()) {
+                case 'a': { // Assign - open assign modal for first pending request
+                    // The old selector matched the zone-overview table's bin badge
+                    // (the first tbody in the document), so the id it read was the
+                    // geo icon's empty textContent and the modal never opened.
+                    // Target the pending request rows directly.
+                    const firstPendingRow = document.querySelector('tr[data-status="pending"]');
+                    if (firstPendingRow) {
+                        const row = firstPendingRow;
+                        const requestId = row.dataset.requestId
+                            || row.id.replace('admin-request-row-', '');
+                        if (requestId) window.openAssignModal(requestId);
+                    }
+                    break;
                 }
-                break;
-            case 'r': // Route - navigate to route planning
-                window.location.href = '{% url "route-planning" %}';
-                break;
-            case 'd': // Drivers - navigate to drivers list
-                window.location.href = '{% url "admin-drivers" %}';
-                break;
-            case 'm': // Map - scroll to fleet map
-                const mapCard = document.getElementById('live-fleet-map')?.closest('.card');
-                if (mapCard) mapCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                break;
-            case 'h': // Help - show shortcuts toast
-                showToast('Shortcuts: A=Assign, R=Route, D=Drivers, M=Map, H=Help', 'info');
-                break;
-        }
-    });
+                case 'r': // Route - navigate to route planning
+                    window.ssNavigate('{% url "route-planning" %}');
+                    break;
+                case 'd': // Drivers - navigate to drivers list
+                    window.ssNavigate('{% url "admin-drivers" %}');
+                    break;
+                case 'm': { // Map - scroll to fleet map
+                    const mapCard = document.getElementById('live-fleet-map')?.closest('.card');
+                    if (mapCard) mapCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    break;
+                }
+                case 'h': // Help - show shortcuts toast
+                    showToast('Shortcuts: A=Assign, R=Route, D=Drivers, M=Map, H=Help', 'info');
+                    break;
+            }
+        });
+    }
 
     window.applyFilters = function() {
         const searchTerm = document.getElementById('search-box').value.trim();
@@ -1617,9 +1632,10 @@
         if (searchTerm) url += `search=${encodeURIComponent(searchTerm)}&`;
         if (status) url += `status=${status}`;
 
-        window.location.href = url;
+        // Swap through htmx rather than navigating, so the shell (sockets,
+        // intervals, sidebar state) survives applying a filter.
+        window.ssNavigate(url);
     };
-
     const searchBox = document.getElementById('search-box');
     if (searchBox) {
         searchBox.addEventListener('keypress', e => {

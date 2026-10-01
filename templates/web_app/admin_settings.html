@@ -1076,28 +1076,37 @@
     // second render that runs a moment later.
     let checkpointsLoadInFlight = null;
 
-    if (!document.body.dataset._leafletCleanupBound) {
-      document.body.addEventListener("htmx:beforeSwap", () => {
-        if (depotMap) {
-          depotMap.remove();
-          depotMap = null;
-        }
-        if (checkpointMap) {
-          checkpointMap.remove();
-          checkpointMap = null;
-        }
-        depotMarker = null;
-        checkpointMarker = null;
-        editingCheckpointId = null;
-        activeSavedCheckpointEditId = null;
-        pendingCheckpointsLayer = null;
-        pendingCheckpoints = [];
-        savedCheckpointsLayer = null;
-        markerRegistry = {};
-        checkpointsLoadInFlight = null;
-      });
-      document.body.dataset._leafletCleanupBound = "1";
-    }
+    // Re-registered on every htmx visit so it closes over the CURRENT depotMap /
+    // checkpointMap. This used to be guarded by a bare `dataset` key that both
+    // froze it on the first visit (leaking both maps afterwards) and collided
+    // with the other map pages. ssRegisterPageTeardown gives each visit its own
+    // teardown against a single session-wide listener.
+    window.ssRegisterPageTeardown(() => {
+      // Capture references before nulling, otherwise the __ssActiveMap check
+      // below compares against null and never matches.
+      const oldDepot = depotMap;
+      const oldCheckpoint = checkpointMap;
+      if (oldDepot) {
+        oldDepot.remove();
+        depotMap = null;
+      }
+      if (oldCheckpoint) {
+        oldCheckpoint.remove();
+        checkpointMap = null;
+      }
+      if (window.__ssActiveMap === oldDepot || window.__ssActiveMap === oldCheckpoint) {
+        window.__ssActiveMap = null;
+      }
+      depotMarker = null;
+      checkpointMarker = null;
+      editingCheckpointId = null;
+      activeSavedCheckpointEditId = null;
+      pendingCheckpointsLayer = null;
+      pendingCheckpoints = [];
+      savedCheckpointsLayer = null;
+      markerRegistry = {};
+      checkpointsLoadInFlight = null;
+    });
 
     window.previewBrandingLogo = function(input) {
       if (input.files && input.files[0]) {
@@ -1151,7 +1160,7 @@
               brandLogos.forEach((img) => { img.src = result.data.site_logo + "?t=" + Date.now(); });
             }
 
-            setTimeout(() => location.reload(), 900);
+            setTimeout(() => window.ssRefreshContent(), 300);
           } else {
             showToast(gettext("Failed to update system branding."), "danger");
           }
@@ -1406,6 +1415,7 @@
         [DEFAULT_LAT, DEFAULT_LNG],
         14,
       );
+      window.__ssActiveMap = checkpointMap;
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap contributors",
@@ -3244,11 +3254,11 @@
           throw new Error(data.error || "Unable to delete backup.");
         }
 
-        showToast(data.message, "success");
+        showToast(window.escapeHtml(String(data.message ?? '')), "success");
 
         await loadBackupFiles();
       } catch (e) {
-        showToast(e.message, "danger");
+        showToast(window.escapeHtml(String(e.message ?? '')), "danger");
       }
     }
 
@@ -3318,7 +3328,10 @@
           throw new Error(data.error || "Unable to restore backup.");
         }
 
-        showToast(data.message + " You may need to sign in again.", "success");
+        showToast(
+          window.escapeHtml(String(data.message ?? '')) + " You may need to sign in again.",
+          "success",
+        );
 
         await loadBackupFiles();
       } catch (e) {
@@ -3398,14 +3411,20 @@
       loadBackupFiles();
     })();
 
-    document.body.addEventListener("htmx:afterSwap", function (evt) {
-      const btn = document.getElementById("backup-create-btn");
+    // One-time flag on the persistent <body>: this script is inside the swapped
+    // fragment, so an unguarded listener here was registered once per visit and
+    // grew without bound.
+    if (!window.__ssBackupAfterSwapBound) {
+      window.__ssBackupAfterSwapBound = true;
+      document.body.addEventListener("htmx:afterSwap", function () {
+        const btn = document.getElementById("backup-create-btn");
 
-      if (btn && !btn.dataset._backupBound) {
-        attachBackupHandlers();
-        loadBackupFiles();
-      }
-    });
+        if (btn && !btn.dataset._backupBound) {
+          attachBackupHandlers();
+          loadBackupFiles();
+        }
+      });
+    }
 
     // ── Add Setting Node Async Trigger ──
     async function addSetting() {

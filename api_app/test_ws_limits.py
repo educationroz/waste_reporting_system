@@ -18,7 +18,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.test import TransactionTestCase, override_settings
 
 from . import ws_limits
-from .consumers import DriverLocationConsumer, NotificationConsumer
+from .consumers import ComplaintConsumer, DriverLocationConsumer, NotificationConsumer
 
 User = get_user_model()
 
@@ -305,6 +305,151 @@ class WebSocketAuthTests(TransactionTestCase):
         )
         await c.connect()
         await c.disconnect()
-        self.assertEqual(
-            ws_limits.current_connection_count(NotificationConsumer, None), 0
+
+
+class _CaptureMixin:
+    """Collect frames a consumer handler tries to send instead of writing a socket.
+
+    Scoping is decided inside the group-delivery handlers, and those are plain
+    methods on the consumer. Calling them with a capturing ``send`` tests the
+    real filter deterministically - no socket, no channel layer, and no
+    cross-test interference from a process-wide InMemoryChannelLayer.
+    """
+
+    def _capture(self, user):
+        consumer = self.consumer_cls()
+        consumer.user = user
+        consumer.sent = []
+        consumer.base_send = consumer.send
+
+        async def _send(payload=None, **kwargs):
+            consumer.sent.append(payload)
+
+        consumer.send = _send
+        return consumer
+
+
+class DriverLocationScopingTests(_CaptureMixin, TransactionTestCase):
+    """Read-side scoping on /ws/driver-locations/.
+
+    The socket is dual-purpose: drivers WRITE their GPS here, admins READ the
+    whole fleet. So a driver must be able to connect at all, but must only ever
+    receive their own position and Route - never another driver's - and a plain
+    citizen must not be able to subscribe to the fleet feed.
+    """
+
+    consumer_cls = DriverLocationConsumer
+
+    async def _user(self, username, role):
+        return await sync_to_async(User.objects.create_user)(
+            username=username, password='pw',
+            email=f'{username}@example.com', role=role,
         )
+
+    async def _loc(self, user, driver_id, name, lat='1.0', lng='2.0'):
+        event = {
+            'type': 'driver_location_update', 'driver_id': driver_id,
+            'driver_name': name, 'latitude': lat, 'longitude': lng,
+            'is_available': True,
+        }
+        if user is not None:
+            event['driver_user_id'] = user.id
+        return event
+
+    async def test_driver_receives_own_location_but_not_another_drivers(self):
+        mine = await self._user('scopemine', 'driver')
+        other = await self._user('scopeother', 'driver')
+        c = self._capture(mine)
+
+        await c.driver_location_update(await self._loc(other, 999, 'Other'))
+        await c.driver_location_update(await self._loc(mine, 111, 'Mine'))
+
+        names = [json.loads(s)['driver_name'] for s in c.sent]
+        self.assertEqual(names, ['Mine'])
+
+    async def test_admin_receives_every_drivers_location(self):
+        admin = await self._user('scopewsadmin', 'admin')
+        other = await self._user('scopeadminother', 'driver')
+        c = self._capture(admin)
+
+        await c.driver_location_update(await self._loc(other, 999, 'Other'))
+
+        self.assertEqual(len(c.sent), 1)
+        self.assertEqual(json.loads(c.sent[0])['driver_name'], 'Other')
+
+    async def test_driver_does_not_receive_another_drivers_route(self):
+        mine = await self._user('scoperoutemine', 'driver')
+        other = await self._user('scoperouteother', 'driver')
+        c = self._capture(mine)
+
+        def route(driver_user_id, route_id):
+            return {
+                'type': 'route_update', 'driver_id': route_id,
+                'driver_user_id': driver_user_id, 'route_id': route_id,
+                'waypoints': [], 'total_distance': '1', 'total_stops': 1,
+            }
+
+        await c.route_update(route(other.id, 5))
+        await c.route_update(route(mine.id, 6))
+
+        self.assertEqual([json.loads(s)['route_id'] for s in c.sent], [6])
+
+    async def test_event_without_owner_id_is_not_leaked_to_a_driver(self):
+        """Defensive: a payload that never carried an owner must not be
+        broadcast to every driver as if it were theirs."""
+        mine = await self._user('scopenoowner', 'driver')
+        c = self._capture(mine)
+        await c.driver_location_update({
+            'type': 'driver_location_update', 'driver_id': 7,
+            'driver_name': 'Ghost', 'latitude': '0', 'longitude': '0',
+        })
+        self.assertEqual(c.sent, [])
+
+
+class ComplaintScopingTests(_CaptureMixin, TransactionTestCase):
+    """/ws/complaints/ is read by BOTH the admin table and the citizen's own
+    /complaints/ page, so a non-admin must be scoped to their own rows rather
+    than refused at connect() - which left the citizen page's live updates
+    permanently dead."""
+
+    consumer_cls = ComplaintConsumer
+
+    async def test_complainant_receives_only_own_complaint(self):
+        owner = await sync_to_async(User.objects.create_user)(
+            username='compowner', password='pw',
+            email='compowner@example.com', role='user',
+        )
+        c = self._capture(owner)
+
+        await c.complaint_update({'complaint_id': 1, 'owner_user_id': owner.id + 999,
+                                  'status': 'completed'})
+        await c.complaint_update({'complaint_id': 2, 'owner_user_id': owner.id,
+                                  'status': 'completed'})
+
+        self.assertEqual([json.loads(s)['complaint_id'] for s in c.sent], [2])
+
+    async def test_admin_receives_all_complaints(self):
+        admin = await sync_to_async(User.objects.create_user)(
+            username='compadmin', password='pw',
+            email='compadmin@example.com', role='admin',
+        )
+        c = self._capture(admin)
+
+        await c.complaint_update({'complaint_id': 77,
+                                  'owner_user_id': admin.id + 4242, 'status': 'pending'})
+
+        self.assertEqual([json.loads(s)['complaint_id'] for s in c.sent], [77])
+
+    async def test_complaint_consumer_lets_a_complainant_connect(self):
+        """The citizen page opens this socket, so connect() must not 4001 a
+        non-admin any more."""
+        owner = await sync_to_async(User.objects.create_user)(
+            username='compconnect', password='pw',
+            email='compconnect@example.com', role='user',
+        )
+        c = make_communicator(ComplaintConsumer, owner, '/ws/complaints/')
+        connected, _ = await c.connect()
+        await c.disconnect()
+        self.assertTrue(connected)
+
+

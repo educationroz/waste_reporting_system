@@ -201,18 +201,34 @@ def _log_admin_action(request, action_type, content_type, obj, description=''):
     """
     Create an AdminLog entry. Any authenticated user's tracked action gets
     logged here — admin, driver, or regular user.
+
+    ``request`` may be None for automated/system actions (e.g. ML auto-assign),
+    in which case no actor is attributed to the entry. Logging must never raise:
+    a failure here must not turn an already-committed write into a 500.
     """
-    if not request.user.is_authenticated:
-        return
-    AdminLog.objects.create(
-        admin_user=request.user,
-        action=action_type,
-        content_type=content_type,
-        object_id=getattr(obj, 'id', None),
-        object_description=description or str(obj),
-        ip_address=request.META.get('REMOTE_ADDR'),
-        user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
-    )
+    if request is None:
+        admin_user = None
+        ip_address = None
+        user_agent = ''
+    else:
+        if not getattr(request, 'user', None) or not request.user.is_authenticated:
+            return
+        admin_user = request.user
+        ip_address = request.META.get('REMOTE_ADDR')
+        user_agent = request.META.get('HTTP_USER_AGENT', '')[:500]
+
+    try:
+        AdminLog.objects.create(
+            admin_user=admin_user,
+            action=action_type,
+            content_type=content_type,
+            object_id=getattr(obj, 'id', None),
+            object_description=description or str(obj),
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+    except Exception:
+        logger.exception('Failed to write AdminLog entry for %s #%s', content_type, getattr(obj, 'id', None))
 
 
 def _push_ws_request_update(request_id, status, updated_by=None):
@@ -244,6 +260,10 @@ def _push_ws_request_update(request_id, status, updated_by=None):
                 req.driver.user.username
                 if req.driver is not None and req.driver.user_id else ''
             )
+            # Ownership hints so the consumer can drop updates the socket's user
+            # is not entitled to see. Admins bypass the check entirely.
+            payload['owner_user_id'] = req.user_id
+            payload['driver_user_id'] = req.driver.user_id if req.driver else None
     except Exception:  # noqa: BLE001 - extras are best-effort; base payload still fires
         pass
     try:
@@ -293,7 +313,8 @@ def _push_ws_complaint_update(complaint_id, status=None, deleted=False):
     """
     Broadcast a complaint create/status/delete change to the
     'complaint_updates' group (ComplaintConsumer). Admin pages listening on
-    /ws/complaints/ refresh the affected row live instead of reloading.
+    /ws/complaints/ refresh the affected row live instead of reloading, and a
+    complainant's own /complaints/ page sees their rows update.
     Status extras are best-effort — deletion only needs the id and a flag.
     """
     if CHANNEL_LAYER is None:
@@ -311,12 +332,16 @@ def _push_ws_complaint_update(complaint_id, status=None, deleted=False):
             if c is not None:
                 payload['status'] = c.status
                 payload['status_display'] = c.get_status_display()
+                payload['owner_user_id'] = c.user_id
         else:
             payload['status'] = status
             payload['status_display'] = (
                 dict(Complaint.STATUS_CHOICES).get(status, status)
                 if hasattr(Complaint, 'STATUS_CHOICES') else status
             )
+            # owner_user_id is what scopes delivery to the complainant; without
+            # it a non-admin socket would either see nothing or see everything.
+            payload['owner_user_id'] = Complaint.objects.filter(pk=complaint_id).values_list('user_id', flat=True).first()
     except Exception:  # noqa: BLE001 - extras are best-effort; id + deleted flag still fire
         pass
     try:
@@ -1197,7 +1222,7 @@ class DriverViewSet(viewsets.ModelViewSet):
 
         # Current active route (if any)
         current_route = Route.objects.filter(
-            driver=driver, status__in=['planned', 'in_progress']
+            driver=driver, status__in=['planned', 'active']
         ).order_by('planned_date').first()
 
         # Serialize assigned requests
@@ -1288,8 +1313,8 @@ class DriverViewSet(viewsets.ModelViewSet):
         except Route.DoesNotExist:
             return Response({'error': 'Route not found or not assigned to you.'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Update route status to in_progress
-        route.status = 'in_progress'
+        # Update route status to active
+        route.status = 'active'
         route.started_at = timezone.now()
         route.save(update_fields=['status', 'started_at'])
 
@@ -1474,6 +1499,12 @@ class DriverViewSet(viewsets.ModelViewSet):
 
         schedule_data = []
         for sch in schedules:
+            # Anchor the recurrence on the schedule's creation week/month. Without
+            # an anchor, biweekly/monthly cannot be distinguished from weekly —
+            # comparing a date inside the requested week against that same week
+            # always yields a difference of 0.
+            anchor = timezone.localtime(sch.created_at).date() if sch.created_at else week_start
+
             # Calculate which days this schedule runs in the week
             run_days = []
             if sch.frequency == 'daily':
@@ -1486,10 +1517,34 @@ class DriverViewSet(viewsets.ModelViewSet):
                 if run_date > week_end:
                     continue
 
-                # For biweekly, check if this is the right week
                 if sch.frequency == 'biweekly':
-                    weeks_diff = (run_date - week_start).days // 7
-                    if weeks_diff % 2 != 0:
+                    # Compare week-of-month starts so the difference is a whole
+                    # number of weeks. Python's % preserves parity for negatives,
+                    # so weeks before the anchor are handled correctly too.
+                    anchor_week = anchor - timedelta(days=anchor.weekday())
+                    run_week = run_date - timedelta(days=run_date.weekday())
+                    weeks_since_anchor = (run_week - anchor_week).days // 7
+                    if weeks_since_anchor % 2 != 0:
+                        continue
+
+                if sch.frequency == 'monthly':
+                    # Once per month, on the same ordinal weekday of the month as
+                    # the anchor (e.g. "2nd Tuesday"), repeating in EVERY month.
+                    #
+                    # The previous check compared run_date's month AND year to the
+                    # anchor's, so a monthly schedule only ever rendered in the
+                    # month it was created and then disappeared forever.
+                    #
+                    # This endpoint renders one week at a time, so compute the
+                    # month's actual occurrence and keep the day only if it is
+                    # that date. A month with too few occurrences (e.g. a 5th
+                    # Monday) is simply skipped, which is well defined and far
+                    # better than never recurring at all.
+                    nth = anchor.day // 7  # 0-based week-of-month of the anchor
+                    first_of_month = run_date.replace(day=1)
+                    offset = (sch.day_of_week - first_of_month.weekday()) % 7
+                    occurrence = first_of_month + timedelta(days=offset + nth * 7)
+                    if occurrence != run_date:
                         continue
 
                 schedule_data.append({
@@ -2064,23 +2119,36 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         """
-        create (submitting a new pickup request) chai guest (login nagareko) lai pani
-        khula rakhne.
-        assign_driver / update_status / bulk_assign_driver / bulk_cancel chai
-        driver/admin le use garne action ho — yaha IsOwnerOrAdmin apply garda
-        driver "owner" nabhako le 403 aauthyo, tesैle yi lai IsAuthenticated
-        matra rakheर, role-check function bhitra nai (already existing) garne.
-        bulk_export / resolve_review chai admin-only action ho.
-        soft_delete / restore chai request ko malik (owner) le afैle Recycle Bin
-        ma sarne / restore garne action ho, tesैle IsOwnerOrAdmin nai lagau —
-        owner ra admin duवैले use garna paaun.
-        Baaki (list/retrieve/update/delete) chai login + ownership check required nai.
+        DRF ignores @action(permission_classes=...) when get_permissions() is
+        overridden, so every action's real permission MUST be mapped here —
+        otherwise it silently falls through to the IsAuthenticated +
+        IsOwnerOrAdmin default. That bug previously (a) blocked guests from
+        send_claim_link (401 — the magic-link modal is for unauthenticated
+        users) and (b) let ANY logged-in user call the admin-only actions
+        reassign_all_from_driver / auto_assign_driver (privilege escalation:
+        has_permission only checks login, and detail=False actions never run
+        the object-level check).
+
+        Mapping:
+        - create / send_claim_link → guests allowed (public flows)
+        - role-checked driver/admin actions → IsAuthenticated only (the
+          role check lives inside the handler)
+        - admin-only actions → IsAuthenticated + IsAdminUser (role='admin')
+        - everything else → IsAuthenticated + IsOwnerOrAdmin (object-level
+          owner check runs in get_object())
         """
-        if self.action == 'create':
+        if self.action in ('create', 'send_claim_link'):
             return [AllowAny()]
         if self.action in ('assign_driver', 'update_status', 'bulk_assign_driver', 'bulk_cancel'):
             return [IsAuthenticated()]
-        if self.action in ('bulk_export', 'resolve_review'):
+        if self.action in (
+            'bulk_export', 'resolve_review',
+            # admin-only HTTP actions (frontend calls them from admin pages;
+            # bulk_assign / bulk_reschedule keep their in-handler admin check
+            # as belt-and-suspenders)
+            'auto_assign_driver', 'reassign_all_from_driver',
+            'bulk_assign', 'bulk_reschedule',
+        ):
             return [IsAuthenticated(), IsAdminUser()]
         return [IsAuthenticated(), IsOwnerOrAdmin()]
 
@@ -2717,7 +2785,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 qs = qs.filter(status=status_filter)
             if waste_type_filter:
                 qs = qs.filter(waste_type=waste_type_filter)
-            if zone_filter in dict(WasteRequest.ZONE_CHOICES):
+            if zone_filter in dict(ZONE_CHOICES):
                 qs = qs.filter(zone=zone_filter)
             if needs_review == 'true':
                 qs = qs.filter(needs_manual_review=True)
@@ -2973,7 +3041,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             # drivers. Count completed rows per driver and add that many.
             per_driver = (
                 WasteRequest.objects
-                .filter(id__in=clean_ids, status='completed', driver_id__isnull=False)
+                .filter(id__in=eligible_ids, status='completed', driver_id__isnull=False)
                 .values('driver_id')
                 .annotate(n=Count('id'))
             )
@@ -3038,7 +3106,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         
         if waste_request.needs_manual_review:
             return Response(
-                {'error': 'Cannot auto-assign: request needs manual review (ML confidence < 80%).'},
+                {'error': 'Cannot auto-assign: request needs manual review (ML confidence below the configured threshold).'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -3057,7 +3125,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         
         if not available_drivers.exists():
             return Response(
-                {'error': f'No available drivers in {dict(WasteRequest.ZONE_CHOICES).get(zone, zone)} zone.'},
+                {'error': f'No available drivers in {dict(ZONE_CHOICES).get(zone, zone)} zone.'},
                 status=status.HTTP_404_NOT_FOUND
             )
         
@@ -3288,7 +3356,8 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         Only shows requests where:
         - Status is 'pending' (not assigned)
         - Zone matches driver's zone
-        - ML confidence >= 80% (not needs_manual_review)
+        - Not flagged needs_manual_review, i.e. ML confidence cleared the
+          runtime-configured threshold (or an admin approved it)
         - Has valid location coordinates
         - Not flagged for spam (checkpoint cooldown handled at creation)
         
@@ -3378,46 +3447,73 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         - Request is in driver's zone
         - Request status is 'pending'
         - Request has no driver assigned
-        - Request ML confidence >= 80%
+        - Request is NOT flagged needs_manual_review
+
+        The confidence threshold is deliberately NOT re-checked here. It is
+        already applied by the classifier, which sets
+        needs_manual_review = (confidence < ml_confidence_threshold) using the
+        runtime-tunable threshold from SystemSettings. Re-deriving it here would
+        both hardcode a stale 80 and defeat the admin override: an admin who
+        approves a low-confidence request via resolve_review clears the flag
+        precisely so a driver can pick it up.
         """
-        waste_request = self.get_object()
         user = request.user
-        
+
         if user.role != 'driver':
             return Response({'error': 'Only drivers can claim requests.'}, status=status.HTTP_403_FORBIDDEN)
-        
+
         try:
             driver = user.driver_profile
         except Driver.DoesNotExist:
             return Response({'error': 'Driver profile not found.'}, status=status.HTTP_404_NOT_FOUND)
-        
+
         if not driver.is_available or driver.on_break:
             return Response({'error': 'You are not available or on break.'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
+        # Look the request up OUTSIDE get_queryset(): the driver-scoped queryset only
+        # contains requests already assigned to this driver, so a genuinely claimable
+        # (pending, unassigned) request would 404 before reaching the guards below.
+        try:
+            waste_request = WasteRequest.objects.select_related('driver').get(
+                pk=pk, is_deleted=False
+            )
+        except WasteRequest.DoesNotExist:
+            return Response({'error': 'Request not found.'}, status=status.HTTP_404_NOT_FOUND)
+
         if waste_request.status != 'pending':
             return Response({'error': f'Request is not available for claiming (status: {waste_request.status}).'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         if waste_request.driver is not None:
             return Response({'error': 'Request is already assigned to another driver.'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         if waste_request.zone != driver.zone:
             return Response({'error': 'Request is not in your zone.'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         if waste_request.needs_manual_review:
-            return Response({'error': 'Request needs manual review (ML confidence < 80%).'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Assign the request to this driver
-        waste_request.driver = driver
-        waste_request.status = 'assigned'
-        waste_request.save(update_fields=['driver', 'status'])
-        
-        # Also assign same-location siblings
-        siblings = _same_location_siblings(waste_request)
-        for sibling in siblings:
-            sibling.driver = driver
-            sibling.status = 'assigned'
-            sibling.save(update_fields=['driver', 'status'])
-        
+            return Response({'error': 'Request needs manual review before it can be claimed.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Conditional UPDATE guards against two drivers claiming simultaneously:
+        # only the one whose UPDATE matches an unassigned pending row wins.
+        with transaction.atomic():
+            claimed = WasteRequest.objects.filter(
+                pk=waste_request.pk, driver__isnull=True, status='pending'
+            ).update(driver=driver, status='assigned')
+            if not claimed:
+                return Response(
+                    {'error': 'Request was just claimed by another driver.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            # Also assign same-location siblings
+            siblings = _same_location_siblings(waste_request)
+            if siblings:
+                sibling_ids = [s.id for s in siblings]
+                WasteRequest.objects.filter(
+                    id__in=sibling_ids, driver__isnull=True, status='pending'
+                ).update(driver=driver, status='assigned')
+
+        waste_request.refresh_from_db()
+
         grouped_note = f' (+{len(siblings)} same-location request(s))' if siblings else ''
         _log_admin_action(
             request, 'assign', 'WasteRequest', waste_request,
@@ -3854,7 +3950,14 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         if user.role != 'user':
             return Response({'error': 'User access required.'}, status=status.HTTP_403_FORBIDDEN)
 
-        weeks = int(request.query_params.get('weeks', 4))
+        try:
+            weeks = int(request.query_params.get('weeks', 4))
+        except (TypeError, ValueError):
+            return Response(
+                {'error': "'weeks' must be an integer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        weeks = max(1, min(weeks, 52))
         today = timezone.now().date()
         end_date = today + timedelta(weeks=weeks)
 
@@ -3878,7 +3981,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         # Get user's assigned routes
         routes = Route.objects.filter(
             waste_requests__user=user,
-            status__in=['planned', 'active', 'in_progress'],
+            status__in=['planned', 'active'],
             planned_date__gte=today,
             planned_date__lte=end_date,
         ).select_related('driver__user', 'vehicle').prefetch_related('waste_requests').distinct().order_by('planned_date')
@@ -4220,12 +4323,15 @@ class RouteViewSet(viewsets.ModelViewSet):
         )
 
         # Broadcast route geometry via WebSocket to driver-facing map pages.
+        # driver_user_id lets DriverLocationConsumer route_update() deliver this
+        # to the assigned driver and any admin, but to no other driver.
         if CHANNEL_LAYER is not None:
             async_to_sync(CHANNEL_LAYER.group_send)(
                 'driver_locations',
                 {
                     'type': 'route_update',
                     'driver_id': driver.id,
+                    'driver_user_id': driver.user_id,
                     'route_id': route.id,
                     'waypoints': route_data['waypoints'],
                     'total_distance': route_data['total_distance_km'],
@@ -4426,11 +4532,6 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         while next_week_date.weekday() != schedule.day_of_week:
             next_week_date += timedelta(days=1)
 
-        if schedule.planned_date and schedule.planned_date >= next_week_date:
-            next_week_date = schedule.planned_date + timedelta(days=7)
-            while next_week_date.weekday() != schedule.day_of_week:
-                next_week_date += timedelta(days=1)
-
         new_schedule = Schedule.objects.create(
             zone_name=schedule.zone_name,
             driver=schedule.driver,
@@ -4506,7 +4607,10 @@ class ScheduleViewSet(viewsets.ModelViewSet):
                     'backgroundColor': '#e8f5e9' if sch.driver_id else '#fff3e0',
                     'borderColor': '#198754' if sch.driver_id else '#fd7e14',
                     'textColor': '#198754' if sch.driver_id else '#e65100',
-                    'classNames': [getFrequencyClass(sch.frequency), getStatusClass(sch.is_active)], #type: ignore
+                    'classNames': [
+                        f'freq-{sch.frequency}' if sch.frequency else 'freq-unknown',
+                        'sched-active' if sch.is_active else 'sched-inactive',
+                    ],
                     'extendedProps': {
                         'schedule_id': sch.id,
                         'zone_name': sch.zone_name,

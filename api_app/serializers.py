@@ -250,10 +250,13 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         if 'longitude' in data and data['longitude'] is not None and not (-180 <= data['longitude'] <= 180):
             raise serializers.ValidationError({'longitude': 'Longitude must be between -180 and 180'})
 
-        # Require at least one photo (primary photo field)
-        photo = self.initial_data.get('photo') if hasattr(self, 'initial_data') else None
-        if not photo and not data.get('photo'):
-            raise serializers.ValidationError({'photo': 'At least one photo is required to submit a waste request.'})
+        # Require at least one photo, but only on creation. On PATCH/PUT the
+        # instance already has its photo, so re-demanding an upload would block
+        # every ordinary field edit.
+        if self.instance is None:
+            photo = self.initial_data.get('photo') if hasattr(self, 'initial_data') else None
+            if not photo and not data.get('photo'):
+                raise serializers.ValidationError({'photo': 'At least one photo is required to submit a waste request.'})
 
         if 'guest_email' in data and data['guest_email'] in (None, ''):
             # Client sent an empty string — normalize to NULL so the db_index
@@ -270,15 +273,18 @@ class WasteRequestSerializer(serializers.ModelSerializer):
         # When inference deferred to the background (pending), default to
         # "needs_manual_review" so an admin catches anything inconclusive before
         # the async result lands.
-        ml_result = getattr(self, '_ml_result', None)
-        if ml_result:
-            data['severity'] = ml_result['severity']
-            data['ml_confidence'] = ml_result['confidence']
-            data['needs_manual_review'] = ml_result['needs_manual_review']
-        else:
-            data['severity'] = None
-            data['ml_confidence'] = None
-            data['needs_manual_review'] = True
+        # Only ever applied on creation: on update, a failed/partial ML run must
+        # not wipe a classification that was already computed and acted upon.
+        if self.instance is None:
+            ml_result = getattr(self, '_ml_result', None)
+            if ml_result:
+                data['severity'] = ml_result['severity']
+                data['ml_confidence'] = ml_result['confidence']
+                data['needs_manual_review'] = ml_result['needs_manual_review']
+            else:
+                data['severity'] = None
+                data['ml_confidence'] = None
+                data['needs_manual_review'] = True
 
         return data
 

@@ -413,11 +413,11 @@
             <nav class="mt-3" aria-label="Page navigation">
                 <ul class="pagination justify-content-center mb-0">
                     {% if page_obj.has_previous %}
-                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_waste_type %}&waste_type={{ current_waste_type }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">{% trans "Previous" %}</a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_status %}&amp;status={{ current_status|urlencode }}{% endif %}{% if current_waste_type %}&amp;waste_type={{ current_waste_type|urlencode }}{% endif %}{% if current_search %}&amp;search={{ current_search|urlencode }}{% endif %}">{% trans "Previous" %}</a></li>
                     {% endif %}
                     <li class="page-item disabled"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
                     {% if page_obj.has_next %}
-                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_waste_type %}&waste_type={{ current_waste_type }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">{% trans "Next" %}</a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_status %}&amp;status={{ current_status|urlencode }}{% endif %}{% if current_waste_type %}&amp;waste_type={{ current_waste_type|urlencode }}{% endif %}{% if current_search %}&amp;search={{ current_search|urlencode }}{% endif %}">{% trans "Next" %}</a></li>
                     {% endif %}
                 </ul>
             </nav>
@@ -734,7 +734,7 @@
             }
             if (failCount === 0) {
                 showToast(interpolate(gettext('%(v0)s request(s) moved to Recycle Bin.'), {v0: okCount}, true), 'success');
-                setTimeout(function(){ window.location.reload(); }, 800);
+                setTimeout(function(){ window.ssRefreshContent(); }, 400);
             } else {
                 showToast(interpolate(gettext('Moved %(v0)s, failed %(v1)s.'), {v0: okCount, v1: failCount}, true), 'warning');
             }
@@ -849,7 +849,17 @@
 
     function ensureLeafletLoaded(onReady) {
         if (typeof L !== 'undefined' && L.map) { onReady(); return; }
-        if (window._leafletLoadPromise) { window._leafletLoadPromise.then(onReady).catch(function(){}); return; }
+        function reportFailure(error) {
+            console.error('Leaflet failed to load:', error);
+            showToast(gettext('Map failed to load. Please refresh the page.'), 'danger');
+            // Drop the cached REJECTED promise so a later attempt can retry
+            // instead of short-circuiting into a silently swallowed catch.
+            window._leafletLoadPromise = null;
+        }
+        if (window._leafletLoadPromise) {
+            window._leafletLoadPromise.then(onReady).catch(reportFailure);
+            return;
+        }
         window._leafletLoadPromise = new Promise(function(resolve, reject) {
             const existing = document.querySelector('script[data-leaflet-loader="user-requests"]');
             if (existing) { existing.addEventListener('load', resolve); existing.addEventListener('error', reject); return; }
@@ -861,7 +871,7 @@
             script.onerror = reject;
             document.head.appendChild(script);
         });
-        window._leafletLoadPromise.then(onReady).catch(function(){});
+        window._leafletLoadPromise.then(onReady).catch(reportFailure);
     }
 
     function initMyMap() {
@@ -873,13 +883,24 @@
             // Let the just-shown modal settle so the container has real pixels.
             requestAnimationFrame(function () {
                 myMap = L.map('my-map', { scrollWheelZoom: false }).setView([28.3949, 84.1240], 13);
+                // Publish for base.html's shared refreshCheckpoints().
+                window.__ssActiveMap = myMap;
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19,
                     attribution: '&copy; OpenStreetMap contributors'
                 }).addTo(myMap);
 
                 {% if located_requests_json %}
-                const located = {{ located_requests_json|safe }};
+                {% comment %}
+                json_script escapes <, > and &, so a pickup address containing
+                a literal closing-script tag cannot terminate this block.
+                Inlining the JSON with the |safe filter (the old form here)
+                allowed stored XSS.
+                {% endcomment %}
+                {{ located_requests_json|json_script:"located-requests-data" }}
+                const located = JSON.parse(
+                    document.getElementById('located-requests-data').textContent
+                );
                 const bounds = [];
                 located.forEach(function(r) {
                     const lat = parseFloat(r.latitude), lng = parseFloat(r.longitude);

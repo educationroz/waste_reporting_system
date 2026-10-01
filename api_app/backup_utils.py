@@ -128,6 +128,8 @@ def verify_backup_file(file_path: Path):
         if not isinstance(record, dict) or not all(k in record for k in ('model', 'fields')):
             raise BackupError(f'Record {i} is missing model/fields — not a valid fixture entry.')
 
+    return len(data)
+
 def restore_backup(file_path: Path):
     """
     Restores the DB from `file_path`. This is destructive: it flushes

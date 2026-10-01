@@ -180,5 +180,24 @@
     };
 
     connectComplaintWebSocket();
+
+    // The IIFE opened at the top of this block was never closed, so the whole
+    // script failed to parse: the complaint WebSocket never connected and no
+    // live status updates were applied. It also needs a teardown, because this
+    // script re-runs on every htmx visit and each run left an open socket plus
+    // an exponential-backoff reconnect timer behind.
+    window.ssRegisterPageTeardown(() => {
+        if (complaintReconnectTimer) {
+            clearTimeout(complaintReconnectTimer);
+            complaintReconnectTimer = null;
+        }
+        if (complaintWS) {
+            complaintWS.onclose = null;
+            complaintWS.onerror = null;
+            try { complaintWS.close(1000, 'htmx navigation'); } catch (e) { /* already closing */ }
+            complaintWS = null;
+        }
+    });
+})();
 </script>
 {% endblock %}

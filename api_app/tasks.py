@@ -37,6 +37,7 @@ the brand-new task never blocks/freezes a request worker.
 """
 
 import logging
+import threading
 from concurrent.futures import Future, ThreadPoolExecutor
 
 from django.conf import settings
@@ -46,19 +47,25 @@ logger = logging.getLogger(__name__)
 
 _executor = None
 _email_executor = None
+_executor_lock = threading.Lock()
 
 
 def _get_executor():
     """Lazily create the process-wide thread pool (safe to call from any thread)."""
     global _executor
-    if _executor is None:
-        max_workers = getattr(settings, 'ML_MAX_WORKERS', 2)
-        if max_workers <= 0:
-            return None
-        _executor = ThreadPoolExecutor(
-            max_workers=max_workers,
-            thread_name_prefix='ml-task',
-        )
+    if _executor is not None:
+        return _executor
+    max_workers = getattr(settings, 'ML_MAX_WORKERS', 2)
+    if max_workers <= 0:
+        return None
+    # Double-checked locking: without it two concurrent first calls can each
+    # build a pool and the loser's threads leak for the process lifetime.
+    with _executor_lock:
+        if _executor is None:
+            _executor = ThreadPoolExecutor(
+                max_workers=max_workers,
+                thread_name_prefix='ml-task',
+            )
     return _executor
 
 
@@ -119,14 +126,25 @@ def run_ml_classification_async(waste_request_id, image_bytes):
             )
             result = None
 
-        updated = WasteRequest.objects.filter(pk=waste_request_id).update(
+        # Only write back if the row is still awaiting a background verdict.
+        # An unconditional update would run inference twice on every upload (the
+        # request path classifies synchronously too) and then clobber the
+        # severity/confidence that the request path already stored and already
+        # used to auto-assign a driver. Guarding on ml_confidence IS NULL makes
+        # the task idempotent against concurrent writers.
+        updated = WasteRequest.objects.filter(
+            pk=waste_request_id, ml_confidence__isnull=True
+        ).update(
             severity=(result['severity'] if result else None),
             ml_confidence=(result['confidence'] if result else 0.0),
             needs_manual_review=(not result or result['needs_manual_review'] or not result['is_waste']),
             updated_at=timezone.now(),
         )
         if not updated:
-            logger.warning(f'[ML] request={waste_request_id} not found for classification update.')
+            logger.debug(
+                f'[ML] request={waste_request_id} already classified or gone; '
+                'skipping background write-back.'
+            )
             return result
 
         # Auto-assign driver for HIGH waste with confidence >= 80%

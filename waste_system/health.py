@@ -45,12 +45,17 @@ from django.views.decorators.http import require_http_methods
 
 # How long any single dependency probe may take before it is called a failure.
 # Keep this comfortably below the probe timeout configured on the LB, otherwise
-# the LB gives up first and every check looks like a timeout.
+# the LB gives up first and every check looks like a timeout. Both values are
+# read from settings, which sources them from the environment (see settings.py)
+# so an operator can tune them without a code change.
+#
+# These stay module-level because tests patch them with mock.patch.object; the
+# _healthcheck_*() accessors below are the single read path.
 HEALTHCHECK_TIMEOUT = float(getattr(settings, 'HEALTHCHECK_TIMEOUT', 2.0))
 
 # Include exception messages in the JSON body. Handy while debugging a bad
 # deploy; turn it off if the endpoint is reachable from outside the cluster.
-HEALTHCHECK_DETAIL = bool(getattr(settings, 'HEALTHCHECK_DETAIL', True))
+HEALTHCHECK_DETAIL = bool(getattr(settings, 'HEALTHCHECK_DETAIL', False))
 
 # Status vocabulary. "skipped" means the dependency is not part of this
 # deployment (e.g. Redis when USE_REDIS is off) and must NOT fail the probe.
@@ -59,13 +64,21 @@ FAILED = 'failed'
 SKIPPED = 'skipped'
 
 
+def _healthcheck_timeout():
+    return HEALTHCHECK_TIMEOUT
+
+
+def _healthcheck_detail():
+    return HEALTHCHECK_DETAIL
+
+
 def _elapsed_ms(start):
     return round((time.monotonic() - start) * 1000, 2)
 
 
 def _error_detail(exc):
     """Render an exception for the JSON body, honouring HEALTHCHECK_DETAIL."""
-    if not HEALTHCHECK_DETAIL:
+    if not _healthcheck_detail():
         return type(exc).__name__
     message = str(exc).strip()
     if not message:
@@ -174,7 +187,7 @@ def check_channel_layer():
     backend = settings.CHANNEL_LAYERS.get('default', {}).get('BACKEND', 'unknown')
     in_memory = 'InMemory' in backend
 
-    message = async_to_sync(_channel_layer_roundtrip)(layer, HEALTHCHECK_TIMEOUT)
+    message = async_to_sync(_channel_layer_roundtrip)(layer, _healthcheck_timeout())
     if not message or message.get('type') != 'healthz.ping':
         raise RuntimeError(f'channel layer returned {message!r}')
 
@@ -218,8 +231,8 @@ def check_redis():
         'host': settings.REDIS_HOST,
         'port': settings.REDIS_PORT,
         'password': settings.REDIS_PASSWORD or None,
-        'socket_connect_timeout': HEALTHCHECK_TIMEOUT,
-        'socket_timeout': HEALTHCHECK_TIMEOUT,
+        'socket_connect_timeout': _healthcheck_timeout(),
+        'socket_timeout': _healthcheck_timeout(),
     }
     try:
         from redis.backoff import NoBackoff

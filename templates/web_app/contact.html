@@ -242,6 +242,7 @@
         const lng = 83.981981;
 
         contactMap = L.map('contact-map').setView([lat, lng], 17);
+        window.__ssActiveMap = contactMap;
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors',
@@ -253,9 +254,12 @@
             .bindPopup('<b>SATRI</b><br>Pokhara, Kaski, Nepal')
             .openPopup();
 
-        // Ensure map renders at correct size immediately
-        setTimeout(() => contactMap.invalidateSize(), 0);
-        setTimeout(() => contactMap.invalidateSize(), 100);
+        // Ensure map renders at correct size immediately.
+        // The truthiness of contactMap is re-checked INSIDE each callback: the
+        // map can be torn down (set to null) between scheduling and firing,
+        // which used to throw "Cannot read properties of null".
+        setTimeout(() => { if (contactMap) contactMap.invalidateSize(); }, 0);
+        setTimeout(() => { if (contactMap) contactMap.invalidateSize(); }, 100);
     }
 
     // Load Leaflet and initialize map when ready
@@ -264,19 +268,27 @@
             initContactMap();
             return;
         }
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-        script.async = true;
-        script.onload = initContactMap;
-        document.head.appendChild(script);
+        if (window._contactLeafletPromise) {
+            window._contactLeafletPromise.then(initContactMap).catch(() => {});
+            return;
+        }
+        window._contactLeafletPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            script.async = true;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+        window._contactLeafletPromise.then(initContactMap).catch(() => {});
     }
 
     // Fix map size after any layout change
     function fixMapSize() {
         if (contactMap) {
             // Multiple delays to catch CSS transitions
-            [0, 50, 150, 300].forEach(delay => 
-                setTimeout(() => contactMap.invalidateSize(), delay)
+            [0, 50, 150, 300].forEach(delay =>
+                setTimeout(() => { if (contactMap) contactMap.invalidateSize(); }, delay)
             );
         }
     }
@@ -292,6 +304,12 @@
         const successAlert = document.getElementById('contact-success');
         const errorAlert = document.getElementById('contact-error');
         const errorText = document.getElementById('contact-error-text');
+
+        // Belt-and-braces: the swapped <script> re-runs per visit, so even with
+        // the one-time listener above a handler could be attached twice to the
+        // same form element.
+        if (form.dataset._submitBound) return;
+        form.dataset._submitBound = '1';
 
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -354,16 +372,44 @@
         initPage();
     }
 
-    // Re-initialize on HTMX swap (for SPA navigation)
-    document.body.addEventListener('htmx:afterSwap', function(evt) {
-        if (evt.target.id === 'content-app') {
-            contactMap = null; // Reset so it re-initializes
-            initPage();
-        }
-    });
+    // Re-initialize on HTMX swap (for SPA navigation).
+    // The body-level listener lives outside the swapped <script>, so it would
+    // otherwise be registered once per visit and accumulate: on the Nth visit
+    // initPage() ran N times, attaching N submit handlers to the new
+    // #contact-form (one click = N POSTs) and creating N Leaflet maps.
+    // One-time flag on the persistent <body>.
+    if (!document.body.dataset._contactInitBound) {
+        document.body.dataset._contactInitBound = '1';
 
-    // Also fix map size on window resize
-    window.addEventListener('resize', fixMapSize);
+        function destroyContactMap() {
+            // Capture the reference first: `contactMap` is nulled below, so
+            // comparing against it afterwards could never match.
+            const old = contactMap;
+            if (!old) return;
+            try { old.remove(); } catch (e) {}
+            contactMap = null;
+            if (window.__ssActiveMap === old) window.__ssActiveMap = null;
+        }
+
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt.target.id === 'content-app') {
+                // Tear the previous map down properly before dropping the
+                // reference. Just nulling the variable leaked a full Leaflet
+                // instance (DOM nodes, renderer, resize observer) on every
+                // visit, and left window.__ssActiveMap pointing at a map whose
+                // container no longer existed.
+                destroyContactMap();
+                initPage();
+            }
+        });
+
+        // Also fix map size on window resize (bound once, for the same reason).
+        window.addEventListener('resize', fixMapSize);
+
+        // Leaving Contact entirely still needs to release the map, and this
+        // listener is registered on the persistent <body> exactly once.
+        document.body.addEventListener('htmx:beforeSwap', destroyContactMap, true);
+    }
 })();
 </script>
 {% endblock %}

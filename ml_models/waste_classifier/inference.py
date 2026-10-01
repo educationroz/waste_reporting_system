@@ -1,4 +1,5 @@
 import os
+import threading
 
 import torch
 import torch.nn.functional as F
@@ -25,16 +26,24 @@ def build_model():
     return model
 
 _model = None  # process ma ek patak matra load huos (singleton)
+_model_lock = threading.Lock()  # concurrent first-calls must not each load a model
+
 
 def get_model():
     global _model
-    if _model is None:
-        model = build_model()
-        state_dict = torch.load(MODEL_PATH, map_location=device)
-        model.load_state_dict(state_dict)
-        model = model.to(device)
-        model.eval()
-        _model = model
+    if _model is not None:
+        return _model
+    # Double-checked locking: without it, simultaneous first requests each build
+    # and load a full MobileNetV3 (memory spike / OOM on a small instance), and
+    # the losers leave an orphaned loaded model behind.
+    with _model_lock:
+        if _model is None:
+            model = build_model()
+            state_dict = torch.load(MODEL_PATH, map_location=device)
+            model.load_state_dict(state_dict)
+            model = model.to(device)
+            model.eval()
+            _model = model
     return _model
 
 transform = transforms.Compose([

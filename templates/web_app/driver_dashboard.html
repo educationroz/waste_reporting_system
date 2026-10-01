@@ -1161,35 +1161,35 @@ let hasFittedBounds = false; // only auto-fit the view once, on first load
 let lastBoundsPoints = [];
 let mapRefreshIntervalId = null; // FIX: track the interval so it can actually be cleared
 
-if (!document.body.dataset._leafletCleanupBound) {
-    document.body.addEventListener('htmx:beforeSwap', () => {
-        // FIX: previously the 30s setInterval kept running forever after an
-        // htmx page swap, because nothing ever called clearInterval() on it.
-        // The stale interval kept calling loadMapData() against DOM elements
-        // (#map-route-info, #map-empty-note) that no longer existed on the
-        // new page, causing "Cannot set properties of null" crashes.
-        if (mapRefreshIntervalId) {
-            clearInterval(mapRefreshIntervalId);
-            mapRefreshIntervalId = null;
-        }
-        if (driverMap) {
-            // FIX: if fitBounds' zoom/pan animation is still mid-flight when
-            // htmx swaps the page, its transitionend handler can fire after
-            // this map (and its renderer) is torn down — that's what caused
-            // the uncaught Bounds.js crash right after sidebar navigation.
-            // stop() cancels any in-progress animation immediately.
-            try { driverMap.stop(); } catch (e) {}
-            driverMap.remove();
-            driverMap = null;
-        }
-        driverMarker = null;
-        routeLine = null;
-        requestMarkersLayer = null;
-        checkpointsLayer = null;
-        hasFittedBounds = false;
-    });
-    document.body.dataset._leafletCleanupBound = '1';
-}
+// Re-registered on every htmx visit so the teardown always closes over the
+// CURRENT map/interval. The `dataset` guard that used to wrap this froze it on
+// the first visit, so the 30s poller and map leaked on every later visit.
+window.ssRegisterPageTeardown(function () {
+    // Previously the 30s setInterval kept running forever after an
+    // htmx page swap, because nothing ever called clearInterval() on it.
+    // The stale interval kept calling loadMapData() against DOM elements
+    // (#map-route-info, #map-empty-note) that no longer existed on the
+    // new page, causing "Cannot set properties of null" crashes.
+    if (mapRefreshIntervalId) {
+        clearInterval(mapRefreshIntervalId);
+        mapRefreshIntervalId = null;
+    }
+    if (driverMap) {
+        // FIX: if fitBounds' zoom/pan animation is still mid-flight when
+        // htmx swaps the page, its transitionend handler can fire after
+        // this map (and its renderer) is torn down — that's what caused
+        // the uncaught Bounds.js crash right after sidebar navigation.
+        // stop() cancels any in-progress animation immediately.
+        try { driverMap.stop(); } catch (e) {}
+        driverMap.remove();
+        driverMap = null;
+    }
+    driverMarker = null;
+    routeLine = null;
+    requestMarkersLayer = null;
+    checkpointsLayer = null;
+    hasFittedBounds = false;
+});
 
 function ensureLeafletLoaded(onReady) {
     if (typeof L !== 'undefined') {
@@ -1231,7 +1231,10 @@ function initDriverMap() {
         return;
     }
 
-    driverMap = L.map('driver-map', { scrollWheelZoom: true }).setView(DEFAULT_CENTER, 13);
+        driverMap = L.map('driver-map', { scrollWheelZoom: true }).setView(DEFAULT_CENTER, 13);
+        // Publish for base.html's shared refreshCheckpoints(), which can only
+        // reach this map through window.
+        window.__ssActiveMap = driverMap;
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,

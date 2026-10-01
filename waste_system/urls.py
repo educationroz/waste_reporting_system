@@ -117,5 +117,9 @@ if settings.DEBUG:
     urlpatterns += [
         path('__dev__/livereload/', livereload_ping, name='dev-livereload'),
     ]
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # MEDIA_ROOT is only assigned by settings when the storage backend is local;
+    # with any other backend it stays None and static() raises TypeError, taking
+    # every page down because this is imported at startup.
+    if settings.MEDIA_ROOT:
+        urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

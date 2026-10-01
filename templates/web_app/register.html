@@ -101,7 +101,7 @@
                     <div class="position-relative">
                         <input type="password" id="password2" class="form-control pe-5" placeholder="{% trans 'Re-enter password' %}" oninput="handlePassword2Input()">
                         <i class="bi bi-eye position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
-                            id="toggle-password-icon" style="cursor: pointer; display: none;" onclick="togglePassword2()"></i>
+                            id="toggle-password2-icon" style="cursor: pointer; display: none;" onclick="togglePassword2()"></i>
                     </div>
                 </div>
 
@@ -338,8 +338,20 @@ window.doRegister = async function() {
                 window.location.href = loginUrl;
             }, 3000);
         } else {
-            const msgs = Object.entries(data).map(([k,v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('<br>');
-            errDiv.innerHTML = msgs || gettext('Registration failed.');
+              // DOM nodes + textContent rather than innerHTML: keeps any echoed
+              // input from becoming reflected XSS.
+              errDiv.textContent = '';
+              const entries = Object.entries(data);
+              if (entries.length) {
+                  entries.forEach(([k, v], i) => {
+                      if (i > 0) errDiv.appendChild(document.createElement('br'));
+                      errDiv.appendChild(
+                          document.createTextNode(`${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+                      );
+                  });
+              } else {
+                  errDiv.textContent = gettext('Registration failed.');
+              }
             errDiv.classList.remove('d-none');
             btn.disabled = false;
         }
@@ -471,7 +483,7 @@ window.handleGoogleCredential = async function(response) {
                 driver: '/driver-dashboard/',
                 user: '/',
             };
-            window.location.href = redirectMap[role] || '/dashboard/';
+                window.location.href = redirectMap[role] || '/';
         } else {
             if (errDiv) {
                 errDiv.textContent = data.error || gettext('Google sign-in failed.');

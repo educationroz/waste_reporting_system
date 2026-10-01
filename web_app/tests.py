@@ -1,7 +1,11 @@
+import json
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 
-from api_app.models import AdminLog
+from api_app.models import AdminLog, WasteRequest
 
 User = get_user_model()
 
@@ -271,7 +275,10 @@ class ServiceWorkerTests(TestCase):
     def test_base_template_registers_the_worker(self):
         response = self.client.get('/login/')
         body = response.content.decode()
-        self.assertIn("navigator.serviceWorker.register('/sw.js')", body)
+        # The URL is now a template variable (a cache-busting ?debug=1 is
+        # appended under DEBUG), so assert the registration call itself.
+        self.assertIn('navigator.serviceWorker.register(', body)
+        self.assertIn("'/sw.js'", body)
 
     def test_sw_view_returns_404_when_source_missing(self):
         from unittest import mock
@@ -294,3 +301,71 @@ class AdminSettingsViewTest(TestCase):
     def test_admin_settings_view_loads(self):
         response = self.client.get('/management/settings/')
         self.assertEqual(response.status_code, 200)
+
+
+class LocatedRequestsJsonTest(TestCase):
+    """The /my-requests/ map is fed by the json_script filter.
+
+    The view must hand the filter the raw list. Passing an already-serialized
+    string made json_script emit `"[]"`, so JSON.parse() returned a string and
+    every .forEach() over it threw - the "located requests" markers silently
+    never rendered.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='located_user', password='Password123!', role='user',
+        )
+        self.client.force_login(self.user)
+
+    def _located_request(self, address='Somewhere 1'):
+        return WasteRequest.objects.create(
+            user=self.user,
+            waste_type='general',
+            pickup_address=address,
+            description='located request',
+            scheduled_date=timezone.now() + timedelta(days=1),
+            latitude=28.2096,
+            longitude=83.9856,
+        )
+
+    def test_payload_is_a_json_array_not_a_quoted_string(self):
+        self._located_request()
+        response = self.client.get('/my-requests/')
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+
+        marker = 'id="located-requests-data"'
+        self.assertIn(marker, body)
+        start = body.index(marker)
+        start = body.index('>', start) + 1
+        end = body.index('</script>', start)
+        payload = body[start:end].strip()
+
+        parsed = json.loads(payload)
+        self.assertIsInstance(
+            parsed, list,
+            'json_script received a pre-serialized string, so the page parses a '
+            'string instead of a list and .forEach() throws',
+        )
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0]['address'], 'Somewhere 1')
+        self.assertAlmostEqual(parsed[0]['latitude'], 28.2096, places=4)
+
+    def test_address_cannot_break_out_of_the_script_block(self):
+        """json_script escapes <, > and &, so a hostile address cannot escape."""
+        self._located_request(address='</script><img src=x onerror=alert(1)>')
+        response = self.client.get('/my-requests/')
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+
+        marker = 'id="located-requests-data"'
+        start = body.index(marker)
+        start = body.index('>', start) + 1
+        end = body.index('</script>', start)
+        payload = body[start:end]
+
+        self.assertNotIn('<img', payload)
+        self.assertNotIn('</script>', payload)
+        self.assertEqual(json.loads(payload)[0]['address'],
+                         '</script><img src=x onerror=alert(1)>')

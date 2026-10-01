@@ -251,7 +251,7 @@
                     user: '/',
                 };
 
-                window.location.href = redirectMap[role] || '/dashboard/';
+                window.location.href = redirectMap[role] || '/';
             } else {
                 errDiv.textContent = data.detail || data.error || JSON.stringify(data);
                 errDiv.classList.remove('d-none');
@@ -359,7 +359,7 @@ callback: function(resp) {
                     driver: '/driver-dashboard/',
                     user: '/',
                 };
-                window.location.href = redirectMap[role] || '/dashboard/';
+                window.location.href = redirectMap[role] || '/';
             } else {
                 if (errDiv) {
                     errDiv.textContent = data.error || gettext('Google sign-in failed.');
@@ -612,7 +612,7 @@ callback: function(resp) {
                     user: '/',
                 };
 
-                window.location.href = redirectMap[role] || '/dashboard/';
+                window.location.href = redirectMap[role] || '/';
             } else {
                 const usernameInput = document.getElementById('username');
                 if (usernameInput) usernameInput.value = user;

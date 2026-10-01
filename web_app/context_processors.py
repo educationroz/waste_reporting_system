@@ -19,9 +19,21 @@ def google_client_id(request):
 
 
 def system_branding(request):
-    site_name = cache.get('site_branding_name')
-    site_logo = cache.get('site_branding_logo')
-    site_tagline = cache.get('site_branding_tagline')
+    # A context processor runs on EVERY template render, so it must never raise:
+    # an unreachable cache backend would otherwise turn a Redis blip into a
+    # site-wide 500.
+    defaults = {
+        'site_branding_name': 'SafhaSahar',
+        'site_branding_logo': '',
+        'site_branding_tagline': 'Live Waste Reporting System',
+    }
+    try:
+        site_name = cache.get('site_branding_name')
+        site_logo = cache.get('site_branding_logo')
+        site_tagline = cache.get('site_branding_tagline')
+    except Exception:  # noqa: BLE001 - cache backend unreachable
+        logger.warning('system_branding: cache unavailable; using defaults.')
+        site_name, site_logo, site_tagline = None, None, None
 
     if site_name is None:
         try:
@@ -41,9 +53,12 @@ def system_branding(request):
             site_logo = ''
             site_tagline = 'Live Waste Reporting System'
 
-        cache.set('site_branding_name', site_name, 3600)
-        cache.set('site_branding_logo', site_logo, 3600)
-        cache.set('site_branding_tagline', site_tagline, 3600)
+        try:
+            cache.set('site_branding_name', site_name, 3600)
+            cache.set('site_branding_logo', site_logo, 3600)
+            cache.set('site_branding_tagline', site_tagline, 3600)
+        except Exception:  # noqa: BLE001 - cache backend unreachable
+            logger.warning('system_branding: could not write branding to cache.')
 
     return {
         'SITE_NAME': site_name or 'SafhaSahar',

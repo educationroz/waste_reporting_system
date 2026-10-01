@@ -675,20 +675,26 @@ const CHECKPOINT_AUTO_ASSIGN_METERS = 200; //for 200m around checkpoint
 
 const NEARBY_CHECKPOINT_DISPLAY_RADIUS_METERS = 2000; //for 2km location
 
-if (!document.body.dataset._leafletCleanupBound) {
-    document.body.addEventListener('htmx:beforeSwap', () => {
-        if (map) {
-            map.remove();
-            map = null;
-        }
-        marker = null;
-        checkpointMarkersLayer = null;
-        driverMarkersLayer = null;
-        driverMarkers.clear();
-        checkpointData = [];
-    });
-    document.body.dataset._leafletCleanupBound = '1';
-}
+// Each htmx visit to Home builds a new map, poller and marker layer, so the
+// teardown must be re-registered per visit against the CURRENT closure. A
+// `dataset` guard was used before, which froze this on the first visit: from the
+// second visit on, every map and interval leaked. See ssRegisterPageTeardown
+// in base.html.
+window.ssRegisterPageTeardown(function () {
+    if (map) {
+        map.remove();
+        map = null;
+    }
+    if (window._driverLocationRefreshTimer) {
+        clearInterval(window._driverLocationRefreshTimer);
+        window._driverLocationRefreshTimer = null;
+    }
+    marker = null;
+    checkpointMarkersLayer = null;
+    driverMarkersLayer = null;
+    driverMarkers.clear();
+    checkpointData = [];
+});
 
 function ensureLeafletLoaded(onReady) {
     if (typeof L !== 'undefined') {
@@ -721,6 +727,11 @@ function ensureLeafletLoaded(onReady) {
     window._leafletLoadPromise.then(onReady).catch((error) => {
         console.error('Leaflet failed to load for home map:', error);
         showToast(gettext('Map failed to load. Please refresh the page.'), 'danger');
+        // Clear the cached REJECTED promise. It is shared with user_requests.html,
+        // which took the early-return branch above and swallowed the error — so a
+        // single CDN failure left the map dead for the rest of the session with no
+        // retry and no further feedback.
+        window._leafletLoadPromise = null;
     });
 }
 
@@ -860,7 +871,10 @@ function initMap(lat, lng) {
     const mapEl = document.getElementById('map');
     if (!mapEl) return;
 
-    map = L.map('map').setView([lat, lng], 15);
+        map = L.map('map').setView([lat, lng], 15);
+        // Publish for base.html's shared refreshCheckpoints(), which can only
+        // reach this map through window.
+        window.__ssActiveMap = map;
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
@@ -1101,7 +1115,7 @@ function renderDriverMarkers(drivers) {
         nextIds.add(driver.id);
 
         const name = driver.driver_name || `Driver #${driver.id}`;
-        const popupHtml = `<strong>🚛 ${name}</strong><br>Live driver location`;
+        const popupHtml = `<strong>🚛 ${escapeHtml(name)}</strong><br>Live driver location`;
         const icon = L.divIcon({
             className: 'driver-marker-icon',
             html: '<span style="font-size:1.4rem; line-height:1;">🚛</span>',
@@ -1148,18 +1162,24 @@ async function loadDriverMarkers() {
     }
 }
 
-let driverLocationRefreshTimer = null;
+// Driver-location poller state lives on window (see startPublicDriverLocationRefresh),
+// not in an IIFE-scoped variable, because this IIFE re-runs on every htmx visit.
 
 function startPublicDriverLocationRefresh() {
-    if (driverLocationRefreshTimer) {
-        clearInterval(driverLocationRefreshTimer);
+    // The timer is stored on window, not in an IIFE-scoped `let`: this IIFE
+    // re-runs on every htmx swap, so the local was always null here and the
+    // previous 5s poller was never cleared — N visits left N pollers hitting
+    // /api/driver-locations/.
+    if (window._driverLocationRefreshTimer) {
+        clearInterval(window._driverLocationRefreshTimer);
+        window._driverLocationRefreshTimer = null;
     }
 
     // Load immediately
     loadDriverMarkers();
 
     // Refresh every 5 seconds
-    driverLocationRefreshTimer = setInterval(() => {
+    window._driverLocationRefreshTimer = setInterval(() => {
         loadDriverMarkers();
     }, 5000);
 }
@@ -1558,7 +1578,9 @@ function insertHomeRequestRow(req) {
     if (emptyRow) emptyRow.closest('tr').remove();
 
     const statusClass = HOME_STATUS_BADGE_CLASS[req.status] || 'bg-primary';
-    const statusLabel = HOME_STATUS_LABELS[req.status] || req.status;
+    // Escape the raw-status fallback: HOME_STATUS_LABELS only covers known
+    // statuses, and statusLabel is written into innerHTML below.
+    const statusLabel = escapeHtml(HOME_STATUS_LABELS[req.status] || req.status);
     const driverName = escapeHtml(req.driver && req.driver.user ? req.driver.user.username : '—');
     const photoCell = req.photo
         ? `<a href="${escapeHtml(req.photo)}" target="_blank"><img src="${escapeHtml(req.photo)}" alt="${gettext('photo')}" style="height:36px;width:36px;object-fit:cover;border-radius:4px;"></a>`
@@ -1952,11 +1974,23 @@ window.deleteRequest = async function(requestId, btn) {
 };
 
 // ── Tooltip ──────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
+// Same htmx caveat as the pickup schedule: DOMContentLoaded fires once per
+// document, so tooltips on swapped-in markup never initialised. Run now if the
+// document is already parsed, and again after each #content-app swap.
+function initTooltips() {
+    if (typeof bootstrap === 'undefined') return;
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTooltips, { once: true });
+} else {
+    initTooltips();
+}
+document.body.addEventListener('htmx:afterSwap', function (evt) {
+    if (evt.target && evt.target.id === 'content-app') initTooltips();
 });
 
 // ── Complaint Modal Logic ─────────────────────────────────────────────────────
@@ -2148,7 +2182,7 @@ try {
             if (!driverId || isNaN(lat) || isNaN(lng)) return;
 
             const name = data.driver_name || `Driver #${driverId}`;
-            const popupHtml = `<strong>🚛 ${name}</strong><br>Live driver location`;
+            const popupHtml = `<strong>🚛 ${escapeHtml(name)}</strong><br>Live driver location`;
             const icon = L.divIcon({
                 className: 'driver-marker-icon',
                 html: '<span style="font-size:1.4rem; line-height:1;">🚛</span>',
@@ -2192,9 +2226,11 @@ try {
     // ── Repeat Last Request ─────────────────────────────────────────────────────
     window.repeatLastRequest = async function() {
         try {
-            // Include guest_token from localStorage if available (for guest users)
+            // Key must match the one set above ('current_guest_token'); it was
+            // read as 'guest_token', so this always resolved to null and a guest's
+            // last request was never attributed to them.
             let url = '/api/waste-requests/my_last_request/';
-            const guestToken = localStorage.getItem('guest_token');
+            const guestToken = localStorage.getItem('current_guest_token');
             if (guestToken) {
                 url += '?guest_token=' + encodeURIComponent(guestToken);
             }
@@ -2305,7 +2341,7 @@ try {
                 return;
             }
 
-            tbody.innerHTML = allItems.map(item => {
+            tbody.innerHTML = allItems.map((item, itemIdx) => {
                 const dateObj = new Date(item.date);
                 const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
                 const formattedDate = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -2315,8 +2351,15 @@ try {
 
                 let detailsHtml = '';
                 if (item.type === 'route' && item.pickups) {
+                    // Never interpolate pickups into an inline onclick: a pickup
+                    // address containing a double quote terminates the attribute
+                    // (HTML does not honour JS backslash escapes) and injects
+                    // markup. Stash them on a module-level registry and pass only
+                    // an index, then bind real listeners after the innerHTML write.
+                    window._routePickups = window._routePickups || {};
+                    window._routePickups[itemIdx] = item.pickups;
                     detailsHtml = `
-                        <button class="btn btn-sm btn-outline-primary" onclick="showRoutePickups(${JSON.stringify(item.pickups).replace(/"/g, '"')})">
+                        <button type="button" class="btn btn-sm btn-outline-primary js-show-route-pickups" data-pickup-idx="${itemIdx}">
                             <i class="bi bi-list-ul me-1"></i>{% trans "View Pickups" %}
                         </button>
                     `;
@@ -2333,14 +2376,22 @@ try {
                                 ${item.type === 'route' ? '{% trans "Route" %}' : '{% trans "Schedule" %}'}
                             </span>
                         </td>
-                        <td>${item.zone}</td>
-                        <td>${item.start_time}</td>
-                        <td>${item.driver || '<span class="text-muted">—</span>'}</td>
-                        <td>${item.vehicle || '<span class="text-muted">—</span>'}</td>
+                        <td>${window.escapeHtml(String(item.zone ?? ''))}</td>
+                        <td>${window.escapeHtml(String(item.start_time ?? ''))}</td>
+                        <td>${item.driver ? window.escapeHtml(String(item.driver)) : '<span class="text-muted">—</span>'}</td>
+                        <td>${item.vehicle ? window.escapeHtml(String(item.vehicle)) : '<span class="text-muted">—</span>'}</td>
                         <td>${detailsHtml}</td>
                     </tr>
                 `;
             }).join('');
+
+            // Bind after the write so the handler is a real listener, not inline JS.
+            tbody.querySelectorAll('.js-show-route-pickups').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const idx = parseInt(this.dataset.pickupIdx, 10);
+                    window.showRoutePickups((window._routePickups || {})[idx] || []);
+                });
+            });
 
         } catch (e) {
             console.error('Failed to load pickup schedule:', e);
@@ -2378,8 +2429,8 @@ try {
                                         ${pickups.map(p => `
                                             <tr>
                                                 <td>${p.id}</td>
-                                                <td><span class="badge bg-info">${p.waste_type_display}</span></td>
-                                                <td class="small">${p.address}</td>
+                                                <td><span class="badge bg-info">${window.escapeHtml(String(p.waste_type_display ?? ''))}</span></td>
+                                                <td class="small">${window.escapeHtml(String(p.address ?? ''))}</td>
                                             </tr>
                                         `).join('')}
                                     </tbody>
@@ -2397,9 +2448,21 @@ try {
         modal.show();
     };
 
-    // Load pickup schedule on page load
-    document.addEventListener('DOMContentLoaded', () => {
+    // Load pickup schedule on page load.
+    // DOMContentLoaded fires once per DOCUMENT; reaching Home through the
+    // hx-boosted sidebar/navbar only swaps #content-app, so this never fired and
+    // the server-rendered "Loading schedule..." placeholder stayed forever.
+    // Run immediately when the document is already parsed, and again after a swap.
+    function initPickupSchedule() {
         loadPickupSchedule();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPickupSchedule, { once: true });
+    } else {
+        initPickupSchedule();
+    }
+    document.body.addEventListener('htmx:afterSwap', function (evt) {
+        if (evt.target && evt.target.id === 'content-app') initPickupSchedule();
     });
 
     // ── Guest Claim Modal ───────────────────────────────────────────────────────

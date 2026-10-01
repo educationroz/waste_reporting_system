@@ -757,7 +757,7 @@ async function loadZoneForecast() {
                 <div class="col-md-6 col-lg-4 col-xl-2">
                     <div class="card dashboard-card h-100 ${z.has_gap ? 'border-danger' : ''}">
                         <div class="card-body p-3">
-                            <h6 class="fw-bold mb-2">${z.zone_name}</h6>
+                            <h6 class="fw-bold mb-2">${escapeHtml(z.zone_name || '')}</h6>
                             <div class="d-flex flex-wrap gap-1 mb-2">
                                 <span class="badge bg-danger">${z.high} HIGH</span>
                                 <span class="badge bg-warning text-dark">${z.medium} MED</span>
@@ -993,8 +993,9 @@ loadZoneForecast();
                 );
                 // Refresh both views
                 loadCalendarEvents();
-                // Optionally reload table data
-                location.reload();
+                // Re-render the shell in place rather than location.reload(),
+                // which would drop every open socket/interval on the page.
+                window.ssRefreshContent();
             } else {
                 showToast(gettext('Route generation completed.'), 'success');
             }

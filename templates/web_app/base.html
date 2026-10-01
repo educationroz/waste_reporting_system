@@ -190,6 +190,40 @@
 </head>
 <body hx-ext="head-support" hx-boost="true" hx-target="#content-app" hx-select="#content-app" hx-swap="outerHTML show:window:top" data-user-role="{% if user.is_authenticated %}{{ user.role }}{% else %}anonymous{% endif %}">
 
+<!--
+    Page-owned resource teardown registry.
+    MUST be declared before the content block: the map pages call
+    ssRegisterPageTeardown() from inline scripts inside the swapped fragment,
+    which is rendered above the main script block.
+
+    Map pages keep their state in an IIFE that re-runs on every htmx visit, so
+    each visit creates a NEW map, timer and marker layer. A per-page
+    `dataset` guard fixed the listener pile-up but introduced the opposite bug:
+    only the first visit ever registered a teardown, and that closure only knew
+    about the first visit's variables - so from the second visit onward every
+    map and interval leaked. This attaches exactly one beforeSwap listener for
+    the session; each call retires the previous teardown and becomes current.
+-->
+<script nonce="{{ csp_nonce }}">
+(function () {
+    window.__ssPageTeardown = null;
+    if (!window.__ssPageTeardownBound) {
+        window.__ssPageTeardownBound = true;
+        document.addEventListener('htmx:beforeSwap', function () {
+            if (typeof window.__ssPageTeardown === 'function') {
+                try { window.__ssPageTeardown(); } catch (e) { /* never block the swap */ }
+            }
+        }, true);
+    }
+    window.ssRegisterPageTeardown = function (fn) {
+        if (typeof window.__ssPageTeardown === 'function') {
+            try { window.__ssPageTeardown(); } catch (e) { /* ignore */ }
+        }
+        window.__ssPageTeardown = fn;
+    };
+})();
+</script>
+
 <!-- NAVBAR SECTION -->
 <nav class="navbar navbar-light shadow-sm sticky-top" style="z-index: 1030;">
     <div class="container-fluid d-flex align-items-center flex-nowrap position-relative px-3 px-md-4">
@@ -788,6 +822,44 @@ window.authFetch = async function authFetch(url, options = {}) {
     if (res.status === 401) { return null; }
     return res;
 };
+
+// Re-render the current page in place instead of window.location.reload().
+// A reload tears down the whole app shell — every open WebSocket, polling
+// interval and map — just to show data the server already has. Fetching the
+// current URL through htmx keeps the shell alive and updates only #content-app.
+// `delay` exists so callers that used setTimeout(reload, N) keep their pacing.
+window.ssRefreshContent = function ssRefreshContent(delay = 0) {
+    const run = function () {
+        const target = document.getElementById('content-app');
+        if (!target || !window.htmx) {
+            // No htmx on the page (e.g. an auth screen): a real load is the only
+            // option, and it is correct there.
+            window.location.reload();
+            return;
+        }
+        window.htmx.ajax('GET', window.location.href, {
+            target: '#content-app',
+            select: '#content-app',
+        });
+    };
+    if (delay > 0) { window.setTimeout(run, delay); } else { run(); }
+};
+
+// Navigate to another app page without a full page load when possible, so the
+// shell (WebSockets, polling intervals, sidebar state) survives. Same contract
+// as ssRefreshContent, but for a different URL.
+//
+// Use this instead of `window.location.href = url` in onclick handlers: a raw
+// location assignment always discards the whole document, which tears down
+// every live socket and map just to change page.
+window.ssNavigate = function ssNavigate(url) {
+    const target = document.getElementById('content-app');
+    if (!target || !window.htmx) {
+        window.location.href = url;
+        return;
+    }
+    window.htmx.ajax('GET', url, { target: '#content-app', select: '#content-app' });
+};
 </script>
 
 <!-- GLOBAL API OBJECT (available to all users, including guests) -->
@@ -939,9 +1011,59 @@ if (!window.__ssAuthScriptLoaded) {
         f.submit();
     };
 
+    // Defined here, not on notifications.html: the navbar bell dropdown renders
+    // this markup on EVERY page, so a page-scoped definition made markOneRead
+    // undefined everywhere except /notifications/ — clicking an unread item
+    // threw a ReferenceError and the link never navigated.
+    if (!window.markOneRead) {
+        const _markingRead = new Set();
+        window.markOneRead = async function(notifId) {
+            if (notifId == null) return;
+            if (_markingRead.has(notifId)) return;
+            _markingRead.add(notifId);
+            try {
+                const data = await API.patch(`/api/notifications/${notifId}/`, { is_read: true });
+                if (data && data.id) {
+                    const el = document.getElementById(`notif-${notifId}`);
+                    if (el) {
+                        el.classList.remove('unread-style');
+                        el.removeAttribute('onclick');
+                        el.removeAttribute('title');
+                        const tag = el.querySelector('.unread-tag');
+                        if (tag) tag.remove();
+                    }
+                    decrementMainBadge();
+                } else if (typeof showToast === 'function') {
+                    showToast(gettext('Failed to mark as read.'), 'danger');
+                }
+            } catch (e) {
+                console.error('Failed to mark notification read:', e);
+            } finally {
+                _markingRead.delete(notifId);
+            }
+        };
+    }
+
+    // Shared by the navbar badge and notifications.html. Defined on window so
+    // both the base-level and page-level callers reach the same implementation.
+    if (!window.decrementMainBadge) {
+        window.decrementMainBadge = function () {
+            const mainBadge = document.getElementById('notif-badge');
+            if (!mainBadge || mainBadge.classList.contains('d-none')) return;
+            const current = parseInt(mainBadge.textContent || '0', 10) - 1;
+            if (current > 0) {
+                mainBadge.textContent = current;
+            } else {
+                mainBadge.classList.add('d-none');
+                mainBadge.textContent = '';
+            }
+        };
+    }
+    function decrementMainBadge() { return window.decrementMainBadge(); }
+
     function refreshNotifBadge() {
         const badge = document.getElementById('notif-badge');
-        if (!getToken() || !badge) return;
+        if (!badge) return;
         API.get('/api/notifications/unread/').then(data => {
             if (!data) return; // apiFetch already handled 401/refresh/logout
             let count = 0;
@@ -966,7 +1088,7 @@ if (!window.__ssAuthScriptLoaded) {
     function loadNotifDropdown() {
         const listEl = document.getElementById('notif-dropdown-list');
         const loadingEl = document.getElementById('notif-dropdown-loading');
-        if (!listEl || !getToken()) return;
+        if (!listEl) return;
         
         if (loadingEl) loadingEl.style.display = 'block';
         
@@ -986,9 +1108,11 @@ if (!window.__ssAuthScriptLoaded) {
                 return;
             }
             
-            listEl.innerHTML = notifications.map(n => `
-                <a href="#" class="list-group-item list-group-item-action py-2 px-3 ${!n.is_read ? 'unread-style' : ''}"
-                   onclick="event.preventDefault(); ${!n.is_read ? `markOneRead(${n.id})` : ''} window.location.href='${n.related_request ? '/user-requests/' : '/notifications/'}';">
+            listEl.innerHTML = notifications.map(n => {
+                const target = n.related_request ? '/user-requests/' : '/notifications/';
+                return `
+                <a href="${target}" class="list-group-item list-group-item-action py-2 px-3 ${!n.is_read ? 'unread-style' : ''}"
+                   data-notif-id="${n.id}" data-target="${target}">
                     <div class="d-flex justify-content-between align-items-start">
                         <div class="flex-grow-1">
                             <span class="badge rounded-pill px-2 py-1 me-2
@@ -1006,8 +1130,23 @@ if (!window.__ssAuthScriptLoaded) {
                     </div>
                     <p class="mb-0 mt-1 text-secondary small" style="font-size: 0.8rem;">${window.escapeHtml(n.message)}</p>
                     ${n.related_request ? `<div class="mt-1"><span class="badge bg-light text-secondary border rounded-1" style="font-size: 0.65rem;">Request #${n.related_request.id}</span></div>` : ''}
-                </a>
-            `).join('');
+                </a>`;
+            }).join('');
+
+            // Real listeners instead of inline onclick: mark as read, then swap
+            // the page in through htmx so the app shell (and every other open
+            // WebSocket/interval) survives navigation.
+            listEl.querySelectorAll('a[data-notif-id]').forEach(link => {
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const notifId = this.dataset.notifId;
+                    if (this.classList.contains('unread-style')) {
+                        window.markOneRead(notifId);
+                    }
+                    const url = this.dataset.target;
+                    window.ssNavigate(url);
+                });
+            });
         }).catch((e) => {
             if (loadingEl) loadingEl.style.display = 'none';
             listEl.innerHTML = `<div class="text-center py-3 text-danger small">Failed to load</div>`;
@@ -1017,7 +1156,7 @@ if (!window.__ssAuthScriptLoaded) {
 
     function refreshRecycleBinBadge() {
         const binBadge = document.getElementById('recycle-bin-badge');
-        if (!getToken() || !binBadge) return;
+        if (!binBadge) return;
         API.get('/api/waste-requests/recycle_bin/').then(data => {
             if (!data) return;
             let count = 0;
@@ -1046,7 +1185,7 @@ if (!window.__ssAuthScriptLoaded) {
     function refreshComplaintsBadge() {
         const complaintsBadge = document.getElementById('complaints-badge');
         const complaintsDot = document.getElementById('complaints-badge-dot');
-        if (!getToken() || !complaintsBadge) return;
+        if (!complaintsBadge) return;
         API.get('/api/complaints/?status=pending').then(data => {
             if (!data) return;
             let count = 0;
@@ -1229,7 +1368,12 @@ if (!window.__ssAuthScriptLoaded) {
             const list = Array.isArray(data) ? data : (data.results || []);
             const checkpoints = list.filter(ch => ch.is_active);
 
-            const targetMap = window.map || window.driverMap || window.checkpointMap || null;
+            // Pages keep their Leaflet instance in an IIFE-scoped `let map`, so
+            // nothing was ever assigned to window.map / window.driverMap and
+            // this always returned early — checkpoints never rendered. Each map
+            // page now publishes its instance as window.__ssActiveMap.
+            const targetMap = window.__ssActiveMap
+                || window.map || window.driverMap || window.checkpointMap || null;
             if (!targetMap || typeof L === 'undefined') return;
 
             if (!window._checkpointLayer) {
@@ -1248,7 +1392,7 @@ if (!window.__ssAuthScriptLoaded) {
                         iconSize: [24, 24],
                         iconAnchor: [12, 24],
                     }),
-                }).bindPopup(`<strong>${ch.name}</strong><br>${ch.description || 'Designated checkpoint'}`);
+                }).bindPopup(`<strong>${window.escapeHtml(ch.name || '')}</strong><br>${window.escapeHtml(ch.description || 'Designated checkpoint')}`);
 
                 marker.addTo(window._checkpointLayer);
             });
@@ -1289,25 +1433,26 @@ if (!window.__ssAuthScriptLoaded) {
         document.documentElement.style.cursor = 'default';
     });
 
-    // T2.2 FIX: previously ANY send error (a single dropped/timed-out
-    // request — exactly what happens when the dev server's single sync
-    // worker is busy holding the open WebSocket) triggered a full
-    // window.location.reload(). That's what was making a stalled htmx
-    // navigation escalate into a full page reload + the WS getting
-    // killed + the "connection lost" toast, all from one hiccup.
-    // Now: just warn + let the user retry the click. Only force a reload
-    // on a REAL 5xx server response, and only once (guarded), so a string
-    // of errors can't reload the page in a loop.
-    let _reloadTriggered = false;
+    // A failed send (dropped/timed-out request — common while the dev server's
+    // single sync worker is busy holding an open WebSocket) must not escalate to
+    // a full page load either: warn and let the user retry the click.
     document.body.addEventListener('htmx:sendError', function(evt) {
         console.warn('htmx request failed to send:', evt.detail);
         showToast(gettext('Request failed — please try again.'), 'warning');
     });
+
+    // A 5xx must NOT trigger window.location.reload() either: that discards the
+    // whole app shell — open WebSockets, polling intervals, map state — for one
+    // failed call, which is exactly the full-page-reload behaviour the rest of
+    // this file works to avoid. Surface the error and let the user retry.
     document.body.addEventListener('htmx:responseError', function(evt) {
-        if (evt.detail.xhr && evt.detail.xhr.status >= 500 && !_reloadTriggered) {
-            _reloadTriggered = true;
-            showToast(gettext('Server error — reloading...'), 'danger');
-            setTimeout(() => window.location.reload(), 1000);
+        const status = evt.detail.xhr ? evt.detail.xhr.status : 0;
+        if (status >= 500) {
+            showToast(gettext('Server error — please try again.'), 'danger');
+        } else if (status === 403) {
+            showToast(gettext('You do not have permission to do that.'), 'warning');
+        } else if (status === 404) {
+            showToast(gettext('That page was not found.'), 'warning');
         }
     });
 } // end __ssAuthScriptLoaded guard
@@ -1368,7 +1513,31 @@ if (!window.__ssAuthScriptLoaded) {
        window.scrollTo(0, window._sidebarScrollY || 0);
    }
 
-   function applySidebarState() {
+    // ── Global WebSocket cleanup on navigation ────────────────────────────────
+    // Page scripts open their sockets on window (window._requestWs, _fleetWs,
+    // driver-location sockets, ...) and only close the PREVIOUS socket when
+    // another page that happens to share the same global connects. Navigating
+    // away from a socket-owning page therefore left it open, still receiving
+    // server broadcasts, for the rest of the session. One listener here closes
+    // every registered socket before any swap. Pages register new sockets by
+    // assigning to window.__ssSockets.
+    window.__ssSockets = window.__ssSockets || new Set();
+    document.body.addEventListener('htmx:beforeSwap', function () {
+        const globals = ['_requestWs', '_fleetWs', '_driverWs', '_driverLocationWs'];
+        globals.forEach(function (name) {
+            const ws = window[name];
+            if (!ws) return;
+            try { ws.close(1000, 'htmx navigation'); } catch (e) { /* already closing */ }
+            window[name] = null;
+        });
+        window.__ssSockets.forEach(function (ws) {
+            try { if (ws && ws.readyState <= 1) ws.close(1000, 'htmx navigation'); } catch (e) {}
+        });
+          window.__ssSockets.clear();
+      }, true);
+
+
+    function applySidebarState() {
        const wrapper = document.querySelector(".layout-wrapper");
        const backdrop = document.getElementById('sidebar-backdrop');
        if (!wrapper) return;
@@ -1427,7 +1596,7 @@ function toggleNavQuickMenu() {
 // Close the quick menu if user taps outside it (mobile)
 document.addEventListener('click', function (e) {
     const menu = document.getElementById('navQuickMenu');
-    const toggleBtn = document.querySelector('.navbar-quick-toggle');
+    const toggleBtn = document.querySelector('.nav-quick-toggle-btn');
     if (!menu || !toggleBtn) return;
     if (menu.classList.contains('mobile-open') &&
         !menu.contains(e.target) &&

@@ -57,6 +57,22 @@ class User(AbstractUser):
             self.email = self.email.strip().lower()
         else:
             self.email = None
+        # `manage.py createsuperuser` (README setup step) only sets
+        # is_superuser/is_staff — the role field keeps its 'user' default, and
+        # every management page gates on role=='admin', so the superuser was
+        # silently redirected away from ALL admin pages. Keep the two in sync:
+        # a Django superuser is always an admin of this app.
+        if self.is_superuser:
+            if self.role != 'admin':
+                self.role = 'admin'
+            # Also grant app-level superadmin (admin-account management,
+            # backup/restore) — but only when the account is FIRST created:
+            # an existing superadmin can still be revoked via the
+            # admin-users UI (that path saves with is_superuser still True,
+            # and re-forcing the flag on every save would make revoking
+            # impossible).
+            if self._state.adding and not self.is_superadmin:
+                self.is_superadmin = True
         super().save(*args, **kwargs)
  
     @property

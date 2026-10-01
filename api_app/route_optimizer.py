@@ -20,16 +20,20 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     return R * c
 
 
-def get_location_coords(obj) -> tuple[float, float]:
-    """Extract latitude and longitude from a location object (WasteRequest or Bin)."""
+def get_location_coords(obj) -> tuple[float, float] | None:
+    """Extract latitude and longitude from a location object (WasteRequest or Bin).
+
+    Prefers the explicit coordinate fields over the photo geotags so that routing
+    matches the coordinates shown to users and used everywhere else in the app.
+    """
     if isinstance(obj, WasteRequest):
-        lat = obj.photo_latitude or obj.latitude
-        lon = obj.photo_longitude or obj.longitude
+        lat = obj.latitude if obj.latitude is not None else obj.photo_latitude
+        lon = obj.longitude if obj.longitude is not None else obj.photo_longitude
     else:  # Bin
         lat = obj.latitude
         lon = obj.longitude
-    
-    if lat and lon:
+
+    if lat is not None and lon is not None:
         return float(lat), float(lon)
     return None
 
@@ -161,7 +165,7 @@ def generate_optimal_route(driver, waste_request_ids=None, bin_ids=None):
     
     locations = []
     if waste_request_ids:
-        requests = WasteRequest.objects.filter(id__in=waste_request_ids).prefetch_related('photos')
+        requests = WasteRequest.objects.filter(id__in=waste_request_ids).prefetch_related('extra_photos')
         for req in requests:
             coords = get_location_coords(req)
             if coords:

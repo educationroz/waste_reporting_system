@@ -674,7 +674,7 @@
                 const data = await API.post('/api/admin-logs/clear_all/', {});
                 if (data && typeof data.deleted === 'number') {
                     showToast(gettext('All activity logs have been cleared.'), 'success');
-                    setTimeout(() => location.reload(), 700);
+                    setTimeout(() => window.ssRefreshContent(), 250);
                 } else {
                     showToast(gettext('Failed to clear activity logs.'), 'danger');
                 }
@@ -690,9 +690,11 @@
         if (!tbody) return;
         const rows = tbody.querySelectorAll('tr[id^="log-row-"]');
         if (rows.length === 0) {
-            // When all items on this page are deleted, automatically reload so the next page's records instantly slide into page 1!
+            // When all items on this page are deleted, re-render the current view
+            // in place so the next page's records slide into view — without a
+            // full location.reload() tearing down the app shell.
             setTimeout(() => {
-                window.location.reload();
+                window.ssRefreshContent();
             }, 350);
         }
     }

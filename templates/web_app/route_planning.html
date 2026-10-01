@@ -313,22 +313,22 @@
     let driverMarkersLayer = null;
     let driverMarkers = new Map();
 
-    if (!document.body.dataset._leafletCleanupBound) {
-        document.body.addEventListener('htmx:beforeSwap', () => {
-            if (map) {
-                map.remove();
-                map = null;
-            }
-            routeMarkers = [];
-            routePolyline = null;
-            selectedRequests = [];
-            checkpointMarkersLayer = null;
-            driverMarkersLayer = null;
-            driverMarkers.clear();
-            window._routePlanningInitialized = false;
-        });
-        document.body.dataset._leafletCleanupBound = '1';
-    }
+    // Re-registered on every htmx visit so it closes over the CURRENT map/layers;
+    // the `dataset` guard that used to wrap this froze it on the first visit and
+    // leaked the map from the second visit onward.
+    window.ssRegisterPageTeardown(function () {
+        if (map) {
+            map.remove();
+            map = null;
+        }
+        routeMarkers = [];
+        routePolyline = null;
+        selectedRequests = [];
+        checkpointMarkersLayer = null;
+        driverMarkersLayer = null;
+        driverMarkers.clear();
+        window._routePlanningInitialized = false;
+    });
 
     function ensureLeafletLoaded(onReady) {
         if (typeof L !== 'undefined') {
@@ -405,6 +405,9 @@
         if (!mapEl) return; // page swapped away before Leaflet finished loading
 
         map = L.map('route-map').setView([28.2096, 83.9856], 13);
+        // Publish for base.html's shared refreshCheckpoints(), which can only
+        // reach this map through window.
+        window.__ssActiveMap = map;
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
             maxZoom: 19
@@ -473,7 +476,7 @@
             nextIds.add(driver.id);
 
             const name = driver.user?.username || driver.user_detail?.username || `Driver #${driver.id}`;
-            const popupHtml = `<strong>🚛 ${name}</strong><br>Live driver location`;
+            const popupHtml = `<strong>🚛 ${escapeHtml(name)}</strong><br>Live driver location`;
             const icon = L.divIcon({
                 className: 'driver-marker-icon',
                 html: '<span style="font-size:1.4rem; line-height:1;">🚛</span>',
@@ -686,7 +689,7 @@
                     badgeClass = 'bg-secondary';
                 }
                 const reviewIcon = !isHighConf && !wp.ml_reviewed ? ' ⏳' : '';
-                mlHtml = `<br><span class="badge ${badgeClass}">${wp.ml_prediction} ${conf}%${reviewIcon}</span>`;
+                mlHtml = `<br><span class="badge ${badgeClass}">${escapeHtml(wp.ml_prediction)} ${conf}%${reviewIcon}</span>`;
             }
             const marker = L.marker([wp.latitude, wp.longitude])
                 .addTo(map)
@@ -749,7 +752,7 @@
             badgeClass = 'bg-secondary';
         }
         const reviewIcon = !isHighConf && !wp.ml_reviewed ? ' ⏳' : '';
-        return `<span class="badge ${badgeClass} ms-2">${wp.ml_prediction} ${conf}%${reviewIcon}</span>`;
+        return `<span class="badge ${badgeClass} ms-2">${escapeHtml(wp.ml_prediction)} ${conf}%${reviewIcon}</span>`;
     }
 
     function displayWaypoints(waypoints) {
@@ -849,7 +852,7 @@
                 if (isNaN(lat) || isNaN(lng) || !driverId) return;
 
                 const name = data.driver_name || `Driver #${driverId}`;
-                const popupHtml = `<strong>🚛 ${name}</strong><br>Live driver location`;
+                const popupHtml = `<strong>🚛 ${escapeHtml(name)}</strong><br>Live driver location`;
                 const icon = L.divIcon({
                     className: 'driver-marker-icon',
                     html: '<span style="font-size:1.4rem; line-height:1;">🚛</span>',
