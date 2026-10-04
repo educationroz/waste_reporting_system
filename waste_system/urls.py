@@ -123,3 +123,20 @@ if settings.DEBUG:
     if settings.MEDIA_ROOT:
         urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# User uploads (/media/ request photos, profile pictures, PDFs) must resolve
+# on EVERY device, not just the submitting one. WhiteNoise only serves
+# /static/, and the DEBUG block above leaves /media/ unmounted in production —
+# so with the local storage backend every uploaded image 404s in production
+# (photo visible in the pre-submit local preview, gone on reload / other
+# devices / profile save). Mount the media route whenever local disk is the
+# backend, in any DEBUG mode. NOTE: django.conf.urls.static.static() returns
+# [] when DEBUG is False, so the route is built with django.views.static.serve
+# directly. Single-instance traffic is trivial for serve(); for multi-instance
+# or redeploy-proof persistence set MEDIA_BACKEND=cloudinary (or s3) instead —
+# then MEDIA_ROOT is None and this block stays inert.
+if getattr(settings, 'MEDIA_ROOT', None):
+    from django.views.static import serve as _media_serve
+    urlpatterns += [
+        path('media/<path:path>', _media_serve, {'document_root': settings.MEDIA_ROOT}),
+    ]

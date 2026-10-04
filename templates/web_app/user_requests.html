@@ -361,7 +361,8 @@
                                             {% if req.photo %}
                                             <img src="{{ req.photo|thumbnail:'48x48' }}" alt="{% trans 'photo' %}"
                                                 class="extra-photo-thumb" style="height:48px;width:48px;"
-                                                onclick="openPhotoLightbox({{ req.id }}, 0)">
+                                                onclick="openPhotoLightbox({{ req.id }}, 0)"
+                                                onerror="this.style.display='none'">
                                             {% endif %}
                                             {% with req.extra_photos.all as extras %}
                                             {% if extras %}

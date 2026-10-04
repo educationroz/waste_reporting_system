@@ -338,7 +338,7 @@
                     <a class="nav-link dropdown-toggle d-flex align-items-center px-2 py-1" href="#" hx-boost="false" data-bs-toggle="dropdown">
                         <span id="navbar-avatar-slot" class="d-inline-flex align-items-center me-1">
                             {% if user.profile_picture %}
-                                <img id="navbar-profile-pic" src="{{ user.profile_picture|thumbnail:'32x32' }}" alt="{% trans 'Profile' %}" class="navbar-profile-pic">
+                                <img id="navbar-profile-pic" src="{{ user.profile_picture|thumbnail:'32x32' }}" alt="{% trans 'Profile' %}" class="navbar-profile-pic" onerror="this.outerHTML='<i class=&quot;bi bi-person-circle&quot; id=&quot;navbar-profile-pic-placeholder&quot;></i>'">
                             {% else %}
                                 <i class="bi bi-person-circle" id="navbar-profile-pic-placeholder"></i>
                             {% endif %}
@@ -794,7 +794,31 @@ document.addEventListener("DOMContentLoaded", function() {
     window.updateNavbarAvatar = function updateNavbarAvatar(url) {
         const slot = document.getElementById('navbar-avatar-slot');
         if (!slot || !url) return;
-        slot.innerHTML = '<img id="navbar-profile-pic" src="' + url + '" alt="Profile" class="navbar-profile-pic">';
+        slot.innerHTML = '<img id="navbar-profile-pic" src="' + url + '" alt="Profile" class="navbar-profile-pic" onerror="this.outerHTML=\'<i class=&quot;bi bi-person-circle&quot; id=&quot;navbar-profile-pic-placeholder&quot;></i>\'">';
+    };
+
+    // Turns a DRF error payload ({field: [msgs]} or {detail/error}) into a
+    // short human sentence. Pages previously dumped the raw object with
+    // JSON.stringify(), so users saw JSON like {"photo":["..."]} in toasts.
+    window.formatApiErrors = function formatApiErrors(data, fallback) {
+        const fb = fallback || gettext('Something went wrong. Please try again.');
+        if (data == null) return fb;
+        if (typeof data === 'string') return data.slice(0, 300) || fb;
+        if (typeof data !== 'object') return fb;
+        if (typeof data.detail === 'string') return data.detail.slice(0, 300);
+        if (typeof data.error === 'string') return data.error.slice(0, 300);
+        if (typeof data.message === 'string' && !data.id) return data.message.slice(0, 300);
+        const parts = [];
+        for (const [key, val] of Object.entries(data)) {
+            if (val == null) continue;
+            const text = Array.isArray(val) ? val.join(' ') : String(val);
+            if (!text) continue;
+            const label = key === 'non_field_errors' ? '' : key.replace(/_/g, ' ') + ': ';
+            parts.push(label + text);
+            if (parts.length >= 2) break;
+        }
+        const msg = parts.join(' ');
+        return (msg ? msg.charAt(0).toUpperCase() + msg.slice(1) : fb).slice(0, 300);
     };
 
     // Shared CSV/file download helper for every "bulk_export" endpoint

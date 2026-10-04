@@ -35,9 +35,9 @@
                     below) so both copies of the picture update instantly,
                     with no full page reload needed.
                 -->
-                <span class="sidebar-avatar" id="sidebar-avatar-slot">
+                <span class="sidebar-avatar" id="sidebar-avatar-slot" data-initial="{{ user.username|slice:":1"|upper }}">
                     {% if user.profile_picture %}
-                        <img src="{{ user.profile_picture|thumbnail:'48x48' }}" alt="{{ user.username }}">
+                        <img src="{{ user.profile_picture|thumbnail:'48x48' }}" alt="{{ user.username }}" onerror="var s=this.closest('#sidebar-avatar-slot'); if(s){s.textContent=s.dataset.initial||'';} this.remove();">
                     {% else %}
                         {{ user.username|slice:":1"|upper }}
                     {% endif %}
@@ -61,7 +61,9 @@
         const slot = document.getElementById('sidebar-avatar-slot');
         if (!slot) return;
         if (url) {
-            slot.innerHTML = '<img src="' + url + '" alt="{{ user.username|escapejs }}">';
+            const initial = slot.dataset.initial || '{{ user.username|slice:":1"|upper|escapejs }}';
+            slot.innerHTML = '<img src="' + url + '" alt="{{ user.username|escapejs }}" onerror="var s=this.closest(\'#sidebar-avatar-slot\'); if(s){s.textContent=s.dataset.initial||\'\';} this.remove();">';
+            slot.dataset.initial = initial;
         } else {
             slot.textContent = '{{ user.username|slice:":1"|upper|escapejs }}';
         }

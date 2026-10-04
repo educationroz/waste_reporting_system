@@ -400,7 +400,8 @@
                                     {% if req.photo %}
                                     <a href="{{ req.photo.url }}" target="_blank">
                                         <img src="{{ req.photo|thumbnail:'36x36' }}" alt="{% trans 'photo' %}"
-                                            style="height:36px;width:36px;object-fit:cover;border-radius:4px;">
+                                            style="height:36px;width:36px;object-fit:cover;border-radius:4px;"
+                                            onerror="this.closest('a').outerHTML='<span class=text-muted small>—</span>'">
                                     </a>
                                     {% else %}
                                     <span class="text-muted small">—</span>
@@ -1582,8 +1583,10 @@ function insertHomeRequestRow(req) {
     // statuses, and statusLabel is written into innerHTML below.
     const statusLabel = escapeHtml(HOME_STATUS_LABELS[req.status] || req.status);
     const driverName = escapeHtml(req.driver && req.driver.user ? req.driver.user.username : '—');
+    // onerror: a stored file missing from disk (e.g. ephemeral container
+    // storage) must degrade to "—", never a broken-image icon.
     const photoCell = req.photo
-        ? `<a href="${escapeHtml(req.photo)}" target="_blank"><img src="${escapeHtml(req.photo)}" alt="${gettext('photo')}" style="height:36px;width:36px;object-fit:cover;border-radius:4px;"></a>`
+        ? `<a href="${escapeHtml(req.photo)}" target="_blank"><img src="${escapeHtml(req.photo)}" alt="${gettext('photo')}" style="height:36px;width:36px;object-fit:cover;border-radius:4px;" onerror="this.closest('a').outerHTML='<span class=text-muted small>—</span>'"></a>`
         : '<span class="text-muted small">—</span>';
     const dateStr = req.scheduled_date
         ? new Date(req.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -1870,10 +1873,11 @@ window.submitRequest = async function() {
                 bumpStat('stat-pending-count', 1);
             }
         } else {
-            const errMsg = typeof data === 'object'
-                ? Object.entries(data).map(([k,v]) => `${k}: ${v}`).join(', ')
-                : JSON.stringify(data);
-            showToast(gettext('Error: ') + errMsg, 'danger');
+            // Human sentence, never raw JSON ({"photo": [...]} leaked here).
+            const fmt = typeof window.formatApiErrors === 'function'
+                ? window.formatApiErrors
+                : (d) => (d && (d.error || d.detail)) || gettext('Failed to submit request.');
+            showToast(fmt(data, gettext('Failed to submit request.')), 'danger');
         }
     } catch (e) {
         // navigator.onLine said we were online but the request still
@@ -2076,10 +2080,11 @@ window.submitComplaint = async function() {
             resetComplaintForm();
             bootstrap.Modal.getInstance(document.getElementById('complaintModal')).hide();
         } else {
-            const errMsg = typeof data === 'object'
-                ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
-                : JSON.stringify(data);
-            showToast(gettext('Error: ') + errMsg, 'danger');
+            // Human sentence, never raw JSON ({"photo": [...]} leaked here).
+            const fmt = typeof window.formatApiErrors === 'function'
+                ? window.formatApiErrors
+                : (d) => (d && (d.error || d.detail)) || gettext('Failed to submit complaint.');
+            showToast(fmt(data, gettext('Failed to submit complaint.')), 'danger');
         }
     } catch (e) {
         const msg = e.message || gettext('Network error occurred');
