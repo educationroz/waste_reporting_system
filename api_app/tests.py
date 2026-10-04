@@ -11,6 +11,80 @@ from .views import _create_notification
 
 User = get_user_model()
 
+
+class OverdueLogicTests(TestCase):
+    """Grace-based overdue: fresh submissions never pop up; old stuck ones do."""
+
+    def _request(self, **kwargs):
+        from django.utils import timezone
+        defaults = dict(
+            pickup_address='Test address',
+            scheduled_date=timezone.now(),
+            status='pending',
+        )
+        defaults.update(kwargs)
+        return WasteRequest.objects.create(**defaults)
+
+    def test_fresh_submission_is_not_overdue(self):
+        from django.utils import timezone
+        from .models import filter_overdue
+        self._request(scheduled_date=timezone.now())
+        self.assertEqual(filter_overdue(WasteRequest.objects.all()).count(), 0)
+
+    def test_old_open_request_is_overdue_oldest_first(self):
+        from django.utils import timezone
+        from .models import filter_overdue
+        now = timezone.now()
+        old = self._request(scheduled_date=now - datetime.timedelta(days=5))
+        mid = self._request(scheduled_date=now - datetime.timedelta(days=2))
+        self._request(scheduled_date=now)  # fresh — excluded
+        done = self._request(scheduled_date=now - datetime.timedelta(days=9), status='completed')
+        rows = list(filter_overdue(WasteRequest.objects.all()).order_by('scheduled_date'))
+        self.assertEqual([r.id for r in rows], [old.id, mid.id])
+        self.assertNotIn(done.id, [r.id for r in rows])
+
+    def test_deleted_and_terminal_excluded(self):
+        from django.utils import timezone
+        from .models import filter_overdue
+        now = timezone.now()
+        old = now - datetime.timedelta(days=4)
+        self._request(scheduled_date=old, is_deleted=True)
+        self._request(scheduled_date=old, status='cancelled')
+        self.assertEqual(filter_overdue(WasteRequest.objects.all()).count(), 0)
+
+    def test_tiers_and_flags(self):
+        from django.utils import timezone
+        from .models import is_request_stale, overdue_tier
+        now = timezone.now()
+        wr = self._request(scheduled_date=now - datetime.timedelta(hours=30))
+        self.assertEqual(overdue_tier(wr, now), 'overdue')
+        wr2 = self._request(scheduled_date=now - datetime.timedelta(days=4))
+        self.assertEqual(overdue_tier(wr2, now), 'long')
+        wr3 = self._request(scheduled_date=now - datetime.timedelta(days=10))
+        self.assertEqual(overdue_tier(wr3, now), 'critical')
+        # stale: updated_at untouched 48h+ (backdate via queryset update)
+        stale = self._request(scheduled_date=now - datetime.timedelta(days=3))
+        WasteRequest.objects.filter(pk=stale.pk).update(
+            updated_at=now - datetime.timedelta(hours=50))
+        stale.refresh_from_db()
+        self.assertTrue(is_request_stale(stale, now))
+
+    def test_overdue_api_admin_only(self):
+        from django.utils import timezone
+        admin = User.objects.create_user(username='oadmin', password='pw', role='admin')
+        citizen = User.objects.create_user(username='ocit', password='pw', role='user')
+        self._request(scheduled_date=timezone.now() - datetime.timedelta(days=3))
+        client = APIClient()
+        client.force_authenticate(citizen)
+        self.assertEqual(client.get('/api/waste-requests/overdue/').status_code, 403)
+        client.force_authenticate(admin)
+        resp = client.get('/api/waste-requests/overdue/')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        row = resp.json()[0]
+        self.assertEqual(row['tier'], 'long')
+        self.assertTrue(row['unassigned'])
+        self.assertIn('age_hours', row)
+
 class BackupRestoreTests(APITestCase):
     def setUp(self):
         # Backup/restore is gated by IsSuperAdminUser, not just role='admin'.

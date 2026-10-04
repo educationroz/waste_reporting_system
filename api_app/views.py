@@ -2231,7 +2231,7 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             # bulk_assign / bulk_reschedule keep their in-handler admin check
             # as belt-and-suspenders)
             'auto_assign_driver', 'reassign_all_from_driver',
-            'bulk_assign', 'bulk_reschedule',
+            'bulk_assign', 'bulk_reschedule', 'overdue',
         ):
             return [IsAuthenticated(), IsAdminUser()]
         return [IsAuthenticated(), IsOwnerOrAdmin()]
@@ -4215,6 +4215,54 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 'end': end_date.isoformat(),
             }
         })
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def overdue(self, request):
+        """GET /api/waste-requests/overdue/?limit=15 — admin-only overdue timeline.
+
+        Oldest overdue first: open status + not deleted + scheduled_date past
+        the OVERDUE_GRACE_HOURS grace period. Each row carries age_hours,
+        tier (overdue/long/critical), stale (no change for 48 h) and
+        unassigned (pending with no driver) flags so the dashboard timeline
+        can refresh live without a page reload.
+        """
+        from api_app.models import (
+            filter_overdue,
+            is_request_stale,
+            overdue_age_hours,
+            overdue_tier,
+        )
+        try:
+            limit = int(request.query_params.get('limit', 15))
+        except (TypeError, ValueError):
+            limit = 15
+        limit = max(1, min(limit, 100))
+        now = timezone.now()
+        rows = list(
+            filter_overdue(
+                WasteRequest.objects.select_related('user', 'driver__user')
+            ).order_by('scheduled_date')[:limit]
+        )
+        return Response([
+            {
+                'id': wr.id,
+                'status': wr.status,
+                'status_display': wr.get_status_display(),
+                'waste_type': wr.waste_type,
+                'waste_type_display': wr.get_waste_type_display(),
+                'pickup_address': wr.pickup_address,
+                'zone': wr.zone,
+                'citizen': wr.user.username if wr.user else None,
+                'driver_name': wr.driver.user.username if wr.driver and wr.driver.user else None,
+                'scheduled_date': wr.scheduled_date.isoformat() if wr.scheduled_date else None,
+                'updated_at': wr.updated_at.isoformat() if wr.updated_at else None,
+                'age_hours': round(overdue_age_hours(wr, now), 1),
+                'tier': overdue_tier(wr, now),
+                'stale': is_request_stale(wr, now),
+                'unassigned': wr.driver_id is None and wr.status == 'pending',
+            }
+            for wr in rows
+        ])
 
     def _build_schedule_occurrence(self, schedule, date_obj):
         """Helper to build a schedule occurrence dict."""

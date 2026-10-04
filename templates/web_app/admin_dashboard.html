@@ -250,10 +250,11 @@
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <div class="card metric-card border-0 bg-danger bg-opacity-10 h-100 cursor-pointer">
+                    <div class="card metric-card border-0 bg-danger bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-requests' %}?overdue=true')">
                         <div class="card-body p-4">
                             <div class="text-danger fw-semibold small mb-1">{% trans "Overdue Alerts" %}</div>
-                            <div class="display-6 fw-bold text-danger">{{ overdue_requests }}</div>
+                            <div class="display-6 fw-bold text-danger" id="overdue-count-number">{{ overdue_requests }}</div>
+                            <div class="small text-muted mt-1">{% trans "past 24 h grace" %}</div>
                         </div>
                     </div>
                 </div>
@@ -298,6 +299,55 @@
                         <div class="card-body p-4">
                             <div class="text-primary fw-semibold small mb-1">{% trans "Fleet Available" %}</div>
                             <div class="display-6 fw-bold text-primary">{{ available_vehicles }}<span class="fs-5 text-secondary fw-normal">/{{ total_vehicles }}</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overdue Timeline: oldest-stuck requests first (live, no reload) -->
+            <div class="row g-3 mb-4">
+                <div class="col-12">
+                    <div class="card dashboard-card shadow-sm">
+                        <div class="card-header py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-hourglass-split me-2 text-danger"></i>{% trans "Overdue Timeline" %}
+                                <span class="badge bg-danger bg-opacity-10 text-danger ms-2" id="overdue-timeline-count">{{ overdue_timeline|length }}</span>
+                            </h6>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="small text-muted">{% trans "oldest first · 24 h grace" %}</span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshOverdueTimeline()">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>{% trans "Refresh" %}
+                                </button>
+                                <a href="{% url 'admin-requests' %}?overdue=true" class="btn btn-sm btn-outline-danger">{% trans "Open All" %}</a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush" id="overdue-timeline-list">
+                                {% for item in overdue_timeline %}
+                                <li class="list-group-item d-flex flex-wrap align-items-center gap-2 py-3" id="overdue-row-{{ item.request.id }}">
+                                    <span class="badge {% if item.tier == 'critical' %}bg-dark{% elif item.tier == 'long' %}bg-danger{% else %}bg-warning text-dark{% endif %} rounded-pill px-3" title="{{ item.age_label }}">
+                                        <i class="bi bi-clock-history me-1"></i>{{ item.age_label }}
+                                    </span>
+                                    <span class="fw-bold">#{{ item.request.id }}</span>
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border">{{ item.request.get_status_display }}</span>
+                                    {% if item.unassigned %}
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border"><i class="bi bi-person-exclamation me-1"></i>{% trans "Unassigned" %}</span>
+                                    {% elif item.request.driver %}
+                                    <span class="small text-muted"><i class="bi bi-person me-1"></i>{{ item.request.driver.user.username }}</span>
+                                    {% endif %}
+                                    {% if item.stale %}
+                                    <span class="badge bg-info bg-opacity-10 text-info border" title="{% trans 'No status change for 48+ hours' %}"><i class="bi bi-pause-circle me-1"></i>{% trans "Stale" %}</span>
+                                    {% endif %}
+                                    <span class="small text-truncate" style="max-width: 260px;" title="{{ item.request.pickup_address }}">{{ item.request.pickup_address }}</span>
+                                    <span class="small text-muted ms-auto">{{ item.request.scheduled_date|date:"d M Y, H:i" }}</span>
+                                    <a href="{% url 'admin-requests' %}?search={{ item.request.id }}" class="btn btn-sm btn-outline-success">{% trans "Open" %}</a>
+                                </li>
+                                {% empty %}
+                                <li class="list-group-item text-center text-muted py-4" id="overdue-empty-note">
+                                    <i class="bi bi-check-circle-fill text-success fs-4 d-block mb-2"></i>
+                                    {% trans "All clear — nothing is overdue." %}
+                                </li>
+                                {% endfor %}
+                            </ul>
                         </div>
                     </div>
                 </div>
@@ -922,6 +972,9 @@
                     if (data.type === 'request_update') {
                         // Update the request table row if it exists
                         applyAdminRequestRowUpdate(data);
+                        // Any status/assignment change can move rows in or out
+                        // of the overdue timeline — refresh it (debounced).
+                        scheduleOverdueRefresh();
                     }
                 } catch (err) {
                     console.error('Error parsing request update:', err);
@@ -1213,6 +1266,81 @@
             console.warn('Fleet WebSocket setup error:', e);
         }
     }
+
+    // ── Overdue timeline: live refresh without reload ─────────────────────
+    let _overdueRefreshTimer = null;
+    let _overduePoller = null;
+
+    function overdueTierBadge(tier) {
+        if (tier === 'critical') return 'bg-dark';
+        if (tier === 'long') return 'bg-danger';
+        return 'bg-warning text-dark';
+    }
+
+    function overdueAgeLabel(ageHours) {
+        if (ageHours < 48) return `${Math.floor(ageHours)} hours overdue`;
+        const days = Math.floor(ageHours / 24);
+        return days === 1 ? '1 day overdue' : `${days} days overdue`;
+    }
+
+    function scheduleOverdueRefresh() {
+        if (_overdueRefreshTimer) return;
+        _overdueRefreshTimer = setTimeout(() => {
+            _overdueRefreshTimer = null;
+            refreshOverdueTimeline();
+        }, 1500);
+    }
+
+    async function refreshOverdueTimeline() {
+        const list = document.getElementById('overdue-timeline-list');
+        if (!list) return;
+        try {
+            const rows = await API.get('/api/waste-requests/overdue/?limit=15');
+            const countEl = document.getElementById('overdue-timeline-count');
+            if (countEl) countEl.textContent = rows.length;
+            const numEl = document.getElementById('overdue-count-number');
+            if (numEl) numEl.textContent = rows.length;
+            if (!rows.length) {
+                list.innerHTML = `<li class="list-group-item text-center text-muted py-4"><i class="bi bi-check-circle-fill text-success fs-4 d-block mb-2"></i>${gettext('All clear — nothing is overdue.')}</li>`;
+                return;
+            }
+            list.innerHTML = rows.map((r) => {
+                const tierClass = overdueTierBadge(r.tier);
+                const ageLabel = overdueAgeLabel(r.age_hours);
+                const who = r.driver_name
+                    ? `<span class="small text-muted"><i class="bi bi-person me-1"></i>${escapeHtml(r.driver_name)}</span>`
+                    : (r.unassigned
+                        ? `<span class="badge bg-danger bg-opacity-10 text-danger border"><i class="bi bi-person-exclamation me-1"></i>${gettext('Unassigned')}</span>`
+                        : '');
+                const stale = r.stale
+                    ? `<span class="badge bg-info bg-opacity-10 text-info border" title="${gettext('No status change for 48+ hours')}"><i class="bi bi-pause-circle me-1"></i>${gettext('Stale')}</span>`
+                    : '';
+                const sched = r.scheduled_date ? new Date(r.scheduled_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+                return `<li class="list-group-item d-flex flex-wrap align-items-center gap-2 py-3" id="overdue-row-${r.id}">
+                    <span class="badge ${tierClass} rounded-pill px-3" title="${escapeHtml(ageLabel)}"><i class="bi bi-clock-history me-1"></i>${escapeHtml(ageLabel)}</span>
+                    <span class="fw-bold">#${r.id}</span>
+                    <span class="badge bg-secondary bg-opacity-10 text-secondary border">${escapeHtml(r.status_display || r.status)}</span>
+                    ${who}${stale}
+                    <span class="small text-truncate" style="max-width: 260px;" title="${escapeHtml(r.pickup_address || '')}">${escapeHtml(r.pickup_address || '')}</span>
+                    <span class="small text-muted ms-auto">${escapeHtml(sched)}</span>
+                    <a href="/management/requests/?search=${r.id}" class="btn btn-sm btn-outline-success">${gettext('Open')}</a>
+                </li>`;
+            }).join('');
+        } catch (e) {
+            console.debug('Overdue timeline refresh failed:', e);
+        }
+    }
+    window.refreshOverdueTimeline = refreshOverdueTimeline;
+
+    // Ages tick up even with no WS traffic — re-render every 60 s while the
+    // dashboard is open. Retired on htmx navigation with everything else.
+    _overduePoller = setInterval(() => {
+        if (document.getElementById('overdue-timeline-list')) refreshOverdueTimeline();
+    }, 60000);
+    window.ssRegisterPageTeardown(() => {
+        if (_overdueRefreshTimer) { clearTimeout(_overdueRefreshTimer); _overdueRefreshTimer = null; }
+        if (_overduePoller) { clearInterval(_overduePoller); _overduePoller = null; }
+    });
 
     window.initFleetTrackingMap = initFleetTrackingMap;
 

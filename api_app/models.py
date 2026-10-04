@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.validators import (
     FileExtensionValidator,
@@ -227,6 +229,73 @@ class Checkpoint(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.latitude}, {self.longitude})"
+
+
+# ── Overdue policy ──────────────────────────────────────────────────────
+# A fresh submission sets scheduled_date=now, so counting "scheduled in the
+# past" flags every new report instantly. The grace period below means a
+# request only becomes overdue once its scheduled date is this far behind —
+# new reports never pop up as overdue right after submission.
+OVERDUE_GRACE_HOURS = 24
+# "Stale" = open this long with no status/assignment change at all
+# (updated_at untouched) — surfaced as its own flag on the timeline.
+OVERDUE_STALE_HOURS = 48
+# Only open pipeline stages can be overdue; completed/cancelled are terminal.
+OVERDUE_STATUSES = ('pending', 'assigned', 'in_progress')
+# Age tiers past the grace cutoff, for timeline badges.
+OVERDUE_TIER_LONG_HOURS = 48      # grace+48h  -> "long overdue"
+OVERDUE_TIER_CRITICAL_HOURS = 168  # grace+7d   -> "critical"
+
+
+def overdue_cutoff(now=None):
+    """Scheduled dates older than this are overdue (grace applied)."""
+    from django.utils import timezone
+    now = now or timezone.now()
+    return now - timedelta(hours=OVERDUE_GRACE_HOURS)
+
+
+def filter_overdue(qs, now=None):
+    """Restrict a WasteRequest queryset to overdue rows.
+
+    Overdue = open status + not soft-deleted + scheduled_date past grace.
+    """
+    return qs.filter(
+        status__in=OVERDUE_STATUSES,
+        is_deleted=False,
+        scheduled_date__lt=overdue_cutoff(now),
+    )
+
+
+def overdue_age_hours(request, now=None):
+    """Hours elapsed since the scheduled date (negative = not yet due)."""
+    from django.utils import timezone
+    now = now or timezone.now()
+    if not request.scheduled_date:
+        return 0.0
+    return (now - request.scheduled_date).total_seconds() / 3600.0
+
+
+def overdue_tier(request, now=None):
+    """Age tier past the grace cutoff: 'due' | 'overdue' | 'long' | 'critical'."""
+    age = overdue_age_hours(request, now) - OVERDUE_GRACE_HOURS
+    if age < 0:
+        return 'due'
+    if age >= OVERDUE_TIER_CRITICAL_HOURS:
+        return 'critical'
+    if age >= OVERDUE_TIER_LONG_HOURS:
+        return 'long'
+    return 'overdue'
+
+
+def is_request_stale(request, now=None):
+    """True when an open request saw no change for OVERDUE_STALE_HOURS."""
+    from django.utils import timezone
+    now = now or timezone.now()
+    if request.status not in OVERDUE_STATUSES:
+        return False
+    if not request.updated_at:
+        return False
+    return (now - request.updated_at).total_seconds() >= OVERDUE_STALE_HOURS * 3600
 
 
 class WasteRequest(models.Model):

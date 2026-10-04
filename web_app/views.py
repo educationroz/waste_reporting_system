@@ -463,6 +463,12 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
             # The old pattern issued a separate SELECT COUNT(*) for each
             # status/type combination — 10+ round-trips on every uncached
             # dashboard load. This collapses them into ONE query.
+            from api_app.models import overdue_cutoff
+            # Grace-based overdue: scheduled_date must be OVERDUE_GRACE_HOURS
+            # past (not merely past now) — fresh submissions set
+            # scheduled_date=now at submit time, so the old
+            # scheduled_date__lt=now flagged every new report instantly.
+            # in_progress also counts: a job stuck mid-pipeline is overdue too.
             waste_stats = WasteRequest.objects.aggregate(
                 total_requests=Count('id'),
                 pending_requests=Count('id', filter=Q(status='pending')),
@@ -471,8 +477,9 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
                 completed_requests_count=Count('id', filter=Q(status='completed')),
                 cancelled_requests_count=Count('id', filter=Q(status='cancelled')),
                 overdue_requests=Count('id', filter=Q(
-                    status__in=['pending', 'assigned'],
-                    scheduled_date__lt=timezone.now(),
+                    status__in=['pending', 'assigned', 'in_progress'],
+                    is_deleted=False,
+                    scheduled_date__lt=overdue_cutoff(),
                 )),
             )
             driver_stats = Driver.objects.aggregate(
@@ -527,6 +534,42 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
         ctx['drivers'] = Driver.objects.select_related('user', 'vehicle').all()
         ctx['schedules'] = Schedule.objects.select_related('driver__user', 'vehicle').filter(is_active=True)
         ctx['now'] = timezone.now()
+
+        # Overdue timeline: oldest overdue first, so requests sitting the
+        # longest without progress are on top. Annotated in Python (age,
+        # tier, stale, unassigned flags) — always fresh, never cached.
+        from api_app.models import (
+            filter_overdue,
+            is_request_stale,
+            overdue_age_hours,
+            overdue_tier,
+        )
+        now = timezone.now()
+        overdue_rows = list(
+            filter_overdue(
+                WasteRequest.objects.select_related('user', 'driver__user')
+            ).order_by('scheduled_date')[:15]
+        )
+
+        def _age_label(hours):
+            if hours < 48:
+                return _('%(n)s hours overdue') % {'n': int(hours)}
+            days = int(hours // 24)
+            if days == 1:
+                return _('1 day overdue')
+            return _('%(n)s days overdue') % {'n': days}
+
+        ctx['overdue_timeline'] = [
+            {
+                'request': wr,
+                'age_hours': overdue_age_hours(wr, now),
+                'age_label': _age_label(overdue_age_hours(wr, now)),
+                'tier': overdue_tier(wr, now),
+                'stale': is_request_stale(wr, now),
+                'unassigned': wr.driver_id is None and wr.status == 'pending',
+            }
+            for wr in overdue_rows
+        ]
         
         # System alerts.
         # Titles embed a count, so they use a gettext format string with a
@@ -545,7 +588,7 @@ class AdminDashboardView(LoginRequiredMixin, TemplateView):
                 'icon': 'exclamation-triangle',
                 'title': _('%(count)s Overdue Requests') % {
                     'count': overdue_requests},
-                'message': _('Requests past scheduled date need immediate attention'),
+                'message': _('Open requests sitting past their scheduled date (24 h grace) need immediate attention'),
             })
         if pending_requests > 5:
             ctx['system_alerts'].append({
@@ -595,9 +638,14 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         search_query = self.request.GET.get('search', '').strip()
         report_date = parse_date(self.request.GET.get('report_date', '').strip())
         needs_review_filter = self.request.GET.get('needs_review', '').strip().lower()
+        overdue_filter = self.request.GET.get('overdue', '').strip().lower()
 
         if status_filter:
             qs = qs.filter(status=status_filter)
+
+        if overdue_filter == 'true':
+            from api_app.models import filter_overdue
+            qs = filter_overdue(qs).order_by('scheduled_date')
 
         if needs_review_filter == 'true':
             qs = qs.filter(needs_manual_review=True)
@@ -638,6 +686,7 @@ class AdminRequestListView(LoginRequiredMixin, ListView):
         ctx['current_zone'] = self.request.GET.get('zone', '')
         ctx['current_report_date'] = self.request.GET.get('report_date', '')
         ctx['current_needs_review'] = self.request.GET.get('needs_review', '')
+        ctx['current_overdue'] = self.request.GET.get('overdue', '')
         return ctx
 
 class AdminDriverListView(LoginRequiredMixin, ListView):

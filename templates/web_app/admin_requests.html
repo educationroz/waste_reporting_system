@@ -199,8 +199,15 @@
                                 <option value="true" {% if current_needs_review == 'true' %}selected{% endif %}>{% trans "Flagged for Review Only" %}</option>
                             </select>
                         </div>
+                        <div class="col-lg-3 col-md-6 col-sm-12">
+                            <label class="form-label small fw-semibold text-secondary mb-1">{% trans "Overdue" %}</label>
+                            <select name="overdue" class="form-select" style="font-size: 0.9rem;" onchange="document.getElementById('requests-filter-form').requestSubmit()">
+                                <option value="">{% trans "All Requests" %}</option>
+                                <option value="true" {% if current_overdue == 'true' %}selected{% endif %}>{% trans "Overdue Only (24 h grace, oldest first)" %}</option>
+                            </select>
+                        </div>
 
-                        {% if current_status or current_search or current_waste_type or current_zone or current_report_date or current_needs_review %}
+                        {% if current_status or current_search or current_waste_type or current_zone or current_report_date or current_needs_review or current_overdue %}
                         <div class="col-12 mt-2 text-end">
                             <a href="{% url 'admin-requests' %}" class="btn btn-sm btn-outline-secondary px-3">
                                 <i class="bi bi-x-circle me-1"></i>{% trans "Clear All Active Filters" %}
