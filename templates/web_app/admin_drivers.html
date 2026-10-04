@@ -1065,7 +1065,17 @@
                 }, delay);
             }
 
+            // Permanent server refusals (4001/4003/4008/4009/4010) must NOT
+            // reconnect — retrying a rejected socket spams the console forever.
+            function isPermanentWsClose(e) {
+                return !!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010);
+            }
+
             function notifyDriverSocketIssue(label, event) {
+                if (isPermanentWsClose(event)) {
+                    console.debug(label, event);
+                    return;
+                }
                 console.warn(label, event);
                 if (!driverReconnectWarned) {
                     showToast(gettext('Connection lost — live driver updates paused'), 'warning');
@@ -1094,7 +1104,9 @@
                     driverReconnectTimer = null;
                 }
             };
-            ws.onerror = (e) => notifyDriverSocketIssue('Driver location WebSocket error:', e);
+            // onerror fires right before onclose — only log here, let onclose
+            // decide whether to reconnect so we don't schedule two timers.
+            ws.onerror = (e) => console.debug('Driver location WebSocket error:', e);
             ws.onclose = (e) => notifyDriverSocketIssue('Driver location WebSocket closed:', e);
         }
 

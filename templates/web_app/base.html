@@ -379,6 +379,14 @@
      snapshot, so it simply stays as-is across every boosted / Back
      navigation. -->
 <main id="content-app" class="site-main" hx-history-elt>
+    <!-- Role sentinel: #content-app is the htmx swap target, so this carries
+         the FRESH role/username on every boosted navigation while <body>
+         (outside the swap) keeps the stale one. The role-change script below
+         compares the two to detect account/role switches without a reload. -->
+    <div id="ss-role-sentinel" hidden
+         data-role="{% if user.is_authenticated %}{{ user.role }}{% else %}anonymous{% endif %}"
+         data-username="{% if user.is_authenticated %}{{ user.username }}{% else %}{% endif %}"
+         data-user-id="{% if user.is_authenticated %}{{ user.id }}{% else %}{% endif %}"></div>
     <div class="main-body-wrapper">
         {% if messages %}
             <div class="container pt-3">
@@ -543,39 +551,70 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 
 <!-- ROLE CHANGE DETECTION -->
-<!-- When user logs out and logs in as a different role, HTMX boosted navigation
-     might not refresh the sidebar (which is outside #content-app). This script
-     detects role changes and forces a full page reload. -->
+<!-- The navbar and <body data-user-role> live OUTSIDE the #content-app htmx
+     swap target, so boosted navigation never refreshes them. The sidebar
+     itself IS inside the swap (fresh per nav), but a stale navbar/sentinel
+     mismatch means the chrome belongs to the wrong account (e.g. an admin
+     page showing the previous citizen's name/avatar). The #ss-role-sentinel
+     above always carries the fresh role/user for the rendered page, so we
+     compare it against the body attribute: on user OR role change we reset
+     the persisted sidebar-collapsed pref (a collapsed drawer must not leak
+     across accounts) and force one full reload to rebuild the navbar. -->
 <script nonce="{{ csp_nonce }}">
 (function () {
     var body = document.body;
-    var currentRole = body.getAttribute('data-user-role');
-    if (!currentRole) return;
+
+    function sentinelIdentity() {
+        var s = document.getElementById('ss-role-sentinel');
+        if (!s) return null;
+        return {
+            role: s.getAttribute('data-role') || 'anonymous',
+            username: s.getAttribute('data-username') || '',
+            userId: s.getAttribute('data-user-id') || '',
+        };
+    }
+
+    function handleRoleChange(freshRole, freshUsername, freshUserId) {
+        var currentRole = body.getAttribute('data-user-role') || 'anonymous';
+        // Username is the stronger signal: same-role account switches
+        // (citizen A -> citizen B) must also rebuild the navbar/sidebar
+        // profile card, not just admin<->user flips.
+        var lastKnown = null;
+        try { lastKnown = JSON.parse(sessionStorage.getItem('ss_last_identity') || 'null'); } catch (e) {}
+        var changed = false;
+        if (lastKnown) {
+            changed = (lastKnown.role !== freshRole) || (lastKnown.userId !== freshUserId) || (lastKnown.username !== freshUsername);
+        } else {
+            changed = (currentRole !== freshRole);
+        }
+        try { sessionStorage.setItem('ss_last_identity', JSON.stringify({ role: freshRole, username: freshUsername, userId: freshUserId })); } catch (e) {}
+        try { sessionStorage.setItem('ss_last_role', freshRole); } catch (e) {}
+        if (!changed) return;
+        // New account/role: drop the persisted collapsed/mobile drawer state
+        // so one account's preference never hides another's profile card,
+        // then rebuild the out-of-swap chrome with a single reload.
+        try { localStorage.removeItem('safhasahar_sidebar_collapsed'); } catch (e) {}
+        body.setAttribute('data-user-role', freshRole);
+        window.location.reload();
+    }
 
     // If logout flag is set, force reload and clear flag
-    var forceReload = sessionStorage.getItem('ss_force_reload_on_login');
+    var forceReload = null;
+    try { forceReload = sessionStorage.getItem('ss_force_reload_on_login'); } catch (e) {}
     if (forceReload) {
-        sessionStorage.removeItem('ss_force_reload_on_login');
+        try { sessionStorage.removeItem('ss_force_reload_on_login'); } catch (e) {}
         window.location.reload();
         return;
     }
 
-    var lastKnownRole = sessionStorage.getItem('ss_last_role');
-    if (lastKnownRole && lastKnownRole !== currentRole) {
-        // Role changed — force full reload to refresh sidebar/navbar
-        sessionStorage.setItem('ss_last_role', currentRole);
-        window.location.reload();
-        return;
-    }
-    sessionStorage.setItem('ss_last_role', currentRole);
+    var initial = sentinelIdentity();
+    if (initial) handleRoleChange(initial.role, initial.username, initial.userId);
 
-    // Also listen for htmx:afterSwap to catch role changes during boosted navigation
+    // Boosted navigation: the sentinel is fresh after every swap, the body
+    // attribute is not — compare them here.
     document.body.addEventListener('htmx:afterSwap', function (evt) {
-        var newRole = body.getAttribute('data-user-role');
-        if (newRole && newRole !== currentRole) {
-            sessionStorage.setItem('ss_last_role', newRole);
-            window.location.reload();
-        }
+        var fresh = sentinelIdentity();
+        if (fresh) handleRoleChange(fresh.role, fresh.username, fresh.userId);
     });
 })();
 </script>
@@ -1279,11 +1318,12 @@ if (!window.__ssAuthScriptLoaded) {
                 // Server refused us on purpose. Retrying just burns the very
                 // resources the limit exists to protect, so stop reconnecting.
                 //   4001 = not authenticated
+                //   4003 = forbidden (role not allowed on this socket)
                 //   4008 = too many concurrent connections for this user
                 //   4009 = message flood
                 //   4010 = too many handshakes from this IP
                 const code = event && event.code;
-                if (code === 4001 || code === 4008 || code === 4009 || code === 4010) {
+                if (code === 4001 || code === 4003 || code === 4008 || code === 4009 || code === 4010) {
                     const reason = code === 4001
                         ? gettext('Live updates stopped — please sign in again.')
                         : gettext('Live updates stopped — too many open connections. Close some tabs and reload.');
@@ -1552,7 +1592,11 @@ if (!window.__ssAuthScriptLoaded) {
     // assigning to window.__ssSockets.
     window.__ssSockets = window.__ssSockets || new Set();
     document.body.addEventListener('htmx:beforeSwap', function () {
-        const globals = ['_requestWs', '_fleetWs', '_driverWs', '_driverLocationWs'];
+        // Keep in sync with the socket globals each page uses: home
+        // (_homeRequestWS/_homeDriverWS are closures, closed by their own
+        // teardown), admin (_requestWs/_fleetWs), drivers (_routeWebSocket,
+        // locationWS) and complaints pages.
+        const globals = ['_requestWs', '_fleetWs', '_driverWs', '_driverLocationWs', '_routeWebSocket', 'locationWS'];
         globals.forEach(function (name) {
             const ws = window[name];
             if (!ws) return;

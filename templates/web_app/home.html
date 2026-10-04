@@ -2541,7 +2541,16 @@ try {
         statusEl.classList.add('d-none');
 
         try {
-            const data = await API.post('/api/waste-requests/send_claim_link/', { email });
+            // Send the browser's guest tokens too: the server stamps this
+            // email onto those rows, reserving them so a different citizen
+            // signing in later cannot grab them first (claimed mail wins).
+            let guestTokens = [];
+            try {
+                guestTokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
+                const current = localStorage.getItem('current_guest_token');
+                if (current && !guestTokens.includes(current)) guestTokens = [...guestTokens, current];
+            } catch (e) { guestTokens = []; }
+            const data = await API.post('/api/waste-requests/send_claim_link/', { email, guest_tokens: guestTokens });
             if (data && data.claim_url) {
                 statusEl.className = 'small text-success d-block mt-2';
                 statusEl.textContent = gettext('Magic link sent! Check your email.') + ' ' + data.claim_url;

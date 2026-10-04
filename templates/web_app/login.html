@@ -164,47 +164,96 @@
     }
 
     // ── Guest claim-link backup (email) ─────────────────────────────────────────
+    // ?claim_token=<guest uuid>  -> token-based claim (same-browser rows).
+    // ?token=<signed email> or ?claim_token=<signed email> (contains ':')
+    //   -> magic-link claim: completed via claim_by_token AFTER login, where
+    //      the claimed mail wins over any first-login steal (backend transfer).
     (function handleClaimTokenFromUrl() {
         const params = new URLSearchParams(window.location.search);
-        const claimToken = params.get('claim_token');
-        if (!claimToken) return;
+        const rawToken = params.get('claim_token') || params.get('token');
+        if (!rawToken) return;
 
-        const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
-        if (!tokens.includes(claimToken)) {
-            tokens.push(claimToken);
-            localStorage.setItem('guest_claim_tokens', JSON.stringify(tokens));
+        if (rawToken.includes(':')) {
+            try { sessionStorage.setItem('ss_pending_claim_token', rawToken); } catch (e) {}
+        } else {
+            const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
+            if (!tokens.includes(rawToken)) {
+                tokens.push(rawToken);
+                localStorage.setItem('guest_claim_tokens', JSON.stringify(tokens));
+            }
         }
 
         const registerLink = document.getElementById('register-link');
         if (registerLink) {
             const url = new URL(registerLink.href, window.location.origin);
-            url.searchParams.set('claim_token', claimToken);
+            url.searchParams.set('claim_token', rawToken);
             registerLink.href = url.toString();
         }
     })();
 
     async function claimGuestRequests() {
         const tokens = JSON.parse(localStorage.getItem('guest_claim_tokens') || '[]');
-        if (!tokens.length) return;
-
-        try {
-            const res = await fetch('/api/waste-requests/claim_guest_requests/', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken'),
-                },
-                body: JSON.stringify({ guest_tokens: tokens }),
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.claimed > 0) {
-                    localStorage.removeItem('guest_claim_tokens');
+        if (tokens.length) {
+            try {
+                const res = await fetch('/api/waste-requests/claim_guest_requests/', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify({ guest_tokens: tokens }),
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.claimed > 0) {
+                        localStorage.removeItem('guest_claim_tokens');
+                    }
                 }
+            } catch (e) {
+                console.warn('Guest claim failed', e);
             }
-        } catch (e) {
-            console.warn('Guest claim failed', e);
+        }
+
+        // Magic-link (signed email) claim: runs after the session exists, so
+        // the server can verify the link email against this account. The
+        // backend transfers email-reserved rows here even if another citizen
+        // claimed them first — claimed mail wins.
+        let pendingToken = null;
+        try { pendingToken = sessionStorage.getItem('ss_pending_claim_token'); } catch (e) {}
+        if (pendingToken) {
+            try {
+                const res = await fetch('/api/waste-requests/claim_by_token/', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify({ token: pendingToken }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && (data.claimed || 0) > 0) {
+                    try { sessionStorage.removeItem('ss_pending_claim_token'); } catch (e) {}
+                    showToastShim(gettext('Guest requests linked to your account.'), 'success');
+                } else if (res.status === 403) {
+                    // Link belongs to another email — keep the token so it can
+                    // still complete after signing in with the right account.
+                    showToastShim((data && data.error) || gettext('This claim link is for a different email address.'), 'warning');
+                } else {
+                    try { sessionStorage.removeItem('ss_pending_claim_token'); } catch (e) {}
+                }
+            } catch (e) {
+                console.warn('Magic-link claim failed', e);
+            }
+        }
+    }
+
+    function showToastShim(message, type) {
+        if (typeof window.showToast === 'function') {
+            window.showToast(message, type);
+        } else {
+            console.info('[claim]', type, message);
         }
     }
 

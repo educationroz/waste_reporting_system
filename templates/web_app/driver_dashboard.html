@@ -470,7 +470,17 @@ async function connectLocationWebSocket() {
         }, delay);
     }
 
+    // Permanent server refusals (4001/4003/4008/4009/4010) must NOT
+    // reconnect — retrying a rejected socket spams the console forever.
+    function isPermanentLocationClose(e) {
+        return !!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010);
+    }
+
     function notifyLocationSocketIssue(label, event) {
+        if (isPermanentLocationClose(event)) {
+            console.debug(label, event);
+            return;
+        }
         console.warn(label, event);
         if (!window._locationReconnectWarned) {
             showToast(gettext('Connection lost — live updates paused'), 'warning');
@@ -505,7 +515,9 @@ async function connectLocationWebSocket() {
         window._locationReconnectAttempt = 0;
         window._locationReconnectWarned = false;
     };
-    ws.onerror = (e) => notifyLocationSocketIssue('Driver location WebSocket error:', e);
+    // onerror fires right before onclose — only log here, let onclose
+    // decide whether to reconnect so we don't schedule two timers.
+    ws.onerror = (e) => console.debug('Driver location WebSocket error:', e);
     ws.onclose = (e) => notifyLocationSocketIssue('Driver location WebSocket closed:', e);
 }
 
@@ -1189,6 +1201,42 @@ window.ssRegisterPageTeardown(function () {
     requestMarkersLayer = null;
     checkpointsLayer = null;
     hasFittedBounds = false;
+    // Single teardown per page visit (registering twice would run the first
+    // one immediately): also stop GPS streaming, watchPosition, the 4s
+    // heartbeat and both sockets, or they keep running — sending the
+    // driver's GPS and stacking duplicates — after leaving the dashboard.
+    try {
+        if (typeof stopLiveGPSStreaming === 'function' && _isStreamingGPS) stopLiveGPSStreaming();
+    } catch (e) { /* ignore */ }
+    if (typeof _watchPositionId !== 'undefined' && _watchPositionId !== null && navigator.geolocation) {
+        try { navigator.geolocation.clearWatch(_watchPositionId); } catch (e) {}
+        _watchPositionId = null;
+    }
+    if (typeof _liveIntervalId !== 'undefined' && _liveIntervalId) {
+        clearInterval(_liveIntervalId);
+        _liveIntervalId = null;
+    }
+    if (window._locationReconnectTimer) {
+        clearTimeout(window._locationReconnectTimer);
+        window._locationReconnectTimer = null;
+    }
+    if (typeof locationWS !== 'undefined' && locationWS) {
+        locationWS.onclose = null;
+        locationWS.onerror = null;
+        try { locationWS.close(1000, 'htmx navigation'); } catch (e) {}
+        locationWS = null;
+        window.locationWS = null;
+    }
+    if (typeof requestReconnectTimer !== 'undefined' && requestReconnectTimer) {
+        clearTimeout(requestReconnectTimer);
+        requestReconnectTimer = null;
+    }
+    if (typeof requestWS !== 'undefined' && requestWS) {
+        requestWS.onclose = null;
+        requestWS.onerror = null;
+        try { requestWS.close(1000, 'htmx navigation'); } catch (e) {}
+        if (window._requestWs === requestWS) window._requestWs = null;
+    }
 });
 
 function ensureLeafletLoaded(onReady) {
@@ -1731,7 +1779,13 @@ if (driverMapEl && !driverMapEl.dataset._bound) {
                 }
             };
 
-            ws.onclose = () => {
+            ws.onclose = (e) => {
+                // Permanent server refusals (4001/4003/4008/4009/4010) must
+                // NOT reconnect — retrying a rejected socket loops forever.
+                if (!!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010)) {
+                    console.debug('Request WebSocket closed (server refused, not reconnecting):', e);
+                    return;
+                }
                 setTimeout(() => {
                     if (document.body.contains(document.getElementById('assigned-requests-body'))) {
                         connectRequestWebSocket();
@@ -1739,8 +1793,10 @@ if (driverMapEl && !driverMapEl.dataset._bound) {
                 }, 4000);
             };
 
-            ws.onerror = () => {
-                ws.close();
+            // onerror fires right before onclose — only log here, let onclose
+            // decide whether to reconnect so we don't schedule two timers.
+            ws.onerror = (e) => {
+                console.debug('Request WebSocket error:', e);
             };
         } catch (e) {
             console.warn('Request WebSocket setup error:', e);

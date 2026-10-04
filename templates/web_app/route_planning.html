@@ -825,7 +825,17 @@
             }, delay);
         }
 
+        // Permanent server refusals (4001/4003/4008/4009/4010) must NOT
+        // reconnect — retrying a rejected socket spams the console forever.
+        function isPermanentRouteClose(e) {
+            return !!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010);
+        }
+
         function notifyRouteSocketIssue(label, event) {
+            if (isPermanentRouteClose(event)) {
+                console.debug(label, event);
+                return;
+            }
             console.warn(label, event);
             if (!window._routeReconnectWarned) {
                 showToast(gettext('Connection lost — live updates paused'), 'warning');
@@ -876,9 +886,29 @@
             window._routeReconnectAttempt = 0;
             window._routeReconnectWarned = false;
         };
-        ws.onerror = (e) => notifyRouteSocketIssue('Route WebSocket error:', e);
+        // onerror fires right before onclose — only log here, let onclose
+        // decide whether to reconnect so we don't schedule two timers.
+        ws.onerror = (e) => console.debug('Route WebSocket error:', e);
         ws.onclose = (e) => notifyRouteSocketIssue('Route WebSocket closed:', e);
     }
+
+    // Teardown for htmx navigation: without this each visit stacked another
+    // route socket + reconnect timer firing displayRoute against detached DOM.
+    window.ssRegisterPageTeardown(() => {
+        if (window._routeReconnectTimer) {
+            clearTimeout(window._routeReconnectTimer);
+            window._routeReconnectTimer = null;
+        }
+        if (window._routeWebSocket) {
+            window._routeWebSocket.onclose = null;
+            window._routeWebSocket.onerror = null;
+            try { window._routeWebSocket.close(1000, 'htmx navigation'); } catch (e) { /* already closing */ }
+            window._routeWebSocket = null;
+        }
+        if (window.refreshCheckpoints === loadCheckpoints) {
+            window.refreshCheckpoints = null;
+        }
+    });
 
     // ── Init ─────────────────────────────────────────────────────────────
     ensureLeafletLoaded(initMap);

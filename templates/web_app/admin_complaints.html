@@ -522,13 +522,21 @@
                 }
             };
 
-            ws.onclose = () => {
+            ws.onclose = (e) => {
+                // Permanent server refusals (4001/4003/4008/4009/4010) must
+                // NOT reconnect — retrying a rejected socket loops forever.
+                if (!!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010)) {
+                    console.debug('[Complaint WS] Closed (server refused, not reconnecting):', e);
+                    return;
+                }
                 console.log('[Complaint WS] Disconnected, reconnecting...');
                 setTimeout(connectComplaintWebSocket, 4000);
             };
 
-            ws.onerror = () => {
-                ws.close();
+            // onerror fires right before onclose — only log here, let onclose
+            // decide whether to reconnect so we don't schedule two timers.
+            ws.onerror = (e) => {
+                console.debug('[Complaint WS] error:', e);
             };
         } catch (e) {
             console.warn('Complaint WebSocket setup error:', e);

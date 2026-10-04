@@ -2025,15 +2025,22 @@ def claim_guest_requests_by_email(user):
     account, so registering/logging in with the same email recovers the
     report automatically.
 
+    Claim-mail-wins: if a guest row carrying guest_email=E was already
+    grabbed by a *different* citizen account (e.g. someone signed in on the
+    same browser first and the token-based claim fired before the magic link
+    was clicked), proving ownership of E via a verified login transfers the
+    row to this account. Only guest-originated rows (guest_token set) whose
+    guest_email matches are ever transferred — ordinary citizen-submitted
+    requests are never touched.
+
     Safe to call on every register/login — it is a no-op when there is
-    nothing to claim, and a request already claimed by token won't be
-    claimed twice (the user__isnull=True filter excludes it).
+    nothing to claim.
 
     Citizen-only: guest reports belong to citizen accounts. Drivers and
     admins logging in with a matching email must NOT absorb guest
     requests into their staff accounts.
 
-    Returns the number of requests newly claimed.
+    Returns the number of requests newly claimed (owned + transferred).
     """
     if user is None or not user.is_authenticated:
         return 0
@@ -2047,8 +2054,30 @@ def claim_guest_requests_by_email(user):
     unowned = list(qs)
     claimed_count = qs.update(user=user)
 
-    if claimed_count and unowned:
-        for wr in unowned:
+    # Transfer: guest-origin rows reserved for this email but currently held
+    # by another citizen account (first-login steal before the magic link was
+    # clicked). The verified login email is proof of ownership, so the
+    # claimed mail wins over the first login.
+    transfer_qs = WasteRequest.objects.filter(
+        guest_email__iexact=email,
+        guest_token__isnull=False,
+    ).exclude(guest_token='').exclude(user=user)
+    transferred = [wr for wr in transfer_qs.select_related('user') if wr.user_id is not None]
+    transferred_count = 0
+    if transferred:
+        for wr in transferred:
+            old_user_id = wr.user_id
+            wr.user = user
+            wr.save(update_fields=['user'])
+            transferred_count += 1
+            logger.info(
+                f'[CLAIM_BY_EMAIL TRANSFER] request={wr.id} moved '
+                f'from user={old_user_id} to user={user.id} ({email!r}) via verified claim mail.'
+            )
+
+    total = claimed_count + transferred_count
+    if total and (unowned or transferred):
+        for wr in (unowned + transferred):
             _create_notification(
                 user=user,
                 title='Request Linked to Your Account',
@@ -2058,9 +2087,46 @@ def claim_guest_requests_by_email(user):
             )
         logger.info(
             f'[CLAIM_BY_EMAIL] user={user.id} ({email!r}) claimed '
-            f'{claimed_count} guest request(s): {[wr.id for wr in unowned]}'
+            f'{claimed_count} + transferred {transferred_count} guest request(s): '
+            f'{[wr.id for wr in (unowned + transferred)]}'
         )
-    return claimed_count
+    return total
+
+
+def consume_pending_guest_claim(request, user):
+    """Complete a magic-link claim that was parked in the session.
+
+    ``guest_claim_view`` stores the signed token when an unauthenticated
+    visitor opens a claim link. ``django.contrib.auth.login()`` flushes the
+    session on account switch, so callers must capture the token BEFORE
+    login() — pass it via ``pending_token`` or leave it in the session for
+    same-user logins. Only consumes when the signed email matches the logged
+    in user's verified email; the transfer-aware email claim then runs, so
+    the claimed mail wins over any first-login steal.
+
+    Returns the number of requests linked (0 when nothing pending/mismatched).
+    """
+    from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+
+    token = request.session.pop('guest_claim_token', None)
+    if not token:
+        return 0
+    request.session.pop('guest_claim_email', None)
+    if user is None or not user.is_authenticated:
+        return 0
+    if getattr(user, 'role', '') != 'user':
+        return 0
+    try:
+        signed_email = TimestampSigner(salt='guest-claim-link').unsign(token, max_age=86400 * 7)
+    except (BadSignature, SignatureExpired):
+        return 0
+    if (signed_email or '').strip().lower() != (user.email or '').strip().lower():
+        return 0
+    try:
+        return claim_guest_requests_by_email(user)
+    except Exception:  # noqa: BLE001 - claim must never break login
+        logger.warning(f'[PENDING CLAIM] claim failed for user={user.id}.')
+        return 0
 
 
 def guest_claim_view(request):
@@ -2098,13 +2164,20 @@ def guest_claim_view(request):
         user_email = (request.user.email or '').strip().lower()
         if email == user_email:
             claimed_count = claim_guest_requests_by_email(request.user)
+            request.session.pop('guest_claim_token', None)
+            request.session.pop('guest_claim_email', None)
             if claimed_count:
                 messages.success(request, f'Successfully claimed {claimed_count} guest request(s)!')
             else:
                 messages.info(request, 'No guest requests found for this email.')
             return redirect('user-requests')
         else:
-            messages.warning(request, 'This claim link is for a different email address. Please log in with the correct account.')
+            # Park the token: after the visitor signs out and signs back in
+            # with the correct email, consume_pending_guest_claim() completes
+            # the claim automatically (claimed mail wins over this account).
+            request.session['guest_claim_token'] = token
+            request.session['guest_claim_email'] = email
+            messages.warning(request, f'This claim link is for {email}. Sign in with that email address to claim your requests (your current account cannot take them).')
             return redirect('login')
     else:
         # Store token in session and redirect to login with a flag
@@ -2502,11 +2575,19 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def send_claim_link(self, request):
         """
-        POST /api/waste-requests/send_claim_link/ — {email: "user@example.com"}
+        POST /api/waste-requests/send_claim_link/
+        — {email: "user@example.com", guest_tokens?: ["uuid", ...]}
 
         Sends a magic claim link to the given email. When clicked, the link
         will claim any guest requests associated with that email (if the user
         is logged in) or prompt them to register/login first.
+
+        Reservation: when the caller also sends the browser's guest_tokens,
+        any still-unowned rows carrying those tokens get stamped with this
+        email first. That reserves them for the email owner, so a *different*
+        citizen signing in on the same browser afterwards cannot steal them
+        via the token-based claim (claim_guest_requests skips email-reserved
+        rows) — the claimed mail wins over the first login.
         """
         email = (request.data.get('email') or '').strip().lower()
         if not email or '@' not in email:
@@ -2515,6 +2596,23 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         from django.core.signing import TimestampSigner
         from django.conf import settings
         from django.urls import reverse
+        from django.db.models import Q
+
+        tokens = request.data.get('guest_tokens', [])
+        reserved = 0
+        if isinstance(tokens, list) and tokens:
+            clean_tokens = [str(t).strip() for t in tokens if str(t).strip()][:50]
+            if clean_tokens:
+                reserved = WasteRequest.objects.filter(
+                    guest_token__in=clean_tokens, user__isnull=True
+                ).filter(
+                    Q(guest_email__isnull=True) | Q(guest_email='')
+                ).update(guest_email=email)
+                if reserved:
+                    logger.info(
+                        f'[SEND_CLAIM_LINK] email={email} reserved '
+                        f'{reserved} guest request(s) for this email.'
+                    )
 
         signer = TimestampSigner(salt='guest-claim-link')
         token = signer.sign(email)
@@ -2525,10 +2623,37 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         # TODO: Integrate with email sending system
         logger.info(f'[SEND_CLAIM_LINK] email={email} claim_url={claim_url}')
 
+        # Actually deliver the link when mail is configured; the JSON fallback
+        # keeps the dev/test flow working when it isn't.
+        emailed = False
+        if getattr(settings, 'DEFAULT_FROM_EMAIL', None):
+            try:
+                from .tasks import send_mail_async
+                send_mail_async(
+                    subject='Claim your waste reports — SafhaSahar',
+                    message=(
+                        'Namaste,\n\n'
+                        'Click the link below to link your guest waste reports '
+                        'to your account (valid for 24 hours):\n'
+                        f'{claim_url}\n\n'
+                        'If you already signed in with a different account, '
+                        'sign out and sign in (or register) with this email '
+                        'address first, then open the link again.\n\n'
+                        'Thank you for keeping your community clean.'
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                )
+                emailed = True
+            except Exception:  # noqa: BLE001 - link in response still works
+                logger.warning(f'[SEND_CLAIM_LINK] mail send failed for {email}.')
+
         return Response({
             'message': 'Claim link generated. Check your email (or response below for testing).',
             'claim_url': claim_url,
             'email': email,
+            'reserved': reserved,
+            'emailed': emailed,
         })
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])

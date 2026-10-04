@@ -1022,7 +1022,13 @@ window.openPhotoGallery = function(requestId) {
                 }
             };
 
-            ws.onclose = () => {
+            ws.onclose = (e) => {
+                // Permanent server refusals (4001/4003/4008/4009/4010) must
+                // NOT reconnect — retrying a rejected socket loops forever.
+                if (!!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010)) {
+                    console.debug('Request WebSocket closed (server refused, not reconnecting):', e);
+                    return;
+                }
                 setTimeout(() => {
                     if (document.body.contains(document.getElementById('requests-table-body'))) {
                         connectRequestWebSocket();
@@ -1030,8 +1036,10 @@ window.openPhotoGallery = function(requestId) {
                 }, 4000);
             };
 
-            ws.onerror = () => {
-                ws.close();
+            // onerror fires right before onclose — only log here, let onclose
+            // decide whether to reconnect so we don't schedule two timers.
+            ws.onerror = (e) => {
+                console.debug('Request WebSocket error:', e);
             };
         } catch (e) {
             console.warn('Request WebSocket setup error:', e);

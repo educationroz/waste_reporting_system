@@ -36,8 +36,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # otherwise-valid login, so swallow errors here (already logged
         # downstream in claim_guest_requests_by_email).
         try:
-            from api_app.views import claim_guest_requests_by_email
+            from api_app.views import claim_guest_requests_by_email, consume_pending_guest_claim
             claim_guest_requests_by_email(self.user)
+            request = self.context.get('request')
+            if request is not None:
+                consume_pending_guest_claim(request, self.user)
         except Exception:  # noqa: BLE001 - intentionally non-fatal; logged downstream
             logger.warning(f'[TOKEN] guest request claim failed for user={self.user.id}.')
         return data

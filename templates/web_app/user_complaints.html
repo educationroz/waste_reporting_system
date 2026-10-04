@@ -41,11 +41,11 @@
                             </thead>
                             <tbody>
                                 {% for c in complaints %}
-                                <tr>
+                                <tr id="complaint-row-{{ c.id }}">
                                     <td>{{ c.id }}</td>
                                     <td>{{ c.get_complaint_type_display }}</td>
                                     <td>{{ c.subject|default:"—" }}</td>
-                                    <td>
+                                    <td data-field="status">
                                         <span class="badge
                                             {% if c.status == 'completed' %}bg-success
                                             {% elif c.status == 'pending' %}bg-warning text-dark
@@ -53,7 +53,7 @@
                                             {{ c.get_status_display }}
                                         </span>
                                     </td>
-                                    <td class="small text-muted">{{ c.admin_response|default:"—" }}</td>
+                                    <td class="small text-muted" data-field="admin_response">{{ c.admin_response|default:"—" }}</td>
                                     <td class="small text-muted">{{ c.created_at|date:"d M Y, H:i" }}</td>
                                 </tr>
                                 {% empty %}
@@ -115,7 +115,17 @@
             }, delay);
         }
 
+        // Permanent server refusals (4001/4003/4008/4009/4010) must NOT
+        // reconnect — retrying a rejected socket spams the console forever.
+        function isPermanentWsClose(e) {
+            return !!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010);
+        }
+
         function notifyComplaintSocketIssue(label, event) {
+            if (isPermanentWsClose(event)) {
+                console.debug(label, event);
+                return;
+            }
             console.warn(label, event);
             if (!complaintReconnectWarned) {
                 showToast(gettext('Connection lost — live complaint updates paused'), 'warning');
@@ -127,8 +137,14 @@
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (data.type === 'complaint_update') {
-                showToast(interpolate(gettext('Complaint #%(v0)s updated to: %(v1)s'), {v0: data.complaint_id, v1: data.status}, true), 'info');
-                applyUserComplaintRowUpdate(data.complaint_id, data.status);
+                if (data.deleted) {
+                    const gone = document.getElementById(`complaint-row-${data.complaint_id}`);
+                    if (gone) gone.remove();
+                    showToast(interpolate(gettext('Complaint #%(v0)s was removed'), {v0: data.complaint_id}, true), 'info');
+                } else {
+                    showToast(interpolate(gettext('Complaint #%(v0)s updated to: %(v1)s'), {v0: data.complaint_id, v1: data.status}, true), 'info');
+                    applyUserComplaintRowUpdate(data.complaint_id, data.status);
+                }
             }
         };
 
@@ -140,32 +156,10 @@
                 complaintReconnectTimer = null;
             }
         };
-        ws.onerror = (e) => notifyComplaintSocketIssue('Complaint WebSocket error:', e);
+        // onerror fires right before onclose — only log here, let onclose
+        // decide whether to reconnect so we don't schedule two timers.
+        ws.onerror = (e) => console.debug('Complaint WebSocket error:', e);
         ws.onclose = (e) => notifyComplaintSocketIssue('Complaint WebSocket closed:', e);
-    }
-
-    function applyUserComplaintRowUpdate(complaintId, newStatus) {
-        const row = document.getElementById(`complaint-row-${complaintId}`);
-        if (!row) return;
-
-        const statusCell = row.querySelector('[data-field="status"]');
-        if (statusCell) {
-            const statusLabels = {
-                'pending': gettext('Pending'),
-                'under_review': gettext('Under Review'),
-                'completed': gettext('Completed'),
-            };
-            const statusClasses = {
-                'pending': 'bg-warning text-dark',
-                'under_review': 'bg-info',
-                'completed': 'bg-success',
-            };
-            const badge = statusCell.querySelector('.badge');
-            if (badge) {
-                badge.className = `badge ${STATUS_CLASSES[newStatus] || 'bg-secondary'}`;
-                badge.textContent = STATUS_LABELS[newStatus] || newStatus;
-            }
-        }
     }
 
     const STATUS_CLASSES = {
@@ -178,6 +172,20 @@
         'under_review': gettext('Under Review'),
         'completed': gettext('Completed'),
     };
+
+    function applyUserComplaintRowUpdate(complaintId, newStatus) {
+        const row = document.getElementById(`complaint-row-${complaintId}`);
+        if (!row) return;
+
+        const statusCell = row.querySelector('[data-field="status"]');
+        if (statusCell) {
+            const badge = statusCell.querySelector('.badge');
+            if (badge) {
+                badge.className = `badge ${STATUS_CLASSES[newStatus] || 'bg-secondary'}`;
+                badge.textContent = STATUS_LABELS[newStatus] || newStatus;
+            }
+        }
+    }
 
     connectComplaintWebSocket();
 

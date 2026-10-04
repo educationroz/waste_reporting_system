@@ -928,7 +928,17 @@
                 }
             };
 
-            ws.onclose = () => {
+            // Permanent server refusals (4001/4003/4008/4009/4010) must NOT
+            // reconnect — retrying a rejected socket spams the console forever.
+            function isPermanentWsClose(e) {
+                return !!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010);
+            }
+
+            ws.onclose = (e) => {
+                if (isPermanentWsClose(e)) {
+                    console.debug('Request WebSocket closed (server refused, not reconnecting):', e);
+                    return;
+                }
                 const badge = document.getElementById('request-live-status-badge');
                 if (badge) {
                     badge.className = 'badge bg-secondary bg-opacity-10 text-secondary border px-2.5 py-1.5 fw-semibold small';
@@ -941,8 +951,10 @@
                 }, 4000);
             };
 
-            ws.onerror = () => {
-                ws.close();
+            // onerror fires right before onclose — only log here, let onclose
+            // decide whether to reconnect so we don't schedule two timers.
+            ws.onerror = (e) => {
+                console.debug('Request WebSocket error:', e);
             };
         } catch (e) {
             console.warn('Request WebSocket setup error:', e);
@@ -1172,7 +1184,13 @@
                 }
             };
 
-            ws.onclose = () => {
+            ws.onclose = (e) => {
+                // Permanent server refusals (e.g. session expired) must NOT
+                // reconnect — the badge stays informative instead of looping.
+                if (!!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010)) {
+                    console.debug('Fleet WebSocket closed (server refused, not reconnecting):', e);
+                    return;
+                }
                 if (!document.getElementById('live-fleet-map')) return;
                 const badge = document.getElementById('fleet-live-status-badge');
                 if (badge) {
@@ -1186,8 +1204,10 @@
                 }, 4000);
             };
 
-            ws.onerror = () => {
-                ws.close();
+            // onerror fires right before onclose — only log here, let onclose
+            // decide whether to reconnect so we don't schedule two timers.
+            ws.onerror = (e) => {
+                console.debug('Fleet WebSocket error:', e);
             };
         } catch (e) {
             console.warn('Fleet WebSocket setup error:', e);

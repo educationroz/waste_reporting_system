@@ -95,12 +95,21 @@ class SessionLoginView(APIView):
     def post(self, request):
         username = request.data.get('username')
         password = request.data.get('password')
+        # login() flushes the session on account switch, which would wipe a
+        # parked magic-link token — capture it first, restore after.
+        pending_claim_token = request.session.get('guest_claim_token')
+        pending_claim_email = request.session.get('guest_claim_email')
         user = authenticate(username=username, password=password)
         if user:
             login(request, user)
-            from api_app.views import claim_guest_requests_by_email
+            if pending_claim_token:
+                request.session['guest_claim_token'] = pending_claim_token
+                if pending_claim_email:
+                    request.session['guest_claim_email'] = pending_claim_email
+            from api_app.views import claim_guest_requests_by_email, consume_pending_guest_claim
             try:
                 claim_guest_requests_by_email(user)
+                consume_pending_guest_claim(request, user)
             except Exception:  # noqa: BLE001 - login must succeed even if the claim backup hiccups
                 logger.warning(f'[SESSION LOGIN] claim_guest_requests_by_email failed for user={user.id}.')
             return Response({
@@ -164,11 +173,18 @@ class BiometricLoginView(APIView):
         if not user or not user.is_active:
             return Response({'error': 'Account not found or inactive.'}, status=status.HTTP_401_UNAUTHORIZED)
 
+        pending_claim_token = request.session.get('guest_claim_token')
+        pending_claim_email = request.session.get('guest_claim_email')
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+        if pending_claim_token:
+            request.session['guest_claim_token'] = pending_claim_token
+            if pending_claim_email:
+                request.session['guest_claim_email'] = pending_claim_email
 
-        from api_app.views import claim_guest_requests_by_email
+        from api_app.views import claim_guest_requests_by_email, consume_pending_guest_claim
         try:
             claim_guest_requests_by_email(user)
+            consume_pending_guest_claim(request, user)
         except Exception:  # noqa: BLE001 - biometric login must succeed even if the claim backup hiccups
             logger.warning(f'[BIOMETRIC LOGIN] claim_guest_requests_by_email failed for user={user.id}.')
 
@@ -358,13 +374,20 @@ class GoogleLoginView(APIView):
         #
         # backend= is required because authenticate() was never called, so
         # Django cannot infer which auth backend to record on the session.
+        pending_claim_token = request.session.get('guest_claim_token')
+        pending_claim_email = request.session.get('guest_claim_email')
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+        if pending_claim_token:
+            request.session['guest_claim_token'] = pending_claim_token
+            if pending_claim_email:
+                request.session['guest_claim_email'] = pending_claim_email
 
         # Google has verified the email, so it's safe to auto-claim guest
         # reports dropped under this address.
-        from api_app.views import claim_guest_requests_by_email
+        from api_app.views import claim_guest_requests_by_email, consume_pending_guest_claim
         try:
             claim_guest_requests_by_email(user)
+            consume_pending_guest_claim(request, user)
         except Exception:  # noqa: BLE001 - Google login must succeed even if the claim backup hiccups
             logger.warning(f'[GOOGLE LOGIN] claim_guest_requests_by_email failed for user={user.id}.')
 
@@ -423,9 +446,10 @@ class VerifyEmailView(APIView):
 
             # Email is now cryptographically proven to belong to this user —
             # claim any guest reports dropped under the same address.
-            from api_app.views import claim_guest_requests_by_email
+            from api_app.views import claim_guest_requests_by_email, consume_pending_guest_claim
             try:
                 claim_guest_requests_by_email(user)
+                consume_pending_guest_claim(request, user)
             except Exception:  # noqa: BLE001 - claim backup failing must never break email verification
                 logger.warning(f'[VERIFY EMAIL] claim_guest_requests_by_email failed for user={user.id}.')
 
