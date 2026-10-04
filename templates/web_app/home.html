@@ -2095,6 +2095,23 @@ window.submitComplaint = async function() {
 {% if user.is_authenticated %}
 try {
     const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    // Role-gate for the driver-locations socket: the consumer only allows
+    // admin/driver (see api_app/consumers.py DriverLocationConsumer). Regular
+    // users (role 'user') get HTTP 4003 -> browser reports 1006/failed, so
+    // they must NOT open this socket at all — they already get driver pins
+    // via polling /api/drivers/public-locations/ (startPublicDriverLocationRefresh).
+    const CURRENT_USER_ROLE = '{{ user.role|escapejs }}';
+    const CAN_USE_DRIVER_WS = (CURRENT_USER_ROLE === 'admin' || CURRENT_USER_ROLE === 'driver');
+
+    // Auth/permission close codes must NEVER reconnect — retrying a rejected
+    // socket in a loop is what spammed the console with
+    // "wss://.../ws/driver-locations/ failed" + toasts.
+    // 4001 unauthenticated, 4003 forbidden, 4008 too many connections,
+    // 4009 message flood, 4010 handshake flood.
+    function isPermanentWsClose(e) {
+        return !!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010);
+    }
+
     let requestWS = null;
     let requestReconnectAttempt = 0;
     let requestReconnectTimer = null;
@@ -2117,6 +2134,11 @@ try {
         }
 
         function notifyRequestSocketIssue(label, event) {
+            // Permanent rejections (e.g. session expired -> 4001) must not loop.
+            if (isPermanentWsClose(event)) {
+                console.debug(label, event);
+                return;
+            }
             console.warn(label, event);
             if (!requestReconnectWarned) {
                 showToast(gettext('Connection lost — live updates paused'), 'warning');
@@ -2140,7 +2162,9 @@ try {
                 requestReconnectTimer = null;
             }
         };
-        ws.onerror = (e) => notifyRequestSocketIssue('Request WebSocket error:', e);
+        // onerror fires right before onclose — only log here, let onclose
+        // decide whether to reconnect so we don't schedule two timers.
+        ws.onerror = (e) => console.debug('Request WebSocket error:', e);
         ws.onclose = (e) => notifyRequestSocketIssue('Request WebSocket closed:', e);
     }
 
@@ -2150,6 +2174,9 @@ try {
     let driverReconnectWarned = false;
 
     async function connectDriverLocationWebSocket() {
+        // Defensive double-check: never open the admin/driver-only socket
+        // for citizens even if the caller gate above is bypassed.
+        if (!CAN_USE_DRIVER_WS) return;
         const ws = new WebSocket(`${protocol}${location.host}/ws/driver-locations/`);
         driverWS = ws;
 
@@ -2164,6 +2191,12 @@ try {
         }
 
         function notifyDriverSocketIssue(label, event) {
+            // Server rejected this role (4003) or the session died (4001):
+            // stay on REST polling, do not retry and do not toast-spam.
+            if (isPermanentWsClose(event)) {
+                console.debug(label, event);
+                return;
+            }
             console.warn(label, event);
             if (!driverReconnectWarned) {
                 showToast(gettext('Connection lost — live updates paused'), 'warning');
@@ -2209,12 +2242,20 @@ try {
                 driverReconnectTimer = null;
             }
         };
-        ws.onerror = (e) => notifyDriverSocketIssue('Driver location WebSocket error:', e);
+        // onerror fires right before onclose — only log here, let onclose
+        // decide whether to reconnect so we don't schedule two timers.
+        ws.onerror = (e) => console.debug('Driver location WebSocket error:', e);
         ws.onclose = (e) => notifyDriverSocketIssue('Driver location WebSocket closed:', e);
     }
 
     connectRequestWebSocket();
-    connectDriverLocationWebSocket();
+    // Citizens (role 'user') use the 5s REST poller only; the WS endpoint
+    // rejects them with 4003, so opening it just spams console errors.
+    if (CAN_USE_DRIVER_WS) {
+        connectDriverLocationWebSocket();
+    } else {
+        console.debug('Driver location WebSocket skipped for role:', CURRENT_USER_ROLE, '- using REST polling.');
+    }
     window._homeRequestWS = () => requestWS;
     window._homeDriverWS = () => driverWS;
 } catch (e) {
