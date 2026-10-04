@@ -495,6 +495,7 @@
     // Live complaint updates via WebSocket
     // ────────────────────────────────────────────────────────────────────────
     let complaintWS = null;
+    let complaintReconnectTimer = null;
 
     function connectComplaintWebSocket() {
         if (complaintWS && (complaintWS.readyState === WebSocket.OPEN || complaintWS.readyState === WebSocket.CONNECTING)) {
@@ -530,7 +531,11 @@
                     return;
                 }
                 console.log('[Complaint WS] Disconnected, reconnecting...');
-                setTimeout(connectComplaintWebSocket, 4000);
+                if (complaintReconnectTimer) clearTimeout(complaintReconnectTimer);
+                complaintReconnectTimer = setTimeout(() => {
+                    complaintReconnectTimer = null;
+                    if (document.getElementById('complaint-table-body')) connectComplaintWebSocket();
+                }, 4000);
             };
 
             // onerror fires right before onclose — only log here, let onclose
@@ -579,6 +584,11 @@
             allComplaints[existingIdx].status = data.status;
             if (data.status_display) {
                 allComplaints[existingIdx].status_display = data.status_display;
+            }
+            // Admin responses now ride the same event — keep the re-rendered
+            // row in sync without a list re-fetch.
+            if (data.admin_response !== undefined) {
+                allComplaints[existingIdx].admin_response = data.admin_response;
             }
         } else {
             // New complaint not in our loaded list — need full reload to get all fields
@@ -632,6 +642,22 @@
     if (document.readyState !== 'loading') {
         bootstrapComplaintsPage();
     }
+
+    // Teardown for htmx navigation (single registration): without this the
+    // complaint socket + reconnect timer survived page swaps and stacked
+    // duplicates on every revisit.
+    window.ssRegisterPageTeardown(() => {
+        if (typeof complaintReconnectTimer !== 'undefined' && complaintReconnectTimer) {
+            clearTimeout(complaintReconnectTimer);
+            complaintReconnectTimer = null;
+        }
+        if (typeof complaintWS !== 'undefined' && complaintWS) {
+            complaintWS.onclose = null;
+            complaintWS.onerror = null;
+            try { complaintWS.close(1000, 'htmx navigation'); } catch (e) { /* already closing */ }
+            complaintWS = null;
+        }
+    });
 })();
 </script>
 {% endblock %}

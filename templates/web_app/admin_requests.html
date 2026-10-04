@@ -963,9 +963,13 @@ window.openPhotoGallery = function(requestId) {
 
     const modal = getPhotoGalleryModal();
     if (modal) modal.show();
+};
 
-    // ── Request WebSocket for real-time status updates ──────────────────────
-    let requestWS = null;
+// ── Request WebSocket for real-time status updates ──────────────────────
+// NOTE: this block used to live nested inside openPhotoGallery() above, so
+// the socket only connected after someone opened a photo gallery once and
+// the table was otherwise dead to live updates. It now runs at page scope.
+let requestWS = null;
     let requestReconnectAttempt = 0;
     let requestReconnectTimer = null;
     let requestReconnectWarned = false;
@@ -995,34 +999,53 @@ window.openPhotoGallery = function(requestId) {
                 try {
                     const data = JSON.parse(e.data);
                     if (data.type === 'request_update') {
-                        const statusKey = data.status;
-                        // Build driver cell HTML from enriched payload
-                        let driverHtml = null;
-                        if (data.driver_name !== undefined) {
-                            if (data.driver_name) {
-                                driverHtml = `<span><i class="bi bi-person me-1"></i>${escapeHtml(data.driver_name)}</span>`;
-                            } else {
-                                driverHtml = '<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>Unassigned</span>';
+                        if (data.deleted) {
+                            const gone = document.querySelector(`tr[id$="-${data.request_id}"]`);
+                            if (gone && gone.closest('#requests-table-body')) gone.remove();
+                        } else if (!document.getElementById(`admin-request-row-${data.request_id}`)
+                                && !document.getElementById(`request-row-${data.request_id}`)) {
+                            // Brand-new report from another actor — re-render
+                            // the list (current URL keeps all active filters).
+                            if (typeof window.scheduleLiveRefresh === 'function') {
+                                window.scheduleLiveRefresh('admin-requests-list', () => window.ssRefreshContent(), 2000);
                             }
-                        }
-                        // Build action cell HTML based on new status
-                        let actionHtml = '';
-                        let showDelete = false;
-                        if (statusKey === 'pending') {
-                            actionHtml = `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${data.request_id}, this)">${gettext('Cancel')}</button>`;
-                        } else if (['completed', 'cancelled', 'assigned', 'in_progress'].includes(statusKey)) {
-                            actionHtml = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${data.request_id}, this)"><i class="bi bi-trash3"></i> ${gettext('Delete')}</button>`;
-                            showDelete = true;
                         } else {
-                            actionHtml = '<span class="text-muted small italic px-2">Lifecycle Locked</span>';
-                            showDelete = true;
+                            const statusKey = data.status;
+                            // Build driver cell HTML from enriched payload
+                            let driverHtml = null;
+                            if (data.driver_name !== undefined) {
+                                if (data.driver_name) {
+                                    driverHtml = `<span><i class="bi bi-person me-1"></i>${escapeHtml(data.driver_name)}</span>`;
+                                } else {
+                                    driverHtml = '<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>Unassigned</span>';
+                                }
+                            }
+                            // Build action cell HTML based on new status
+                            let actionHtml = '';
+                            let showDelete = false;
+                            if (statusKey === 'pending') {
+                                actionHtml = `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${data.request_id}, this)">${gettext('Cancel')}</button>`;
+                            } else if (['completed', 'cancelled', 'assigned', 'in_progress'].includes(statusKey)) {
+                                actionHtml = `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${data.request_id}, this)"><i class="bi bi-trash3"></i> ${gettext('Delete')}</button>`;
+                                showDelete = true;
+                            } else {
+                                actionHtml = '<span class="text-muted small italic px-2">Lifecycle Locked</span>';
+                                showDelete = true;
+                            }
+                            applyRequestRowUpdate(data.request_id, {
+                                statusKey,
+                                driverHtml,
+                                actionHtml,
+                                showDelete
+                            });
                         }
-                        applyRequestRowUpdate(data.request_id, {
-                            statusKey,
-                            driverHtml,
-                            actionHtml,
-                            showDelete
-                        });
+                    } else if (data.type === 'entity_update') {
+                        // Driver/vehicle renames change rendered cells — the
+                        // list re-render keeps the current URL (and filters).
+                        if ((data.entity === 'driver' || data.entity === 'vehicle')
+                                && typeof window.scheduleLiveRefresh === 'function') {
+                            window.scheduleLiveRefresh('admin-requests-list', () => window.ssRefreshContent(), 2500);
+                        }
                     }
                 } catch (err) {
                     console.error('Error parsing request update:', err);
@@ -1055,7 +1078,22 @@ window.openPhotoGallery = function(requestId) {
 
     // Start the WebSocket connection
     connectRequestWebSocket();
-};
+
+    // Teardown for htmx navigation (single registration): without this the
+    // socket + reconnect timer survived page swaps and stacked duplicates.
+    window.ssRegisterPageTeardown(() => {
+        if (requestReconnectTimer) {
+            clearTimeout(requestReconnectTimer);
+            requestReconnectTimer = null;
+        }
+        if (requestWS) {
+            requestWS.onclose = null;
+            requestWS.onerror = null;
+            try { requestWS.close(1000, 'htmx navigation'); } catch (e) { /* already closing */ }
+            if (window._requestWs === requestWS) window._requestWs = null;
+            requestWS = null;
+        }
+    });
 })();
 </script>
 {% endblock %}

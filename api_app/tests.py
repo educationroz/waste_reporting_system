@@ -12,6 +12,127 @@ from .views import _create_notification
 User = get_user_model()
 
 
+class LiveSyncTests(TestCase):
+    """Every mutation that a live page depends on must push WS + notify."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(username='liveadmin', password='pw', role='admin')
+        self.citizen = User.objects.create_user(
+            username='livecit', password='pw', role='user', email='livecit@example.com')
+        self.client = APIClient()
+
+    def _request(self, **kwargs):
+        from django.utils import timezone
+        defaults = dict(pickup_address='Live addr', scheduled_date=timezone.now(), status='pending')
+        defaults.update(kwargs)
+        return WasteRequest.objects.create(**defaults)
+
+    def test_stats_endpoint_admin_only_and_counts(self):
+        from django.utils import timezone
+        import datetime
+        self._request(user=self.citizen, status='pending')
+        self._request(
+            user=self.citizen, status='pending',
+            scheduled_date=timezone.now() - datetime.timedelta(days=3))
+        self.client.force_authenticate(self.citizen)
+        self.assertEqual(self.client.get('/api/waste-requests/stats/').status_code, 403)
+        self.client.force_authenticate(self.admin)
+        resp = self.client.get('/api/waste-requests/stats/')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        data = resp.json()
+        self.assertEqual(data['pending'], 2)
+        self.assertEqual(data['overdue'], 1)
+
+    def test_mine_counts_for_citizen(self):
+        self._request(user=self.citizen, status='pending')
+        self._request(user=self.citizen, status='completed')
+        self.client.force_authenticate(self.citizen)
+        resp = self.client.get('/api/waste-requests/mine_counts/')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.json()['pending'], 1)
+        self.assertEqual(resp.json()['completed'], 1)
+
+    def test_bulk_cancel_pushes_and_notifies(self):
+        wr = self._request(user=self.citizen, status='pending')
+        self.client.force_authenticate(self.admin)
+        with patch('api_app.views._push_ws_request_update') as push, \
+             patch('api_app.views._create_notification') as notif:
+            resp = self.client.post('/api/waste-requests/bulk_cancel/', {'ids': [wr.id]}, format='json')
+            self.assertEqual(resp.status_code, 200, resp.content)
+            push.assert_called_with(wr.id, 'cancelled', self.admin.username)
+            self.assertTrue(notif.called)
+
+    def test_claim_request_pushes_ws(self):
+        from api_app.models import Driver
+        user = User.objects.create_user(username='livedrv', password='pw', role='driver')
+        driver = Driver.objects.get(user=user)
+        driver.zone = 'central'
+        driver.save(update_fields=['zone'])
+        wr = self._request(status='pending', zone='central')
+        self.client.force_authenticate(user)
+        with patch('api_app.views._push_ws_request_update') as push:
+            resp = self.client.post(f'/api/waste-requests/{wr.id}/claim_request/')
+            self.assertEqual(resp.status_code, 200, resp.content)
+            push.assert_called_with(wr.id, 'assigned', user.username)
+
+    def test_chart_data_admin_only(self):
+        self.client.force_authenticate(self.citizen)
+        self.assertEqual(self.client.get('/api/waste-requests/chart_data/').status_code, 403)
+        self.client.force_authenticate(self.admin)
+        resp = self.client.get('/api/waste-requests/chart_data/')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        data = resp.json()
+        self.assertIn('labels', data['over_time'])
+        self.assertIn('data', data['by_type'])
+        self.assertIn('data', data['by_zone'])
+
+    def test_admin_log_recent_feed(self):
+        from api_app.models import AdminLog
+        self.client.force_authenticate(self.citizen)
+        self.assertEqual(self.client.get('/api/admin-logs/recent/').status_code, 403)
+        self.client.force_authenticate(self.admin)
+        AdminLog.objects.create(
+            admin_user=self.admin, action='create', content_type='WasteRequest',
+            object_id=1, object_description='created #1')
+        resp = self.client.get('/api/admin-logs/recent/?limit=5')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(len(resp.json()), 1)
+        first_id = resp.json()[0]['id']
+        self.assertEqual(
+            self.client.get(f'/api/admin-logs/recent/?since_id={first_id}').json(), [])
+
+    def test_entity_event_fans_out_to_both_groups(self):
+        from api_app import views as views_mod
+        calls = []
+
+        class FakeLayer:
+            def group_send(self, group, payload):
+                calls.append((group, payload))
+
+        with patch.object(views_mod, 'CHANNEL_LAYER', FakeLayer()):
+            with patch('api_app.views.async_to_sync', side_effect=lambda fn: fn):
+                views_mod._push_ws_entity_event('driver', 'update', 7)
+        groups = {group for group, _ in calls}
+        self.assertEqual(groups, {'request_updates', 'driver_locations'})
+        payload = calls[0][1]
+        self.assertEqual(payload['type'], 'broadcast_entity_update')
+        self.assertEqual(payload['entity'], 'driver')
+        self.assertEqual(payload['object_id'], 7)
+        self.assertEqual(payload['audience'], 'admin')
+
+    def test_soft_delete_and_restore_push_deleted_flag(self):
+        wr = self._request(user=self.citizen, status='pending')
+        self.client.force_authenticate(self.citizen)
+        with patch('api_app.views._push_ws_request_update') as push:
+            self.assertEqual(
+                self.client.patch(f'/api/waste-requests/{wr.id}/soft_delete/').status_code, 200)
+            push.assert_called_with(wr.id, 'pending', self.citizen.username, deleted=True)
+        with patch('api_app.views._push_ws_request_update') as push:
+            self.assertEqual(
+                self.client.patch(f'/api/waste-requests/{wr.id}/restore/').status_code, 200)
+            push.assert_called_with(wr.id, 'pending', self.citizen.username)
+
+
 class OverdueLogicTests(TestCase):
     """Grace-based overdue: fresh submissions never pop up; old stuck ones do."""
 

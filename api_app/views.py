@@ -231,7 +231,45 @@ def _log_admin_action(request, action_type, content_type, obj, description=''):
         logger.exception('Failed to write AdminLog entry for %s #%s', content_type, getattr(obj, 'id', None))
 
 
-def _push_ws_request_update(request_id, status, updated_by=None):
+def _push_ws_entity_event(entity, action, object_id=None, audience='admin', extra=None):
+    """Broadcast a non-request entity change (driver/vehicle/schedule/route/
+    checkpoint/bin/complaint-admin) on the shared 'request_updates' group.
+
+    Reuses the existing groups instead of a new socket: both consumers forward
+    it as {type:'entity_update'} only to entitled sockets — audience 'admin'
+    → admins, 'driver' → admins+drivers, 'all' → everyone (e.g. checkpoints,
+    whose maps are public). Both groups are fanned out because fleet pages
+    (drivers/vehicles/route-planning) only hold a driver-locations socket
+    while list pages only hold a requests socket; handlers are idempotent
+    (debounced refreshes, row-exists guards) so dual-socket pages process the
+    event once. Pages debounce this into a targeted refresh (row patch /
+    list re-fetch), never a full reload.
+    entity/action/id are coerced to plain values; never free-form objects.
+    """
+    if CHANNEL_LAYER is None:
+        return
+    if audience not in ('admin', 'driver', 'all'):
+        audience = 'admin'
+    try:
+        payload = {
+            'type': 'broadcast_entity_update',
+            'entity': str(entity)[:32],
+            'action': str(action)[:16],
+            'audience': audience,
+        }
+        if object_id is not None:
+            payload['object_id'] = int(object_id)
+        if isinstance(extra, dict):
+            for key, value in list(extra.items())[:8]:
+                if isinstance(value, (str, int, float, bool)) or value is None:
+                    payload[str(key)[:32]] = value
+        async_to_sync(CHANNEL_LAYER.group_send)('request_updates', payload)
+        async_to_sync(CHANNEL_LAYER.group_send)('driver_locations', payload)
+    except Exception:
+        logger.warning(f'[WS ENTITY UPDATE] failed for {entity}/{action}')
+
+
+def _push_ws_request_update(request_id, status, updated_by=None, deleted=False):
     """
     Broadcast a waste request status/driver change to all connected WebSocket
     clients in the 'request_updates' group (WasteRequestConsumer).
@@ -240,6 +278,8 @@ def _push_ws_request_update(request_id, status, updated_by=None):
     zone, driver_name) so every page's live row-updater can render the changed
     cells without re-fetching the row from the API. Extras are best-effort: if
     the row is gone (e.g. someone deleted it) they're simply omitted.
+    deleted=True marks soft-delete/permanent removal so list pages drop the
+    row live instead of waiting for a reload.
     """
     if CHANNEL_LAYER is None:
         return
@@ -248,6 +288,7 @@ def _push_ws_request_update(request_id, status, updated_by=None):
         'request_id': request_id,
         'status': status,
         'updated_by': updated_by or 'system',
+        'deleted': bool(deleted),
     }
     try:
         req = WasteRequest.objects.select_related('driver', 'driver__user').filter(pk=request_id).first()
@@ -273,6 +314,33 @@ def _push_ws_request_update(request_id, status, updated_by=None):
         )
     except Exception:
         logger.warning(f'[WS REQUEST UPDATE] failed for request={request_id}')
+
+
+def _push_ws_route_update(route, driver, waypoints=None, total_distance=None, total_stops=None):
+    """Broadcast route geometry/status to the assigned driver + admins live.
+
+    Single choke point for every route mutation (generate/start/complete/
+    driver-started) so driver maps and the route-planning page update without
+    reload. driver_user_id scopes delivery to that driver + admins.
+    """
+    if CHANNEL_LAYER is None:
+        return
+    try:
+        async_to_sync(CHANNEL_LAYER.group_send)(
+            'driver_locations',
+            {
+                'type': 'route_update',
+                'driver_id': driver.id if driver else None,
+                'driver_user_id': driver.user_id if driver else None,
+                'route_id': route.id if route else None,
+                'route_status': getattr(route, 'status', '') if route else '',
+                'waypoints': waypoints or [],
+                'total_distance': total_distance,
+                'total_stops': total_stops,
+            }
+        )
+    except Exception:
+        logger.warning('[WS ROUTE UPDATE] failed')
 
 
 def _push_ws_notification(notification):
@@ -332,6 +400,7 @@ def _push_ws_complaint_update(complaint_id, status=None, deleted=False):
             if c is not None:
                 payload['status'] = c.status
                 payload['status_display'] = c.get_status_display()
+                payload['admin_response'] = c.admin_response or ''
                 payload['owner_user_id'] = c.user_id
         else:
             payload['status'] = status
@@ -341,7 +410,10 @@ def _push_ws_complaint_update(complaint_id, status=None, deleted=False):
             )
             # owner_user_id is what scopes delivery to the complainant; without
             # it a non-admin socket would either see nothing or see everything.
-            payload['owner_user_id'] = Complaint.objects.filter(pk=complaint_id).values_list('user_id', flat=True).first()
+            row = Complaint.objects.filter(pk=complaint_id).values_list('user_id', 'admin_response').first()
+            if row is not None:
+                payload['owner_user_id'] = row[0]
+                payload['admin_response'] = row[1] or ''
     except Exception:  # noqa: BLE001 - extras are best-effort; id + deleted flag still fire
         pass
     try:
@@ -779,14 +851,18 @@ class VehicleViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         vehicle = serializer.save()
         _log_admin_action(self.request, 'create', 'Vehicle', vehicle, f'Added vehicle {vehicle.plate_number}')
+        _push_ws_entity_event('vehicle', 'create', vehicle.id)
 
     def perform_update(self, serializer):
         vehicle = serializer.save()
         _log_admin_action(self.request, 'update', 'Vehicle', vehicle, f'Updated vehicle {vehicle.plate_number}')
+        _push_ws_entity_event('vehicle', 'update', vehicle.id)
 
     def perform_destroy(self, instance):
         _log_admin_action(self.request, 'delete', 'Vehicle', instance, f'Removed vehicle {instance.plate_number}')
+        vehicle_id = instance.id
         instance.delete()
+        _push_ws_entity_event('vehicle', 'delete', vehicle_id)
 
     @action(detail=False, methods=['get'])
     def available(self, request):
@@ -821,10 +897,12 @@ class DriverViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         driver = serializer.save()
         _log_admin_action(self.request, 'create', 'Driver', driver, f'Registered driver {driver.user.username}')
+        _push_ws_entity_event('driver', 'create', driver.id)
 
     def perform_update(self, serializer):
         driver = serializer.save()
         _log_admin_action(self.request, 'update', 'Driver', driver, f'Updated driver {driver.user.username}')
+        _push_ws_entity_event('driver', 'update', driver.id)
 
     @action(
         detail=False,
@@ -883,6 +961,7 @@ class DriverViewSet(viewsets.ModelViewSet):
         driver.save(update_fields=['zone'])
 
         _log_admin_action(request, 'create', 'Driver', driver, f'Created driver account {user.username}')
+        _push_ws_entity_event('driver', 'create', driver.id)
         return Response(DriverSerializer(driver, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
     # 👇 ADD THIS
@@ -937,9 +1016,11 @@ class DriverViewSet(viewsets.ModelViewSet):
         user = driver.user
         _log_admin_action(request, 'delete', 'Driver', driver, f'Removed driver {user.username}')
 
+        driver_id = driver.id
         with transaction.atomic():
             user.delete()
 
+        _push_ws_entity_event('driver', 'delete', driver_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
@@ -957,6 +1038,8 @@ class DriverViewSet(viewsets.ModelViewSet):
             request, 'update', 'Driver', driver,
             f'{driver.user.username} availability set to {driver.is_available}'
         )
+        # Live: fleet tables/badges flip without reload.
+        _push_ws_entity_event('driver', 'update', driver.id)
         return Response(DriverSerializer(driver).data)
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
@@ -1020,6 +1103,8 @@ class DriverViewSet(viewsets.ModelViewSet):
         _log_admin_action(
             request, 'update', 'Driver', driver, log_note,
         )
+        # Live: fleet tables/badges flip without reload.
+        _push_ws_entity_event('driver', 'update', driver.id)
         return Response(DriverSerializer(driver).data)
 
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
@@ -1134,6 +1219,10 @@ class DriverViewSet(viewsets.ModelViewSet):
                 {
                     'type': 'driver_location_update',
                     'driver_id': driver.id,
+                    # Parity with the socket receive() path: without
+                    # driver_user_id the consumer drops this for non-admin
+                    # sockets, so drivers never saw their own echo.
+                    'driver_user_id': driver.user_id,
                     'driver_name': driver.user.username,
                     'latitude': str(lat_f),
                     'longitude': str(lng_f),
@@ -1347,6 +1436,10 @@ class DriverViewSet(viewsets.ModelViewSet):
                     notification_type='info',
                     related_request=wr,
                 )
+
+        # Live: driver map + route-planning page follow the active status.
+        _push_ws_route_update(route, driver)
+        _push_ws_entity_event('route', 'update', route.id, audience='driver')
 
         return Response({
             'message': 'Route marked as started. Notifications sent.',
@@ -1615,14 +1708,18 @@ class BinViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         bin_obj = serializer.save()
         _log_admin_action(self.request, 'create', 'Bin', bin_obj, f'Added bin {bin_obj.bin_code}')
+        _push_ws_entity_event('bin', 'create', bin_obj.id)
 
     def perform_update(self, serializer):
         bin_obj = serializer.save()
         _log_admin_action(self.request, 'update', 'Bin', bin_obj, f'Updated bin {bin_obj.bin_code}')
+        _push_ws_entity_event('bin', 'update', bin_obj.id)
 
     def perform_destroy(self, instance):
         _log_admin_action(self.request, 'delete', 'Bin', instance, f'Removed bin {instance.bin_code}')
+        bin_id = instance.id
         instance.delete()
+        _push_ws_entity_event('bin', 'delete', bin_id)
 
     @action(detail=False, methods=['get'])
     def full_bins(self, request):
@@ -1700,6 +1797,9 @@ class CheckpointViewSet(viewsets.ModelViewSet):
                 message=f'A new checkpoint "{checkpoint.name}" is now available on the map.',
                 notification_type='info',
             )
+            # Live: audience 'all' so public maps (home/route-planning) redraw
+            # markers instantly instead of waiting for a reload.
+            _push_ws_entity_event('checkpoint', 'create', checkpoint.id, audience='all')
 
         out = CheckpointSerializer(checkpoint, context={'request': request}).data
         out.update({'deduped': deduped})
@@ -1716,6 +1816,7 @@ class CheckpointViewSet(viewsets.ModelViewSet):
             message=f'Checkpoint "{checkpoint.name}" was moved or edited — the map has been refreshed.',
             notification_type='info',
         )
+        _push_ws_entity_event('checkpoint', 'update', checkpoint.id, audience='all')
 
     def perform_destroy(self, instance):
         _log_admin_action(self.request, 'delete', 'Checkpoint', instance, f'Deleted checkpoint {instance.name}')
@@ -1724,7 +1825,9 @@ class CheckpointViewSet(viewsets.ModelViewSet):
             message=f'Checkpoint "{instance.name}" has been removed.',
             notification_type='warning',
         )
+        checkpoint_id = instance.id
         instance.delete()
+        _push_ws_entity_event('checkpoint', 'delete', checkpoint_id, audience='all')
 
     @action(detail=False, methods=['post'])
     def bulk_create(self, request):
@@ -1809,6 +1912,7 @@ class CheckpointViewSet(viewsets.ModelViewSet):
                 message=f'{len(created)} new checkpoint(s) are now available on the map.',
                 notification_type='info',
             )
+            _push_ws_entity_event('checkpoint', 'bulk_create', None, audience='all')
 
         return Response(
             {
@@ -1875,6 +1979,7 @@ class CheckpointViewSet(viewsets.ModelViewSet):
                 message=f'{len(found_ids)} checkpoint(s) have been removed from the map.',
                 notification_type='warning',
             )
+            _push_ws_entity_event('checkpoint', 'bulk_delete', None, audience='all')
 
         return Response({
             'deleted': len(found_ids),
@@ -2231,9 +2336,11 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             # bulk_assign / bulk_reschedule keep their in-handler admin check
             # as belt-and-suspenders)
             'auto_assign_driver', 'reassign_all_from_driver',
-            'bulk_assign', 'bulk_reschedule', 'overdue',
+            'bulk_assign', 'bulk_reschedule', 'overdue', 'stats', 'chart_data',
         ):
             return [IsAuthenticated(), IsAdminUser()]
+        if self.action == 'mine_counts':
+            return [IsAuthenticated()]
         return [IsAuthenticated(), IsOwnerOrAdmin()]
 
     def get_queryset(self):
@@ -2314,9 +2421,26 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             )
         return super().create(request, *args, **kwargs)
 
+    def perform_update(self, serializer):
+        # Generic PUT/PATCH bypasses the dedicated actions — still push live
+        # so open lists refresh the row instead of going stale.
+        waste_request = serializer.save()
+        _push_ws_request_update(
+            waste_request.id, waste_request.status,
+            self.request.user.username if self.request.user.is_authenticated else 'system')
+
+    def perform_destroy(self, instance):
+        request_id = instance.id
+        status = instance.status
+        instance.delete()
+        _push_ws_request_update(
+            request_id, status,
+            self.request.user.username if self.request.user.is_authenticated else 'system',
+            deleted=True)
+
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
-        
+
         # Checkpoint spam prevention: 2 per hour, 10 per day per identity per checkpoint
         checkpoint = serializer.validated_data.get('dropoff_checkpoint')
         if checkpoint:
@@ -2354,11 +2478,27 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         
         waste_request = serializer.save(user=user)
 
+        # Live: a brand-new report must appear on open admin tables NOW, not
+        # after reload. Admins also get a notification (badge + toast live).
+        _push_ws_request_update(
+            waste_request.id, 'pending',
+            user.username if user else 'guest')
+        try:
+            _notify_admins(
+                title='New Waste Report',
+                message=f'New {waste_request.get_waste_type_display()} report '
+                        f'#{waste_request.id} submitted'
+                        f'{" by " + user.username if user else " by a guest"}.',
+                notification_type='info',
+            )
+        except Exception:  # noqa: BLE001 - notify best-effort
+            pass
+
         # Auto-assign driver for HIGH waste with confidence >= 80%
         # Only if ML result is already available (sync path)
-        if (waste_request.severity == 'high' and 
-            waste_request.ml_confidence is not None and 
-            waste_request.ml_confidence >= 80 and 
+        if (waste_request.severity == 'high' and
+            waste_request.ml_confidence is not None and
+            waste_request.ml_confidence >= 80 and
             not waste_request.needs_manual_review):
             self._auto_assign_driver_for_request(waste_request)
 
@@ -2889,6 +3029,9 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         waste_request.is_deleted = True
         waste_request.deleted_at = timezone.now()
         waste_request.save(update_fields=['is_deleted', 'deleted_at'])
+        # Live: drop the row on every open list without reload.
+        _push_ws_request_update(
+            waste_request.id, waste_request.status, request.user.username, deleted=True)
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
     @action(detail=True, methods=['patch'])
@@ -2901,6 +3044,9 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             waste_request.status = 'pending'
             update_fields.append('status')
         waste_request.save(update_fields=update_fields)
+        # Live: restored rows reappear (possibly with a new status).
+        _push_ws_request_update(
+            waste_request.id, waste_request.status, request.user.username)
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
     @action(detail=False, methods=['get'])
@@ -3078,6 +3224,22 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         missing_ids = [i for i in clean_ids if i not in found_ids]
         updated = qs.update(status='cancelled')
 
+        # Live: cancelled rows must vanish/update on every open list + notify owners.
+        for req_id in found_ids:
+            _push_ws_request_update(req_id, 'cancelled', request.user.username)
+        try:
+            for wr in WasteRequest.objects.filter(id__in=found_ids).select_related('user'):
+                if wr.user_id:
+                    _create_notification(
+                        user=wr.user,
+                        title='Request Cancelled',
+                        message=f'Your waste pickup request #{wr.id} has been cancelled.',
+                        notification_type='warning',
+                        related_request=wr,
+                    )
+        except Exception:  # noqa: BLE001 - notification push must not break bulk cancel
+            logger.warning('[BULK_CANCEL] notification push failed, DB update already committed.')
+
         _log_admin_action(
             request, 'status_change', 'WasteRequest', None,
             f'Bulk-cancelled {updated} request(s): {found_ids}'
@@ -3204,6 +3366,17 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                         notification_type='success',
                         related_request=wr,
                     )
+                if wr.driver_id:
+                    try:
+                        _notify_driver(
+                            wr.driver,
+                            title='Pickup Completed',
+                            message=f'Request #{wr.id} marked completed by {request.user.username}.',
+                            notification_type='success',
+                            related_request=wr,
+                        )
+                    except Exception:  # noqa: BLE001 - notify best-effort
+                        pass
 
             # Bump total_trips correctly per driver: one driver may complete
             # many rows in this batch, admins may complete rows for several
@@ -3240,6 +3413,29 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         # Broadcast real-time updates for bulk operations
         for req_id in eligible_ids:
             _push_ws_request_update(req_id, new_status, request.user.username)
+
+        # Owners (and assigned drivers) must hear about in_progress/cancelled
+        # too — previously only the socket fired, no notification existed.
+        try:
+            for wr in WasteRequest.objects.filter(id__in=list(eligible_ids)).select_related('user', 'driver__user'):
+                if wr.user_id:
+                    _create_notification(
+                        user=wr.user,
+                        title='Request Status Updated',
+                        message=f'Your waste pickup request #{wr.id} is now {new_status.replace("_", " ")}.',
+                        notification_type='info',
+                        related_request=wr,
+                    )
+                if wr.driver_id:
+                    _notify_driver(
+                        wr.driver,
+                        title='Request Status Changed',
+                        message=f'Request #{wr.id} is now {new_status.replace("_", " ")}.',
+                        notification_type='info',
+                        related_request=wr,
+                    )
+        except Exception:  # noqa: BLE001 - notification push must not break bulk update
+            logger.warning('[BULK_UPDATE_STATUS] notification push failed, DB update already committed.')
 
         _log_admin_action(
             request, 'status_change', 'WasteRequest', None,
@@ -3435,9 +3631,29 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         waste_request.driver = None
         waste_request.status = 'pending'
         waste_request.save(update_fields=['driver', 'status'])
-        
+
         # Broadcast real-time update for rejection
         _push_ws_request_update(waste_request.id, 'pending', user.username)
+
+        # The citizen and the admins must hear about the rejection — previously
+        # only the next driver was notified and only on reassignment.
+        try:
+            if waste_request.user_id:
+                _create_notification(
+                    user=waste_request.user,
+                    title='Driver Reassigned',
+                    message=f'Driver {user.username} could not take request #{waste_request.id}'
+                            f' ({reason}). It is back in the queue.',
+                    notification_type='warning',
+                    related_request=waste_request,
+                )
+            _notify_admins(
+                title='Driver Rejected a Request',
+                message=f'Driver {user.username} rejected request #{waste_request.id}: {reason}',
+                notification_type='warning',
+            )
+        except Exception:  # noqa: BLE001 - notify best-effort
+            logger.warning(f'[DRIVER_REJECT] notification push failed for request={waste_request.id}')
         
         # Try to auto-assign to next nearest driver
         zone = waste_request.zone
@@ -3719,6 +3935,11 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             )
         except Exception:
             logger.warning(f'[CLAIM_REQUEST] notification push failed for request={waste_request.id}')
+
+        # Live: every open list + the claiming driver's board update now.
+        _push_ws_request_update(waste_request.id, 'assigned', user.username)
+        for sibling in siblings:
+            _push_ws_request_update(sibling.id, 'assigned', user.username)
         
         return Response({
             'message': 'Request claimed successfully',
@@ -3759,6 +3980,23 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
                 )
             except Exception:  # noqa: BLE001 - notification push must not break review resolution
                 logger.warning(f'[RESOLVE_REVIEW] notification push failed for request={waste_request.id}.')
+        elif decision == 'approve' and waste_request.user_id:
+            # Approved rows become claimable — the owner must hear about it.
+            try:
+                _create_notification(
+                    user=waste_request.user,
+                    title='Request Approved',
+                    message=f'Your request #{waste_request.id} passed manual review and is now awaiting a driver.',
+                    notification_type='success',
+                    related_request=waste_request,
+                )
+            except Exception:  # noqa: BLE001 - notification push must not break review resolution
+                logger.warning(f'[RESOLVE_REVIEW] approve notification failed for request={waste_request.id}.')
+
+        # Live: the review flag gates driver visibility, so every open list
+        # refreshes the row now (status may also have flipped to cancelled).
+        _push_ws_request_update(
+            waste_request.id, waste_request.status, request.user.username)
 
         return Response(WasteRequestSerializer(waste_request, context={'request': request}).data)
 
@@ -3987,6 +4225,10 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
 
         updated = eligible_qs.update(driver=driver, status='assigned')
 
+        # Live parity with bulk_assign_driver: every open list patches now.
+        for req_id in found_ids:
+            _push_ws_request_update(req_id, 'assigned', request.user.username)
+
         # Notify users
         try:
             for wr in WasteRequest.objects.filter(id__in=found_ids).select_related('user'):
@@ -4065,6 +4307,11 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
         ineligible_ids = [i for i in clean_ids if i not in found_ids and i not in missing_ids]
 
         updated = eligible_qs.update(scheduled_date=new_scheduled)
+
+        # Live: dates render in tables/timelines, so push the (unchanged-status)
+        # rows too — otherwise open lists show the old date until reload.
+        for wr in WasteRequest.objects.filter(id__in=found_ids).only('id', 'status'):
+            _push_ws_request_update(wr.id, wr.status, request.user.username)
 
         # Notify users
         try:
@@ -4264,6 +4511,100 @@ class WasteRequestViewSet(viewsets.ModelViewSet):
             for wr in rows
         ])
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def stats(self, request):
+        """GET /api/waste-requests/stats/ — admin-only live KPI numbers.
+
+        Same grace-based overdue rule as the dashboard (scheduled_date past
+        OVERDUE_GRACE_HOURS, open statuses, not deleted). The admin dashboard
+        re-fetches this on every request_update/entity event so KPI cards stay
+        correct without any page reload.
+        """
+        from api_app.models import overdue_cutoff
+        now = timezone.now()
+        waste_stats = WasteRequest.objects.aggregate(
+            total_requests=Count('id'),
+            pending=Count('id', filter=Q(status='pending', is_deleted=False)),
+            assigned=Count('id', filter=Q(status='assigned', is_deleted=False)),
+            in_progress=Count('id', filter=Q(status='in_progress', is_deleted=False)),
+            completed=Count('id', filter=Q(status='completed', is_deleted=False)),
+            cancelled=Count('id', filter=Q(status='cancelled', is_deleted=False)),
+            overdue=Count('id', filter=Q(
+                status__in=['pending', 'assigned', 'in_progress'],
+                is_deleted=False,
+                scheduled_date__lt=overdue_cutoff(now),
+            )),
+        )
+        driver_stats = Driver.objects.aggregate(
+            active_drivers=Count('id', filter=Q(is_available=True)),
+            total_drivers=Count('id'),
+        )
+        vehicle_stats = Vehicle.objects.aggregate(
+            available_vehicles=Count('id', filter=Q(status='available')),
+            total_vehicles=Count('id'),
+        )
+        return Response({**waste_stats, **driver_stats, **vehicle_stats})
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def mine_counts(self, request):
+        """GET /api/waste-requests/mine_counts/ — live counters for dashboards.
+
+        Citizen: own requests by status (+ recycle bin). Driver: assigned jobs
+        by status (+ completed today). The home/driver dashboards re-fetch on
+        every relevant WS event so stat cards stay correct without reload.
+        """
+        user = request.user
+        if getattr(user, 'role', '') == 'driver':
+            try:
+                driver = Driver.objects.get(user=user)
+            except Driver.DoesNotExist:
+                return Response({'assigned': 0, 'in_progress': 0, 'completed_today': 0})
+            today = timezone.now().date()
+            qs = WasteRequest.objects.filter(driver=driver, is_deleted=False)
+            return Response({
+                'assigned': qs.filter(status='assigned').count(),
+                'in_progress': qs.filter(status='in_progress').count(),
+                'completed_today': qs.filter(status='completed', completed_at__date=today).count(),
+            })
+        qs = WasteRequest.objects.filter(user=user, is_deleted=False)
+        return Response({
+            'pending': qs.filter(status='pending').count(),
+            'assigned': qs.filter(status='assigned').count(),
+            'in_progress': qs.filter(status='in_progress').count(),
+            'completed': qs.filter(status='completed').count(),
+            'cancelled': qs.filter(status='cancelled').count(),
+            'recycle_bin': WasteRequest.objects.filter(user=user, is_deleted=True).count(),
+        })
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def chart_data(self, request):
+        """GET /api/waste-requests/chart_data/ — admin-only live chart datasets.
+
+        Same builders as the dashboard's initial render (30-day trend,
+        by-type and by-zone counts). The dashboard re-fetches this on WS
+        events and patches Chart.js datasets in place — no reload, no
+        chart flicker (no destroy/recreate).
+        """
+        from web_app.views import (
+            _requests_by_dimension,
+            _requests_over_time,
+        )
+        return Response({
+            'over_time': _requests_over_time(),
+            'by_type': _requests_by_dimension(
+                field='waste_type',
+                choices=WasteRequest.WASTE_TYPE_CHOICES,
+                label_field='waste_type_label',
+                count_field='waste_type_count',
+            ),
+            'by_zone': _requests_by_dimension(
+                field='zone',
+                choices=ZONE_CHOICES,
+                label_field='zone_label',
+                count_field='zone_count',
+            ),
+        })
+
     def _build_schedule_occurrence(self, schedule, date_obj):
         """Helper to build a schedule occurrence dict."""
         return {
@@ -4301,6 +4642,7 @@ class RouteViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         route = serializer.save()
         _log_admin_action(self.request, 'create', 'Route', route, f'Created route #{route.id}')
+        _push_ws_entity_event('route', 'create', route.id, audience='driver')
 
     @action(detail=True, methods=['patch'])
     def start_route(self, request, pk=None):
@@ -4311,6 +4653,9 @@ class RouteViewSet(viewsets.ModelViewSet):
         route.save(update_fields=['status', 'started_at'])
 
         _log_admin_action(request, 'status_change', 'Route', route, f'Route #{route.id} started')
+        # Live: driver map + route-planning page follow the status now.
+        _push_ws_route_update(route, route.driver)
+        _push_ws_entity_event('route', 'update', route.id, audience='driver')
         return Response(RouteSerializer(route).data)
 
     @action(detail=True, methods=['patch'])
@@ -4322,6 +4667,9 @@ class RouteViewSet(viewsets.ModelViewSet):
         route.save(update_fields=['status', 'completed_at'])
 
         _log_admin_action(request, 'status_change', 'Route', route, f'Route #{route.id} completed')
+        # Live: driver map + route-planning page follow the status now.
+        _push_ws_route_update(route, route.driver)
+        _push_ws_entity_event('route', 'update', route.id, audience='driver')
         return Response(RouteSerializer(route).data)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
@@ -4542,19 +4890,9 @@ class RouteViewSet(viewsets.ModelViewSet):
         # Broadcast route geometry via WebSocket to driver-facing map pages.
         # driver_user_id lets DriverLocationConsumer route_update() deliver this
         # to the assigned driver and any admin, but to no other driver.
-        if CHANNEL_LAYER is not None:
-            async_to_sync(CHANNEL_LAYER.group_send)(
-                'driver_locations',
-                {
-                    'type': 'route_update',
-                    'driver_id': driver.id,
-                    'driver_user_id': driver.user_id,
-                    'route_id': route.id,
-                    'waypoints': route_data['waypoints'],
-                    'total_distance': route_data['total_distance_km'],
-                    'total_stops': route_data['total_stops'],
-                }
-            )
+        _push_ws_route_update(
+            route, driver,
+            route_data['waypoints'], route_data['total_distance_km'], route_data['total_stops'])
 
         return Response({
             'route': RouteSerializer(route).data,
@@ -4594,6 +4932,9 @@ class ScheduleViewSet(viewsets.ModelViewSet):
                 )
             except Exception:  # noqa: BLE001 - notification push must never fail the request
                 logger.warning(f'[SCHEDULE CREATE] notification push failed for schedule={schedule.id}.')
+        # Live: assigned driver's schedule section + admin list refresh.
+        _push_ws_entity_event('schedule', 'create', schedule.id, audience='driver',
+                              extra={'driver_id': schedule.driver_id})
 
     def perform_update(self, serializer):
         schedule = serializer.save()
@@ -4611,10 +4952,28 @@ class ScheduleViewSet(viewsets.ModelViewSet):
                 )
             except Exception:  # noqa: BLE001 - notification push must never fail the request
                 logger.warning(f'[SCHEDULE UPDATE] notification push failed for schedule={schedule.id}.')
+        _push_ws_entity_event('schedule', 'update', schedule.id, audience='driver',
+                              extra={'driver_id': schedule.driver_id})
 
     def perform_destroy(self, instance):
         _log_admin_action(self.request, 'delete', 'Schedule', instance, f'Removed schedule for {instance.zone_name}')
+        schedule_id, driver_id = instance.id, instance.driver_id
         instance.delete()
+        # Live + notify: the driver loses those shifts without a word otherwise.
+        if driver_id:
+            try:
+                driver = Driver.objects.select_related('user').filter(pk=driver_id).first()
+                if driver is not None:
+                    _notify_driver(
+                        driver,
+                        title='Zone Schedule Removed',
+                        message='One of your collection schedules was removed by an admin.',
+                        notification_type='warning',
+                    )
+            except Exception:  # noqa: BLE001 - notify best-effort
+                pass
+        _push_ws_entity_event('schedule', 'delete', schedule_id, audience='driver',
+                              extra={'driver_id': driver_id})
 
     # ────────────────────────────────────────────────────────────────────
     # NEW: bulk_export — admin_schedules.html को "Export (CSV)" button ले
@@ -4775,6 +5134,9 @@ class ScheduleViewSet(viewsets.ModelViewSet):
                 )
             except Exception:
                 logger.warning(f'[CLONE_SCHEDULE] notification push failed for schedule={new_schedule.id}.')
+
+        _push_ws_entity_event('schedule', 'create', new_schedule.id, audience='driver',
+                              extra={'driver_id': new_schedule.driver_id})
 
         return Response({
             'message': f'Schedule cloned to next week ({next_week_date}).',
@@ -4941,6 +5303,14 @@ class ScheduleViewSet(viewsets.ModelViewSet):
                             message=f'Route for {schedule.zone_name} on {planned_date} with {route_data["total_stops"]} stops.',
                             notification_type='info',
                         )
+                        # Live parity with generate_optimal: driver map gets
+                        # the geometry, open request lists patch assigned rows.
+                        _push_ws_route_update(
+                            route, schedule.driver,
+                            route_data.get('waypoints'), route_data.get('total_distance_km'),
+                            route_data.get('total_stops'))
+                        for req_id in request_ids:
+                            _push_ws_request_update(req_id, 'assigned', request.user.username)
                 except IntegrityError:
                     continue
                 except Exception as exc:
@@ -5223,6 +5593,26 @@ class AdminLogViewSet(viewsets.ModelViewSet):
             status=status.HTTP_405_METHOD_NOT_ALLOWED,
         )
 
+    @action(detail=False, methods=['get'])
+    def recent(self, request):
+        """GET /api/admin-logs/recent/?since_id=&limit=20 — admin-only live feed.
+
+        Returns newest-first entries with id greater than since_id (or the
+        latest `limit` when omitted) so the audit-trail page can prepend new
+        rows without reload. Limit clamped to 50.
+        """
+        try:
+            limit = int(request.query_params.get('limit', 20))
+        except (TypeError, ValueError):
+            limit = 20
+        limit = max(1, min(limit, 50))
+        qs = AdminLog.objects.select_related('admin_user').order_by('-created_at', '-id')
+        since_id = request.query_params.get('since_id')
+        if since_id and str(since_id).isdigit():
+            qs = qs.filter(id__gt=int(since_id))
+        rows = list(qs[:limit])
+        return Response(AdminLogSerializer(rows, many=True).data)
+
     @action(detail=False, methods=['post', 'delete'])
     def bulk_delete(self, request):
         """Bulk delete selected admin logs by IDs."""
@@ -5423,6 +5813,12 @@ class ComplaintViewSet(viewsets.ModelViewSet):
         )
         # Live-refresh any open admin complaint table so the new row appears
         # without a page reload.
+        _push_ws_complaint_update(complaint.id)
+
+    def perform_update(self, serializer):
+        # Generic PUT/PATCH bypasses update_status — still push live so open
+        # tables (status or admin_response edits) refresh without reload.
+        complaint = serializer.save()
         _push_ws_complaint_update(complaint.id)
 
     def destroy(self, request, *args, **kwargs):

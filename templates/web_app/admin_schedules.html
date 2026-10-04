@@ -1013,6 +1013,66 @@ loadZoneForecast();
         setTimeout(() => switchView('calendar'), 100);
     }
 
+    // ── Entity socket: schedule/route CRUD by another admin refreshes this
+    // page live (debounced list re-render keeps the current URL/filters) ──
+    let scheduleEntityWS = null;
+    let scheduleEntityTimer = null;
+
+    function connectScheduleEntitySocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        try {
+            if (window._requestWs) {
+                try { window._requestWs.close(); } catch (e) {}
+            }
+            const ws = new WebSocket(`${protocol}${location.host}/ws/requests/`);
+            window._requestWs = ws;
+            scheduleEntityWS = ws;
+
+            ws.onopen = () => {
+                if (scheduleEntityTimer) { clearTimeout(scheduleEntityTimer); scheduleEntityTimer = null; }
+            };
+            ws.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type !== 'entity_update') return;
+                    if ((data.entity === 'schedule' || data.entity === 'route')
+                            && typeof window.scheduleLiveRefresh === 'function') {
+                        window.scheduleLiveRefresh('admin-schedules-list', () => window.ssRefreshContent(), 2000);
+                    }
+                } catch (err) {
+                    console.error('Error parsing entity update:', err);
+                }
+            };
+            ws.onclose = (e) => {
+                if (!!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010)) {
+                    console.debug('Schedule entity socket closed (server refused, not reconnecting):', e);
+                    return;
+                }
+                if (scheduleEntityTimer) return;
+                scheduleEntityTimer = setTimeout(() => {
+                    scheduleEntityTimer = null;
+                    if (document.getElementById('schedules-table-body')) connectScheduleEntitySocket();
+                }, 4000);
+            };
+            ws.onerror = (e) => { console.debug('Schedule entity socket error:', e); };
+        } catch (e) {
+            console.warn('Schedule entity socket setup error:', e);
+        }
+    }
+
+    connectScheduleEntitySocket();
+
+    window.ssRegisterPageTeardown(() => {
+        if (scheduleEntityTimer) { clearTimeout(scheduleEntityTimer); scheduleEntityTimer = null; }
+        if (scheduleEntityWS) {
+            scheduleEntityWS.onclose = null;
+            scheduleEntityWS.onerror = null;
+            try { scheduleEntityWS.close(1000, 'htmx navigation'); } catch (e) {}
+            if (window._requestWs === scheduleEntityWS) window._requestWs = null;
+            scheduleEntityWS = null;
+        }
+    });
+
 })();
 </script>
 {% endblock %}

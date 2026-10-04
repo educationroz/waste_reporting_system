@@ -122,6 +122,13 @@
             border: 1px solid var(--border-color, #dee2e6);
         }
 
+        /* Dangling upload references (file lost from storage, e.g. ephemeral
+           container disk) render as src="" via the thumbnail filter — never
+           show a broken-image icon or fire a self-request for these. */
+        img[src=""] {
+            display: none !important;
+        }
+
         /* ==========================================
            NATIVE LANGUAGE SWITCHER
            Replaces the old Google Translate widget (#custom-lang-switcher
@@ -951,6 +958,27 @@ window.ssNavigate = function ssNavigate(url) {
         return;
     }
     window.htmx.ajax('GET', url, { target: '#content-app', select: '#content-app' });
+};
+
+// Debounced live-refresh scheduler shared by every page's WebSocket handlers.
+// Many socket events can arrive in a burst (bulk assign fires one per row);
+// without debouncing each page would re-fetch N times. Keyed per page+purpose
+// so concurrent refreshes don't cancel each other, and safe to call after the
+// page was swapped away (no-op when the guard element is gone).
+// Usage: scheduleLiveRefresh('admin-kpis', refreshAdminKpis, 1500);
+window._ssLiveTimers = window._ssLiveTimers || {};
+window.scheduleLiveRefresh = function scheduleLiveRefresh(key, fn, ms) {
+    if (window._ssLiveTimers[key]) return;
+    window._ssLiveTimers[key] = setTimeout(() => {
+        window._ssLiveTimers[key] = null;
+        try { fn(); } catch (e) { console.debug('Live refresh failed:', e); }
+    }, ms || 1500);
+};
+window.cancelLiveRefresh = function cancelLiveRefresh(key) {
+    if (window._ssLiveTimers[key]) {
+        clearTimeout(window._ssLiveTimers[key]);
+        window._ssLiveTimers[key] = null;
+    }
 };
 </script>
 

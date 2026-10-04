@@ -270,6 +270,99 @@
         showEmptyStateIfNeeded();
         });
     };
+
+    // ── Live bin sync: soft-delete/restore done in another tab updates this
+    // table without reload (same requests socket, entity-free) ──────────────
+    let binWS = null;
+    let binWSTimer = null;
+
+    function connectBinSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        try {
+            if (window._requestWs) {
+                try { window._requestWs.close(); } catch (e) {}
+            }
+            const ws = new WebSocket(`${protocol}${location.host}/ws/requests/`);
+            window._requestWs = ws;
+            binWS = ws;
+            ws.onopen = () => {
+                if (binWSTimer) { clearTimeout(binWSTimer); binWSTimer = null; }
+            };
+            ws.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type !== 'request_update') return;
+                    if (data.deleted) {
+                        prependBinRowById(data.request_id);
+                    } else {
+                        // Restored (or otherwise un-deleted) elsewhere — it no
+                        // longer belongs in the bin.
+                        fadeRemoveRow(data.request_id);
+                        setTimeout(showEmptyStateIfNeeded, 350);
+                    }
+                } catch (err) {
+                    console.error('Error parsing request update:', err);
+                }
+            };
+            ws.onclose = (e) => {
+                if (!!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010)) {
+                    console.debug('Bin socket closed (server refused, not reconnecting):', e);
+                    return;
+                }
+                if (binWSTimer) return;
+                binWSTimer = setTimeout(() => {
+                    binWSTimer = null;
+                    if (document.getElementById('recycle-bin-body')) connectBinSocket();
+                }, 4000);
+            };
+            ws.onerror = (e) => { console.debug('Bin socket error:', e); };
+        } catch (e) {
+            console.warn('Bin socket setup error:', e);
+        }
+    }
+
+    async function prependBinRowById(requestId) {
+        const tbody = document.getElementById('recycle-bin-body');
+        if (!tbody || document.getElementById(`bin-row-${requestId}`)) return;
+        try {
+            const res = await fetch(`/api/waste-requests/${requestId}/`, { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const req = await res.json();
+            if (!req || !req.id) return;
+            const emptyRow = tbody.querySelector('tr td[colspan]');
+            if (emptyRow) emptyRow.closest('tr').remove();
+            const photoCell = req.photo
+                ? `<a href="${escapeHtml(req.photo)}" target="_blank"><img src="${escapeHtml(req.photo)}" alt="${gettext('photo')}" style="height:36px;width:36px;object-fit:cover;border-radius:4px;" onerror="this.closest('a').outerHTML='<span class=text-muted small>—</span>'"></a>`
+                : '<span class="text-muted small">—</span>';
+            tbody.insertAdjacentHTML('afterbegin', `
+                <tr id="bin-row-${req.id}" class="bin-item-fade">
+                    <td class="ps-4 fw-bold text-secondary">#${req.id}</td>
+                    <td>${escapeHtml(req.waste_type_display || req.waste_type || '')}</td>
+                    <td>${photoCell}</td>
+                    <td><span class="badge bg-secondary">${escapeHtml(req.status_display || req.status || '')}</span></td>
+                    <td class="small text-muted">${gettext('just now')}</td>
+                    <td class="pe-4 text-end">
+                        <button class="btn btn-sm btn-outline-success me-1" onclick="restoreRequest(${req.id}, this)"><i class="bi bi-arrow-counterclockwise me-1"></i>${gettext('Restore')}</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="permanentlyDeleteRequest(${req.id}, this)"><i class="bi bi-trash3 me-1"></i>${gettext('Delete Forever')}</button>
+                    </td>
+                </tr>`);
+        } catch (e) {
+            console.debug('Bin prepend failed:', e);
+        }
+    }
+
+    connectBinSocket();
+
+    window.ssRegisterPageTeardown(() => {
+        if (binWSTimer) { clearTimeout(binWSTimer); binWSTimer = null; }
+        if (binWS) {
+            binWS.onclose = null;
+            binWS.onerror = null;
+            try { binWS.close(1000, 'htmx navigation'); } catch (e) {}
+            if (window._requestWs === binWS) window._requestWs = null;
+            binWS = null;
+        }
+    });
 })();
 </script>
 {% endblock %}

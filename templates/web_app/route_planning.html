@@ -315,7 +315,9 @@
 
     // Re-registered on every htmx visit so it closes over the CURRENT map/layers;
     // the `dataset` guard that used to wrap this froze it on the first visit and
-    // leaked the map from the second visit onward.
+    // leaked the map from the second visit onward. SINGLE registration per
+    // visit: registering twice runs the first immediately (base.html), so the
+    // socket teardown below lives in this same callback, not a second one.
     window.ssRegisterPageTeardown(function () {
         if (map) {
             map.remove();
@@ -328,6 +330,19 @@
         driverMarkersLayer = null;
         driverMarkers.clear();
         window._routePlanningInitialized = false;
+        if (window._routeReconnectTimer) {
+            clearTimeout(window._routeReconnectTimer);
+            window._routeReconnectTimer = null;
+        }
+        if (window._routeWebSocket) {
+            window._routeWebSocket.onclose = null;
+            window._routeWebSocket.onerror = null;
+            try { window._routeWebSocket.close(1000, 'htmx navigation'); } catch (e) { /* already closing */ }
+            window._routeWebSocket = null;
+        }
+        if (window.refreshCheckpoints === loadCheckpoints) {
+            window.refreshCheckpoints = null;
+        }
     });
 
     function ensureLeafletLoaded(onReady) {
@@ -846,6 +861,17 @@
 
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
+            if (data.type === 'entity_update') {
+                // Checkpoint CRUD anywhere redraws markers live; driver/route
+                // changes refresh the driver list + active route overlay.
+                if (data.entity === 'checkpoint' && typeof loadCheckpoints === 'function') {
+                    loadCheckpoints();
+                    if (typeof loadDriverMarkers === 'function') loadDriverMarkers();
+                } else if ((data.entity === 'driver' || data.entity === 'route') && typeof loadDrivers === 'function') {
+                    loadDrivers();
+                }
+                return;
+            }
             if (data.type === 'route_update') {
                 showToast(gettext('Route updated in real-time!'), 'info');
                 if (data.waypoints) displayRoute({
@@ -892,23 +918,7 @@
         ws.onclose = (e) => notifyRouteSocketIssue('Route WebSocket closed:', e);
     }
 
-    // Teardown for htmx navigation: without this each visit stacked another
-    // route socket + reconnect timer firing displayRoute against detached DOM.
-    window.ssRegisterPageTeardown(() => {
-        if (window._routeReconnectTimer) {
-            clearTimeout(window._routeReconnectTimer);
-            window._routeReconnectTimer = null;
-        }
-        if (window._routeWebSocket) {
-            window._routeWebSocket.onclose = null;
-            window._routeWebSocket.onerror = null;
-            try { window._routeWebSocket.close(1000, 'htmx navigation'); } catch (e) { /* already closing */ }
-            window._routeWebSocket = null;
-        }
-        if (window.refreshCheckpoints === loadCheckpoints) {
-            window.refreshCheckpoints = null;
-        }
-    });
+
 
     // ── Init ─────────────────────────────────────────────────────────────
     ensureLeafletLoaded(initMap);

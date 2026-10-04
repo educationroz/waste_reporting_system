@@ -745,7 +745,65 @@ function removeAssignedRow(requestId) {
 
     const tbody = document.getElementById('assigned-requests-body');
     if (tbody && !tbody.querySelector('tr')) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No assigned requests.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No assigned requests.</td></tr>';
+    }
+}
+
+// New assignment from another actor — fetch the row and prepend it live
+// (mirrors the server-rendered assigned row markup above).
+async function prependAssignedRowById(requestId) {
+    const tbody = document.getElementById('assigned-requests-body');
+    if (!tbody || document.getElementById(`assigned-row-${requestId}`)) return;
+    try {
+        const req = await API.get(`/api/waste-requests/${requestId}/`);
+        if (!req || !req.id) return;
+        const emptyRow = tbody.querySelector('tr td[colspan]');
+        if (emptyRow) emptyRow.closest('tr').remove();
+        const userName = escapeHtml(req.user && req.user.username ? req.user.username : (typeof req.user === 'string' ? req.user : 'Guest'));
+        const addr = escapeHtml((req.pickup_address || '').slice(0, 30));
+        const wtype = escapeHtml(req.waste_type_display || req.waste_type || '');
+        const sched = req.scheduled_date
+            ? new Date(req.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+            : '—';
+        const badgeClass = req.status === 'in_progress' ? 'bg-info' : 'bg-primary';
+        const badgeLabel = req.status === 'in_progress' ? gettext('In Progress') : gettext('Assigned');
+        const actionBtn = req.status === 'assigned'
+            ? `<button class="btn btn-outline-info" onclick="updateStatus(${req.id}, 'in_progress', this)">${gettext('Start')}</button>`
+            : (req.status === 'in_progress'
+                ? `<button class="btn btn-outline-success" onclick="updateStatus(${req.id}, 'completed', this)">${gettext('Done')}</button>`
+                : '');
+        tbody.insertAdjacentHTML('afterbegin', `
+            <tr id="assigned-row-${req.id}">
+                <td><input type="checkbox" class="form-check-input row-batch-check" value="${req.id}" data-status="${escapeHtml(req.status || '')}" onclick="refreshBatchBar()"></td>
+                <td>${req.id}</td>
+                <td>${userName}</td>
+                <td class="small">${addr}</td>
+                <td><span class="badge bg-secondary">${wtype}</span></td>
+                <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+                <td class="small text-muted">${escapeHtml(sched)}</td>
+                <td><div class="btn-group btn-group-sm">${actionBtn}</div></td>
+            </tr>`);
+        showToast(interpolate(gettext('New pickup assigned: request #%(v0)s'), { v0: req.id }, true), 'info');
+    } catch (e) {
+        console.debug('Live assignment prepend failed:', e);
+    }
+}
+
+// Server-truth stat sync for the driver cards (assigned / in-progress /
+// completed-today) — converges with the optimistic bumpStat() on own actions.
+async function refreshDriverStats() {
+    const hasCards = document.getElementById('stat-completed-today') || document.getElementById('stat-total-trips');
+    if (!hasCards) return;
+    try {
+        const data = await API.get('/api/waste-requests/mine_counts/');
+        if (!data || typeof data !== 'object') return;
+        const setNum = (id, val) => {
+            const el = document.getElementById(id);
+            if (el && typeof val === 'number') el.textContent = val;
+        };
+        setNum('stat-completed-today', data.completed_today);
+    } catch (e) {
+        console.debug('Driver stat sync failed:', e);
     }
 }
 
@@ -1772,7 +1830,26 @@ if (driverMapEl && !driverMapEl.dataset._bound) {
                 try {
                     const data = JSON.parse(e.data);
                     if (data.type === 'request_update') {
-                        applyAssignedRowUpdate(data.request_id, data.status);
+                        if (data.deleted) {
+                            removeAssignedRow(data.request_id);
+                        } else if (!document.getElementById(`assigned-row-${data.request_id}`)) {
+                            // New assignment from another actor (admin/bulk) —
+                            // fetch the row and prepend it live.
+                            prependAssignedRowById(data.request_id);
+                        } else {
+                            applyAssignedRowUpdate(data.request_id, data.status);
+                        }
+                        if (typeof window.scheduleLiveRefresh === 'function') {
+                            window.scheduleLiveRefresh('driver-stats', refreshDriverStats, 1500);
+                        }
+                    } else if (data.type === 'entity_update') {
+                        // Schedule/route changes affect this board — refresh
+                        // the map now; the schedule list follows on next
+                        // visit (rare, admin-driven change).
+                        if ((data.entity === 'schedule' || data.entity === 'route') && typeof loadMapData === 'function') {
+                            loadMapData();
+                            showToast(gettext('Schedule information updated.'), 'info');
+                        }
                     }
                 } catch (err) {
                     console.error('Error parsing request update:', err);

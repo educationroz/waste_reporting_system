@@ -355,7 +355,7 @@
                                             <i class="bi bi-list-check me-1"></i>{% trans "Timeline" %}
                                         </button>
                                     </td>
-                                    <td class="small">{{ req.driver.user.username|default:"—" }}</td>
+                                    <td class="small" data-field="driver">{{ req.driver.user.username|default:"—" }}</td>
                                     <td>
                                         <div class="d-flex align-items-center gap-1">
                                             {% if req.photo %}
@@ -375,7 +375,7 @@
                                         </div>
                                     </td>
                                     <td class="small text-muted">{{ req.scheduled_date|date:"d M Y, H:i" }}</td>
-                                    <td>
+                                    <td data-field="actions">
                                         <button class="btn btn-sm btn-outline-secondary" onclick="openDetailModal({{ req.id }})" title="{% trans 'View details' %}">
                                             <i class="bi bi-eye"></i>
                                         </button>
@@ -971,7 +971,12 @@
                 try {
                     const data = JSON.parse(e.data);
                     if (data.type === 'request_update') {
-                        applyUserRequestRowUpdate(data.request_id, data.status);
+                        if (data.deleted) {
+                            const gone = document.getElementById(`request-row-${data.request_id}`);
+                            if (gone) gone.remove();
+                        } else {
+                            applyUserRequestRowUpdate(data.request_id, data.status, data);
+                        }
                     }
                 } catch (err) {
                     console.error('Error parsing request update:', err);
@@ -1008,7 +1013,7 @@
         }
     }
 
-    function applyUserRequestRowUpdate(requestId, newStatus) {
+    function applyUserRequestRowUpdate(requestId, newStatus, data) {
         const row = document.getElementById(`request-row-${requestId}`);
         if (!row) return;
 
@@ -1027,6 +1032,30 @@
             statusCell.dataset.status = newStatus;
         }
 
+        // Driver + action cells go stale on assignment — patch from payload.
+        if (data && data.driver_name !== undefined) {
+            const driverCell = row.querySelector('[data-field="driver"]');
+            if (driverCell) driverCell.textContent = data.driver_name || '—';
+            const actionCell = row.querySelector('[data-field="actions"]');
+            if (actionCell) {
+                const viewBtn = `<button class="btn btn-sm btn-outline-secondary" onclick="openDetailModal(${requestId})" title="${gettext('View details')}"><i class="bi bi-eye"></i></button>`;
+                if (newStatus === 'pending') {
+                    actionCell.innerHTML = `${viewBtn} <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${requestId}, this)">${gettext('Cancel')}</button>`;
+                } else if (newStatus === 'completed' || newStatus === 'cancelled') {
+                    actionCell.innerHTML = `${viewBtn} <button class="btn btn-sm btn-outline-danger" onclick="deleteRequest(${requestId}, this)"><i class="bi bi-trash3"></i></button>`;
+                } else {
+                    actionCell.innerHTML = viewBtn;
+                }
+            }
+            const checkbox = row.querySelector('.row-checkbox');
+            if (checkbox) {
+                const deletable = (newStatus === 'pending' || newStatus === 'cancelled' || newStatus === 'completed');
+                checkbox.disabled = !deletable;
+                if (deletable) checkbox.setAttribute('data-deletable', '1');
+                else checkbox.removeAttribute('data-deletable');
+            }
+        }
+
         // Update timeline in detail modal if open
         const detailBody = document.getElementById('detailModalBody');
         if (detailBody) {
@@ -1042,6 +1071,22 @@
 
     // Start the WebSocket connection
     connectRequestWebSocket();
+
+    // Teardown for htmx navigation (single registration): without this the
+    // socket + reconnect timer survived page swaps and stacked duplicates.
+    window.ssRegisterPageTeardown(() => {
+        if (requestReconnectTimer) {
+            clearTimeout(requestReconnectTimer);
+            requestReconnectTimer = null;
+        }
+        if (requestWS) {
+            requestWS.onclose = null;
+            requestWS.onerror = null;
+            try { requestWS.close(1000, 'htmx navigation'); } catch (e) { /* already closing */ }
+            if (window._requestWs === requestWS) window._requestWs = null;
+            requestWS = null;
+        }
+    });
 })();
 </script>
 {% endblock %}

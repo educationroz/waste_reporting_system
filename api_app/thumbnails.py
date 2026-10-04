@@ -34,6 +34,12 @@ THUMBNAIL_SIZES = {}
 
 _locks = {}
 
+# Sources already reported missing (per-process): a dangling DB reference
+# would otherwise log an identical WARNING on every page render that touches
+# it. The audit command `manage.py audit_media` lists them all for cleanup.
+_missing_logged = set()
+_missing_lock = threading.Lock()
+
 
 def _parse_size(size):
     """Parse 'WxH' (e.g. '100x100') into a (width, height) tuple."""
@@ -102,9 +108,30 @@ def get_or_create_thumbnail(file_field, size='100x100'):
             with storage.open(source_name, 'rb') as src:
                 img = Image.open(src)
                 img.load()
-        except Exception as exc:  # noqa: BLE001 - any read/decode failure falls back to the original
+        except Exception as exc:  # noqa: BLE001 - any read/decode failure handled below
+            # Distinguish "file gone" (dangling DB reference — e.g. uploads
+            # lost in an ephemeral container, or a backend switch that
+            # stranded files) from transient read errors. Gone files return ''
+            # so templates render their placeholder instead of a broken image;
+            # transient errors keep the original URL so the next page load
+            # retries generation.
+            try:
+                source_missing = not storage.exists(source_name)
+            except Exception:  # noqa: BLE001 - exists() itself glitched; treat as transient
+                source_missing = False
+            if source_missing:
+                with _missing_lock:
+                    first_sight = source_name not in _missing_logged
+                    _missing_logged.add(source_name)
+                if first_sight:
+                    logger.warning(
+                        '[THUMB] source file missing from storage: %s '
+                        '(dangling reference — run `manage.py audit_media` to list all).',
+                        source_name,
+                    )
+                return ''
             logger.warning('[THUMB] could not open source %s: %s', source_name, exc)
-            return source_name  # fall back to the original on any failure
+            return source_name  # fall back to the original on transient failure
 
         is_alpha = img.mode in ('RGBA', 'LA', 'P')
         out_format = 'PNG' if is_alpha else 'JPEG'

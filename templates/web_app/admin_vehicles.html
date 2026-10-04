@@ -524,6 +524,108 @@ window.addVehicle = async function(btn) {
     }
     });
 };
+
+// ── Entity socket: vehicle CRUD by another admin updates this table live ──
+// Single-purpose connection on the shared requests group; only entity_update
+// events are handled (request rows never render here). Same reconnect-guard
+// and teardown discipline as every other page socket.
+let vehicleEntityWS = null;
+let vehicleEntityTimer = null;
+
+function connectVehicleEntitySocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    try {
+        if (window._requestWs) {
+            try { window._requestWs.close(); } catch (e) {}
+        }
+        const ws = new WebSocket(`${protocol}${location.host}/ws/requests/`);
+        window._requestWs = ws;
+        vehicleEntityWS = ws;
+
+        ws.onopen = () => {
+            if (vehicleEntityTimer) { clearTimeout(vehicleEntityTimer); vehicleEntityTimer = null; }
+        };
+        ws.onmessage = (e) => {
+            try {
+                const data = JSON.parse(e.data);
+                if (data.type !== 'entity_update' || (data.entity !== 'vehicle' && data.entity !== 'driver')) return;
+                if (data.entity === 'vehicle') {
+                    if (data.action === 'delete' && data.object_id) {
+                        const gone = document.getElementById(`vehicle-row-${data.object_id}`);
+                        if (gone) gone.remove();
+                        checkEmptyState();
+                    } else if (data.action === 'update' && data.object_id) {
+                        refreshVehicleRowById(data.object_id);
+                    } else if (data.action === 'create') {
+                        if (typeof window.scheduleLiveRefresh === 'function') {
+                            window.scheduleLiveRefresh('admin-vehicles-list', () => window.ssRefreshContent(), 2000);
+                        }
+                    }
+                } else if (data.entity === 'driver' && typeof window.scheduleLiveRefresh === 'function') {
+                    // Assigned-driver names render here — refresh on change.
+                    window.scheduleLiveRefresh('admin-vehicles-list', () => window.ssRefreshContent(), 2500);
+                }
+            } catch (err) {
+                console.error('Error parsing entity update:', err);
+            }
+        };
+        ws.onclose = (e) => {
+            if (!!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010)) {
+                console.debug('Vehicle entity socket closed (server refused, not reconnecting):', e);
+                return;
+            }
+            if (vehicleEntityTimer) return;
+            vehicleEntityTimer = setTimeout(() => {
+                vehicleEntityTimer = null;
+                if (document.getElementById('vehicles-tbody')) connectVehicleEntitySocket();
+            }, 4000);
+        };
+        ws.onerror = (e) => { console.debug('Vehicle entity socket error:', e); };
+    } catch (e) {
+        console.warn('Vehicle entity socket setup error:', e);
+    }
+}
+
+async function refreshVehicleRowById(vehicleId) {
+    const row = document.getElementById(`vehicle-row-${vehicleId}`);
+    if (!row || typeof API === 'undefined') return;
+    try {
+        const v = await API.get(`/api/vehicles/${vehicleId}/`);
+        if (!v || !v.id) return;
+        const set = (field, text) => {
+            const el = row.querySelector(`[data-field="${field}"]`);
+            if (el) el.textContent = text;
+        };
+        set('plate_number', v.plate_number || '');
+        set('vehicle_type', v.vehicle_type || '');
+        set('capacity_kg', v.capacity_kg != null ? v.capacity_kg : '');
+        const statusCell = row.querySelector('[data-field="status-cell"]');
+        if (statusCell && v.status) {
+            const map = {
+                available: 'bg-success-subtle text-success border-success-subtle',
+                on_route: 'bg-primary-subtle text-primary border-primary-subtle',
+                maintenance: 'bg-warning-subtle text-warning border-warning-subtle',
+            };
+            const cls = map[v.status] || 'bg-secondary-subtle text-secondary border-secondary-subtle';
+            statusCell.innerHTML = `<span class="badge px-2.5 py-1.5 rounded-pill border ${cls}"><i class="bi bi-circle-fill me-1" style="font-size: 0.5rem; vertical-align: middle;"></i>${escapeHtml(v.status_display || v.status)}</span>`;
+        }
+    } catch (e) {
+        console.debug('Vehicle row refresh failed:', e);
+    }
+}
+
+connectVehicleEntitySocket();
+
+window.ssRegisterPageTeardown(() => {
+    if (vehicleEntityTimer) { clearTimeout(vehicleEntityTimer); vehicleEntityTimer = null; }
+    if (vehicleEntityWS) {
+        vehicleEntityWS.onclose = null;
+        vehicleEntityWS.onerror = null;
+        try { vehicleEntityWS.close(1000, 'htmx navigation'); } catch (e) {}
+        if (window._requestWs === vehicleEntityWS) window._requestWs = null;
+        vehicleEntityWS = null;
+    }
+});
 })();
 </script>
 {% endblock %}

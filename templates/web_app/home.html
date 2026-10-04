@@ -690,6 +690,13 @@ window.ssRegisterPageTeardown(function () {
         clearInterval(window._driverLocationRefreshTimer);
         window._driverLocationRefreshTimer = null;
     }
+    // Sockets + reconnect timers are block-scoped inside the authenticated
+    // try{} below — delegate to the teardown registered alongside, which
+    // closes sockets AND cancels pending reconnect timers (a timer left
+    // armed would reconnect on the wrong page after navigation).
+    try {
+        if (typeof window._homeTeardownSockets === 'function') window._homeTeardownSockets();
+    } catch (e) { /* sockets never connected */ }
     marker = null;
     checkpointMarkersLayer = null;
     driverMarkersLayer = null;
@@ -1528,6 +1535,25 @@ function bumpStat(elId, delta) {
     el.textContent = Math.max(0, current + delta);
 }
 
+// Server-truth stat sync: pending/completed cards re-read from
+// /api/waste-requests/mine_counts/ after any WS change (debounced by the
+// caller). Converges with the optimistic bumpStat() above — no reload, no
+// drift when another actor (driver/admin) changes our rows.
+async function refreshHomeStats() {
+    if (!IS_AUTHENTICATED) return;
+    if (!document.getElementById('stat-pending-count') && !document.getElementById('stat-completed-count')) return;
+    try {
+        const data = await API.get('/api/waste-requests/mine_counts/');
+        if (!data || typeof data !== 'object') return;
+        const pendingEl = document.getElementById('stat-pending-count');
+        const completedEl = document.getElementById('stat-completed-count');
+        if (pendingEl && typeof data.pending === 'number') pendingEl.textContent = data.pending;
+        if (completedEl && typeof data.completed === 'number') completedEl.textContent = data.completed;
+    } catch (e) {
+        console.debug('Home stat sync failed:', e);
+    }
+}
+
 const HOME_STATUS_BADGE_CLASS = {
     completed: 'bg-success',
     pending: 'bg-warning text-dark',
@@ -2155,8 +2181,36 @@ try {
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (data.type === 'request_update') {
-                showToast(interpolate(gettext('Request #%(v0)s updated to: %(v1)s'), {v0: data.request_id, v1: data.status}, true), 'info');
-                applyHomeRequestRowUpdate(data.request_id, data.status);
+                if (data.deleted) {
+                    const gone = document.getElementById(`home-request-row-${data.request_id}`);
+                    if (gone) gone.remove();
+                } else {
+                    showToast(interpolate(gettext('Request #%(v0)s updated to: %(v1)s'), {v0: data.request_id, v1: data.status}, true), 'info');
+                    applyHomeRequestRowUpdate(data.request_id, data.status);
+                }
+                // Any status/assignment change can move counts — re-sync the
+                // stat cards from the server (debounced, converges instantly
+                // with the optimistic bumpStat on own actions).
+                if (typeof window.scheduleLiveRefresh === 'function') {
+                    window.scheduleLiveRefresh('home-stats', refreshHomeStats, 1500);
+                    // Schedules/routes/drivers all feed the pickup-schedule
+                    // card — re-render it live too (keeps the weeks selector).
+                    window.scheduleLiveRefresh('pickup-schedule', () => {
+                        if (typeof loadPickupSchedule === 'function') loadPickupSchedule();
+                    }, 2000);
+                }
+            } else if (data.type === 'entity_update') {
+                // Checkpoints redraw markers; schedule/route/driver changes
+                // re-render the pickup-schedule card live.
+                if (data.entity === 'checkpoint' && typeof loadCheckpoints === 'function') {
+                    loadCheckpoints();
+                }
+                if ((data.entity === 'schedule' || data.entity === 'route' || data.entity === 'driver')
+                        && typeof window.scheduleLiveRefresh === 'function') {
+                    window.scheduleLiveRefresh('pickup-schedule', () => {
+                        if (typeof loadPickupSchedule === 'function') loadPickupSchedule();
+                    }, 2000);
+                }
             }
         };
         ws.onopen = () => {
@@ -2263,6 +2317,25 @@ try {
     }
     window._homeRequestWS = () => requestWS;
     window._homeDriverWS = () => driverWS;
+    // Full socket teardown for the page-level ssRegisterPageTeardown above
+    // (timers + sockets are block-scoped here, invisible outside this try).
+    window._homeTeardownSockets = () => {
+        if (requestReconnectTimer) { clearTimeout(requestReconnectTimer); requestReconnectTimer = null; }
+        if (driverReconnectTimer) { clearTimeout(driverReconnectTimer); driverReconnectTimer = null; }
+        if (requestWS) {
+            requestWS.onclose = null;
+            requestWS.onerror = null;
+            try { requestWS.close(1000, 'htmx navigation'); } catch (e) {}
+            if (window._requestWs === requestWS) window._requestWs = null;
+            requestWS = null;
+        }
+        if (driverWS) {
+            driverWS.onclose = null;
+            driverWS.onerror = null;
+            try { driverWS.close(1000, 'htmx navigation'); } catch (e) {}
+            driverWS = null;
+        }
+    };
 } catch (e) {
     console.error('Failed to initialize home WebSockets:', e);
     showToast(gettext('Live updates unavailable.'), 'warning');

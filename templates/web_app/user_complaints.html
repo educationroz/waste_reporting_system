@@ -143,7 +143,7 @@
                     showToast(interpolate(gettext('Complaint #%(v0)s was removed'), {v0: data.complaint_id}, true), 'info');
                 } else {
                     showToast(interpolate(gettext('Complaint #%(v0)s updated to: %(v1)s'), {v0: data.complaint_id, v1: data.status}, true), 'info');
-                    applyUserComplaintRowUpdate(data.complaint_id, data.status);
+                    applyUserComplaintRowUpdate(data.complaint_id, data.status, data.admin_response);
                 }
             }
         };
@@ -173,7 +173,7 @@
         'completed': gettext('Completed'),
     };
 
-    function applyUserComplaintRowUpdate(complaintId, newStatus) {
+    function applyUserComplaintRowUpdate(complaintId, newStatus, adminResponse) {
         const row = document.getElementById(`complaint-row-${complaintId}`);
         if (!row) return;
 
@@ -184,6 +184,11 @@
                 badge.className = `badge ${STATUS_CLASSES[newStatus] || 'bg-secondary'}`;
                 badge.textContent = STATUS_LABELS[newStatus] || newStatus;
             }
+        }
+        // Admin responses arrive on the same event now — patch live.
+        if (adminResponse !== undefined && adminResponse !== null) {
+            const respCell = row.querySelector('[data-field="admin_response"]');
+            if (respCell) respCell.textContent = adminResponse || '—';
         }
     }
 

@@ -727,6 +727,185 @@
             form.submit();
         }, 600);
     });
+
+    // ── Live audit feed: prepend new entries without reload ─────────────
+    // Any WS event (request/complaint/entity/notif) implies a possible new
+    // AdminLog row, so refresh event-driven; a 30 s poll covers actions from
+    // actors whose events this socket didn't see. Prepends only on the
+    // unfiltered first page — with filters or ?page=N active the list stays
+    // untouched to avoid mixing contexts.
+    const LOG_FILTERS_ACTIVE = '{{ current_action|default:""|escapejs }}' !== ''
+        || '{{ current_operator|default:""|escapejs }}' !== ''
+        || new URLSearchParams(window.location.search).has('page');
+    let logFeedWS = null;
+    let logFeedTimer = null;
+    let logPoller = null;
+
+    function maxLogRowId() {
+        let max = 0;
+        document.querySelectorAll('tr[id^="log-row-"]').forEach((tr) => {
+            const id = parseInt(tr.id.replace('log-row-', ''), 10);
+            if (Number.isFinite(id) && id > max) max = id;
+        });
+        return max;
+    }
+
+    function actionBadge(action, label) {
+        const map = {
+            create: ['bg-success bg-opacity-10 text-success', 'bi-plus-circle'],
+            update: ['bg-info bg-opacity-10 text-info', 'bi-pencil-square'],
+            delete: ['bg-danger bg-opacity-10 text-danger', 'bi-trash'],
+            status_change: ['bg-warning bg-opacity-10 text-warning-emphasis', 'bi-arrow-repeat'],
+        };
+        const [cls, icon] = map[action] || ['bg-secondary bg-opacity-10 text-secondary', 'bi-dot'];
+        return `<span class="badge ${cls} px-2 py-1"><i class="bi ${icon} me-1"></i>${escapeHtml(label || action)}</span>`;
+    }
+
+    function logRowHtml(entry) {
+        const user = entry.admin_user && entry.admin_user.username
+            ? `<span class="badge bg-primary bg-opacity-10 text-primary px-2 py-1 fw-semibold">${escapeHtml(entry.admin_user.username)}</span>`
+            : '<span class="badge bg-dark bg-opacity-10 text-dark px-2 py-1 fw-semibold">SYSTEM CRON</span>';
+        const when = entry.created_at
+            ? new Date(entry.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : '—';
+        return `<tr class="log-row" id="log-row-${entry.id}">
+            <td class="text-center" onclick="event.stopPropagation()">
+                <input type="checkbox" class="form-check-input log-select" value="${entry.id}" onchange="updateLogSelectionUI()">
+            </td>
+            <td onclick="openLiveLogModal(${entry.id})">
+                <span class="text-muted small fw-semibold"><i class="bi bi-clock me-1 text-secondary"></i>${escapeHtml(when)}</span>
+            </td>
+            <td onclick="openLiveLogModal(${entry.id})">${user}</td>
+            <td onclick="openLiveLogModal(${entry.id})">${actionBadge(entry.action, entry.action_display)}</td>
+            <td onclick="openLiveLogModal(${entry.id})"><code class="text-secondary small">${escapeHtml(entry.content_type || '')}</code></td>
+            <td onclick="openLiveLogModal(${entry.id})"><span class="fw-medium">${escapeHtml((entry.object_description || '').split(' ').slice(0, 5).join(' '))}</span></td>
+            <td onclick="openLiveLogModal(${entry.id})">${entry.ip_address ? `<code class="text-info font-monospace" style="font-size: 0.8rem;">${escapeHtml(entry.ip_address)}</code>` : '<span class="text-muted small">—</span>'}</td>
+            <td class="text-end pe-3" onclick="event.stopPropagation()">
+                <div class="log-action-btns">
+                    <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="openLiveLogModal(${entry.id})" style="font-size: 0.8rem;"><i class="bi bi-eye"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2" onclick="deleteSingleLog(event, ${entry.id})" style="font-size: 0.8rem;"><i class="bi bi-trash"></i></button>
+                </div>
+            </td>
+        </tr>`;
+    }
+
+    // Detail viewer for live-prepended rows (server rows ship their own
+    // modals; live rows fetch detail on demand into one shared modal).
+    window.openLiveLogModal = async function(logId) {
+        try {
+            const data = await API.get(`/api/admin-logs/${logId}/`);
+            if (!data || !data.id) return;
+            let modalEl = document.getElementById('liveLogDetailModal');
+            if (!modalEl) {
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal fade" id="liveLogDetailModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow">
+                            <div class="modal-header"><h6 class="modal-title fw-bold" id="liveLogTitle"></h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                            <div class="modal-body small" id="liveLogBody"></div>
+                        </div></div>
+                    </div>`);
+                modalEl = document.getElementById('liveLogDetailModal');
+            }
+            document.getElementById('liveLogTitle').textContent = `Log #${data.id} — ${data.action_display || data.action}`;
+            const rows = [
+                ['Operator', data.admin_user && data.admin_user.username ? data.admin_user.username : 'SYSTEM'],
+                ['Action', data.action_display || data.action],
+                ['Target', `${data.content_type || ''} ${data.object_id || ''}`.trim()],
+                ['Detail', data.object_description || '—'],
+                ['IP', data.ip_address || '—'],
+                ['At', data.created_at ? new Date(data.created_at).toLocaleString() : '—'],
+            ];
+            document.getElementById('liveLogBody').innerHTML = rows.map(([k, v]) =>
+                `<div class="d-flex gap-2 py-1 border-bottom"><span class="text-muted" style="min-width:70px;">${escapeHtml(k)}</span><span>${escapeHtml(String(v))}</span></div>`
+            ).join('');
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        } catch (e) {
+            console.debug('Live log detail failed:', e);
+        }
+    };
+
+    async function fetchRecentLogs() {
+        const tbody = document.getElementById('logs-table-body');
+        if (!tbody || LOG_FILTERS_ACTIVE) return;
+        try {
+            const data = await API.get(`/api/admin-logs/recent/?since_id=${maxLogRowId()}&limit=20`);
+            if (!Array.isArray(data) || !data.length) return;
+            const emptyRow = tbody.querySelector('tr td[colspan]');
+            if (emptyRow) emptyRow.closest('tr').remove();
+            // Newest-first payload -> insert so the newest ends up on top.
+            [...data].reverse().forEach((entry) => {
+                if (!document.getElementById(`log-row-${entry.id}`)) {
+                    tbody.insertAdjacentHTML('afterbegin', logRowHtml(entry));
+                }
+            });
+            // Keep page size bounded like the server (50 per page).
+            const rows = tbody.querySelectorAll('tr[id^="log-row-"]');
+            if (rows.length > 50) {
+                for (let i = 50; i < rows.length; i++) rows[i].remove();
+            }
+            const totalEl = document.querySelector('.metric-card .display-6');
+            if (totalEl) {
+                const n = parseInt(totalEl.textContent, 10);
+                if (Number.isFinite(n)) totalEl.textContent = n + data.length;
+            }
+        } catch (e) {
+            console.debug('Recent logs fetch failed:', e);
+        }
+    }
+
+    function connectLogFeedSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        try {
+            if (window._requestWs) {
+                try { window._requestWs.close(); } catch (e) {}
+            }
+            const ws = new WebSocket(`${protocol}${location.host}/ws/requests/`);
+            window._requestWs = ws;
+            logFeedWS = ws;
+            ws.onopen = () => {
+                if (logFeedTimer) { clearTimeout(logFeedTimer); logFeedTimer = null; }
+            };
+            ws.onmessage = () => {
+                // Any mutation event may have written an AdminLog row.
+                if (typeof window.scheduleLiveRefresh === 'function') {
+                    window.scheduleLiveRefresh('admin-logs-feed', fetchRecentLogs, 1200);
+                }
+            };
+            ws.onclose = (e) => {
+                if (!!e && (e.code === 4001 || e.code === 4003 || e.code === 4008 || e.code === 4009 || e.code === 4010)) {
+                    console.debug('Log feed socket closed (server refused, not reconnecting):', e);
+                    return;
+                }
+                if (logFeedTimer) return;
+                logFeedTimer = setTimeout(() => {
+                    logFeedTimer = null;
+                    if (document.getElementById('logs-table-body')) connectLogFeedSocket();
+                }, 8000);
+            };
+            ws.onerror = (e) => { console.debug('Log feed socket error:', e); };
+        } catch (e) {
+            console.warn('Log feed socket setup error:', e);
+        }
+    }
+
+    connectLogFeedSocket();
+    // Backstop poll for actions whose events this socket missed (30 s).
+    logPoller = setInterval(() => {
+        if (document.getElementById('logs-table-body')) fetchRecentLogs();
+    }, 30000);
+
+    window.ssRegisterPageTeardown(() => {
+        if (logFeedTimer) { clearTimeout(logFeedTimer); logFeedTimer = null; }
+        if (logPoller) { clearInterval(logPoller); logPoller = null; }
+        if (logFeedWS) {
+            logFeedWS.onclose = null;
+            logFeedWS.onerror = null;
+            try { logFeedWS.close(1000, 'htmx navigation'); } catch (e) {}
+            if (window._requestWs === logFeedWS) window._requestWs = null;
+            logFeedWS = null;
+        }
+    });
 })();
 </script>
 {% endblock %}

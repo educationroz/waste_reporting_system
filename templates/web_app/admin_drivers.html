@@ -1086,6 +1086,24 @@
 
             ws.onmessage = (e) => {
                 const data = JSON.parse(e.data);
+                if (data.type === 'entity_update') {
+                    // Driver/vehicle CRUD by another admin — patch the row
+                    // live (delete removes, create re-renders the list which
+                    // keeps the current URL filters).
+                    if (data.entity === 'driver' || data.entity === 'vehicle') {
+                        if (data.action === 'delete' && data.object_id) {
+                            const gone = document.getElementById(`driver-row-${data.object_id}`);
+                            if (gone) gone.remove();
+                        } else if (data.action === 'update' && data.object_id && data.entity === 'driver') {
+                            refreshDriverRowById(data.object_id);
+                        } else if (data.action === 'create') {
+                            if (typeof window.scheduleLiveRefresh === 'function') {
+                                window.scheduleLiveRefresh('admin-drivers-list', () => window.ssRefreshContent(), 2000);
+                            }
+                        }
+                    }
+                    return;
+                }
                 if (data.type !== 'driver_location') return;
 
                 const driverId = data.driver_id;
@@ -1108,6 +1126,35 @@
             // decide whether to reconnect so we don't schedule two timers.
             ws.onerror = (e) => console.debug('Driver location WebSocket error:', e);
             ws.onclose = (e) => notifyDriverSocketIssue('Driver location WebSocket closed:', e);
+        }
+
+        // Cross-admin live patch: re-fetch one driver row and update the
+        // availability / vehicle / trips cells (columns 4/5/6) in place.
+        async function refreshDriverRowById(driverId) {
+            const row = document.getElementById(`driver-row-${driverId}`);
+            if (!row) return;
+            try {
+                const d = await API.get(`/api/drivers/${driverId}/`);
+                if (!d || !d.id) return;
+                const cells = row.children;
+                const veh = d.vehicle_detail || d.vehicle;
+                const plate = veh && typeof veh === 'object' ? veh.plate_number : null;
+                if (cells[4]) {
+                    cells[4].innerHTML = plate
+                        ? `<div class="fw-semibold"><i class="bi bi-truck me-1 text-success"></i>${escapeHtml(plate)}</div>`
+                        : '<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>No Asset Linked</span>';
+                }
+                if (cells[5]) {
+                    cells[5].innerHTML = d.is_available
+                        ? '<span class="badge bg-success bg-opacity-10 text-success px-3 rounded-pill">Available</span>'
+                        : '<span class="badge bg-secondary bg-opacity-10 text-secondary px-3 rounded-pill">Busy</span>';
+                }
+                if (cells[6] && typeof d.total_trips === 'number') {
+                    cells[6].textContent = d.total_trips;
+                }
+            } catch (e) {
+                console.debug('Driver row refresh failed:', e);
+            }
         }
 
         function updateDriverLocationInTable(driverId, lat, lng, data) {

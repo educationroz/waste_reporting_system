@@ -237,7 +237,7 @@
                     <div class="card metric-card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-requests' %}'">
                         <div class="card-body p-4">
                             <div class="text-success fw-semibold small mb-1">{% trans "Total Requests" %}</div>
-                            <div class="display-6 fw-bold text-success">{{ total_requests }}</div>
+                            <div class="display-6 fw-bold text-success" id="kpi-total-requests">{{ total_requests }}</div>
                         </div>
                     </div>
                 </div>
@@ -245,7 +245,7 @@
                     <div class="card metric-card border-0 bg-warning bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-requests' %}?status=pending'">
                         <div class="card-body p-4">
                             <div class="text-warning fw-semibold small mb-1">{% trans "Pending Sync" %}</div>
-                            <div class="display-6 fw-bold text-warning">{{ pending_requests }}</div>
+                            <div class="display-6 fw-bold text-warning" id="kpi-pending-requests">{{ pending_requests }}</div>
                         </div>
                     </div>
                 </div>
@@ -262,7 +262,7 @@
                     <div class="card metric-card border-0 bg-info bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-requests' %}?status=assigned'">
                         <div class="card-body p-4">
                             <div class="text-info fw-semibold small mb-1">{% trans "Assigned Tasks" %}</div>
-                            <div class="display-6 fw-bold text-info">{{ assigned_requests_count }}</div>
+                            <div class="display-6 fw-bold text-info" id="kpi-assigned-requests">{{ assigned_requests_count }}</div>
                         </div>
                     </div>
                 </div>
@@ -274,7 +274,7 @@
                     <div class="card metric-card border-0 bg-primary bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-requests' %}?status=in_progress'">
                         <div class="card-body p-4">
                             <div class="text-primary fw-semibold small mb-1">{% trans "In Progress" %}</div>
-                            <div class="display-6 fw-bold text-primary">{{ in_progress_requests_count }}</div>
+                            <div class="display-6 fw-bold text-primary" id="kpi-in-progress-requests">{{ in_progress_requests_count }}</div>
                         </div>
                     </div>
                 </div>
@@ -282,7 +282,7 @@
                     <div class="card metric-card border-0 bg-success bg-opacity-10 h-100 cursor-pointer" onclick="window.ssNavigate('{% url 'admin-requests' %}?status=completed'">
                         <div class="card-body p-4">
                             <div class="text-success fw-semibold small mb-1">{% trans "Completed Jobs" %}</div>
-                            <div class="display-6 fw-bold text-success">{{ completed_requests_count }}</div>
+                            <div class="display-6 fw-bold text-success" id="kpi-completed-requests">{{ completed_requests_count }}</div>
                         </div>
                     </div>
                 </div>
@@ -970,11 +970,35 @@
                 try {
                     const data = JSON.parse(e.data);
                     if (data.type === 'request_update') {
-                        // Update the request table row if it exists
-                        applyAdminRequestRowUpdate(data);
+                        if (data.deleted) {
+                            const gone = document.getElementById(`admin-request-row-${data.request_id}`);
+                            if (gone) gone.remove();
+                        } else if (!document.getElementById(`admin-request-row-${data.request_id}`)) {
+                            // Brand-new report from another actor — prepend live.
+                            prependAdminRequestRowById(data.request_id);
+                        } else {
+                            // Update the request table row if it exists
+                            applyAdminRequestRowUpdate(data);
+                        }
                         // Any status/assignment change can move rows in or out
                         // of the overdue timeline — refresh it (debounced).
                         scheduleOverdueRefresh();
+                        // KPI cards re-read server truth (debounced).
+                        if (typeof window.scheduleLiveRefresh === 'function') {
+                            window.scheduleLiveRefresh('admin-kpis', () => {
+                                refreshAdminKpis();
+                                refreshDashboardCharts();
+                            }, 1500);
+                        }
+                    } else if (data.type === 'entity_update') {
+                        // Fleet/schedule/route/checkpoint changes move KPIs —
+                        // refresh numbers only (no swap, no scroll loss).
+                        if (typeof window.scheduleLiveRefresh === 'function') {
+                            window.scheduleLiveRefresh('admin-kpis', () => {
+                                refreshAdminKpis();
+                                refreshDashboardCharts();
+                            }, 1500);
+                        }
                     }
                 } catch (err) {
                     console.error('Error parsing request update:', err);
@@ -1267,6 +1291,76 @@
         }
     }
 
+    // ── Live KPI sync (no reload, no scroll loss) ─────────────────────────
+    // Server-truth numbers from /api/waste-requests/stats/ (same grace-based
+    // overdue rule as the cards). Called debounced on every WS event. Uses
+    // element ids (language-proof — labels are translated).
+    const ADMIN_KPI_MAP = {
+        'kpi-total-requests': 'total_requests',
+        'kpi-pending-requests': 'pending',
+        'overdue-count-number': 'overdue',
+        'kpi-assigned-requests': 'assigned',
+        'kpi-in-progress-requests': 'in_progress',
+        'kpi-completed-requests': 'completed',
+    };
+    async function refreshAdminKpis() {
+        try {
+            const data = await API.get('/api/waste-requests/stats/');
+            if (!data || typeof data !== 'object') return;
+            for (const [elId, key] of Object.entries(ADMIN_KPI_MAP)) {
+                const el = document.getElementById(elId);
+                if (el && typeof data[key] === 'number') el.textContent = data[key];
+            }
+        } catch (e) {
+            console.debug('Admin KPI sync failed:', e);
+        }
+    }
+
+    // Brand-new report from another actor — prepend to the recent table live.
+    async function prependAdminRequestRowById(requestId) {
+        if (document.getElementById(`admin-request-row-${requestId}`)) return;
+        try {
+            const req = await API.get(`/api/waste-requests/${requestId}/`);
+            if (!req || !req.id) return;
+            const tbody = document.querySelector('#requests-table tbody') || document.querySelector('.dashboard-card table tbody');
+            if (!tbody) return;
+            const emptyRow = tbody.querySelector('tr td[colspan]');
+            if (emptyRow) emptyRow.closest('tr').remove();
+            const client = req.user && req.user.username ? escapeHtml(req.user.username)
+                : '<span class="badge bg-secondary bg-opacity-10 text-secondary border"><i class="bi bi-person-x me-1"></i>Guest</span>';
+            const wtype = escapeHtml(req.waste_type_display || req.waste_type || '');
+            const statusClass = { pending: 'bg-warning text-dark', completed: 'bg-success', in_progress: 'bg-info', cancelled: 'bg-danger' }[req.status] || 'bg-primary';
+            const statusLabel = escapeHtml(req.status_display || req.status || '');
+            const driver = (req.driver && req.driver.user)
+                ? `<span><i class="bi bi-person me-1"></i>${escapeHtml(req.driver.user.username)}</span>`
+                : '<span class="text-muted italic small"><i class="bi bi-patch-question me-1"></i>Unassigned</span>';
+            const dateStr = req.scheduled_date
+                ? new Date(req.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+            const action = req.status === 'pending'
+                ? `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(${req.id}, this)">${gettext('Cancel')}</button>`
+                : ['completed', 'cancelled', 'assigned', 'in_progress'].includes(req.status)
+                    ? `<button class="btn btn-sm btn-outline-secondary" onclick="deleteRequest(${req.id}, this)"><i class="bi bi-trash3"></i> ${gettext('Delete')}</button>`
+                    : '—';
+            tbody.insertAdjacentHTML('afterbegin', `
+                <tr id="admin-request-row-${req.id}" data-status="${escapeHtml(req.status || '')}">
+                    <td class="fw-bold text-secondary">#${req.id}</td>
+                    <td>${client}</td>
+                    <td><span class="badge bg-secondary bg-opacity-10 text-secondary border px-2.5 py-1">${wtype}</span></td>
+                    <td><span class="text-muted small">—</span></td>
+                    <td><span class="badge px-2 py-1 ${statusClass}">${statusLabel}</span></td>
+                    <td>${driver}</td>
+                    <td class="small text-muted">${escapeHtml(dateStr)}</td>
+                    <td>${action}</td>
+                </tr>`);
+            // Keep the recent table bounded like the server (10 rows).
+            while (tbody.querySelectorAll('tr[id^="admin-request-row-"]').length > 10) {
+                tbody.querySelectorAll('tr[id^="admin-request-row-"]')[tbody.querySelectorAll('tr[id^="admin-request-row-"]').length - 1].remove();
+            }
+        } catch (e) {
+            console.debug('Admin row prepend failed:', e);
+        }
+    }
+
     // ── Overdue timeline: live refresh without reload ─────────────────────
     let _overdueRefreshTimer = null;
     let _overduePoller = null;
@@ -1526,6 +1620,32 @@
             } catch (e) {
                 console.error('Failed to render requests-by-zone chart:', e);
             }
+        }
+    }
+
+    // Live chart patch: same datasets as renderDashboardCharts(), but updates
+    // the existing Chart.js instances in place (labels + data + update()).
+    // No destroy/recreate => no flicker, no animation restart, theme kept.
+    async function refreshDashboardCharts() {
+        if (typeof Chart === 'undefined') return;
+        if (!chartInstances['overTime'] && !chartInstances['byType'] && !chartInstances['byZone']) return;
+        try {
+            const data = await API.get('/api/waste-requests/chart_data/');
+            if (!data || typeof data !== 'object') return;
+            const patch = (key, payload) => {
+                const chart = chartInstances[key];
+                if (!chart || !payload || !Array.isArray(payload.labels) || !Array.isArray(payload.data)) return;
+                chart.data.labels = payload.labels;
+                if (chart.data.datasets && chart.data.datasets[0]) {
+                    chart.data.datasets[0].data = payload.data;
+                }
+                chart.update();
+            };
+            patch('overTime', data.over_time);
+            patch('byType', data.by_type);
+            patch('byZone', data.by_zone);
+        } catch (e) {
+            console.debug('Dashboard chart sync failed:', e);
         }
     }
 

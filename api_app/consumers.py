@@ -137,6 +137,22 @@ class WasteRequestConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
             return event.get('driver_user_id') == self.user.id
         return event.get('owner_user_id') == self.user.id
 
+    def _may_receive_entity(self, event):
+        """Audience gate for generic entity events (see _push_ws_entity_event).
+
+        'admin' → admins only; 'driver' → admins + drivers (schedules, routes);
+        'all' → every role (checkpoints feed public maps). Unknown → deny.
+        """
+        role = getattr(self.user, 'role', None)
+        audience = event.get('audience', 'admin')
+        if role == 'admin':
+            return True
+        if audience == 'all':
+            return True
+        if audience == 'driver':
+            return role == 'driver'
+        return False
+
     async def broadcast_request_update(self, event):
         """Called when group_send fires 'broadcast_request_update'."""
         if not self._may_receive_update(event):
@@ -151,7 +167,25 @@ class WasteRequestConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
             'zone': event.get('zone', ''),
             'driver_name': event.get('driver_name', ''),
             'updated_by': event['updated_by'],
+            'deleted': bool(event.get('deleted', False)),
         }))
+
+    async def broadcast_entity_update(self, event):
+        """Called when group_send fires 'broadcast_entity_update'."""
+        if not self._may_receive_entity(event):
+            return
+        payload = {
+            'type': 'entity_update',
+            'entity': event.get('entity', ''),
+            'action': event.get('action', ''),
+            'audience': event.get('audience', 'admin'),
+        }
+        if event.get('object_id') is not None:
+            payload['object_id'] = event['object_id']
+        for key in ('driver_id', 'zone', 'status'):
+            if event.get(key) is not None:
+                payload[key] = event[key]
+        await self.send(json.dumps(payload))
 
 
 class DriverLocationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
@@ -247,6 +281,40 @@ class DriverLocationConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
                     'is_available': driver_info.get('is_available', True),
                 }
             )
+
+    def _may_receive_entity(self, event):
+        """Same audience gate as WasteRequestConsumer (see _push_ws_entity_event).
+
+        Duplicated per consumer because Channels dispatches group events to
+        the consumer class the socket connected with — fleet pages only hold
+        a driver-locations socket, so this class must gate entity events too.
+        """
+        role = getattr(self.user, 'role', None)
+        audience = event.get('audience', 'admin')
+        if role == 'admin':
+            return True
+        if audience == 'all':
+            return True
+        if audience == 'driver':
+            return role == 'driver'
+        return False
+
+    async def broadcast_entity_update(self, event):
+        """Called when group_send fires 'broadcast_entity_update'."""
+        if not self._may_receive_entity(event):
+            return
+        payload = {
+            'type': 'entity_update',
+            'entity': event.get('entity', ''),
+            'action': event.get('action', ''),
+            'audience': event.get('audience', 'admin'),
+        }
+        if event.get('object_id') is not None:
+            payload['object_id'] = event['object_id']
+        for key in ('driver_id', 'zone', 'status'):
+            if event.get(key) is not None:
+                payload[key] = event[key]
+        await self.send(json.dumps(payload))
 
     async def driver_location_update(self, event):
         # Admins watch the whole fleet; a driver may only see their own position.
@@ -396,5 +464,6 @@ class ComplaintConsumer(ConnectionLimitMixin, AsyncWebsocketConsumer):
             'complaint_id': event['complaint_id'],
             'status': event.get('status'),
             'status_display': event.get('status_display'),
+            'admin_response': event.get('admin_response', ''),
             'deleted': bool(event.get('deleted', False)),
         }))
