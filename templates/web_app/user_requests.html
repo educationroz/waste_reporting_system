@@ -899,9 +899,24 @@
                 allowed stored XSS.
                 {% endcomment %}
                 {{ located_requests_json|json_script:"located-requests-data" }}
-                const located = JSON.parse(
-                    document.getElementById('located-requests-data').textContent
-                );
+                // Defensive parse: after htmx boosted navigations there can be
+                // two #located-requests-data nodes alive mid-swap (old + new),
+                // and getElementById may return the stale/detached one whose
+                // content is HTML, not JSON ("Unexpected token '<'"). Take the
+                // last node in document order and only parse JSON-looking text.
+                let located = [];
+                try {
+                    const dataNodes = document.querySelectorAll('#located-requests-data');
+                    const dataNode = dataNodes.length ? dataNodes[dataNodes.length - 1] : null;
+                    const rawJson = dataNode ? dataNode.textContent.trim() : '';
+                    if (rawJson && (rawJson[0] === '[' || rawJson[0] === '{')) {
+                        const parsed = JSON.parse(rawJson);
+                        located = Array.isArray(parsed) ? parsed : [];
+                    }
+                } catch (parseErr) {
+                    console.warn('Located-requests map data unreadable, showing base map:', parseErr);
+                    located = [];
+                }
                 const bounds = [];
                 located.forEach(function(r) {
                     const lat = parseFloat(r.latitude), lng = parseFloat(r.longitude);

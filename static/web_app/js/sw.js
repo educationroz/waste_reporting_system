@@ -2,7 +2,7 @@
 // the activate handler when their name differs, so shipping the authenticated
 // API-cache removal under the previous name would have left every previously
 // cached /api/ response sitting on the user's disk indefinitely.
-const CACHE_NAME = 'waste-management-v4';
+const CACHE_NAME = 'waste-management-v5';
 
 // Dev passthrough: when the page registers this worker as /sw.js?debug=1
 // (base.html does that while DEBUG=True via runserver), the worker never
@@ -132,27 +132,177 @@ self.addEventListener('sync', (event) => {
     }
 });
 
+// ── IndexedDB helpers (mirrors base.html OfflineQueue v2) ────────────────
+// The queue lives in IndexedDB ('safhasahar-offline' / 'requests') precisely
+// so BOTH pages and this worker can see it. localStorage is invisible here.
+const OFFLINE_DB = 'safhasahar-offline';
+const OFFLINE_STORE = 'requests';
+
+function swIdbAll() {
+    return new Promise((resolve, reject) => {
+        if (!('indexedDB' in self)) {
+            reject(new Error('IndexedDB not supported in SW'));
+            return;
+        }
+        let req;
+        try {
+            req = self.indexedDB.open(OFFLINE_DB, 1);
+        } catch (e) {
+            reject(e);
+            return;
+        }
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(OFFLINE_STORE)) {
+                db.createObjectStore(OFFLINE_STORE, { keyPath: 'id' });
+            }
+        };
+        req.onsuccess = () => {
+            const db = req.result;
+            let tx;
+            try {
+                tx = db.transaction(OFFLINE_STORE, 'readonly');
+            } catch (e) {
+                db.close();
+                reject(e);
+                return;
+            }
+            const rq = tx.objectStore(OFFLINE_STORE).getAll();
+            rq.onsuccess = () => {
+                db.close();
+                resolve(rq.result || []);
+            };
+            rq.onerror = () => {
+                db.close();
+                reject(rq.error || new Error('SW IDB read failed'));
+            };
+        };
+        req.onerror = () => reject(req.error || new Error('SW IDB open failed'));
+    });
+}
+
+function swIdbDelete(id) {
+    return new Promise((resolve) => {
+        let req;
+        try {
+            req = self.indexedDB.open(OFFLINE_DB, 1);
+        } catch (e) {
+            resolve(false);
+            return;
+        }
+        req.onsuccess = () => {
+            const db = req.result;
+            let done = false;
+            const finish = () => {
+                if (!done) { done = true; try { db.close(); } catch (e2) {} resolve(true); }
+            };
+            try {
+                const tx = db.transaction(OFFLINE_STORE, 'readwrite');
+                tx.objectStore(OFFLINE_STORE).delete(id);
+                tx.oncomplete = finish;
+                tx.onerror = finish;
+                tx.onabort = finish;
+            } catch (e) {
+                finish();
+            }
+        };
+        req.onerror = () => resolve(false);
+    });
+}
+
+function swBuildFormData(item) {
+    const fd = new FormData();
+    const fields = item.fields || item.body || {};
+    Object.keys(fields).forEach((k) => {
+        const v = fields[k];
+        if (v === undefined || v === null || v === '') return;
+        if (Array.isArray(v)) {
+            v.forEach((x) => { if (x !== '' && x !== null && x !== undefined) fd.append(k, String(x)); });
+        } else {
+            fd.append(k, String(v));
+        }
+    });
+    const photos = Array.isArray(item.photos) ? item.photos : [];
+    photos.forEach((p, idx) => {
+        if (!p || !p.blob) return;
+        const name = p.name || ('photo-' + (idx + 1) + '.jpg');
+        const type = p.type || p.blob.type || 'image/jpeg';
+        let file = p.blob;
+        try {
+            file = new File([p.blob], name, { type });
+        } catch (e) {
+            file = p.blob;
+        }
+        if (idx === 0) {
+            fd.append('photo', file, name);
+            if (p.gps && p.gps.lat !== undefined && p.gps.lat !== null && p.gps.lat !== '') {
+                fd.append('photo_latitude', String(p.gps.lat));
+            }
+            if (p.gps && p.gps.lng !== undefined && p.gps.lng !== null && p.gps.lng !== '') {
+                fd.append('photo_longitude', String(p.gps.lng));
+            }
+        } else {
+            fd.append('extra_photos', file, name);
+            fd.append('extra_photos_latitude', (p.gps && p.gps.lat !== undefined && p.gps.lat !== null) ? String(p.gps.lat) : '');
+            fd.append('extra_photos_longitude', (p.gps && p.gps.lng !== undefined && p.gps.lng !== null) ? String(p.gps.lng) : '');
+        }
+    });
+    return fd;
+}
+
 async function syncOfflineRequests() {
     try {
-        // Get all clients (open tabs) to forward the sync operation
         const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        
-        // Post message to all clients to flush their offline queues
-        for (const client of clients) {
-            client.postMessage({
-                type: 'SYNC_OFFLINE_REQUESTS',
-            });
+
+        if (clients.length > 0) {
+            // A tab is open: it holds a fresh CSRF token, so let IT replay.
+            for (const client of clients) {
+                client.postMessage({ type: 'SYNC_OFFLINE_REQUESTS' });
+            }
+            console.log('[SW] Background sync forwarded to', clients.length, 'client(s)');
+            return;
         }
-        
-        // Also attempt direct fetch for any queued items in SW storage
-        // (as a fallback if no client is open)
-        const cache = await caches.open(CACHE_NAME);
-        const keys = await cache.keys();
-        
-        // Check for any pending request bodies stored in IndexedDB via SW
-        // (This is a fallback - primary sync happens via client message)
-        console.log('[SW] Background sync triggered for offline requests');
-        
+
+        // No tab open: replay directly from IndexedDB so closing the tab
+        // while offline no longer strands the report. Cookies ride along via
+        // credentials:include; the stored enqueue-time CSRF is best-effort
+        // (a page flush with a fresh token will retry anything we cannot).
+        let items = [];
+        try {
+            items = await swIdbAll();
+        } catch (e) {
+            console.warn('[SW] IDB read failed:', e);
+            return;
+        }
+        if (!items.length) return;
+
+        let flushed = 0;
+        for (const item of items) {
+            try {
+                const fd = swBuildFormData(item);
+                const headers = {};
+                if (item.csrf) headers['X-CSRFToken'] = item.csrf;
+                const res = await fetch(item.url || '/api/waste-requests/', {
+                    method: item.method || 'POST',
+                    credentials: 'include',
+                    headers,
+                    body: fd,
+                });
+                if (res.ok) {
+                    await swIdbDelete(item.id);
+                    flushed++;
+                } else if (res.status >= 400 && res.status <= 422) {
+                    // Permanent validation error — drop so it cannot jam later items.
+                    await swIdbDelete(item.id);
+                    console.warn('[SW] Dropping permanently rejected offline item', item.id, res.status);
+                }
+                // Else transient (401/403/5xx/network): keep for a page flush.
+            } catch (e) {
+                // Network still down — stop; the next sync event retries.
+                break;
+            }
+        }
+        console.log('[SW] Background sync direct replay flushed', flushed, 'item(s)');
     } catch (e) {
         console.error('[SW] Offline requests sync failed:', e);
     }

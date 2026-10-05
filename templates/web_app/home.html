@@ -1636,13 +1636,11 @@ function insertHomeRequestRow(req) {
 }
 
 // ── Submit Request ───────────────────────────────────────────────────────────
-// OFFLINE HANDLING: this only queues requests that have NO attached photos.
-// The offline queue (see base.html's OfflineQueue) only stores small JSON
-// bodies — a photo upload is a multipart FormData with binary file content,
-// which is a meaningfully bigger and riskier thing to persist in IndexedDB
-// and replay later (large payloads, stale files, partial uploads on retry).
-// That was scoped out as a stretch item earlier, so a request WITH photos
-// still requires a live connection to submit, same as before this change.
+// OFFLINE HANDLING: requests WITH photos are queued too. The queue
+// (see base.html's OfflineQueue v2) persists full entries — scalar fields +
+// photo blobs with per-photo GPS — in IndexedDB, then replays them as
+// multipart FormData when the network returns (page flush + SW Background
+// Sync direct replay, so closing the tab no longer loses the report).
 window.submitRequest = async function() {
     const address  = document.getElementById('pickup-address').value.trim();
     const btn      = document.getElementById('submit-btn');
@@ -1759,16 +1757,30 @@ window.submitRequest = async function() {
             '<span class="text-muted small">Set your location to auto-detect nearest checkpoint...</span>';
     }
 
-    // Queues the request via OfflineQueue (see base.html) instead of
-    // losing it. Only usable when there are no photos attached — see the
-    // note above submitRequest(). Returns true if it queued successfully.
+    // Queues the request via OfflineQueue v2 (see base.html) instead of
+    // losing it — WITH photo blobs. Returns true if it queued successfully.
     async function tryQueueOffline() {
-        if (hasPhotos) {
-            showToast(gettext('Photos can\'t be saved offline yet — remove the photo(s) to submit without one now, or wait until you\'re back online.'), 'warning');
+        if (!window.OfflineQueue || typeof window.OfflineQueue.enqueue !== 'function') {
             return false;
         }
 
-        const payload = {
+        // IndexedDB comfortably holds tens of MB, but a single report with
+        // many full-resolution photos can still exceed backend limits
+        // (20MB total / 3MB per photo) or device quota — guard before saving.
+        let totalBytes = 0;
+        try {
+            totalBytes = photoFiles.reduce(function (sum, item) {
+                return sum + ((item && item.file && item.file.size) || 0);
+            }, 0);
+        } catch (e) {
+            totalBytes = 0;
+        }
+        if (totalBytes > 20 * 1024 * 1024) {
+            showToast(gettext('Photos are too large to save offline (over 20MB). Please use smaller photos or wait until you\'re back online.'), 'warning');
+            return false;
+        }
+
+        const fields = {
             waste_type: document.getElementById('waste-type').value,
             pickup_address: address,
             scheduled_date: scheduledDate,
@@ -1778,35 +1790,56 @@ window.submitRequest = async function() {
             dropoff_checkpoint_id: checkpointId,
         };
         if (currentGuestToken) {
-            payload.guest_token = currentGuestToken;
+            fields.guest_token = currentGuestToken;
             const guestEmailField = document.getElementById('guest-email');
             const guestEmail = guestEmailField ? guestEmailField.value.trim() : '';
-            if (guestEmail) payload.guest_email = guestEmail;
+            if (guestEmail) fields.guest_email = guestEmail;
         }
 
-        // Cookie auth replays automatically when the queue flushes; we only
-        // need the CSRF token for the unsafe verb.
-        const headers = { 'X-CSRFToken': getCookie('csrftoken') };
-
+        // Snapshot photo blobs + per-photo GPS (rounded like the online path
+        // so backend decimal validation passes on replay).
+        const photos = [];
         try {
-            await OfflineQueue.enqueue({
-                url: '/api/waste-requests/',
-                method: 'POST',
-                headers,
-                body: payload,
-                label: `Pickup request (${payload.waste_type})`,
+            photoFiles.forEach(function (item, idx) {
+                if (!item || !item.file) return;
+                const blob = item.file.slice(0, item.file.size, item.file.type || 'image/jpeg');
+                photos.push({
+                    blob: blob,
+                    name: item.file.name || ('photo-' + (idx + 1) + '.jpg'),
+                    type: item.file.type || 'image/jpeg',
+                    gps: item.gps ? {
+                        lat: Number(item.gps.lat).toFixed(6),
+                        lng: Number(item.gps.lng).toFixed(6),
+                    } : null,
+                });
             });
         } catch (e) {
             showToast(gettext('Could not save offline — this device may not support offline storage.'), 'danger');
             return false;
         }
 
-        showToast(gettext('You\'re offline — saved and will submit automatically once you\'re back online.'), 'info');
+        try {
+            await window.OfflineQueue.enqueue({
+                url: '/api/waste-requests/',
+                method: 'POST',
+                fields: fields,
+                photos: photos,
+                label: `Pickup request (${fields.waste_type})`,
+            });
+        } catch (e) {
+            console.warn('Offline enqueue failed:', e);
+            showToast(gettext('Could not save offline — this device may not support offline storage.'), 'danger');
+            return false;
+        }
+
+        const photoNote = photos.length === 1 ? ' (1 photo)' : ' (' + photos.length + ' photos)';
+        showToast(gettext('You\'re offline — saved') + photoNote + gettext(' and will submit automatically once you\'re back online.'), 'info');
         resetFormAfterSubmit();
 
         // We don't have a server-assigned id yet, so we can't insert a real
-        // row into Recent Requests — it'll appear there once this syncs.
-        // The pending count is still safe to bump optimistically.
+        // row into Recent Requests — it'll appear there once this syncs
+        // (flush inserts rows + refreshes stats). The pending count is still
+        // safe to bump optimistically.
         if (IS_AUTHENTICATED) bumpStat('stat-pending-count', 1);
 
         return true;

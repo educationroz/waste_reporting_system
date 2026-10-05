@@ -1759,125 +1759,451 @@ document.addEventListener('click', function (e) {
 </script>
 
 <script nonce="{{ csp_nonce }}">
-    // ── OFFLINE SUBMISSION QUEUE ──────────────────────────────────────────
-    // Stores small JSON request bodies (no binary photo files — see the note
-    // in home.html's submitRequest) in localStorage so a citizen can still
-    // submit a pickup request while offline, then replays them automatically
-    // the moment the network is back. Home.html calls OfflineQueue.enqueue()
-    // for both the "already known offline" and "connection dropped mid-flight"
-    // paths. Replays ride the Django session cookie (with the CSRF token, which
-    // we capture at enqueue time — cookie auth replays transparently).
+    // ── OFFLINE SUBMISSION QUEUE v2 (IndexedDB + photos) ──────────────────
+    // Stores full pickup requests INCLUDING photo blobs in IndexedDB
+    // (localStorage cannot hold binary and caps at ~5MB), then replays them
+    // as multipart FormData the moment the network is back. Home.html calls
+    // OfflineQueue.enqueue() for both the "already known offline" and
+    // "connection dropped mid-flight" paths.
+    // Replays ride the Django session cookie; the CSRF token is re-read fresh
+    // at flush time (with the enqueue-time token as fallback) so an expired
+    // token does not strand the queue. The service worker (sw.js) can also
+    // replay directly from the same IndexedDB when no tab is open.
     // A failure here must never block the main flow, so every method swallows
-    // storage/parse errors and degrades gracefully.
-    //
-    // ENHANCEMENT: Uses Background Sync API (if available) for reliable
-    // cross-session replay even if user closes the tab while offline.
+    // storage errors and degrades gracefully.
     (function () {
-        const QK = 'offlineRequestQueue';
-        const TIMEOUT = 12000;
+        const DB_NAME = 'safhasahar-offline';
+        const DB_VERSION = 1;
+        const STORE = 'requests';
+        const LEGACY_QK = 'offlineRequestQueue';
         const SYNC_TAG = 'offline-requests-sync';
+        const FLUSH_TIMEOUT_MS = 60000;
+        let _flushing = false;
 
-        function read() {
-            try {
-                const raw = localStorage.getItem(QK);
-                const arr = raw ? JSON.parse(raw) : [];
-                return Array.isArray(arr) ? arr : [];
-            } catch (e) {
-                return [];
+        function openDB() {
+            return new Promise(function (resolve, reject) {
+                if (!('indexedDB' in window)) {
+                    reject(new Error('IndexedDB not supported'));
+                    return;
+                }
+                let req;
+                try {
+                    req = window.indexedDB.open(DB_NAME, DB_VERSION);
+                } catch (e) {
+                    reject(e);
+                    return;
+                }
+                req.onupgradeneeded = function () {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains(STORE)) {
+                        db.createObjectStore(STORE, { keyPath: 'id' });
+                    }
+                };
+                req.onsuccess = function () { resolve(req.result); };
+                req.onerror = function () { reject(req.error || new Error('IDB open failed')); };
+                req.onblocked = function () { reject(new Error('IDB blocked')); };
+            });
+        }
+
+        function idbAll() {
+            return openDB().then(function (db) {
+                return new Promise(function (resolve, reject) {
+                    let tx;
+                    try {
+                        tx = db.transaction(STORE, 'readonly');
+                    } catch (e) {
+                        db.close();
+                        reject(e);
+                        return;
+                    }
+                    const store = tx.objectStore(STORE);
+                    const rq = store.getAll();
+                    rq.onsuccess = function () {
+                        db.close();
+                        const arr = rq.result || [];
+                        arr.sort(function (a, b) {
+                            return String(a.ts || '').localeCompare(String(b.ts || ''));
+                        });
+                        resolve(arr);
+                    };
+                    rq.onerror = function () {
+                        db.close();
+                        reject(rq.error || new Error('IDB read failed'));
+                    };
+                });
+            });
+        }
+
+        function idbPut(item) {
+            return openDB().then(function (db) {
+                return new Promise(function (resolve, reject) {
+                    const tx = db.transaction(STORE, 'readwrite');
+                    const store = tx.objectStore(STORE);
+                    const rq = store.put(item);
+                    rq.onsuccess = function () { resolve(true); };
+                    rq.onerror = function () { reject(rq.error || new Error('IDB write failed')); };
+                    tx.oncomplete = function () { try { db.close(); } catch (e) {} };
+                    tx.onerror = function () { try { db.close(); } catch (e) {} };
+                });
+            });
+        }
+
+        function idbDelete(id) {
+            return openDB().then(function (db) {
+                return new Promise(function (resolve) {
+                    let done = false;
+                    const finish = function () {
+                        if (!done) { done = true; try { db.close(); } catch (e) {} resolve(true); }
+                    };
+                    try {
+                        const tx = db.transaction(STORE, 'readwrite');
+                        tx.objectStore(STORE).delete(id);
+                        tx.oncomplete = finish;
+                        tx.onerror = finish;
+                        tx.onabort = finish;
+                    } catch (e) {
+                        finish();
+                    }
+                });
+            });
+        }
+
+        // One-time migration of the old localStorage JSON-only queue.
+        async function migrateLegacy() {
+            let raw = null;
+            try { raw = localStorage.getItem(LEGACY_QK); } catch (e) { raw = null; }
+            if (!raw) return;
+            let arr = [];
+            try { arr = JSON.parse(raw) || []; } catch (e) { arr = []; }
+            if (!Array.isArray(arr) || !arr.length) {
+                try { localStorage.removeItem(LEGACY_QK); } catch (e) {}
+                return;
             }
+            for (const old of arr) {
+                try {
+                    const fields = (old && old.body) || {};
+                    await idbPut({
+                        id: String((old && old.id) || (Date.now() + Math.random())),
+                        ts: (old && old.ts) || new Date().toISOString(),
+                        url: (old && old.url) || '/api/waste-requests/',
+                        method: (old && old.method) || 'POST',
+                        fields: fields,
+                        photos: [],
+                        label: (old && old.label) || 'Pickup request',
+                        csrf: '',
+                    });
+                } catch (e) { /* keep going */ }
+            }
+            try { localStorage.removeItem(LEGACY_QK); } catch (e) {}
         }
-        function write(arr) {
-            try { localStorage.setItem(QK, JSON.stringify(arr)); }
-            catch (e) { /* storage full/unavailable — ignore */ }
+
+        function freshCsrf(fallback) {
+            try {
+                const live = window.getCookie ? window.getCookie('csrftoken') : '';
+                if (live) return live;
+            } catch (e) {}
+            return fallback || '';
         }
-        function getCsrfHeader() {
-            return { 'X-CSRFToken': (window.getCookie ? window.getCookie('csrftoken') : '') };
+
+        function buildFormData(item) {
+            const fd = new FormData();
+            const fields = item.fields || {};
+            Object.keys(fields).forEach(function (k) {
+                const v = fields[k];
+                if (v === undefined || v === null || v === '') return;
+                if (Array.isArray(v)) {
+                    v.forEach(function (x) { if (x !== '' && x !== null && x !== undefined) fd.append(k, String(x)); });
+                } else {
+                    fd.append(k, String(v));
+                }
+            });
+            const photos = Array.isArray(item.photos) ? item.photos : [];
+            photos.forEach(function (p, idx) {
+                if (!p || !p.blob) return;
+                const blob = p.blob;
+                const name = p.name || ('photo-' + (idx + 1) + '.jpg');
+                const type = p.type || blob.type || 'image/jpeg';
+                const file = (typeof File !== 'undefined')
+                    ? new File([blob], name, { type: type })
+                    : blob;
+                if (idx === 0) {
+                    fd.append('photo', file, name);
+                    if (p.gps && p.gps.lat !== undefined && p.gps.lat !== null && p.gps.lat !== '') {
+                        fd.append('photo_latitude', String(p.gps.lat));
+                    }
+                    if (p.gps && p.gps.lng !== undefined && p.gps.lng !== null && p.gps.lng !== '') {
+                        fd.append('photo_longitude', String(p.gps.lng));
+                    }
+                } else {
+                    fd.append('extra_photos', file, name);
+                    fd.append('extra_photos_latitude', (p.gps && p.gps.lat !== undefined && p.gps.lat !== null) ? String(p.gps.lat) : '');
+                    fd.append('extra_photos_longitude', (p.gps && p.gps.lng !== undefined && p.gps.lng !== null) ? String(p.gps.lng) : '');
+                }
+            });
+            return fd;
         }
 
         async function flushOne(item) {
-            const headers = Object.assign({ 'Content-Type': 'application/json' }, item.headers || {}, getCsrfHeader());
-            const res = await fetch(item.url, {
-                method: item.method || 'POST',
-                credentials: 'same-origin',
-                headers: headers,
-                body: JSON.stringify(item.body || {}),
-            });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            return res;
+            const controller = new AbortController();
+            const timer = setTimeout(function () { try { controller.abort(); } catch (e) {} }, FLUSH_TIMEOUT_MS);
+            try {
+                const fd = buildFormData(item);
+                const res = await fetch(item.url || '/api/waste-requests/', {
+                    method: item.method || 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'X-CSRFToken': freshCsrf(item.csrf) },
+                    body: fd,
+                    signal: controller.signal,
+                });
+                let data = null;
+                try {
+                    const ct = res.headers.get('content-type') || '';
+                    data = ct.includes('application/json') ? await res.json() : null;
+                } catch (e) { data = null; }
+                if (res.ok) return { ok: true, data: data };
+                if (res.status >= 400 && res.status <= 422) {
+                    // Permanent validation error — retrying will never help.
+                    let msg = '';
+                    try {
+                        if (data) {
+                            if (typeof data === 'string') msg = data;
+                            else if (data.error) msg = String(data.error);
+                            else if (data.detail) msg = String(data.detail);
+                            else {
+                                const firstKey = Object.keys(data)[0];
+                                const firstVal = data[firstKey];
+                                msg = firstKey + ': ' + (Array.isArray(firstVal) ? firstVal.join(', ') : String(firstVal));
+                            }
+                        }
+                    } catch (e) { msg = ''; }
+                    return { permanent: true, status: res.status, error: msg || ('Request rejected (HTTP ' + res.status + ')') };
+                }
+                throw new Error('HTTP ' + res.status);
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        function renderQueueBadge(count) {
+            try {
+                let note = document.getElementById('offline-queue-note');
+                if (!count || count <= 0) {
+                    if (note && note.parentNode) note.parentNode.removeChild(note);
+                    return;
+                }
+                const btn = document.getElementById('submit-btn');
+                if (!btn || !btn.parentNode) return;
+                if (!note) {
+                    note = document.createElement('div');
+                    note.id = 'offline-queue-note';
+                    note.className = 'alert alert-warning py-1 px-2 mt-2 mb-0 small';
+                    btn.parentNode.appendChild(note);
+                }
+                note.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>'
+                    + '<span>' + count + (count === 1 ? ' report waiting to sync' : ' reports waiting to sync')
+                    + ' — will auto-submit when you are back online.</span>';
+            } catch (e) { /* badge is best-effort */ }
+        }
+
+        async function refreshAfterFlush(insertedRows) {
+            try {
+                if (Array.isArray(insertedRows)) {
+                    for (const row of insertedRows) {
+                        try {
+                            if (row && row.id && typeof window.insertHomeRequestRow === 'function') {
+                                window.insertHomeRequestRow(row);
+                            } else if (row && row.id && typeof insertHomeRequestRow === 'function') {
+                                insertHomeRequestRow(row);
+                            }
+                        } catch (e) {}
+                    }
+                }
+            } catch (e) {}
+            try {
+                if (typeof window.refreshHomeStats === 'function') {
+                    await window.refreshHomeStats();
+                } else if (typeof refreshHomeStats === 'function') {
+                    await refreshHomeStats();
+                }
+            } catch (e) {}
+            try {
+                if (typeof window.reloadRecentRequests === 'function') {
+                    await window.reloadRecentRequests();
+                }
+            } catch (e) {}
+            try {
+                window.dispatchEvent(new CustomEvent('offline-queue-flushed', { detail: { flushed: insertedRows ? insertedRows.length : 0 } }));
+            } catch (e) {}
         }
 
         async function flush() {
-            let items = read();
-            if (!items.length) return;
-            const remaining = [];
-            let flushed = 0;
-            for (const item of items) {
+            if (_flushing) return;
+            // Serialise concurrent triggers (online event + load + SW message).
+            _flushing = true;
+            try {
+                try { await migrateLegacy(); } catch (e) {}
+                let items = [];
                 try {
-                    await flushOne(item);
-                    flushed++;
+                    items = await idbAll();
                 } catch (e) {
-                    remaining.push(item); // keep for a later retry
+                    return;
                 }
-            }
-            write(remaining);
-            if (flushed) {
-                if (typeof window.showToast === 'function') {
-                    window.showToast(gettext('You\'re back online — submitted ') + flushed + (flushed === 1 ? ' saved request.' : ' saved requests.'), 'success');
+                if (!items.length) {
+                    renderQueueBadge(0);
+                    return;
                 }
-                if (typeof window.bumpStat === 'function') {
-                    window.bumpStat('stat-pending-count', -flushed);
+                if (!navigator.onLine) {
+                    renderQueueBadge(items.length);
+                    return;
                 }
-                if (typeof window.reloadRecentRequests === 'function') {
-                    try { window.reloadRecentRequests(); } catch (e) {}
+                let flushed = 0;
+                const insertedRows = [];
+                const permanentErrors = [];
+                for (const item of items) {
+                    try {
+                        const r = await flushOne(item);
+                        if (r && r.ok) {
+                            await idbDelete(item.id);
+                            flushed++;
+                            if (r.data && r.data.id) insertedRows.push(r.data);
+                        } else if (r && r.permanent) {
+                            // Drop poison entries so one bad photo cannot jam the queue.
+                            await idbDelete(item.id);
+                            permanentErrors.push({ label: item.label, error: r.error });
+                        }
+                    } catch (e) {
+                        // Network/server-transient — keep for the next retry.
+                        if (e && e.name === 'AbortError') break;
+                    }
                 }
+                let remaining = 0;
+                try { remaining = (await idbAll()).length; } catch (e) { remaining = 0; }
+                renderQueueBadge(remaining);
+                if (flushed) {
+                    if (typeof window.showToast === 'function') {
+                        try {
+                            window.showToast(gettext('You\'re back online — submitted ') + flushed + (flushed === 1 ? ' saved request.' : ' saved requests.'), 'success');
+                        } catch (e) {
+                            window.showToast('You\'re back online — submitted ' + flushed + (flushed === 1 ? ' saved request.' : ' saved requests.'), 'success');
+                        }
+                    }
+                    await refreshAfterFlush(insertedRows);
+                }
+                if (permanentErrors.length && typeof window.showToast === 'function') {
+                    try {
+                        const first = permanentErrors[0];
+                        window.showToast(gettext('Error: ') + (first.error || 'A saved offline request was rejected.'), 'danger');
+                    } catch (e) {}
+                }
+            } finally {
+                _flushing = false;
             }
         }
 
         function registerBackgroundSync() {
             if ('serviceWorker' in navigator && 'SyncManager' in window) {
-                navigator.serviceWorker.ready.then(function(reg) {
-                    return reg.sync.register(SYNC_TAG);
-                }).catch(function(e) {
+                try {
+                    navigator.serviceWorker.ready.then(function (reg) {
+                        try {
+                            if (reg && reg.sync && reg.sync.register) {
+                                return reg.sync.register(SYNC_TAG);
+                            }
+                        } catch (e) {}
+                        return null;
+                    }).catch(function (e) {
+                        console.warn('Background sync registration failed:', e);
+                    });
+                } catch (e) {
                     console.warn('Background sync registration failed:', e);
-                });
+                }
             }
         }
 
         window.OfflineQueue = {
-            enqueue: function (entry) {
+            enqueue: async function (entry) {
+                const photos = Array.isArray(entry.photos) ? entry.photos : [];
+                const item = {
+                    id: String(Date.now()) + '-' + Math.random().toString(36).slice(2),
+                    ts: new Date().toISOString(),
+                    url: entry.url || '/api/waste-requests/',
+                    method: entry.method || 'POST',
+                    fields: entry.fields || entry.body || {},
+                    photos: photos,
+                    label: entry.label || 'Pickup request',
+                    csrf: '',
+                };
                 try {
-                    const items = read();
-                    items.push(Object.assign({ id: Date.now() + Math.random(), ts: new Date().toISOString() }, entry));
-                    write(items);
+                    item.csrf = window.getCookie ? window.getCookie('csrftoken') : '';
                 } catch (e) {
-                    return Promise.reject(e);
+                    item.csrf = '';
                 }
-                // Register background sync for reliable cross-session replay
+                await idbPut(item);
                 registerBackgroundSync();
-                // Don't block the caller; fire-and-forget a flush attempt if online.
-                if (navigator.onLine) { flush(); }
-                return Promise.resolve(true);
+                try {
+                    const all = await idbAll();
+                    renderQueueBadge(all.length);
+                } catch (e) {}
+                // Fire-and-forget a flush attempt if we look online.
+                if (navigator.onLine) {
+                    flush();
+                }
+                return true;
             },
-            getPendingCount: function () {
-                try { return read().length; } catch (e) { return 0; }
+            getPendingCount: async function () {
+                try {
+                    const all = await idbAll();
+                    return all.length;
+                } catch (e) {
+                    return 0;
+                }
             },
             flush: flush,
+            renderBadge: async function () {
+                try {
+                    const all = await idbAll();
+                    renderQueueBadge(all.length);
+                    return all.length;
+                } catch (e) {
+                    return 0;
+                }
+            },
         };
 
         // Replay when the browser reports we're back online.
         window.addEventListener('online', function () { flush(); });
-        // Also flush on page load in case the queue survived a tab close offline.
-        if (navigator.onLine) {
-            window.addEventListener('load', function () { setTimeout(flush, 800); });
-        }
+        // Also flush on page load (queue may have survived a tab close) and
+        // when the tab becomes visible again.
+        window.addEventListener('load', function () {
+            setTimeout(function () {
+                if (window.OfflineQueue && window.OfflineQueue.renderBadge) {
+                    window.OfflineQueue.renderBadge();
+                }
+                flush();
+            }, 800);
+        });
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden && navigator.onLine) flush();
+        });
 
         // Listen for background sync messages from service worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.addEventListener('message', function(event) {
-                if (event.data && event.data.type === 'SYNC_OFFLINE_REQUESTS') {
-                    flush();
-                }
-            });
+            try {
+                navigator.serviceWorker.addEventListener('message', function (event) {
+                    if (event.data && event.data.type === 'SYNC_OFFLINE_REQUESTS') {
+                        flush();
+                    }
+                    if (event.data && event.data.type === 'OFFLINE_FLUSHED') {
+                        const n = event.data.flushed || 0;
+                        if (n && typeof window.showToast === 'function') {
+                            try {
+                                window.showToast(gettext('You\'re back online — submitted ') + n + (n === 1 ? ' saved request.' : ' saved requests.'), 'success');
+                            } catch (e) {}
+                        }
+                        renderQueueBadge(0);
+                        refreshAfterFlush([]);
+                    }
+                });
+            } catch (e) {}
         }
     })();
 </script>
