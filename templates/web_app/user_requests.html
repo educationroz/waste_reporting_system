@@ -483,6 +483,19 @@
 {% endblock %}
 
 {% block extra_js %}
+{% comment %}
+FIX: json_script renders a complete <script type="application/json"> element.
+It must live OUTSIDE the main <script> block below. Nesting it inside another
+<script> made the browser end the main script at the first closing script tag,
+so the rest of the JS was printed on the page as plain text.
+
+json_script also escapes <, > and &, so a pickup address containing a literal
+closing-script tag cannot terminate the block (no stored XSS).
+{% endcomment %}
+{% if located_requests_json %}
+{{ located_requests_json|json_script:"located-requests-data" }}
+{% endif %}
+
 <script nonce="{{ csp_nonce }}">
 (function() {
     // ── Server-rendered data for JS features ──────────────────────────
@@ -644,6 +657,7 @@
         const list = (window._detailPhotos && window._detailPhotos[requestId]) || [];
         const imgs = document.querySelectorAll('#requests-tbody tr[id="request-row-' + requestId + '"] img, #requestDetailModal .gallery-modal-img');
         list.push.apply(list, Array.from(imgs).map(function(i){ return i.getAttribute('src'); }).filter(Boolean));
+        window._detailPhotos = window._detailPhotos || {};
         window._detailPhotos[requestId] = list;
         openLightboxAt(requestId, index);
     };
@@ -892,13 +906,6 @@
                 }).addTo(myMap);
 
                 {% if located_requests_json %}
-                {% comment %}
-                json_script escapes <, > and &, so a pickup address containing
-                a literal closing-script tag cannot terminate this block.
-                Inlining the JSON with the |safe filter (the old form here)
-                allowed stored XSS.
-                {% endcomment %}
-                {{ located_requests_json|json_script:"located-requests-data" }}
                 // Defensive parse: after htmx boosted navigations there can be
                 // two #located-requests-data nodes alive mid-swap (old + new),
                 // and getElementById may return the stale/detached one whose

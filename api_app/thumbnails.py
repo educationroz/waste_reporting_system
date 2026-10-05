@@ -53,8 +53,28 @@ def _parse_size(size):
         return None
 
 
-def _target_name(field_name, size_key, source_name):
-    """Build a stable cache path inside MEDIA_ROOT/thumbnails/."""
+def _target_name(field_name, size_key, source_name, extension=''):
+    """Build a stable cache path inside MEDIA_ROOT/thumbnails/.
+
+    ``extension`` (e.g. '.jpg') MUST be supplied for non-local backends:
+    Cloudinary classifies uploads by filename extension, and an
+    extensionless target would be stored as a ``raw`` resource whose URL no
+    browser can render as an image.
+    """
+    digest = hashlib.sha1(
+        f'{field_name}:{size_key}:{source_name}'.encode()
+    ).hexdigest()[:16]
+    base = source_name.rsplit('/', 1)[-1]
+    # Strip any stale extension from the source tail so the digest-named
+    # target carries exactly one, correct extension.
+    if '.' in base:
+        base = base.rsplit('.', 1)[0]
+    return f'thumbnails/{size_key}/{digest}-{base}{extension}'
+
+
+def _legacy_target_name(field_name, size_key, source_name):
+    """Pre-fix target path (no extension) — used only to clean up the
+    raw/upload thumbnails the old code produced."""
     digest = hashlib.sha1(
         f'{field_name}:{size_key}:{source_name}'.encode()
     ).hexdigest()[:16]
@@ -88,21 +108,32 @@ def get_or_create_thumbnail(file_field, size='100x100'):
     storage = file_field.storage
     source_name = file_field.name
     size_key = f'{width}x{height}'
-    target = _target_name(source_name, size_key, source_name)
+    # Candidate targets, one per encodable format. The source mode decides
+    # which one wins below; checking both first keeps the cache-hit path to
+    # cheap exists() calls with no image decode.
+    candidate_targets = {
+        'JPEG': _target_name(source_name, size_key, source_name, '.jpg'),
+        'PNG': _target_name(source_name, size_key, source_name, '.png'),
+    }
 
-    try:
-        if storage.exists(target):
-            return target
-    except Exception:  # noqa: BLE001 - storage glitch; fall through to regenerating
-        logger.warning('[THUMB] storage.exists failed for %s', target)
+    def _existing_target():
+        for candidate in candidate_targets.values():
+            try:
+                if storage.exists(candidate):
+                    return candidate
+            except Exception:  # noqa: BLE001 - storage glitch; try next candidate
+                logger.warning('[THUMB] storage.exists failed for %s', candidate)
+        return ''
 
-    lock = _thumbnail_lock(target)
+    hit = _existing_target()
+    if hit:
+        return hit
+
+    lock = _thumbnail_lock(size_key + ':' + source_name)
     with lock:
-        try:
-            if storage.exists(target):
-                return target
-        except Exception:  # noqa: BLE001 - race/tmpfs glitch; fall through to regenerating
-            logger.warning('[THUMB] storage.exists (locked) failed for %s', target)
+        hit = _existing_target()
+        if hit:
+            return hit
 
         try:
             with storage.open(source_name, 'rb') as src:
@@ -135,6 +166,7 @@ def get_or_create_thumbnail(file_field, size='100x100'):
 
         is_alpha = img.mode in ('RGBA', 'LA', 'P')
         out_format = 'PNG' if is_alpha else 'JPEG'
+        target = candidate_targets[out_format]
 
         src_w, src_h = img.size
         target_ratio = width / float(height)
@@ -167,6 +199,20 @@ def get_or_create_thumbnail(file_field, size='100x100'):
         except Exception as exc:  # noqa: BLE001 - fall back to the original on any failure
             logger.warning('[THUMB] storage.save failed for %s: %s', target, exc)
             return file_field.name
+        # Best-effort cleanup of the pre-fix artefacts: the old code saved
+        # the same thumbnail under an extensionless name, which Cloudinary
+        # stored as an unrenderable `raw` resource. The orphan lives under
+        # the RAW type, so plain exists()/delete() (which now correctly
+        # resolve thumbnails/ to IMAGE) cannot see it — the storage backend
+        # exposes a raw-type delete for exactly this case. Ignore all
+        # errors: the orphan is harmless, just wasted bytes.
+        try:
+            legacy = _legacy_target_name(source_name, size_key, source_name)
+            delete_raw = getattr(storage, 'delete_raw_resource', None)
+            if legacy != target and callable(delete_raw):
+                delete_raw(legacy)
+        except Exception:  # noqa: BLE001, S110 - cleanup must never break serving
+            pass
         return stored_name
 
 
