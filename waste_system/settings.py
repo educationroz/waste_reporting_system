@@ -89,7 +89,6 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # must be first
     'django.middleware.security.SecurityMiddleware',
-    'django_browser_reload.middleware.BrowserReloadMiddleware',  # Live reload
     'whitenoise.middleware.WhiteNoiseMiddleware',  # serves STATIC_ROOT in production
     'django.contrib.sessions.middleware.SessionMiddleware',
     # No cache for authenticated users — prevents stale cross-role HTML
@@ -113,6 +112,11 @@ MIDDLEWARE = [
     # CSP + hardening headers. Last so it sees the final response.
     'waste_system.security.SecurityHeadersMiddleware',
 ]
+
+# Live reload only in local dev — never in production/remote. It injects a
+# middleware + file watcher on every request for zero benefit outside DEBUG.
+if DEBUG:
+    MIDDLEWARE.insert(2, 'django_browser_reload.middleware.BrowserReloadMiddleware')
 
 ROOT_URLCONF = 'waste_system.urls'
 
@@ -177,7 +181,11 @@ else:
     CSRF_COOKIE_SECURE = True
 # Rolling expiry so an idle session eventually dies.
 SESSION_COOKIE_AGE = 60 * 60 * 12          # 12 hours
-SESSION_SAVE_EVERY_REQUEST = True          # refresh the window on activity
+# PERF: False saves one remote DB write on EVERY page load. With True, each
+# request UPDATEs the session row (a ~300-500ms round-trip to remote Postgres
+# from local dev). The 12h expiry above still applies; the window just isn't
+# refreshed on every single click.
+SESSION_SAVE_EVERY_REQUEST = False
 
 # ─── Content-Security-Policy ──────────────────────────────────────────────────
 # 'compat' → old permissive behaviour ('unsafe-inline' script-src).

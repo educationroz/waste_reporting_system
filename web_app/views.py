@@ -190,10 +190,18 @@ class UserRequestListView(LoginRequiredMixin, ListView):
 
         # Map view data: ALL of the user's located (non-deleted) requests,
         # not just the current page. Markers show status colour + address.
+        # PERF: capped at 500 markers + .only() so one user with years of
+        # history doesn't transfer the full table (photos/descriptions) over
+        # a remote DB link on every page load.
         located = (
             WasteRequest.objects
             .filter(user=self.request.user, is_deleted=False)
             .exclude(latitude__isnull=True, photo_latitude__isnull=True)
+            .only(
+                'latitude', 'longitude', 'photo_latitude', 'photo_longitude',
+                'status', 'waste_type', 'pickup_address', 'scheduled_date',
+            )
+            .order_by('-created_at')[:500]
         )
         located_data = []
         for req in located:
@@ -307,12 +315,17 @@ class ProfilePageView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         user = self.request.user
-        
-        ctx['user_total_requests'] = WasteRequest.objects.filter(user=user).count()
-        ctx['user_completed_requests'] = WasteRequest.objects.filter(user=user, status='completed').count()
-        ctx['user_pending_requests'] = WasteRequest.objects.filter(
-            user=user, status__in=['pending', 'assigned', 'in_progress']
-        ).count()
+
+        # PERF: one aggregate query instead of 3 separate COUNT(*) round-trips.
+        from django.db.models import Count, Q
+        req_stats = WasteRequest.objects.filter(user=user).aggregate(
+            total=Count('id'),
+            completed=Count('id', filter=Q(status='completed')),
+            pending=Count('id', filter=Q(status__in=['pending', 'assigned', 'in_progress'])),
+        )
+        ctx['user_total_requests'] = req_stats['total']
+        ctx['user_completed_requests'] = req_stats['completed']
+        ctx['user_pending_requests'] = req_stats['pending']
         ctx['user_complaints_count'] = Complaint.objects.filter(user=user).count()
         
         if user.role == 'driver':
@@ -421,17 +434,31 @@ def _requests_by_dimension(field, choices, label_field, count_field):
 
 def _zone_overview():
     """Aggregate counts of requests, drivers, and bins per zone for the
-    admin dashboard allocation panel."""
+    admin dashboard allocation panel.
+
+    PERF: 3 grouped queries total (was 3 queries × N zones = 15 queries).
+    On remote Postgres each round-trip costs hundreds of ms, so the old
+    loop added seconds to every uncached dashboard load.
+    """
     from django.db.models import Count
 
     choices = ZONE_CHOICES
+    req_counts = dict(
+        WasteRequest.objects.values('zone').annotate(c=Count('id')).values_list('zone', 'c')
+    )
+    driver_counts = dict(
+        Driver.objects.values('zone').annotate(c=Count('id')).values_list('zone', 'c')
+    )
+    bin_counts = dict(
+        Bin.objects.values('zone').annotate(c=Count('id')).values_list('zone', 'c')
+    )
     results = {}
     for key, label in choices:
         results[key] = {
             'label': label,
-            'requests': WasteRequest.objects.filter(zone=key).count(),
-            'drivers': Driver.objects.filter(zone=key).count(),
-            'bins': Bin.objects.filter(zone=key).count(),
+            'requests': req_counts.get(key, 0),
+            'drivers': driver_counts.get(key, 0),
+            'bins': bin_counts.get(key, 0),
         }
     return results
 

@@ -22,20 +22,26 @@ def system_branding(request):
     # A context processor runs on EVERY template render, so it must never raise:
     # an unreachable cache backend would otherwise turn a Redis blip into a
     # site-wide 500.
+    #
+    # PERF: single cache round-trip per page (was 3x cache.get + 3x cache.set).
+    # On remote Redis (e.g. Redis Cloud) each round-trip costs ~400-500ms from
+    # local dev, so 3 keys alone added ~1.4s to EVERY page load.
     defaults = {
         'site_branding_name': 'SafhaSahar',
         'site_branding_logo': '',
         'site_branding_tagline': 'Live Waste Reporting System',
     }
     try:
-        site_name = cache.get('site_branding_name')
-        site_logo = cache.get('site_branding_logo')
-        site_tagline = cache.get('site_branding_tagline')
+        branding = cache.get('site_branding')
     except Exception:  # noqa: BLE001 - cache backend unreachable
         logger.warning('system_branding: cache unavailable; using defaults.')
-        site_name, site_logo, site_tagline = None, None, None
+        branding = None
 
-    if site_name is None:
+    if isinstance(branding, dict) and branding:
+        site_name = branding.get('site_branding_name', 'SafhaSahar')
+        site_logo = branding.get('site_branding_logo', '')
+        site_tagline = branding.get('site_branding_tagline', 'Live Waste Reporting System')
+    else:
         try:
             from api_app.models import SystemSettings
             branding_setting = SystemSettings.objects.filter(key='site_branding').first()
@@ -54,9 +60,11 @@ def system_branding(request):
             site_tagline = 'Live Waste Reporting System'
 
         try:
-            cache.set('site_branding_name', site_name, 3600)
-            cache.set('site_branding_logo', site_logo, 3600)
-            cache.set('site_branding_tagline', site_tagline, 3600)
+            cache.set('site_branding', {
+                'site_branding_name': site_name,
+                'site_branding_logo': site_logo,
+                'site_branding_tagline': site_tagline,
+            }, 3600)
         except Exception:  # noqa: BLE001 - cache backend unreachable
             logger.warning('system_branding: could not write branding to cache.')
 
